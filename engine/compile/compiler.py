@@ -13,7 +13,7 @@ from markupsafe import Markup
 
 from ..config import STATIC
 from ..inputs import credit as image_credit, resolve_image
-from ..project import BuildContext, BuildError, Project
+from ..project import BuildContext, BuildError, Project, ffmpeg
 from ..spec import Site, is_scene
 from . import fonts, themes
 
@@ -59,6 +59,12 @@ def _knockout(im):
     return Image.fromarray(a.astype(np.uint8))
 
 
+def _translated(cfg: dict, base: dict, sec: dict) -> dict:
+    """A scene's config for a page in another language. Configs echo some spec fields verbatim (a type scene's text
+    and words); those take the translation's values, and everything built stays shared."""
+    return {k: sec[k] if k in base and k in sec and v == base[k] else v for k, v in cfg.items()}
+
+
 def runtime_ready() -> bool:
     return (STATIC / "runtime" / "index.js").exists()
 
@@ -83,33 +89,28 @@ def build_site(project: Project, log: Callable[[str], None] = print,
     dist.mkdir(parents=True, exist_ok=True)
     (dist / "assets").mkdir(exist_ok=True)
 
-    sections, credits = [], []
+    # Scenes are built once, from site.yaml; every language shares their media.
+    configs = {}
     scenes = [s for s in site.sections if is_scene(s)]
-    for i, sec in enumerate(site.sections):
-        entry = {"s": sec, "scene": is_scene(sec), "config": None,
-                 "sdata": sec.model_dump(mode="json", include={"hud", "steps", "layout", "length"}) if is_scene(sec) else None}
-        if entry["scene"]:
-            if only and sec.id != only:
-                prev = project.build / sec.id / "config.json"
-                if not prev.exists():
-                    raise BuildError(f"section {sec.id} has never been built; build it first")
-                entry["config"] = json.loads(prev.read_text())
-            else:
-                k = scenes.index(sec)
-                log(f"[{sec.id}] {sec.type}")
-                ctx = BuildContext(project, sec.id, log=log, force=force, options=options or {},
-                                   progress=lambda f, m="", k=k: progress((k + f) / max(len(scenes), 1), m))
-                cfg = builder_for(sec.type)(sec, ctx, theme)
-                (ctx.work / "config.json").write_text(json.dumps(cfg))
-                entry["config"] = cfg
-            web = project.build / sec.id / "web"
-            if web.exists():
-                dst = dist / "assets" / sec.id
-                if dst.exists():
-                    shutil.rmtree(dst)
-                shutil.copytree(web, dst)
-            credits += entry["config"].get("credits", [])
-        sections.append(entry)
+    for k, sec in enumerate(scenes):
+        if only and sec.id != only:
+            prev = project.build / sec.id / "config.json"
+            if not prev.exists():
+                raise BuildError(f"section {sec.id} has never been built; build it first")
+            configs[sec.id] = json.loads(prev.read_text())
+        else:
+            log(f"[{sec.id}] {sec.type}")
+            ctx = BuildContext(project, sec.id, log=log, force=force, options=options or {},
+                               progress=lambda f, m="", k=k: progress((k + f) / max(len(scenes), 1), m))
+            configs[sec.id] = builder_for(sec.type)(sec, ctx, theme)
+            (ctx.work / "config.json").write_text(json.dumps(configs[sec.id]))
+        web = project.build / sec.id / "web"
+        if web.exists():
+            dst = dist / "assets" / sec.id
+            if dst.exists():
+                shutil.rmtree(dst)
+            shutil.copytree(web, dst)
+    base_scenes = {sec.id: sec.model_dump(mode="json") for sec in scenes}
 
     # Block media given as project files are copied into the site; URLs pass through untouched.
     media = dist / "assets" / "_media"
@@ -123,14 +124,10 @@ def build_site(project: Project, log: Callable[[str], None] = print,
         media.mkdir(parents=True, exist_ok=True)
         shutil.copy(src, media / src.name)
         return f"assets/_media/{src.name}"
-    for e in sections:
-        if e["s"].type == "gallery":
-            e["s"] = e["s"].model_copy(update={"items": [it.model_copy(update={"image": publish(it.image), "video": publish(it.video)})
-                                                         for it in e["s"].items]})
 
     # Images inside blocks (hero, product, strip) can be files, URLs or generated; each is resized once to the
     # width it is shown at and written as WebP.
-    def block_image(ref, width: int, knockout: bool = False) -> Optional[str]:
+    def block_image(ref, width: int, credits: list, knockout: bool = False) -> Optional[str]:
         if ref is None:
             return None
         src = resolve_image(project, ref, log)
@@ -149,29 +146,25 @@ def build_site(project: Project, log: Callable[[str], None] = print,
         if image_credit(ref):
             credits.append(image_credit(ref))
         return f"assets/_media/{out.name}"
-    for i, e in enumerate(sections):
-        s = e["s"]
-        e["first"] = i == 0   # only the opening section gets the page's h1
-        e["backdrop"] = block_image(getattr(s, "backdrop", None), 2400)
-        if s.type == "hero":
-            e["img"], e["video"] = block_image(s.image, 2400), publish(s.video)
-            e["screen"] = block_image(s.device.image, 800) if s.device and s.device.image else None
-            e["clip"] = publish(s.device.video) if s.device and s.device.video else None
-        elif s.type == "product":
-            e["img"] = block_image(s.image, 1600, knockout=s.knockout and s.surface != "dark")
-            e["screen"] = block_image(s.device.image, 800) if s.device and s.device.image else None
-            e["clip"] = publish(s.device.video) if s.device and s.device.video else None
-            e["behind"] = block_image(s.behind.image, 800) if s.behind and s.behind.image else None
-            e["behind_clip"] = publish(s.behind.video) if s.behind and s.behind.video else None
-        elif s.type == "strip":
-            e["imgs"] = [block_image(it.image, 900) for it in s.items]
 
-    # CTA backgrounds can borrow a scene's final frame
-    finals = {e["s"].id: (e["config"] or {}).get("end") for e in sections if e["scene"]}
-    for e in sections:
-        bg = getattr(e["s"], "background", None)
-        if e["s"].type == "cta" and bg:
-            e["bg"] = finals.get(bg[6:]) if bg.startswith("scene:") else publish(bg)
+    # Clips inside blocks (a product's video) are re-encoded once for the web: H.264 no wider than they are shown,
+    # no sound, the index up front so they start playing before they have finished downloading.
+    def block_video(ref: Optional[str], width: int) -> Optional[str]:
+        if not ref or ref.startswith(("http://", "https://", "/", "assets/", "../")):
+            return ref
+        src = project.path(ref)
+        if not src.exists():
+            log(f"  note: {ref} not found, skipped")
+            return None
+        st = src.stat()
+        digest = hashlib.sha1(json.dumps([str(src), st.st_size, int(st.st_mtime), width, 1]).encode()).hexdigest()[:12]
+        out = media / f"{digest}.mp4"
+        if not out.exists():
+            media.mkdir(parents=True, exist_ok=True)
+            log(f"  {ref}: encoding for the web")
+            ffmpeg("-i", str(src), "-an", "-vf", f"scale='min({width},iw)':-2", "-c:v", "libx264", "-preset", "slow",
+                   "-crf", "27", "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(out), log=log)
+        return f"assets/_media/{out.name}"
 
     rt = dist / "runtime"
     if rt.exists():
@@ -188,13 +181,60 @@ def build_site(project: Project, log: Callable[[str], None] = print,
     env = _env()
     css_vars = themes.css_vars(theme, log)
     page_links = [{"label": p.title, "href": f"{p.slug}/"} for p in site.pages]
-    nav = nav_links(site) + [l for l, p in zip(page_links, site.pages) if p.nav]
-    html = env.get_template("site.html.j2").render(
-        site=site, sections=sections, theme=theme, css_vars=css_vars, logo=logo,
-        font_css=font_css, font_links=[] if font_css else links, nav_links=nav, page_links=page_links, credits=credits,
-        configs={e["s"].id: e["config"] for e in sections if e["scene"]},
-    )
-    (dist / "index.html").write_text(html, encoding="utf-8")
+    languages = [{"lang": site.lang, "href": "index.html"}] + [{"lang": t.lang, "href": f"{t.lang}.html"} for t in site.translations]
+
+    def render(s: Site, out: Path) -> list[dict]:
+        """One language's page from its spec: the scene configs built above, the blocks' media, the template."""
+        sections, credits = [], []
+        for i, sec in enumerate(s.sections):
+            e = {"s": sec, "scene": is_scene(sec), "config": None, "sdata": None,
+                 "first": i == 0}   # only the opening section gets the page's h1
+            if e["scene"]:
+                e["config"] = _translated(configs[sec.id], base_scenes[sec.id], sec.model_dump(mode="json"))
+                e["sdata"] = sec.model_dump(mode="json", include={"hud", "steps", "layout", "length"})
+                credits += e["config"].get("credits", [])
+            elif sec.type == "gallery":
+                e["s"] = sec.model_copy(update={"items": [it.model_copy(update={"image": publish(it.image), "video": publish(it.video)})
+                                                          for it in sec.items]})
+            sections.append(e)
+        for e in sections:
+            b = e["s"]
+            e["backdrop"] = block_image(getattr(b, "backdrop", None), 2400, credits)
+            if b.type == "hero":
+                e["img"], e["video"] = block_image(b.image, 2400, credits), publish(b.video)
+                e["screen"] = block_image(b.device.image, 800, credits) if b.device and b.device.image else None
+                e["clip"] = publish(b.device.video) if b.device and b.device.video else None
+            elif b.type == "product":
+                e["img"] = block_image(b.image, 1600, credits, knockout=b.knockout and b.surface != "dark" and not b.video)
+                e["video"] = block_video(b.video, 1600)
+                e["screen"] = block_image(b.device.image, 800, credits) if b.device and b.device.image else None
+                e["clip"] = publish(b.device.video) if b.device and b.device.video else None
+                e["behind"] = block_image(b.behind.image, 800, credits) if b.behind and b.behind.image else None
+                e["behind_clip"] = publish(b.behind.video) if b.behind and b.behind.video else None
+            elif b.type == "strip":
+                e["imgs"] = [block_image(it.image, 900, credits) for it in b.items]
+
+        # CTA backgrounds can borrow a scene's final frame
+        finals = {e["s"].id: (e["config"] or {}).get("end") for e in sections if e["scene"]}
+        for e in sections:
+            bg = getattr(e["s"], "background", None)
+            if e["s"].type == "cta" and bg:
+                e["bg"] = finals.get(bg[6:]) if bg.startswith("scene:") else publish(bg)
+
+        nav = nav_links(s) + [l for l, p in zip(page_links, s.pages) if p.nav]
+        html = env.get_template("site.html.j2").render(
+            site=s, sections=sections, theme=theme, css_vars=css_vars, logo=logo,
+            font_css=font_css, font_links=[] if font_css else links, nav_links=nav, page_links=page_links, credits=credits,
+            configs={e["s"].id: e["config"] for e in sections if e["scene"]},
+            languages=[dict(l, current=l["lang"] == s.lang) for l in languages] if len(languages) > 1 else [],
+        )
+        out.write_text(html, encoding="utf-8")
+        return nav
+
+    nav = render(site, dist / "index.html")
+    for t in site.translations:
+        render(project.load_translation(t), dist / f"{t.lang}.html")
+        log(f"{t.lang} -> {dist / f'{t.lang}.html'}")
 
     # Plain pages (privacy policy, support): Markdown set in the site's theme at /<slug>/. They live one
     # level down, so every site-relative link gets the `base` prefix.

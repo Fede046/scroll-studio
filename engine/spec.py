@@ -274,6 +274,7 @@ class Feature(Model):
     title: str
     body: Optional[str] = None
     meter: Optional[float] = Field(None, description="0-1 progress bar under the card")
+    href: Optional[str] = Field(None, description="Make the whole card a link (a repository, a case study)")
 
 
 class FeaturesBlock(BlockBase):
@@ -383,6 +384,9 @@ class ProductBlock(BlockBase):
                                                         "(multiply blend), so generate it 'on a plain white background'")
     knockout: bool = Field(True, description="Whiten the shot's light studio background (sampled from its edges) so "
                                              "the product floats on the panel instead of sitting in a grey box")
+    video: Optional[str] = Field(None, description="A clip shown in a rounded frame instead of the shot (a project file "
+                                                  "or URL; muted, looping). Files are re-encoded for the web, without "
+                                                  "sound; `image` is then its poster")
     device: Optional[Device] = None
     side: Literal["left", "right"] = Field("left", description="Which side the image goes on")
     pose: Literal["beside", "rise", "close", "lean", "pair", "turn"] = Field("beside", description=(
@@ -498,10 +502,19 @@ class Page(Model):
     nav: bool = Field(False, description="Also link it from the nav, after the section links")
 
 
+class Translation(Model):
+    """The site in another language, written to <lang>.html beside index.html with a language switch in the nav.
+    The file holds only what changes, laid over this spec: mappings merge key by key, sections are matched by id,
+    other lists of mappings (steps, items, buttons) item by item, and text or lists of plain values (a swap scene's
+    words) are replaced. Scenes are built once; their media is shared between languages."""
+    lang: str = Field(..., description="Language code, e.g. 'en'; also the switch label (EN)")
+    file: str = Field(..., description="Translation YAML relative to the project folder (site.en.yaml)")
+
+
 class Site(Model):
     name: str
     description: str = ""
-    lang: str = "en"
+    lang: str = Field("en", description="Language of site.yaml's copy (the html lang and the switch label)")
     theme: Theme = Field(default_factory=Theme)
     layout: Literal["flow", "stack"] = Field(
         "flow", description="flow: sections follow one another. stack: every section is a full-screen panel with "
@@ -512,6 +525,7 @@ class Site(Model):
     sections: list[Section]
     footer: Footer = Field(default_factory=Footer)
     pages: list[Page] = Field(default_factory=list, description="Plain Markdown pages beside the site (privacy, support)")
+    translations: list[Translation] = Field(default_factory=list, description="The site in other languages (see Translation)")
 
 
 def is_scene(section) -> bool:

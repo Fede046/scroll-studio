@@ -17,7 +17,7 @@ from typing import Any, Callable, Optional
 import yaml
 
 from .config import settings
-from .spec import Site
+from .spec import Site, Translation
 
 
 class BuildError(RuntimeError):
@@ -32,6 +32,27 @@ def file_key(path: Path) -> dict:
 
 def _hash(obj: Any) -> str:
     return hashlib.sha1(json.dumps(obj, sort_keys=True, default=str).encode()).hexdigest()[:16]
+
+
+def overlay(base: Any, over: Any, where: str = "spec") -> Any:
+    """Lay a translation over a spec: mappings merge key by key, sections match by id, other lists of mappings
+    item by item (a shorter list leaves the rest as they are), and anything else is replaced."""
+    if isinstance(base, dict) and isinstance(over, dict):
+        return {**base, **{k: overlay(base[k], v, f"{where}.{k}") if k in base else v for k, v in over.items()}}
+    if isinstance(base, list) and isinstance(over, list) and base and all(isinstance(x, dict) for x in base + over):
+        if where == "spec.sections":
+            ids = {s["id"]: i for i, s in enumerate(base) if s.get("id")}
+            out = list(base)
+            for s in over:
+                if s.get("id") not in ids:
+                    raise BuildError(f"translation: section '{s.get('id')}' is not in site.yaml (sections are matched by id)")
+                i = ids[s["id"]]
+                out[i] = overlay(base[i], s, f"{where}.{s['id']}")
+            return out
+        if len(over) > len(base):
+            raise BuildError(f"translation: {where} has {len(over)} items, site.yaml has {len(base)}")
+        return [overlay(b, o, f"{where}[{i}]") for i, (b, o) in enumerate(zip(base, over))] + base[len(over):]
+    return over
 
 
 class Project:
@@ -55,6 +76,17 @@ class Project:
 
     def load(self) -> Site:
         return Site.model_validate(self.raw())
+
+    def load_translation(self, t: Translation) -> Site:
+        """The site in another language: the translation file laid over site.yaml."""
+        src = self.path(t.file)
+        if not src.exists():
+            raise BuildError(f"translation '{t.lang}': {t.file} not found")
+        with open(src, encoding="utf-8") as f:
+            over = yaml.safe_load(f) or {}
+        data = overlay(self.raw(), over)
+        data["lang"], data["translations"] = t.lang, []
+        return Site.model_validate(data)
 
     def save(self, data: dict | Site) -> None:
         if isinstance(data, Site):
