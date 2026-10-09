@@ -319,6 +319,8 @@ class CtaBlock(BlockBase):
     kicker: Optional[str] = None
     title: str
     button: Optional[Link] = None
+    buttons: list[Link] = Field(default_factory=list, description="Several buttons in a row instead of `button` "
+                                                                  "(e.g. email, LinkedIn); the first is the primary one")
     background: Optional[str] = Field(None, description="'scene:<id>' uses that scene's last frame, or an image path")
 
 
@@ -384,6 +386,8 @@ class ProductBlock(BlockBase):
                                                         "(multiply blend), so generate it 'on a plain white background'")
     knockout: bool = Field(True, description="Whiten the shot's light studio background (sampled from its edges) so "
                                              "the product floats on the panel instead of sitting in a grey box")
+    frame: bool = Field(False, description="Show the image as a photograph in a rounded frame (a portrait, a place) "
+                                          "rather than a cut-out product shot: no knockout, no feathered edges")
     video: Optional[str] = Field(None, description="A clip shown in a rounded frame instead of the shot (a project file "
                                                   "or URL; muted, looping). Files are re-encoded for the web, without "
                                                   "sound; `image` is then its poster")

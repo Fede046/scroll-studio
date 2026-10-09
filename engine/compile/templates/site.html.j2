@@ -36,6 +36,12 @@
   .ss-product__clip { display: block; width: 100%; height: auto; max-height: 68vh; object-fit: cover; border-radius: 18px; background: #000;
     border: 1px solid var(--line); box-shadow: 0 50px 100px -50px rgba(0, 0, 0, .7); transform: translateY(calc(var(--float, 0) * -36px)); }
   @media (max-width: 900px) { .ss-product__clip { max-height: 52vh; } }
+  /* ...and show a photograph whole in the same frame (ProductBlock.frame): the box follows the photo's own shape. */
+  .ss-product__img--frame { width: auto; max-width: 100%; height: auto; -webkit-mask: none; mask: none; mix-blend-mode: normal;
+    border-radius: 18px; border: 1px solid var(--line); box-shadow: 0 50px 100px -50px rgba(0, 0, 0, .7); }
+  /* A CTA with several buttons centres them in one row. */
+  .ss-cta .ss-btns { justify-content: center; margin-top: 44px; }
+  .ss-cta .ss-btns .ss-btn { margin-top: 0; }
   /* A feature card with an href is a link: an arrow after the title, the title takes the accent on hover. */
   .ss-feature--link h3::after { content: " ↗"; font-size: .7em; color: var(--ink-3); transition: color .3s; }
   .ss-feature--link:hover h3::after { color: var(--accent); }

@@ -205,7 +205,7 @@ def build_site(project: Project, log: Callable[[str], None] = print,
                 e["screen"] = block_image(b.device.image, 800, credits) if b.device and b.device.image else None
                 e["clip"] = publish(b.device.video) if b.device and b.device.video else None
             elif b.type == "product":
-                e["img"] = block_image(b.image, 1600, credits, knockout=b.knockout and b.surface != "dark" and not b.video)
+                e["img"] = block_image(b.image, 1600, credits, knockout=b.knockout and b.surface != "dark" and not (b.video or b.frame))
                 e["video"] = block_video(b.video, 1600)
                 e["screen"] = block_image(b.device.image, 800, credits) if b.device and b.device.image else None
                 e["clip"] = publish(b.device.video) if b.device and b.device.video else None
