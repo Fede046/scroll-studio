@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import { resolve } from "node:path";
 
 // Builds the browser runtime into the engine, where the site compiler copies it into every dist/.
+// public/ (the licence notice) is copied in beside the bundle.
 export default defineConfig({
   build: {
     outDir: resolve(__dirname, "../engine/compile/static/runtime"),

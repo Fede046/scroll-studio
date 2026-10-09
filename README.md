@@ -37,7 +37,9 @@ site.yaml ──► studio build ──► dist/  (plain static files: host anyw
 Make previews for any project with
 `studio previews <project> ... --out <folder>` (a video and a poster each), or a single poster at a chosen
 moment with `studio poster <project> --at <scene>:<progress> --out poster.jpg`. Previews stay out of git. To put several built sites online together (GitHub Pages or any static host):
-`studio publish <project> ... --out <folder> --home showcase`.
+`studio publish <project> ... --out <folder> --home showcase`. For a single site at the root of its own repo
+(a personal site on GitHub Pages, served from `docs/`): `studio publish <project> --out <repo>/docs --flat`.
+Every site carries Scroll Studio's licence notice in `runtime/LICENSE.txt`, so a visible credit is optional.
 
 The [showcase site](examples/showcase/site.yaml) puts every example on one page with its preview.
 

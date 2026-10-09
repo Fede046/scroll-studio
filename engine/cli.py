@@ -145,7 +145,9 @@ def poster(name: str, at: str = typer.Option(..., help="scene:progress (e.g. stu
 
 @app.command()
 def publish(names: list[str], out: Path = typer.Option(..., help="Folder to deploy (e.g. a GitHub Pages repo)"),
-            home: Optional[str] = typer.Option(None, help="Project whose page becomes the folder's index.html")):
+            home: Optional[str] = typer.Option(None, help="Project whose page becomes the folder's index.html"),
+            flat: bool = typer.Option(False, help="Publish one project at the folder's root instead of out/<project>/ "
+                                                  "(a personal site; e.g. the docs/ folder GitHub Pages serves)")):
     """Assemble built projects into one static folder: out/<project>/... ready for GitHub Pages or any host.
 
     Cross-links between projects written as ../<project>/dist/ (how the showcase gallery links locally) are
@@ -156,6 +158,21 @@ def publish(names: list[str], out: Path = typer.Option(..., help="Folder to depl
     for r in roots:
         if not (r / "dist" / "index.html").exists():
             raise typer.BadParameter(f"{r.name} is not built: run studio build first")
+    if flat:
+        # The folder is replaced by the site, so it must be one made for it: never a repository or project root.
+        if len(roots) != 1 or home:
+            raise typer.BadParameter("--flat publishes exactly one project, without --home")
+        if (out / ".git").exists() or (out / "site.yaml").exists() or out.resolve() == (roots[0] / "dist").resolve():
+            raise typer.BadParameter(f"{out} is a repository, project or dist folder: publish into a subfolder such as docs/")
+        cname = (out / "CNAME").read_text() if (out / "CNAME").exists() else None   # a custom domain survives
+        if out.exists():
+            shutil.rmtree(out)
+        shutil.copytree(roots[0] / "dist", out)
+        (out / ".nojekyll").write_text("")
+        if cname:
+            (out / "CNAME").write_text(cname)
+        typer.echo(f"published {roots[0].name} to {out}")
+        return
     out.mkdir(parents=True, exist_ok=True)
     # Any sibling project, not just the ones in this call: republishing one site must not break its links
     # to sites published earlier.

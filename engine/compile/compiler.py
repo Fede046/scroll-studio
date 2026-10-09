@@ -114,6 +114,7 @@ def build_site(project: Project, log: Callable[[str], None] = print,
 
     # Block media given as project files are copied into the site; URLs pass through untouched.
     media = dist / "assets" / "_media"
+    used: set[str] = set()   # media files the pages refer to; the rest is pruned after rendering
     def publish(ref):
         if not ref or ref.startswith(("http://", "https://", "/", "assets/", "../")):
             return ref
@@ -123,6 +124,7 @@ def build_site(project: Project, log: Callable[[str], None] = print,
             return None
         media.mkdir(parents=True, exist_ok=True)
         shutil.copy(src, media / src.name)
+        used.add(src.name)
         return f"assets/_media/{src.name}"
 
     # Images inside blocks (hero, product, strip) can be files, URLs or generated; each is resized once to the
@@ -145,6 +147,7 @@ def build_site(project: Project, log: Callable[[str], None] = print,
             im.save(out, "WEBP", quality=86, method=6)
         if image_credit(ref):
             credits.append(image_credit(ref))
+        used.add(out.name)
         return f"assets/_media/{out.name}"
 
     # Clips inside blocks (a product's video) are re-encoded once for the web: H.264 no wider than they are shown,
@@ -164,6 +167,7 @@ def build_site(project: Project, log: Callable[[str], None] = print,
             log(f"  {ref}: encoding for the web")
             ffmpeg("-i", str(src), "-an", "-vf", f"scale='min({width},iw)':-2", "-c:v", "libx264", "-preset", "slow",
                    "-crf", "27", "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(out), log=log)
+        used.add(out.name)
         return f"assets/_media/{out.name}"
 
     rt = dist / "runtime"
@@ -235,6 +239,12 @@ def build_site(project: Project, log: Callable[[str], None] = print,
     for t in site.translations:
         render(project.load_translation(t), dist / f"{t.lang}.html")
         log(f"{t.lang} -> {dist / f'{t.lang}.html'}")
+
+    # Media left from earlier builds (a photo swapped, a crop changed, a clip re-encoded) would ship with the site.
+    if media.exists():
+        for f in media.iterdir():
+            if f.name not in used:
+                f.unlink()
 
     # Plain pages (privacy policy, support): Markdown set in the site's theme at /<slug>/. They live one
     # level down, so every site-relative link gets the `base` prefix.
