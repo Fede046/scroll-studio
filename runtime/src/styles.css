@@ -78,7 +78,7 @@ blockquote { hanging-punctuation: first last; }
 .js .ss-caption.ss-on, .js .ss-caption.ss-off { visibility: visible; }
 .ss-caption.ss-on .ss-w > span { transform: none; }
 .ss-caption.ss-on .ss-eyebrow span, .ss-caption.ss-on .ss-eyebrow i, .ss-caption.ss-on .ss-body { opacity: 1; }
-.ss-caption.ss-off .ss-w > span { transform: translateY(-110%); transition-duration: .5s; transition-delay: 0s !important; }
+.ss-caption.ss-off .ss-w > span { transform: translateY(-140%); transition-duration: .5s; transition-delay: 0s !important; }
 .ss-caption.ss-off .ss-eyebrow span, .ss-caption.ss-off .ss-eyebrow i, .ss-caption.ss-off .ss-body { opacity: 0; transition-delay: 0s; }
 .ss-cue { position: absolute; left: 50%; bottom: 12vh; transform: translateX(-50%); font-family: var(--font-mono); font-size: 12px; letter-spacing: .2em; text-transform: uppercase; color: var(--ink-2); }
 .ss-outro { position: absolute; inset: 0; background: var(--bg); opacity: 0; pointer-events: none; }

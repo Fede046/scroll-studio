@@ -1,0 +1,96 @@
+# Feel: what a landing page can be. A story film told in beats (each a Z-Image still brought to life by LTX-2.3 on a
+# local GPU), every sentence its own shot: laughter, pain, love, hate, longing. It ends on the showcase.
+#   studio build examples/feel        (needs ComfyUI with Z-Image and LTX-2.3; about 5 minutes a beat on an RTX 4090)
+name: Scroll Studio
+description: A landing page is the door to a world. Scroll Studio makes the ones people feel.
+theme:
+  preset: night
+  colors: { bg: "#070707", accent: "#ff7a3d", accent2: "#ffb27a" }
+  fonts: { display: Fraunces, body: Inter, mono: JetBrains Mono }
+  display_weight: 500
+  display_italic_em: true
+nav:
+  cta: { label: The showcase, href: ../showcase/dist/index.html }
+sections:
+  - id: story
+    type: film
+    layout: overlay
+    length: 26
+    cue: Scroll
+    beat_res: [1920, 1088]
+    beats:
+      - id: door
+        seconds: 5
+        prompt: A weathered wooden door standing alone in the middle of an endless pale desert at dusk, no walls around it, slightly ajar, warm golden light spilling through the gap onto the sand, a few dry leaves on the ground, vast empty dunes, deep blue sky, cinematic wide shot, anamorphic 35mm film, photoreal
+        motion: the door slowly swings open toward the camera, warm golden light floods out and leaves swirl through the doorway on the wind, the camera pushes slowly toward the open door
+      - id: book
+        seconds: 4
+        prompt: An old open book lying on a wooden desk by a tall window, soft morning light, dust floating in the light beams, the pages slightly lifting at the edges, shallow depth of field, cinematic, photoreal
+        motion: the pages flutter, tear free one by one and rise into the air, turning into a flock of white birds that fly up and out of the frame, the camera tilts up following them
+      - id: laugh
+        seconds: 4
+        seed: 11
+        prompt: A fluffy golden retriever puppy in a sunny backyard mid-pounce into a huge pile of orange autumn leaves, ears flopping, tongue out, joyful, warm afternoon light, shallow depth of field, photoreal
+        motion: the puppy leaps into the leaf pile, tumbles over clumsily onto its back and pops up again with a leaf stuck on its head, tail wagging, leaves flying everywhere
+      - id: hurt
+        seconds: 5
+        prompt: An elderly man sitting alone at a small kitchen table at night, rain streaking the window behind him, two teacups on the table, the one across from him untouched in front of an empty chair, a single warm lamp, quiet grief, cinematic, photoreal
+        motion: he slowly reaches across the table and rests his hand beside the untouched teacup, then lowers his head, rain runs down the window, the camera stays almost still
+      - id: love
+        seconds: 5
+        prompt: An elderly couple slow dancing barefoot in a warm living room at golden hour, foreheads touching, eyes closed, soft sunlight through sheer curtains, a record player in the background, tender, cinematic, photoreal
+        motion: they sway slowly together and he gently turns her, she smiles with her eyes closed, the curtains drift in the breeze, the camera circles slowly around them
+      - id: charge
+        seconds: 5
+        seed: 21
+        prompt: Two vast armies of ancient Spartan hoplites charging toward each other across a dusty plain, bronze helmets with red horsehair crests, round bronze shields, long spears, red cloaks, thousands of soldiers in tight ranks, towering dust clouds, a dark stormy sky, epic aerial wide shot, cinematic, photoreal
+        motion: both armies sprint toward each other, spears lowering, red cloaks streaming, dust billowing behind them, the gap between the two front lines closing fast, the camera flies low and fast over the field
+      - id: meet
+        seconds: 4
+        seed: 31
+        prompt: Wide side-on shot at ground level of a vast dusty plain, on the left an army of ancient Greek hoplites with red cloaks and round bronze shields charging to the right, on the right an opposing army of hoplites charging to the left, the two front lines a few steps apart in the centre of the frame, spears levelled, thousands of soldiers stretching into the distance, dark storm clouds, epic, cinematic, photoreal
+        motion: the two armies run into each other and the front lines smash together shield against shield in the centre of the frame, a huge burst of dust and splinters explodes upward along the line of impact, the ranks behind push forward, slow motion
+      - id: clash
+        seconds: 4
+        seed: 21
+        prompt: The front lines of two ancient Greek hoplite armies colliding shield to shield, bronze shields with painted emblems slamming together, red cloaks, bronze helmets, dust and splinters exploding into the air, low-angle shot in the middle of the battle line, intense, cinematic, photoreal
+        motion: the two shield walls crash together with tremendous force, dust and splinters burst outward, the soldiers push and strain against each other, dramatic slow motion
+      - id: feel
+        seconds: 4
+        seed: 9
+        prompt: A dark cinema audience lit only by the flickering glow of the screen, rows of faces, a young woman in the centre with tears on her cheeks and a small smile, holding a plain red and white striped paper popcorn bucket with no logo and no text, cinematic, photoreal
+        motion: the light from the screen flickers across the faces, she wipes a tear and laughs softly, the camera pushes in slowly toward her
+      - id: missing
+        seconds: 5
+        prompt: A lone young man standing perfectly still on a crowded subway platform at night while commuters rush past him, he looks up at a huge glowing billboard of a vast turquoise ocean under a bright sky, cold fluorescent light, cinematic, photoreal
+        motion: commuters stream past him in motion blur, he stays perfectly still looking up at the glowing ocean, the light of the billboard on his face, the camera pushes slowly toward him
+      - id: world
+        seconds: 5
+        prompt: Looking through a wide open wooden door standing alone in a dark desert at night into a radiant world on the other side, a sunlit green valley with a river and a golden sky, warm light pouring out across the sand, cinematic, photoreal
+        motion: the camera glides forward through the open doorway into the bright sunlit valley, warm light washing over everything
+    steps:
+      - kicker: Scroll Studio
+        title: A landing page is the door <em>to a world.</em>
+        intro: true
+        state: { beat: door }
+      - title: Not a page. <em>A story.</em>
+        state: { beat: book }
+      - title: One that makes you <em>laugh.</em>
+        state: { beat: laugh }
+      - title: One that makes it <em>hurt.</em>
+        state: { beat: hurt }
+      - title: One that makes you <em>love.</em>
+        state: { beat: love }
+      - title: One that makes you <em>hate.</em>
+        state: { beat: charge }
+      - title: Everyone should <em>feel something.</em>
+        state: { beat: feel }
+      - title: Something missing <em>from their life.</em>
+        state: { beat: missing }
+      - title: That's what <em>Scroll Studio</em> does.
+        state: { beat: world }
+  - type: cta
+    kicker: Every frame above was made on one local GPU and built from one file
+    title: See what it <em>can do.</em>
+    button: { label: Open the showcase, href: ../showcase/dist/index.html }
+footer: { left: "Scroll Studio · AGPL-3.0", right: "Made with Scroll Studio" }
