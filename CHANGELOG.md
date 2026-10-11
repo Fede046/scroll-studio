@@ -8,6 +8,7 @@ commits it spans so you can check out any earlier state (`git checkout <commit>`
 ### Added
 - `film` with `beats:`: a story told in shots. Each beat is a generated still animated by LTX-2.3, cached on its own and
   crossfaded into the next; captions pin to beats (`state: { beat: … }`). Example: Feel.
+  Beats take `strength`, `motion_seed` and `trim` for action shots that freeze on their first frame.
 - `code` scene: fly through a codebase in live 3D following an agent at work. It opens on the agent's prompt box and
   dives through it; read files line a corridor, edits apply their diffs as you scroll, a run prints its output, a status
   bar ticks off the todo list, and captions pin themselves to files (`state: { file: … }`). Text stays real and readable.
@@ -30,6 +31,7 @@ commits it spans so you can check out any earlier state (`git checkout <commit>`
   lines take less scroll, and moves between views are short, so no screen is empty paper.
 
 ### Fixed
+- An animation re-rendered shorter than before no longer keeps the old render's trailing frames.
 - `studio looks` refreshes the site's runtime, so rebuilding only the looks never runs a stale one.
 
 ## 3.0.0 · 2026-10-10

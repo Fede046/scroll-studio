@@ -21,8 +21,9 @@ sections:
     beats:
       - id: door
         seconds: 5
-        prompt: A weathered wooden door standing alone in the middle of an endless pale desert at dusk, no walls around it, slightly ajar, warm golden light spilling through the gap onto the sand, a few dry leaves on the ground, vast empty dunes, deep blue sky, cinematic wide shot, anamorphic 35mm film, photoreal
-        motion: the door slowly swings open toward the camera, warm golden light floods out and leaves swirl through the doorway on the wind, the camera pushes slowly toward the open door
+        seed: 17
+        prompt: "Cinematic wide shot, perfectly centred symmetrical composition: a tall old wooden door in a simple frame standing alone on the crest of a vast desert dune at golden hour, the door is half open and through the doorway a glowing lush green valley with a waterfall and bright daylight is visible, a magical portal to another world, long shadows across rippled sand, dramatic towering clouds lit orange and pink, epic sense of scale, anamorphic lens, Roger Deakins cinematography, photoreal"
+        motion: the camera slowly pushes in toward the open doorway, the waterfall in the valley beyond flows and glitters, warm light glows out of the doorway onto the sand, the clouds drift slowly, everything calm, no smoke, no dust
       - id: book
         seconds: 4
         prompt: An old open book lying on a wooden desk by a tall window, soft morning light, dust floating in the light beams, the pages slightly lifting at the edges, shallow depth of field, cinematic, photoreal
@@ -40,21 +41,19 @@ sections:
         seconds: 5
         prompt: An elderly couple slow dancing barefoot in a warm living room at golden hour, foreheads touching, eyes closed, soft sunlight through sheer curtains, a record player in the background, tender, cinematic, photoreal
         motion: they sway slowly together and he gently turns her, she smiles with her eyes closed, the curtains drift in the breeze, the camera circles slowly around them
-      - id: charge
+      - id: standoff
         seconds: 5
-        seed: 21
-        prompt: Two vast armies of ancient Spartan hoplites charging toward each other across a dusty plain, bronze helmets with red horsehair crests, round bronze shields, long spears, red cloaks, thousands of soldiers in tight ranks, towering dust clouds, a dark stormy sky, epic aerial wide shot, cinematic, photoreal
-        motion: both armies sprint toward each other, spears lowering, red cloaks streaming, dust billowing behind them, the gap between the two front lines closing fast, the camera flies low and fast over the field
-      - id: meet
-        seconds: 4
-        seed: 31
-        prompt: Wide side-on shot at ground level of a vast dusty plain, on the left an army of ancient Greek hoplites with red cloaks and round bronze shields charging to the right, on the right an opposing army of hoplites charging to the left, the two front lines a few steps apart in the centre of the frame, spears levelled, thousands of soldiers stretching into the distance, dark storm clouds, epic, cinematic, photoreal
-        motion: the two armies run into each other and the front lines smash together shield against shield in the centre of the frame, a huge burst of dust and splinters explodes upward along the line of impact, the ranks behind push forward, slow motion
-      - id: clash
-        seconds: 4
-        seed: 21
-        prompt: The front lines of two ancient Greek hoplite armies colliding shield to shield, bronze shields with painted emblems slamming together, red cloaks, bronze helmets, dust and splinters exploding into the air, low-angle shot in the middle of the battle line, intense, cinematic, photoreal
-        motion: the two shield walls crash together with tremendous force, dust and splinters burst outward, the soldiers push and strain against each other, dramatic slow motion
+        seed: 19
+        prompt: "Cinematic wide shot in pouring rain on a muddy medieval battlefield at dusk: two armoured knights in full steel plate armour stand facing each other in the centre, swords drawn, ten paces apart, behind each knight his army lined up in long ranks with banners and spears, one army in red surcoats on the left, the other in blue on the right, rain streaking through cold grey light, puddles reflecting the sky, epic, Game of Thrones cinematography, photoreal"
+        motion: heavy rain pours down, the two knights raise their swords and step slowly toward each other, the soldiers in the ranks watch in silence, banners whip in the wind, the camera pushes slowly down the corridor between the ranks toward the knights
+      - id: blows
+        seconds: 6
+        seed: 29
+        strength: 0.75
+        motion_seed: 3
+        trim: 3.1
+        prompt: "Cinematic medium-wide shot of a sword duel between two knights in full steel plate armour in heavy rain on a muddy field, the knight in a red surcoat on the left lifting his longsword high above his head about to strike, the knight in a blue surcoat on the right bracing with his sword raised to block, two paces apart, rain streaking down, mud on their greaves, ranks of soldiers blurred far behind them, dramatic cold backlight, photoreal"
+        motion: from the very first moment the red knight brings his longsword crashing down in a powerful overhead strike, the blue knight blocks it with a shower of sparks, shoves him back and swings hard at his side, the red knight parries, they keep trading fast heavy blows, rain spraying off their armour and mud splashing under their boots, the camera tracks with them
       - id: feel
         seconds: 4
         seed: 9
@@ -64,10 +63,11 @@ sections:
         seconds: 5
         prompt: A lone young man standing perfectly still on a crowded subway platform at night while commuters rush past him, he looks up at a huge glowing billboard of a vast turquoise ocean under a bright sky, cold fluorescent light, cinematic, photoreal
         motion: commuters stream past him in motion blur, he stays perfectly still looking up at the glowing ocean, the light of the billboard on his face, the camera pushes slowly toward him
-      - id: world
+      - id: screen
         seconds: 5
-        prompt: Looking through a wide open wooden door standing alone in a dark desert at night into a radiant world on the other side, a sunlit green valley with a river and a golden sky, warm light pouring out across the sand, cinematic, photoreal
-        motion: the camera glides forward through the open doorway into the bright sunlit valley, warm light washing over everything
+        seed: 17
+        prompt: "A person seen from behind sitting at a wooden desk in a dark room at night, a laptop in front of them glowing with a vivid image of a tall wooden door standing open on a golden desert dune with a lush green valley visible through it, the warm light of the screen spilling onto their face, hands and the desk, everything else in darkness, cosy and cinematic, shallow depth of field, photoreal"
+        motion: the camera slowly pulls back from the glowing laptop, revealing more of the dark room, the person's fingers scroll gently on the trackpad, the warm light of the screen flickers softly on their face
     steps:
       - kicker: Scroll Studio
         title: A landing page is the door <em>to a world.</em>
@@ -82,13 +82,13 @@ sections:
       - title: One that makes you <em>love.</em>
         state: { beat: love }
       - title: One that makes you <em>hate.</em>
-        state: { beat: charge }
+        state: { beat: standoff }
       - title: Everyone should <em>feel something.</em>
         state: { beat: feel }
       - title: Something missing <em>from their life.</em>
         state: { beat: missing }
       - title: That's what <em>Scroll Studio</em> does.
-        state: { beat: world }
+        state: { beat: screen }
   - type: cta
     kicker: Every frame above was made on one local GPU and built from one file
     title: See what it <em>can do.</em>

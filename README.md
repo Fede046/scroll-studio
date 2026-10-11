@@ -275,7 +275,9 @@ cached on its own, so changing one shot re-renders only that shot. Steps pin the
       - { title: A landing page is the door <em>to a world.</em>, intro: true, state: { beat: door } }
 ```
 
-`beat_res` sets the render size (default 1920x1088; about ten minutes a five-second beat on an RTX 4090).
+`beat_res` sets the render size (default 1920x1088; about seven minutes a five-second beat on an RTX 4090). LTX animates
+slow, camera-led motion best; for an action shot that holds its first frame, lower `strength` (0.7-0.85), re-roll the
+motion alone with `motion_seed`, and cut the hold with `trim` (seconds, re-uses the render).
 Example: [Feel](examples/feel/site.yaml).
 
 ### Flying through code

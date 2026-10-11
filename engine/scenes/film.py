@@ -141,7 +141,15 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
             src = resolve_image(ctx.project, ref, ctx.log)
             still = bdir / "still.png"
             ImageOps.fit(Image.open(src).convert("RGB"), (W, H), Image.LANCZOS).save(still)
-            frames = animate(still, b.prompt, b.motion, b.seconds, b.seed, bdir, ctx.log, size=(W, H))
+            import json
+            akey = json.dumps({k: v for k, v in key.items() if k != "trim"}, sort_keys=True)
+            stamp = bdir / "anim.json"
+            frames = sorted((bdir / "frames").glob("*.png"))
+            if not (frames and stamp.exists() and stamp.read_text() == akey):
+                frames = animate(still, b.prompt, b.motion, b.seconds, b.seed if b.motion_seed is None else b.motion_seed,
+                                 bdir, ctx.log, size=(W, H), strength=b.strength)
+                stamp.write_text(akey)
+            frames = frames[round(b.trim * FPS):]
             seq = bdir / "seq"
             if seq.exists():
                 shutil.rmtree(seq)
@@ -152,6 +160,13 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
                    "-pix_fmt", "yuv420p", clip, log=ctx.log)
         key = {"prompt": b.prompt, "motion": b.motion, "seconds": b.seconds, "seed": b.seed, "res": [W, H],
                "image": file_key(ctx.project.path(b.image)) if b.image and not b.image.startswith("http") else b.image}
+        # only when set, so beats rendered before these existed stay cached
+        if b.strength != 1.0:
+            key["strength"] = b.strength
+        if b.motion_seed is not None:
+            key["motion_seed"] = b.motion_seed
+        if b.trim:
+            key["trim"] = b.trim
         ctx.log(f"  beat {b.id}")
         ctx.stage(f"beat_{b.id}", key, [clip], run)
         clips.append(clip)

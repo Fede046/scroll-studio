@@ -180,6 +180,11 @@ class Beat(Model):
     seconds: float = Field(4.0, ge=1, le=10)
     seed: int = 7
     image: Optional[str] = Field(None, description="Start from this image (project file or URL) instead of generating it")
+    strength: float = Field(1.0, ge=0.3, le=1.0, description="How tightly the clip holds the start image. Lower it "
+                                                           "(0.7-0.85) when an action shot freezes on its first frame")
+    motion_seed: Optional[int] = Field(None, description="Seed for the motion only, to re-roll a clip and keep its still")
+    trim: float = Field(0.0, ge=0, description="Seconds cut from the start of the clip (an action shot that holds its "
+                                               "first frame before moving). Re-uses the render: nothing is re-animated")
 
 
 class FilmScene(SceneBase):

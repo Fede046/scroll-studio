@@ -216,7 +216,7 @@ def build_graph(cfg, guide_video, first_image, frames, width, height, fps, prefi
     return g
 
 
-def build_i2v_graph(cfg, first_image, frames, width, height, fps, prompt, negative, seed, prefix):
+def build_i2v_graph(cfg, first_image, frames, width, height, fps, prompt, negative, seed, prefix, strength=1.0):
     """LTX-2.3 image-to-video without a guide: animate one still into a short clip (theme.art motion)."""
     return {
         "ckpt": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": cfg["checkpoint"]}},
@@ -231,7 +231,7 @@ def build_i2v_graph(cfg, first_image, frames, width, height, fps, prompt, negati
         "latent": {"class_type": "EmptyLTXVLatentVideo", "inputs": {
             "width": width, "height": height, "length": frames, "batch_size": 1}},
         "i2v": {"class_type": "LTXVImgToVideoConditionOnly", "inputs": {
-            "vae": ["ckpt", 2], "image": ["first", 0], "latent": ["latent", 0], "strength": 1.0, "bypass": False}},
+            "vae": ["ckpt", 2], "image": ["first", 0], "latent": ["latent", 0], "strength": float(strength), "bypass": False}},
         "alat": {"class_type": "LTXVEmptyLatentAudio", "inputs": {
             "frames_number": frames, "frame_rate": int(fps), "batch_size": 1, "audio_vae": ["avae", 0]}},
         "av": {"class_type": "LTXVConcatAVLatent", "inputs": {"video_latent": ["i2v", 0], "audio_latent": ["alat", 0]}},
