@@ -252,6 +252,32 @@ A `chart` can carry `callouts` resolved from the data (`{series: Denmark, at: la
 `at` is `max`, `min`, `first`, `last` or an x value), and a `stats` item can take its number from a chart:
 `{ unit: "%", label: World share, data: { section: share, series: World, at: last } }`.
 
+### A story in shots
+
+A `film` with `beats:` tells a story shot by shot. Each beat is a still generated from its `prompt` (or your own
+`image`), brought to life by its `motion` with LTX-2.3, and the shots are joined with short crossfades. Every beat is
+cached on its own, so changing one shot re-renders only that shot. Steps pin themselves to a beat with
+`state: { beat: <id> }`:
+
+```yaml
+  - id: story
+    type: film
+    length: 26
+    beats:
+      - id: door
+        seconds: 5
+        prompt: A weathered wooden door standing alone in an endless desert at dusk, warm light through the gap, photoreal
+        motion: the door swings open, golden light and dust pour out, the camera pushes in
+      - id: clash
+        prompt: Two hoplite shield walls colliding on a dusty plain, bronze and red cloaks, low angle, photoreal
+        motion: the shield walls crash together, dust bursts outward, slow motion
+    steps:
+      - { title: A landing page is the door <em>to a world.</em>, intro: true, state: { beat: door } }
+```
+
+`beat_res` sets the render size (default 1920x1088; about ten minutes a five-second beat on an RTX 4090).
+Example: [Feel](examples/feel/site.yaml).
+
 ### Flying through code
 
 A `code` scene follows an AI agent through a codebase in live 3D, with real, readable text. It opens on the agent's

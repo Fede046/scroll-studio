@@ -6,6 +6,8 @@ commits it spans so you can check out any earlier state (`git checkout <commit>`
 ## Unreleased
 
 ### Added
+- `film` with `beats:`: a story told in shots. Each beat is a generated still animated by LTX-2.3, cached on its own and
+  crossfaded into the next; captions pin to beats (`state: { beat: … }`). Example: Feel.
 - `code` scene: fly through a codebase in live 3D following an agent at work. It opens on the agent's prompt box and
   dives through it; read files line a corridor, edits apply their diffs as you scroll, a run prints its output, a status
   bar ticks off the todo list, and captions pin themselves to files (`state: { file: … }`). Text stays real and readable.
@@ -20,6 +22,8 @@ commits it spans so you can check out any earlier state (`git checkout <commit>`
   background, a light one on black.
 
 ### Changed
+- `code` scene follows the scroll exactly (no trailing flight after you stop), draws lighter frames, and warms up the GPU
+  behind the loader.
 - `particles`: the hero is a field that fills the whole screen (the art, when there is one) and drifts apart as you
   scroll into the first formation.
 - `blueprint`: next, next, next. The pen starts on the next view while the camera is still moving there, construction
