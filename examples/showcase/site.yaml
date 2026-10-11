@@ -12,7 +12,6 @@ nav:
     - { label: Examples, href: "#examples" }
     - { label: New in v3, href: "#v3" }
     - { label: Concepts, href: ../concepts/dist/index.html }
-    - { label: Story, href: ../feel/dist/index.html }
   cta: { label: GitHub, href: "https://github.com/Okohedeki/scroll-studio" }
 sections:
   - id: hello
