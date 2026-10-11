@@ -13,7 +13,7 @@ import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import type { PlayerFactory } from "../lib/types";
-import { clamp, cssVar, easeInOut, follow, isMobile, lerp, rng, smooth } from "../lib/util";
+import { clamp, cssVar, easeInOut, isMobile, lerp, rng, smooth } from "../lib/util";
 
 type Op = " " | "+" | "-";
 interface CFile { path: string; kind: "read" | "edit" | "run"; lang: string; label: string; todo?: string | null; lines: [Op, string][]; at: [number, number] }
@@ -58,7 +58,7 @@ function roundRect(g: CanvasRenderingContext2D, x: number, y: number, w: number,
 
 class Pane {
   f: CFile; canvas = document.createElement("canvas"); g: CanvasRenderingContext2D; tex: THREE.CanvasTexture;
-  mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; hpx: number; wpx: number; key = ""; focusPx = 0; glow = 0; base = 1;
+  mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; hpx: number; wpx: number; key = ""; focusPx = 0; glow = 0; base = 1; drawn = 0;
   toks: [string, string][][];
   constructor(f: CFile, private mono: string, private accent: string, aniso: number) {
     this.f = f;
@@ -82,9 +82,11 @@ class Pane {
 
   /** k: 0-1 through this file's own beat (read sweep, edit, or run output) */
   draw(k: number) {
+    const now = performance.now();
+    if (k > 0 && k < 1 && now - this.drawn < 30) return;   // mid-animation: skip; the next frame catches up
     const key = this.f.kind === "read" ? (k <= 0 || k >= 1 ? String(k >= 1) : (Math.round(k * 60) / 60).toFixed(3)) : (Math.round(k * 400) / 400).toFixed(4);
     if (key === this.key) return;
-    this.key = key;
+    this.key = key; this.drawn = now;
     const g = this.g, f = this.f, W = this.wpx;
     g.clearRect(0, 0, W, this.hpx);
     g.textBaseline = "middle";
@@ -286,7 +288,7 @@ const factory: PlayerFactory = async (cfg, ctx) => {
   const canvas = document.createElement("canvas");
   ctx.visual.appendChild(canvas);
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
-  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, MOB ? 1.5 : 2));
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5));
   const bg = new THREE.Color(bgHex);
   renderer.setClearColor(bg, 1);
   const scene = new THREE.Scene();
@@ -484,15 +486,24 @@ const factory: PlayerFactory = async (cfg, ctx) => {
 
   // the first frame
   panes.forEach((p) => p.draw(0));
+  // do every first-time GPU job now, behind the loader: upload each texture and compile the shaders, then draw one
+  // frame from the overview so nothing hitches the first time it comes into view mid-scroll
+  panes.forEach((p) => renderer.initTexture(p.tex));
+  bgPanes.forEach((m) => renderer.initTexture((m.material as THREE.MeshBasicMaterial).map!));
+  renderer.compile(scene, camera);
+  {
+    const o = overview();
+    camera.position.copy(o.pos); camera.lookAt(o.target);
+    if (composer) composer.render(); else renderer.render(scene, camera);
+    camera.position.set(0, 0, TD); camera.lookAt(0, 0, 0);
+  }
   ctx.progress(1);
 
   const cam = { pos: new THREE.Vector3(0, 0, TD), target: new THREE.Vector3() };
-  let sp = 0;
   return {
     resize,
     update(s) {
-      sp += (s.p - sp) * (follow === 1 ? 1 : 0.12);
-      const p = sp;
+      const p = s.p;
       let pose = startPose(), roll = 0;
 
       // which beat are we in?
@@ -540,7 +551,7 @@ const factory: PlayerFactory = async (cfg, ctx) => {
       });
 
       // camera, with a little pointer parallax
-      cam.pos.lerp(pose.pos, follow === 1 ? 1 : 0.2); cam.target.lerp(pose.target, follow === 1 ? 1 : 0.2);
+      cam.pos.copy(pose.pos); cam.target.copy(pose.target);
       camera.position.copy(cam.pos).add(new THREE.Vector3(s.mx * 0.25, -s.my * 0.18, 0));
       camera.up.set(Math.sin(roll), Math.cos(roll), 0);
       camera.lookAt(cam.target);

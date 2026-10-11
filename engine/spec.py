@@ -172,13 +172,28 @@ class Take(Model):
     upscale: Optional[dict[str, Any]] = Field(None, description="Optional upscale stage, as in shot.upscale")
 
 
+class Beat(Model):
+    """One shot of a story film: a still generated from `prompt` (or taken from `image`), brought to life by `motion`."""
+    id: str
+    prompt: str = Field(..., description="The opening frame, described like a photograph: subject, place, light, lens")
+    motion: str = Field(..., description="What moves and how the camera moves, e.g. 'the door swings open, the camera pushes in'")
+    seconds: float = Field(4.0, ge=1, le=10)
+    seed: int = 7
+    image: Optional[str] = Field(None, description="Start from this image (project file or URL) instead of generating it")
+
+
 class FilmScene(SceneBase):
-    """AI film scrubbed by scroll. Blender blockout -> Z-Image keyframes -> LTX-2.3 -> encode."""
+    """AI film scrubbed by scroll. Blender blockout -> Z-Image keyframes -> LTX-2.3 -> encode. Or `beats`: a story told
+    in separate shots, each a generated still animated by LTX-2.3, joined with short crossfades; steps can pin
+    themselves to a beat with state: {beat: <id>}."""
     type: Literal["film"] = "film"
     video: Optional[str] = Field(None, description="Use an existing film instead of generating one")
     shot: dict[str, Any] = Field(default_factory=dict,
         description="Generation settings: fps, duration, preview_res, blockout {preset|file}, keyframes, ltx, upscale")
     take: Optional[Take] = Field(None, description="A one-take film described in the spec (world, camera, product) instead of `shot`")
+    beats: list[Beat] = Field(default_factory=list, description="A story film shot by shot (instead of `shot` / `take`)")
+    beat_res: tuple[int, int] = Field((1920, 1088), description="beats: render size (multiples of 32)")
+    beat_fade: float = Field(0.4, ge=0, le=2, description="beats: crossfade between shots, in seconds")
     gop: int = 6
 
 

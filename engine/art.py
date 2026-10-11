@@ -18,35 +18,13 @@ from .inputs import resolve_image, resolve_path
 from .project import BuildError, Project
 from .spec import Art, ImageInput
 
-FPS = 24
-NEGATIVE = ("cuts, camera shake, flicker, morphing, warped body, extra limbs, new objects appearing, neon tubes, light "
-            "rings, text, watermark, blur")
-
-
-def _ltx_size(w: int, h: int) -> tuple[int, int]:
-    """About 0.44 MP at the art's aspect, both sides multiples of 32 (what LTX-2.3 wants)."""
-    scale = (440_000 / (w * h)) ** 0.5
-    return max(256, round(w * scale / 32) * 32), max(256, round(h * scale / 32) * 32)
-
-
 def _animate(still: Path, art: Art, work: Path, log: Callable[[str], None]) -> list[Path]:
+    from .animate import animate
     from .backends import comfy
     if not comfy.alive():
-        raise BuildError(f"theme.art has `motion:`, which is animated locally with LTX-2.3, but ComfyUI is not running at "
-                         f"{comfy.COMFY}. Start it (docs/INSTALL.md) or remove `motion:` for a still.")
-    from PIL import Image
-    w, h = _ltx_size(*Image.open(still).size)
-    frames = max(9, round(art.seconds * FPS / 8) * 8 + 1)
-    log(f"  animating art with LTX-2.3 ({w}x{h}, {frames} frames): {art.motion[:80]}")
-    comfy.free()
-    name = comfy.upload(str(still))
-    prompt = f"{art.prompt or 'The subject of the image'}. {art.motion}. Smooth natural motion, the camera stays still."
-    graph = comfy.build_i2v_graph(comfy.LTX, name, frames, w, h, FPS, prompt, NEGATIVE, art.seed,
-                                  prefix=f"studio/art_{work.name}")
-    images = comfy.run(graph, poll=3)
-    tmp = Path(comfy.fetch(images, str(work / "frames")))
-    comfy.free()
-    return sorted(tmp.glob("*.png"))
+        raise BuildError("theme.art has `motion:`, which is animated locally with LTX-2.3, but ComfyUI is not running. "
+                         "Start it (docs/INSTALL.md) or remove `motion:` for a still.")
+    return animate(still, art.prompt or "", f"{art.motion}, the camera stays still", art.seconds, art.seed, work, log)
 
 
 def build(project: Project, art: Art, dist: Path, log: Callable[[str], None] = print) -> dict:

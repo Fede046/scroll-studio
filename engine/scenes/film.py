@@ -121,8 +121,83 @@ def encode(src: Path, ctx: BuildContext, gop: int) -> dict:
     return {"video": ctx.url(outs[0]), "videoMobile": ctx.url(outs[1]), "poster": ctx.url(outs[2]), "end": ctx.url(outs[3])}
 
 
+def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
+    """A story in shots: each beat's still (generated, or a file) animated by LTX-2.3, cached per beat, then joined
+    with crossfades. Steps pinned with state: {beat: <id>} are timed to their beat."""
+    import shutil
+    from PIL import Image, ImageOps
+    from ..animate import FPS, animate
+    from ..inputs import resolve_image
+    from ..spec import ImageInput
+    W, H = sec.beat_res[0] // 32 * 32, sec.beat_res[1] // 32 * 32
+    clips = []
+    for b in sec.beats:
+        bdir = ctx.work / "beats" / b.id
+        clip = bdir / "clip.mp4"
+
+        def run(b=b, bdir=bdir, clip=clip):
+            bdir.mkdir(parents=True, exist_ok=True)
+            ref = b.image if b.image else ImageInput(generate=b.prompt, size=(W, H), seed=b.seed)
+            src = resolve_image(ctx.project, ref, ctx.log)
+            still = bdir / "still.png"
+            ImageOps.fit(Image.open(src).convert("RGB"), (W, H), Image.LANCZOS).save(still)
+            frames = animate(still, b.prompt, b.motion, b.seconds, b.seed, bdir, ctx.log, size=(W, H))
+            seq = bdir / "seq"
+            if seq.exists():
+                shutil.rmtree(seq)
+            seq.mkdir()
+            for i, f in enumerate(frames):
+                shutil.copy(f, seq / f"{i:04d}.png")
+            ffmpeg("-framerate", str(FPS), "-i", seq / "%04d.png", "-c:v", "libx264", "-crf", "13", "-preset", "slow",
+                   "-pix_fmt", "yuv420p", clip, log=ctx.log)
+        key = {"prompt": b.prompt, "motion": b.motion, "seconds": b.seconds, "seed": b.seed, "res": [W, H],
+               "image": file_key(ctx.project.path(b.image)) if b.image and not b.image.startswith("http") else b.image}
+        ctx.log(f"  beat {b.id}")
+        ctx.stage(f"beat_{b.id}", key, [clip], run)
+        clips.append(clip)
+
+    # join: each clip crossfades into the next
+    durs = [float(probe(c)["duration"]) for c in clips]
+    fade = min(sec.beat_fade, *(d / 3 for d in durs)) if len(clips) > 1 else 0
+    out = ctx.work / "gen" / "beats.mp4"
+
+    def join():
+        out.parent.mkdir(parents=True, exist_ok=True)
+        if len(clips) == 1:
+            shutil.copy(clips[0], out)
+            return
+        args, graph, last, t = [], [], "[0:v]", 0.0
+        for c in clips:
+            args += ["-i", c]
+        for i in range(1, len(clips)):
+            t += durs[i - 1] - fade
+            tag = f"[v{i}]"
+            graph.append(f"{last}[{i}:v]xfade=transition=fade:duration={fade:.3f}:offset={t:.3f}{tag}")
+            last = tag
+        ffmpeg(*args, "-filter_complex", ";".join(graph), "-map", last, "-c:v", "libx264", "-crf", "14", "-preset", "slow",
+               "-pix_fmt", "yuv420p", "-r", str(FPS), out, log=ctx.log)
+    ctx.stage("beats_join", {"clips": [file_key(c) for c in clips], "fade": fade}, [out], join)
+
+    # beat spans over the film, for steps pinned with state: {beat: id}
+    total = sum(durs) - fade * (len(durs) - 1)
+    spans, t = {}, 0.0
+    for b, d in zip(sec.beats, durs):
+        spans[b.id] = (t / total, (t + d) / total)
+        t += d - fade
+    for st in sec.steps:
+        pin = (st.state or {}).get("beat")
+        if pin is None or st.at is not None:
+            continue
+        if pin not in spans:
+            raise BuildError(f"film section '{sec.id}': step '{st.title}' is pinned to beat {pin}, which is not in beats")
+        a, b2 = spans[pin]
+        pad = (b2 - a) * 0.1
+        st.at = (round(a + pad, 4), round(b2 - pad * 0.6, 4))
+    return out
+
+
 def build(sec: FilmScene, ctx: BuildContext, theme: dict) -> dict:
-    src = ctx.project.path(sec.video) if sec.video else generate(sec, ctx)
+    src = ctx.project.path(sec.video) if sec.video else beats_film(sec, ctx) if sec.beats else generate(sec, ctx)
     if not src.exists():
         raise BuildError(f"film source not found: {src}")
     return encode(src, ctx, sec.gop)
