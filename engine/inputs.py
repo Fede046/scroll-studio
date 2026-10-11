@@ -57,6 +57,8 @@ def resolve_image(project: Project, ref: ImageRef, log=print) -> Path:
         return out
     if ref.file:
         return resolve_path(project, ref.file, log)
+    if ref.edit:
+        return _edit(project, ref, log)
     if ref.gradient:
         w, h = (int(v) for v in ref.size)
         digest = hashlib.sha1(json.dumps([ref.gradient.model_dump(mode="json"), w, h, ref.seed, 1]).encode()).hexdigest()[:12]
@@ -83,6 +85,30 @@ def resolve_image(project: Project, ref: ImageRef, log=print) -> Path:
     out.parent.mkdir(parents=True, exist_ok=True)
     shutil.move(str(Path(tmp) / "0001.png"), out)
     shutil.rmtree(tmp, ignore_errors=True)
+    return out
+
+
+def _edit(project: Project, ref: ImageInput, log=print) -> Path:
+    """An image made by editing others with Qwen-Image-Edit, cached by the sources' content and the instruction."""
+    from .backends import comfy
+    from .project import file_key
+    e = ref.edit
+    srcs = [resolve_image(project, r, log) for r in [e.source, *e.refs[:2]]]
+    digest = hashlib.sha1(json.dumps([[file_key(s) for s in srcs], e.instruction, e.seed, e.steps, 2]).encode()).hexdigest()[:12]
+    out = project.build / "_generated" / f"edit_{digest}.png"
+    if out.exists():
+        return out
+    if not comfy.alive():
+        raise BuildError(f"this image is edited locally with Qwen-Image-Edit, but ComfyUI is not running at {comfy.COMFY}.")
+    log(f"  editing image (Qwen-Image-Edit, seed {e.seed}): {e.instruction[:80]}")
+    comfy.free()
+    names = [comfy.upload(str(s)) for s in srcs]
+    images = comfy.run(comfy.build_qwen_edit_graph(names, e.instruction, e.seed, e.steps, prefix=f"studio/edit_{digest}"), poll=2)
+    tmp = comfy.fetch(images, str(out.parent / f"_edit_{digest}"))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(Path(tmp) / "0001.png"), out)
+    shutil.rmtree(tmp, ignore_errors=True)
+    comfy.free()
     return out
 
 

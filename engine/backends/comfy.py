@@ -216,9 +216,11 @@ def build_graph(cfg, guide_video, first_image, frames, width, height, fps, prefi
     return g
 
 
-def build_i2v_graph(cfg, first_image, frames, width, height, fps, prompt, negative, seed, prefix, strength=1.0):
-    """LTX-2.3 image-to-video without a guide: animate one still into a short clip (theme.art motion)."""
-    return {
+def build_i2v_graph(cfg, first_image, frames, width, height, fps, prompt, negative, seed, prefix, strength=1.0,
+                    end_image=None, end_strength=1.0):
+    """LTX-2.3 image-to-video without a depth guide: animate one still into a short clip (theme.art, film beats).
+    `end_image` pins the last frame too, so the motion lands where it should (a door that ends open)."""
+    g = {
         "ckpt": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": cfg["checkpoint"]}},
         "te": {"class_type": "LTXAVTextEncoderLoader", "inputs": {
             "text_encoder": cfg["text_encoder"], "ckpt_name": cfg["checkpoint"], "device": "default"}},
@@ -249,6 +251,48 @@ def build_i2v_graph(cfg, first_image, frames, width, height, fps, prompt, negati
             "overlap": 6, "last_frame_fix": False, "working_device": "auto", "working_dtype": "auto"}},
         "save": {"class_type": "SaveImage", "inputs": {"images": ["decode", 0], "filename_prefix": prefix}},
     }
+    if end_image:
+        g["last"] = {"class_type": "LoadImage", "inputs": {"image": end_image}}
+        g["endguide"] = {"class_type": "LTXVAddGuide", "inputs": {
+            "positive": ["cond", 0], "negative": ["cond", 1], "vae": ["ckpt", 2], "latent": ["i2v", 0],
+            "image": ["last", 0], "frame_idx": -1, "strength": float(end_strength)}}
+        g["av"]["inputs"]["video_latent"] = ["endguide", 2]
+        g["guider"]["inputs"].update(positive=["endguide", 0], negative=["endguide", 1])
+        g["crop"] = {"class_type": "LTXVCropGuides", "inputs": {
+            "positive": ["endguide", 0], "negative": ["endguide", 1], "latent": ["split", 0]}}
+        g["decode"]["inputs"]["latents"] = ["crop", 2]
+    return g
+
+
+QWEN_EDIT = {"unet": "qwen_image_edit_2511_fp8mixed.safetensors", "clip": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+             "vae": "qwen_image_vae.safetensors"}
+
+
+def build_qwen_edit_graph(images, instruction, seed, steps, prefix, megapixels=1.6, cfg=QWEN_EDIT):
+    """Qwen-Image-Edit: edit images[0] following `instruction`; images[1:] (up to two) are references it can use."""
+    g = {
+        "unet": {"class_type": "UNETLoader", "inputs": {"unet_name": cfg["unet"], "weight_dtype": "default"}},
+        "clip": {"class_type": "CLIPLoader", "inputs": {"clip_name": cfg["clip"], "type": "qwen_image", "device": "default"}},
+        "vae": {"class_type": "VAELoader", "inputs": {"vae_name": cfg["vae"]}},
+        "shift": {"class_type": "ModelSamplingAuraFlow", "inputs": {"model": ["unet", 0], "shift": 3.1}},
+        "norm": {"class_type": "CFGNorm", "inputs": {"model": ["shift", 0], "strength": 1.0}},
+    }
+    enc = {}
+    for i, name in enumerate(images[:3]):
+        g[f"img{i}"] = {"class_type": "LoadImage", "inputs": {"image": name}}
+        g[f"sc{i}"] = {"class_type": "ImageScaleToTotalPixels", "inputs": {
+            "image": [f"img{i}", 0], "upscale_method": "lanczos", "megapixels": megapixels if i == 0 else 1.0,
+            "resolution_steps": 16}}
+        enc[f"image{i + 1}"] = [f"sc{i}", 0]
+    g["pos"] = {"class_type": "TextEncodeQwenImageEditPlus", "inputs": dict(clip=["clip", 0], prompt=instruction, vae=["vae", 0], **enc)}
+    g["neg"] = {"class_type": "TextEncodeQwenImageEditPlus", "inputs": dict(clip=["clip", 0], prompt="", vae=["vae", 0], **enc)}
+    g["lat"] = {"class_type": "VAEEncode", "inputs": {"pixels": ["sc0", 0], "vae": ["vae", 0]}}
+    g["ks"] = {"class_type": "KSampler", "inputs": {
+        "model": ["norm", 0], "positive": ["pos", 0], "negative": ["neg", 0], "latent_image": ["lat", 0],
+        "seed": seed, "steps": steps, "cfg": 4.0, "sampler_name": "euler", "scheduler": "simple", "denoise": 1.0}}
+    g["dec"] = {"class_type": "VAEDecode", "inputs": {"samples": ["ks", 0], "vae": ["vae", 0]}}
+    g["save"] = {"class_type": "SaveImage", "inputs": {"images": ["dec", 0], "filename_prefix": prefix}}
+    return g
 
 
 def build_upscale_graph(cfg, video, frames, fps, prompt, prefix):

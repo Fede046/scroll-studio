@@ -23,7 +23,7 @@ def frames_for(seconds: float) -> int:
 
 def animate(still: Path, prompt: str, motion: str, seconds: float, seed: int, work: Path,
             log: Callable[[str], None] = print, size: Optional[tuple[int, int]] = None,
-            negative: str = NEGATIVE, strength: float = 1.0) -> list[Path]:
+            negative: str = NEGATIVE, strength: float = 1.0, end_image: Optional[Path] = None) -> list[Path]:
     """Frames (PNG paths, in order) of `still` brought to life by `motion`."""
     from .backends import comfy
     if not comfy.alive():
@@ -34,9 +34,10 @@ def animate(still: Path, prompt: str, motion: str, seconds: float, seed: int, wo
     log(f"  animating with LTX-2.3 ({w}x{h}, {n} frames): {motion[:80]}")
     comfy.free()
     name = comfy.upload(str(still))
+    end_name = comfy.upload(str(end_image)) if end_image else None
     text = f"{prompt or 'The subject of the image'}. {motion}. Smooth natural motion."
     graph = comfy.build_i2v_graph(comfy.LTX, name, n, w, h, FPS, text, negative, seed, prefix=f"studio/anim_{work.name}",
-                                  strength=strength)
+                                  strength=strength, end_image=end_name)
     images = comfy.run(graph, poll=3)
     import shutil
     if (work / "frames").exists():

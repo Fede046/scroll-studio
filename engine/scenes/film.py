@@ -25,6 +25,12 @@ def _args(ctx: BuildContext, **kw):
                            source=None, **kw)
 
 
+def _restore_args(ctx: BuildContext, source: Path):
+    a = _args(ctx)
+    a.source = str(source)
+    return a
+
+
 def take_shot(sec: FilmScene, ctx: BuildContext) -> dict:
     """Turn a spec `take` into the `shot` mapping the film stages run on, writing take.json for Blender."""
     import json
@@ -141,13 +147,18 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
             src = resolve_image(ctx.project, ref, ctx.log)
             still = bdir / "still.png"
             ImageOps.fit(Image.open(src).convert("RGB"), (W, H), Image.LANCZOS).save(still)
+            end = None
+            if b.end_image:
+                end = bdir / "end.png"
+                ImageOps.fit(Image.open(resolve_image(ctx.project, b.end_image, ctx.log)).convert("RGB"), (W, H),
+                             Image.LANCZOS).save(end)
             import json
             akey = json.dumps({k: v for k, v in key.items() if k != "trim"}, sort_keys=True)
             stamp = bdir / "anim.json"
             frames = sorted((bdir / "frames").glob("*.png"))
             if not (frames and stamp.exists() and stamp.read_text() == akey):
                 frames = animate(still, b.prompt, b.motion, b.seconds, b.seed if b.motion_seed is None else b.motion_seed,
-                                 bdir, ctx.log, size=(W, H), strength=b.strength)
+                                 bdir, ctx.log, size=(W, H), strength=b.strength, end_image=end)
                 stamp.write_text(akey)
             frames = frames[round(b.trim * FPS):]
             seq = bdir / "seq"
@@ -158,8 +169,16 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
                 shutil.copy(f, seq / f"{i:04d}.png")
             ffmpeg("-framerate", str(FPS), "-i", seq / "%04d.png", "-c:v", "libx264", "-crf", "13", "-preset", "slow",
                    "-pix_fmt", "yuv420p", clip, log=ctx.log)
+        def ref_key(r):
+            if r is None or (isinstance(r, str) and r.startswith("http")):
+                return r
+            if isinstance(r, str):
+                return file_key(ctx.project.path(r))
+            return r.model_dump(mode="json")
         key = {"prompt": b.prompt, "motion": b.motion, "seconds": b.seconds, "seed": b.seed, "res": [W, H],
-               "image": file_key(ctx.project.path(b.image)) if b.image and not b.image.startswith("http") else b.image}
+               "image": ref_key(b.image)}
+        if b.end_image:
+            key["end_image"] = ref_key(b.end_image)
         # only when set, so beats rendered before these existed stay cached
         if b.strength != 1.0:
             key["strength"] = b.strength
@@ -192,6 +211,14 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
         ffmpeg(*args, "-filter_complex", ";".join(graph), "-map", last, "-c:v", "libx264", "-crf", "14", "-preset", "slow",
                "-pix_fmt", "yuv420p", "-r", str(FPS), out, log=ctx.log)
     ctx.stage("beats_join", {"clips": [file_key(c) for c in clips], "fade": fade}, [out], join)
+    if sec.beat_restore:
+        from . import film_build as fb
+        shot = {"id": sec.id, "fps": FPS, "duration": float(probe(out)["duration"]), "ltx": {},
+                "upscale": {"method": "seedvr2", "resolution": int(sec.beat_restore)}}
+        restored = ctx.work / "gen" / "gen_sr.mp4"
+        ctx.stage("beats_restore", {"src": file_key(out), "res": sec.beat_restore}, [restored],
+                  lambda: fb.stage_upscale(shot, str(ctx.work), _restore_args(ctx, out)))
+        out = restored
 
     # beat spans over the film, for steps pinned with state: {beat: id}
     total = sum(durs) - fade * (len(durs) - 1)
@@ -206,6 +233,9 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
         if pin not in spans:
             raise BuildError(f"film section '{sec.id}': step '{st.title}' is pinned to beat {pin}, which is not in beats")
         a, b2 = spans[pin]
+        part = (st.state or {}).get("part")
+        if part:
+            a, b2 = a + (b2 - a) * float(part[0]), a + (b2 - a) * float(part[1])
         pad = (b2 - a) * 0.1
         st.at = (round(a + pad, 4), round(b2 - pad * 0.6, 4))
     return out

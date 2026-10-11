@@ -51,10 +51,24 @@ class ImageInput(Model):
     size: tuple[int, int] = Field((1920, 1088), description="Generated size (multiples of 16)")
     seed: int = 7
     crop: Optional[tuple[float, float, float, float]] = Field(None, description="Crop [x0, y0, x1, y1] in 0-1 image coordinates")
+    edit: Optional["ImageEdit"] = Field(None, description="Make this image by editing another one locally (Qwen-Image-Edit)")
     credit: Optional[str] = Field(None, description="Attribution shown in the footer")
 
 
 ImageRef = Union[str, ImageInput]   # a bare string is a file path
+
+
+class ImageEdit(Model):
+    """Derive an image from another with a local image editor (Qwen-Image-Edit): change one thing, keep the rest."""
+    source: ImageRef = Field(..., description="The image to edit (a file, or another generated image)")
+    instruction: str = Field(..., description="What to change, e.g. 'close the door completely, keep everything else'")
+    refs: list[ImageRef] = Field(default_factory=list, description="Up to two more images the instruction can refer to "
+                                                                   "('put the second image on the laptop screen')")
+    seed: int = 7
+    steps: int = Field(30, ge=4, le=60)
+
+
+ImageInput.model_rebuild()
 
 
 class Step(Model):
@@ -179,7 +193,10 @@ class Beat(Model):
     motion: str = Field(..., description="What moves and how the camera moves, e.g. 'the door swings open, the camera pushes in'")
     seconds: float = Field(4.0, ge=1, le=10)
     seed: int = 7
-    image: Optional[str] = Field(None, description="Start from this image (project file or URL) instead of generating it")
+    image: Optional[ImageRef] = Field(None, description="Start from this image instead of generating it from `prompt`: "
+                                                        "a file, or an image input (generate:, edit: ...)")
+    end_image: Optional[ImageRef] = Field(None, description="The clip's last frame (same forms as `image`): the motion is "
+                                                            "steered to land on it, e.g. a closed door ending open")
     strength: float = Field(1.0, ge=0.3, le=1.0, description="How tightly the clip holds the start image. Lower it "
                                                            "(0.7-0.85) when an action shot freezes on its first frame")
     motion_seed: Optional[int] = Field(None, description="Seed for the motion only, to re-roll a clip and keep its still")
@@ -199,6 +216,8 @@ class FilmScene(SceneBase):
     beats: list[Beat] = Field(default_factory=list, description="A story film shot by shot (instead of `shot` / `take`)")
     beat_res: tuple[int, int] = Field((1920, 1088), description="beats: render size (multiples of 32)")
     beat_fade: float = Field(0.4, ge=0, le=2, description="beats: crossfade between shots, in seconds")
+    beat_restore: Optional[int] = Field(None, description="beats: run SeedVR2 over the finished film at this height "
+                                                          "(e.g. 1088) to clean grain and redraw fine detail; slow")
     gop: int = 6
 
 
