@@ -9,6 +9,11 @@ commits it spans so you can check out any earlier state (`git checkout <commit>`
 - `theme.art`: a prompt (or `file:`) becomes artwork a style draws in its own medium, generated locally with Z-Image
   and, with `motion:`, animated by LTX-2.3 into a seamless loop. `ascii-art` prints it in characters in the hero and
   the render pane; `particles` turns it into a full-screen field of points.
+- `theme.art` loops cut where the motion repeats: the build finds the stretch of the clip whose last frame matches its
+  first while keeping most of the movement, so fast motion (a dribble) loops without a double exposure.
+- `theme.art` tone mapping reads the background from the frame's border and lifts dark subjects, and a light
+  background is flipped, so a subject prints as a solid figure. Tip: a dark subject reads best on a plain white
+  background, a light one on black.
 
 ### Changed
 - `particles`: the hero is a field that fills the whole screen (the art, when there is one) and drifts apart as you
