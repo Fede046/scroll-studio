@@ -8,6 +8,10 @@ theme:
   colors: { accent: "#ff7a3d", accent2: "#ffa071" }
   fonts: { display: "Bricolage Grotesque", body: "Inter", mono: "JetBrains Mono" }
 nav:
+  links:
+    - { label: Examples, href: "#examples" }
+    - { label: New in v3, href: "#v3" }
+    - { label: Concepts, href: ../concepts/dist/index.html }
   cta: { label: GitHub, href: "https://github.com/Okohedeki/scroll-studio" }
 sections:
   - id: hello
@@ -58,12 +62,12 @@ sections:
       - { tag: 03 · Ship, title: Upload dist/, body: "Plain HTML, CSS and JS with the media. Host it anywhere; no server, no API keys." }
   - type: stats
     items:
-      - { value: "10", label: Scene types }
+      - { value: "11", label: Scene types }
       - { value: "12", label: Content blocks }
-      - { value: "20", label: Styles }
+      - { value: "21", label: Styles }
       - { value: "0", label: API keys }
   - type: cta
-    kicker: MIT licensed · 7 of 10 scene types need no GPU
+    kicker: Open source (AGPL-3.0) · 8 of 11 scene types need no GPU
     title: Build one <em>tonight.</em>
     button: { label: Get Scroll Studio, href: "https://github.com/Okohedeki/scroll-studio" }
-footer: { left: "Scroll Studio · MIT", right: "Every example on this page is a concept site." }
+footer: { left: "Scroll Studio · AGPL-3.0", right: "Every example on this page is a concept site." }

@@ -100,7 +100,8 @@ class Pane {
         if (op === "-") { rows.push({ i, h: 1 - fold, typed: 1, op, n: "" }); return; }
         if (op === "+") {
           const j = adds.indexOf(i), t = clamp(a - j);
-          num++; rows.push({ i, h: clamp((a - j) * 4), typed: t, op, n: String(num) }); return;
+          const hh = clamp((a - j) * 4); if (hh > 0.02) num++;   // a line counts once it starts to appear
+          rows.push({ i, h: hh, typed: t, op, n: String(num) }); return;
         }
         num++; rows.push({ i, h: 1, typed: 1, op, n: String(num) });
       });
