@@ -27,8 +27,8 @@ def _env(style_dir: Optional[Path] = None) -> Environment:
         loaders.append(PrefixLoader({"style": FileSystemLoader(style_dir)}))
     env = Environment(loader=ChoiceLoader(loaders), autoescape=select_autoescape(["html", "j2"]),
                       trim_blocks=True, lstrip_blocks=True)
-    # Copy fields allow a little inline markup (<em>, <br>, <b>, <i>); everything else is escaped.
-    allowed = re.compile(r"&lt;(/?)(em|b|i|br|strong)\s*/?&gt;")
+    # Copy fields allow a little inline markup (<em>, <br>, <b>, <i>, <code>); everything else is escaped.
+    allowed = re.compile(r"&lt;(/?)(em|b|i|br|strong|code)\s*/?&gt;")
     def rich(text):
         if text is None:
             return ""
@@ -131,6 +131,8 @@ def build_site(project: Project, log: Callable[[str], None] = print,
                 cfg = builder_for(sec.type)(sec, ctx, theme)
                 (ctx.work / "config.json").write_text(json.dumps(cfg))
                 entry["config"] = cfg
+                # a builder may schedule the steps itself (code pins captions to files)
+                entry["sdata"] = sec.model_dump(mode="json", include={"hud", "steps", "layout", "length"})
             web = project.build / sec.id / "web"
             if web.exists():
                 dst = dist / "assets" / sec.id

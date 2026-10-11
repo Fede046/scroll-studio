@@ -252,6 +252,38 @@ A `chart` can carry `callouts` resolved from the data (`{series: Denmark, at: la
 `at` is `max`, `min`, `first`, `last` or an x value), and a `stats` item can take its number from a chart:
 `{ unit: "%", label: World share, data: { section: share, series: World, at: last } }`.
 
+### Flying through code
+
+A `code` scene follows an AI agent through a codebase in live 3D, with real, readable text. It opens on the agent's
+prompt box (`terminal`), the task types itself, and the camera dives through the screen into the project. Files the
+agent `read`s line a corridor, each `edit` is a stop where the diff applies itself as you scroll (removed lines light up
+and fold away, new ones type in), and a `run` prints its output line by line. A status bar ticks off each file's `todo`.
+Steps pin themselves to the route with `state: { file: <path> }` (or `terminal` / `outro`), so captions never need
+progress numbers:
+
+```yaml
+  - id: session
+    type: code
+    length: 20
+    terminal: { logo: "open|code", prompt: "add a field that validates signups are 18+", model: Claude Opus 4.5 }
+    files:
+      - { path: config/fortify.php, file: inputs/fortify.php }            # read
+      - path: app/Models/User.php
+        kind: edit
+        todo: "User model: fillable + cast"
+        code: |2
+           protected $fillable = [
+               'name',
+          +    'date_of_birth',
+           ];
+      - { path: php artisan test, kind: run, file: inputs/test-output.txt }
+    steps:
+      - { title: Every change, <em>a diff you can follow.</em>, state: { file: app/Models/User.php } }
+```
+
+For an edit, start each line with `+`, `-` or a space, like a diff (use `|2` so YAML keeps the leading markers).
+`tree` lists more paths to scatter around the route so it reads as a whole project.
+
 ## Client work
 
 ```bash

@@ -15,6 +15,7 @@ MODULES = {
     "chart": "chart",
     "map": "map",
     "splat": "splat",
+    "code": "code",
 }
 
 

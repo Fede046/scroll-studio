@@ -10,6 +10,7 @@ html.lenis, html.lenis body { height: auto; }
 img, video, canvas { display: block; max-width: 100%; }
 a { color: inherit; text-decoration: none; }
 em { font-style: var(--em-style); color: var(--accent-2); }
+code { font-family: var(--font-mono); font-size: .92em; color: var(--ink); background: rgba(127,127,127,.14); padding: .18em .5em; border-radius: 5px; overflow-wrap: anywhere; }
 .mode-light em { color: var(--accent); }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 

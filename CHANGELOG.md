@@ -6,6 +6,10 @@ commits it spans so you can check out any earlier state (`git checkout <commit>`
 ## Unreleased
 
 ### Added
+- `code` scene: fly through a codebase in live 3D following an agent at work. It opens on the agent's prompt box and
+  dives through it; read files line a corridor, edits apply their diffs as you scroll, a run prints its output, a status
+  bar ticks off the todo list, and captions pin themselves to files (`state: { file: … }`). Text stays real and readable.
+- Copy fields accept `<code>` for inline commands.
 - `theme.art`: a prompt (or `file:`) becomes artwork a style draws in its own medium, generated locally with Z-Image
   and, with `motion:`, animated by LTX-2.3 into a seamless loop. `ascii-art` prints it in characters in the hero and
   the render pane; `particles` turns it into a full-screen field of points.

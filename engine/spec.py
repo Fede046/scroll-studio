@@ -346,6 +346,43 @@ class TypeScene(SceneBase):
         "passage", description="passage: reading size, left-aligned. display: a headline, bigger and centred")
 
 
+class CodeFile(Model):
+    """One file on the route through the codebase."""
+    path: str = Field(..., description="Shown as the file's title, e.g. app/Models/User.php")
+    code: Optional[str] = Field(None, description="The source. For kind: edit, start each line with '+' (added), "
+                                                  "'-' (removed) or ' ' (unchanged), like a diff")
+    file: Optional[str] = Field(None, description="Read the source from this project file instead of `code`")
+    kind: Literal["read", "edit", "run"] = Field(
+        "read", description="read: flies past as the agent reads it; edit: a stop where the diff applies itself as you "
+                            "scroll; run: a terminal stop whose output prints line by line")
+    label: Optional[str] = Field(None, description="Tag over the file (default: Read / Edit / the command for run)")
+    lang: Optional[str] = Field(None, description="Highlighting: php, ts, tsx, js, py, go, rust, sh... (default: from the extension)")
+    weight: float = Field(1.0, description="Share of the scroll this file gets, relative to the others of its kind")
+    todo: Optional[str] = Field(None, description="An item on the agent's todo list, ticked when this file is done")
+
+
+class CodeTerminal(Model):
+    """The agent's prompt box the scene opens on; the camera dives through it into the code."""
+    logo: str = Field("", description="Wordmark over the prompt, e.g. 'opencode'; split as dim|bright with '|', e.g. 'open|code'")
+    prompt: str
+    agent: str = "Build"
+    model: str = ""
+    provider: str = ""
+    hints: list[str] = Field(default_factory=lambda: ["tab switch agent", "ctrl+p commands"])
+
+
+class CodeScene(SceneBase):
+    """Fly through a codebase in live 3D, following an agent at work: the scene opens on its prompt, dives into the
+    files it reads, stops at each edit while the diff applies itself, and ends on the test run. Steps can pin
+    themselves to the route with state: {file: <path>} (or 'terminal' / 'outro') instead of `at`."""
+    type: Literal["code"] = "code"
+    terminal: Optional[CodeTerminal] = None
+    files: list[CodeFile] = Field(..., min_length=1, description="The route, in order")
+    tree: list[str] = Field(default_factory=list, description="More paths in the project, drawn around the route so "
+                                                              "it reads as a whole codebase")
+    length: float = 14.0
+
+
 # ---------------------------------------------------------------- content blocks
 
 class BlockBase(Model):
@@ -548,12 +585,12 @@ class FaqBlock(BlockBase):
 
 Section = Annotated[Union[
     FilmScene, ArtworkScene, Scene3DScene, SequenceScene, ParallaxScene, TypeScene, VectorScene, ChartScene, MapScene,
-    SplatScene,
+    SplatScene, CodeScene,
     IntroBlock, FeaturesBlock, StatsBlock, TimelineBlock, QuoteBlock, CtaBlock, GalleryBlock,
     HeroBlock, ProductBlock, StripBlock, OrbitBlock, FaqBlock,
 ], Field(discriminator="type")]
 
-SCENE_TYPES = ("film", "artwork", "scene3d", "sequence", "parallax", "type", "vector", "chart", "map", "splat")
+SCENE_TYPES = ("film", "artwork", "scene3d", "sequence", "parallax", "type", "vector", "chart", "map", "splat", "code")
 
 
 # ---------------------------------------------------------------- site

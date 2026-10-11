@@ -28,6 +28,7 @@ const PLAYERS: Record<string, () => Promise<{ default: PlayerFactory }>> = {
   chart: () => import("./players/chart"),
   map: () => import("./players/map"),
   splat: () => import("./players/splat"),
+  code: () => import("./players/code"),
 };
 
 let mx = 0, my = 0;
