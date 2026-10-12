@@ -1,0 +1,255 @@
+/* Sand: one picture in sand on a warm light table; every section is a scene drawn in it. The runtime fixes each scene's
+   stage over the table (html.sd-live), sweeps the sand from scene to scene with a hand's pile of grains and reveals
+   the copy behind it; without it, scenes are sections in reading order on a printed table.
+   Research: docs/styles/styles-22-23.md, section 23. */
+
+html.style-sand {
+  --glass: #f6dfae; --glass-hi: #fff1cc; --umber: #2a1709; --walnut: #2e1d10; --amber: #b8662a;
+  --rim: 12px;
+  --sd-hand: "Caveat", "Segoe Print", cursive;
+  --sd-serif: "Alegreya", Georgia, serif;
+  --sd-sc: "Alegreya Sans SC", "Alegreya", sans-serif;
+  background: var(--walnut);
+}
+html.style-sand body { background: radial-gradient(120% 90% at 50% 45%, var(--glass-hi), var(--glass) 55%, #e8aa5c); color: var(--ink); font-family: var(--sd-serif); }
+html.style-sand ::selection { background: var(--umber); color: var(--glass-hi); }
+html.style-sand .ss-nav { display: none; }
+html.style-sand em { color: inherit; }
+
+/* ---------------------------------------------------------------- the table, its rim, the top labels */
+.sd-table { position: fixed; inset: 0; z-index: 0; pointer-events: none; display: none; }
+.sd-canvas { width: 100%; height: 100%; display: block; }
+html.sd-live .sd-table { display: block; }
+.sd-rim { position: fixed; inset: 0; z-index: 40; pointer-events: none; }
+.sd-rim::after { content: ""; position: absolute; inset: var(--rim); border-radius: 22px; box-shadow: 0 0 0 40px var(--walnut), inset 0 0 0 1px rgba(0, 0, 0, .3), inset 0 0 36px rgba(70, 30, 5, .35); }
+.sd-top { position: fixed; z-index: 41; top: calc(var(--rim) + 12px); left: calc(var(--rim) + 24px); right: calc(var(--rim) + 22px); display: flex; align-items: center; gap: 30px; padding-top: env(safe-area-inset-top, 0px); }
+.sd-mark { font-family: var(--sd-hand); font-weight: 700; font-size: 32px; line-height: 1; color: var(--ink); }
+.sd-links { display: flex; gap: 24px; margin-left: auto; font-family: var(--sd-sc); font-weight: 500; font-size: 16px; letter-spacing: .04em; }
+.sd-links a { color: var(--ink); padding: 4px 0; background: linear-gradient(currentColor, currentColor) 0 100% / 0 1.5px no-repeat; transition: background-size .35s; }
+.sd-links a:hover { background-size: 100% 1.5px; }
+.sd-top__cta { font-family: var(--sd-sc); font-weight: 700; font-size: 15px; letter-spacing: .04em; padding: 8px 18px; border-radius: 999px; background: var(--umber); color: var(--glass-hi); }
+.sd-top__cta:hover { background: #4a2a12; }
+.sd-count { position: fixed; z-index: 41; left: calc(var(--rim) + 24px); bottom: calc(var(--rim) + 12px); font-family: var(--sd-hand); font-size: 22px; color: var(--ink); }
+html:not(.sd-live) .sd-count, html:not(.sd-live) .sd-rim { display: none; }
+html:not(.sd-live) .sd-top { position: absolute; }
+
+/* ---------------------------------------------------------------- type: crisp ink on the glowing glass */
+.sd-kicker { font-family: var(--sd-sc); font-weight: 700; font-size: 15px; letter-spacing: .08em; color: var(--ink); margin-bottom: 8px; }
+.sd-head { font-family: var(--sd-hand); font-weight: 700; line-height: .95; letter-spacing: 0; text-wrap: balance; color: var(--umber); }
+.sd-head em { font-style: normal; color: #6b3410; }
+.sd-poured { font-family: var(--sd-hand); font-weight: 700; line-height: .9; color: var(--umber); }
+.sd-glyph { font-family: var(--sd-serif); font-style: italic; font-weight: 900; line-height: .8; color: transparent; }
+.sd-lede { font-size: clamp(18px, 1.35vw, 22px); line-height: 1.55; max-width: 38ch; margin-top: 18px; text-wrap: pretty; }
+.sd-note { font-size: 15px; font-style: italic; }
+.sd-btns { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 26px; }
+.sd-btn { display: inline-flex; align-items: center; font-family: var(--sd-sc); font-weight: 700; font-size: 16px; letter-spacing: .05em; padding: 13px 26px; border-radius: 999px;
+  color: var(--ink); border: 2px solid var(--umber); background: rgba(255, 241, 204, .5); transition: background .3s, color .3s; }
+.sd-btn:hover { background: var(--umber); color: var(--glass-hi); }
+.sd-btn--hot { background: var(--umber); color: var(--glass-hi); }
+.sd-btn--hot:hover { background: #4a2a12; }
+.sd-btn--big { font-size: 19px; padding: 18px 38px; }
+.sd-hint { position: absolute; right: calc(var(--rim) + 28px); bottom: calc(var(--rim) + 14px); font-family: var(--sd-hand); font-size: 21px; z-index: 2; }
+
+/* ---------------------------------------------------------------- scenes without the runtime: in flow */
+.sd-scene { position: relative; }
+.sd-stage { position: relative; min-height: 100vh; min-height: 100svh; padding: calc(var(--rim) + 84px) calc(var(--rim) + clamp(22px, 7vw, 120px)) calc(var(--rim) + 64px);
+  display: grid; align-content: center; gap: 20px; z-index: 2; }
+html:not(.sd-live) .sd-hint, html:not(.sd-live) .sd-glyph { display: none; }
+
+/* with the runtime: spacers, and stages fixed over the table, revealed behind the hand */
+html.sd-live .sd-scene { height: var(--sd-h, 100svh); }
+html.sd-live .sd-stage { position: fixed; inset: 0; min-height: 0; clip-path: inset(0 0 100% 0); pointer-events: none; }
+html.sd-live .sd-stage.is-on { pointer-events: auto; }
+html.sd-live .sd-stage .sd-step-wrap, html.sd-live .sd-stage [data-step] { clip-path: inset(0 0 100% 0); }
+html.sd-live .sd-poured { color: transparent; }
+html.sd-live .sd-poured::selection, html.sd-live .sd-poured *::selection { color: var(--glass-hi); background: var(--umber); }
+html.sd-live .sd-pic > img { visibility: hidden; }
+.sd-dunes, .sd-ripples, .sd-iris, .sd-spiral { position: absolute; pointer-events: none; }
+.sd-spiral { right: 7vw; top: 50%; transform: translateY(-50%); width: min(40vw, 64vh); aspect-ratio: 1; }
+
+/* ---------------------------------------------------------------- hero */
+.sd-hero .sd-stage { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); align-items: center; column-gap: 3vw; }
+.sd-hero:not(.sd-hero--pic) .sd-stage { grid-template-columns: minmax(0, 1fr); justify-items: center; text-align: center; }
+.sd-hero__copy { position: relative; z-index: 1; }
+.sd-hero__title { font-size: clamp(76px, 9vw, 168px); max-width: 8ch; }
+.sd-hero:not(.sd-hero--pic) .sd-hero__title { max-width: 11ch; }
+.sd-pic { position: relative; margin: 0; width: 100%; height: min(66svh, 660px); }
+.sd-pic > img { width: 100%; height: 100%; object-fit: contain; filter: grayscale(1) sepia(.6) contrast(1.3); mix-blend-mode: multiply; }
+.sd-dunes { left: 0; right: 0; bottom: 0; height: 20svh; }
+.sd-dunes--low { height: 15svh; transform: scaleX(-1); }
+.sd-figs { position: relative; z-index: 1; }
+.sd-phone { position: relative; height: min(72svh, 700px); display: grid; place-items: center; }
+.sd-phone .ss-phone { width: min(300px, 60%, calc(68svh * .47)); }
+html.sd-live .sd-phone .ss-phone { background: transparent; box-shadow: none; }
+html.sd-live .sd-phone .ss-phone__screen { background: transparent; color: var(--ink); }
+html.sd-live .sd-phone .ss-app, html.sd-live .sd-phone .ss-app__opt { background: transparent; color: var(--ink); }
+html.sd-live .sd-phone .ss-app__opt { border: 1.5px solid rgba(42, 23, 9, .5); }
+html.sd-live .sd-phone .ss-app__opt.is-on { border-color: var(--umber); background: rgba(42, 23, 9, .08); }
+html.sd-live .sd-phone .ss-app__btn { background: var(--umber); color: var(--glass-hi); }
+html.sd-live .sd-phone .ss-phone__bar, html.sd-live .sd-phone .ss-app__label, html.sd-live .sd-phone .ss-app__note, html.sd-live .sd-phone .ss-app__name { color: var(--ink); }
+html.sd-live .sd-phone .ss-phone__bar i { background: transparent; }
+
+/* ---------------------------------------------------------------- intro */
+.sd-intro .sd-stage { align-content: start; padding-top: calc(var(--rim) + 15vh); }
+.sd-intro__copy { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); column-gap: 5vw; align-items: end; }
+.sd-intro__copy .sd-kicker { grid-column: 1 / -1; }
+.sd-intro__title { font-size: clamp(66px, 7.6vw, 144px); max-width: 10ch; }
+.sd-ripples { left: 0; right: 0; bottom: 0; height: 40svh; }
+
+/* ---------------------------------------------------------------- features */
+.sd-features__copy { position: relative; z-index: 1; }
+.sd-features__title { font-size: clamp(66px, 7.8vw, 150px); max-width: 11ch; }
+.sd-feats { list-style: none; display: grid; gap: 8vh; }
+.sd-feat { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 5vw; align-items: center; }
+.sd-feat__disc { width: clamp(240px, 40vh, 420px); aspect-ratio: 1; display: grid; place-items: center; }
+.sd-feat__disc .sd-poured { font-size: clamp(120px, 21vh, 230px); }
+.sd-feat__title { font-size: clamp(60px, 6.4vw, 120px); max-width: 9ch; }
+.sd-feat__body { font-size: clamp(18px, 1.35vw, 22px); line-height: 1.55; max-width: 34ch; margin-top: 16px; }
+.sd-meter { height: 10px; width: min(320px, 80%); border-radius: 99px; border: 1.5px solid var(--umber); margin-top: 18px; overflow: hidden; }
+.sd-meter i { display: block; height: 100%; background: var(--umber); }
+html.sd-live .sd-features .sd-stage { display: block; }
+html.sd-live .sd-step-wrap { position: absolute; inset: 0; display: grid; align-content: center; padding: calc(var(--rim) + 84px) calc(var(--rim) + clamp(22px, 7vw, 120px)) calc(var(--rim) + 64px); }
+html.sd-live .sd-feats { display: block; }
+html.sd-live .sd-features__head { align-content: start; padding-top: calc(var(--rim) + 15vh); }
+
+/* ---------------------------------------------------------------- product */
+.sd-product .sd-stage { grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); align-items: center; column-gap: 4vw; }
+.sd-product--right .sd-product__media { order: 2; }
+.sd-product__title { font-size: clamp(60px, 6.6vw, 124px); max-width: 9ch; margin-bottom: 4px; }
+.sd-tags { list-style: none; display: flex; flex-wrap: wrap; gap: 8px 10px; margin-top: 20px; }
+.sd-tags li { font-family: var(--sd-sc); font-weight: 500; font-size: 15px; padding: 5px 14px; border: 1.5px solid rgba(42, 23, 9, .55); border-radius: 999px; }
+.sd-pstats { display: flex; flex-wrap: wrap; gap: 14px 36px; margin-top: 22px; }
+.sd-pstats dd { font-family: var(--sd-hand); font-weight: 700; font-size: 52px; line-height: 1; }
+.sd-pstats dt { font-family: var(--sd-sc); font-size: 14px; }
+
+/* ---------------------------------------------------------------- stats: poured one after another */
+.sd-stats .sd-stage { align-content: center; }
+.sd-figs { --cols: 4; display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); gap: 3vw; align-items: end; }
+.sd-stats--1 .sd-figs { --cols: 1; } .sd-stats--2 .sd-figs { --cols: 2; } .sd-stats--3 .sd-figs { --cols: 3; } .sd-stats--5 .sd-figs { --cols: 5; }
+.sd-fig { display: grid; gap: 14px; justify-items: start; }
+.sd-fig__v { font-size: clamp(64px, min(14vw, calc(86vw / var(--cols) / var(--chars, 3) * 2)), 250px); white-space: nowrap; }
+.sd-fig__v small { font-size: .5em; margin-left: .04em; }
+.sd-fig__l { font-family: var(--sd-sc); font-weight: 700; font-size: 17px; line-height: 1.35; max-width: 16ch; }
+
+/* ---------------------------------------------------------------- timeline: a walk poured through the sand */
+.sd-timeline .sd-stage { align-content: center; gap: 5vh; }
+.sd-timeline__title { font-size: clamp(60px, 6.6vw, 124px); max-width: 12ch; }
+.sd-walk { list-style: none; display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 3vw; }
+.sd-walk__item { display: grid; gap: 18px; align-content: start; }
+.sd-stop { display: block; width: 50px; height: 50px; border-radius: 50%; border: 3px solid var(--umber); }
+.sd-walk__when { display: block; font-family: var(--sd-hand); font-weight: 700; font-size: clamp(30px, 2.6vw, 46px); line-height: 1; margin-bottom: 6px; }
+.sd-walk__text h3 { font-family: var(--sd-serif); font-weight: 700; font-size: clamp(21px, 1.6vw, 26px); line-height: 1.2; margin-bottom: 6px; }
+.sd-walk__text p { font-size: clamp(16px, 1.2vw, 19px); line-height: 1.5; max-width: 26ch; }
+html.sd-live .sd-stop { visibility: hidden; }
+
+/* ---------------------------------------------------------------- quote: an iris swept clear in the sand */
+.sd-quote .sd-stage { place-content: center; justify-items: center; text-align: center; }
+.sd-iris { inset: 0; }
+.sd-quote__fig { width: min(24em, 70vw); position: relative; z-index: 1; margin: 0; }
+.sd-quote__fig blockquote { font-family: var(--sd-serif); font-style: italic; font-weight: 500; font-size: clamp(28px, 2.9vw, 50px); line-height: 1.24; text-wrap: balance; }
+.sd-quote__fig figcaption { margin-top: 24px; font-family: var(--sd-sc); font-weight: 700; font-size: 16px; letter-spacing: .06em; }
+.sd-quote__mark { position: absolute; left: 8vw; top: calc(var(--rim) + 9vh); font-size: clamp(240px, 42vh, 480px); }
+
+/* ---------------------------------------------------------------- faq */
+.sd-faq .sd-stage { grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); column-gap: 5vw; align-items: center; }
+.sd-column { position: relative; height: 70svh; display: grid; place-items: center; }
+.sd-faq__q { font-size: min(58svh, 30vw); }
+.sd-faq__copy { position: relative; z-index: 1; }
+.sd-faq__title { font-size: clamp(66px, 7.4vw, 140px); }
+.sd-faq__list { margin-top: 18px; }
+.sd-faq__list details { padding: 16px 0; border-bottom: 2px dotted rgba(42, 23, 9, .5); }
+.sd-faq__list summary { list-style: none; cursor: pointer; display: flex; gap: 16px; align-items: baseline; font-size: clamp(21px, 1.7vw, 27px); font-weight: 700; line-height: 1.25; }
+.sd-faq__list summary::-webkit-details-marker { display: none; }
+.sd-faq__list summary::before { content: "~"; font-family: var(--sd-hand); font-size: 1.3em; line-height: .6; transition: transform .35s; }
+.sd-faq__list details[open] summary::before { transform: rotate(90deg); }
+.sd-faq__list p { margin: 10px 0 4px 30px; font-size: clamp(17px, 1.25vw, 20px); line-height: 1.55; max-width: 44ch; }
+
+/* ---------------------------------------------------------------- cta: a ring of gathered sand around the light */
+.sd-cta .sd-stage { place-content: center; justify-items: center; text-align: center; }
+.sd-cta__title { font-size: clamp(76px, 9.6vw, 184px); max-width: 9ch; margin: 6px 0 3vh; }
+.sd-cta__well { padding: clamp(50px, 8vh, 90px) clamp(60px, 8vw, 120px); }
+
+/* ---------------------------------------------------------------- default blocks and scenes on the table */
+html.style-sand main > section:not(.sd-scene), html.style-sand main > div > section:not(.sd-scene) { position: relative; z-index: 2; }
+html.style-sand .ss-block:not(.sd-scene) { padding-left: calc(var(--rim) + 5vw); padding-right: calc(var(--rim) + 5vw); background: transparent; }
+html.style-sand .ss-block:not(.sd-scene) .ss-display, html.style-sand .ss-block:not(.sd-scene) .ss-h2, html.style-sand .ss-h1 { font-family: var(--sd-hand); font-weight: 700; }
+html.style-sand .ss-kicker, html.style-sand .ss-tag, html.style-sand .ss-eyebrow, html.style-sand .ss-when { font-family: var(--sd-sc); color: var(--ink); }
+html.style-sand .ss-tile, html.style-sand .ss-strip figure { background: rgba(255, 241, 204, .6); border-radius: 18px; }
+html.style-sand .ss-tile img, html.style-sand .ss-strip img { filter: sepia(.5); }
+html.style-sand .ss-caption { padding: 22px 28px; border-radius: 26px; transition: background .4s; }
+html.style-sand .ss-caption.ss-on { background: rgba(246, 223, 174, .92); box-shadow: 0 0 60px 30px rgba(246, 223, 174, .7); }
+html.style-sand .ss-caption .ss-h1, html.style-sand .ss-caption .ss-display { font-family: var(--sd-hand); font-weight: 700; color: var(--ink); font-size: clamp(48px, 5.4vw, 96px); }
+html.style-sand .ss-captions { left: calc(var(--rim) + 5vw); }
+html.style-sand .ss-hud, html.style-sand .ss-clock { font-family: var(--sd-sc); color: var(--ink); background: rgba(246, 223, 174, .9); padding: 12px 16px; border-radius: 18px; }
+html.style-sand .ss-row b { font-family: var(--sd-hand); font-weight: 700; color: var(--ink); }
+html.style-sand .ss-events li.ss-done::before { background: var(--umber); border-color: var(--umber); box-shadow: none; }
+html.style-sand .ss-bar i { background: var(--umber); }
+html.style-sand .ss-cue { font-family: var(--sd-hand); font-size: 22px; color: var(--ink); text-transform: none; letter-spacing: 0; }
+html.style-sand .ss-card { background: rgba(246, 223, 174, .92); padding: 28px; border-radius: 22px; }
+html.style-sand .ss-overlay .ss-stage { background: var(--walnut); }
+html.style-sand .ss-overlay .ss-shade { background: radial-gradient(130% 100% at 50% 50%, transparent 55%, rgba(42, 23, 9, .75)); }
+
+/* ---------------------------------------------------------------- footer on the rim */
+html.style-sand .ss-footer { position: relative; z-index: 45; background: var(--walnut); color: #e6c895; font-family: var(--sd-sc); font-size: 14px; border: 0; }
+html.style-sand .ss-footer a { color: var(--glass-hi); }
+html.style-sand .ss-looks { bottom: calc(var(--rim) + 12px); }
+
+/* ---------------------------------------------------------------- phones */
+@media (max-width: 760px) {
+  html.style-sand { --rim: 7px; }
+  .sd-rim::after { border-radius: 14px; }
+  .sd-top { top: calc(var(--rim) + 8px); left: 18px; right: 14px; gap: 12px; }
+  .sd-mark { font-size: 28px; }
+  .sd-links { display: none; }
+  .sd-top__cta { margin-left: auto; font-size: 14px; padding: 7px 14px; }
+  .sd-count { font-size: 19px; left: 18px; }
+  .sd-hint { display: none; }
+  .sd-stage, html.sd-live .sd-step-wrap { padding: calc(var(--rim) + 66px) 22px calc(var(--rim) + 60px); gap: 12px; }
+  .sd-hero .sd-stage, .sd-product .sd-stage, .sd-faq .sd-stage { grid-template-columns: minmax(0, 1fr); }
+  .sd-hero .sd-stage { align-content: start; }
+  .sd-hero__title { font-size: clamp(60px, 17vw, 84px); }
+  .sd-pic { height: 28svh; }
+  .sd-dunes { height: 12svh; }
+  .sd-lede { font-size: 17px; margin-top: 10px; }
+  .sd-btns { margin-top: 16px; }
+  .sd-btn { font-size: 15px; padding: 11px 20px; }
+  .sd-intro .sd-stage, html.sd-live .sd-features__head { padding-top: calc(var(--rim) + 80px); }
+  .sd-intro__copy { grid-template-columns: minmax(0, 1fr); }
+  .sd-intro__title, .sd-features__title { font-size: clamp(54px, 15vw, 76px); }
+  .sd-ripples { height: 34svh; }
+  .sd-spiral { width: 70vw; right: 50%; top: auto; bottom: 9svh; transform: translateX(50%); }
+  .sd-feat { grid-template-columns: minmax(0, 1fr); row-gap: 1svh; }
+  .sd-feat__disc { width: 32svh; max-width: 70vw; justify-self: center; }
+  .sd-feat__disc .sd-poured { font-size: 17svh; }
+  .sd-feat__title { font-size: clamp(48px, 13.5vw, 64px); }
+  html.sd-live .sd-feat { align-content: start; }
+  .sd-product .sd-stage { align-content: start; }
+  .sd-product--right .sd-product__media { order: 0; }
+  .sd-phone { height: 34svh; }
+  .sd-phone .ss-phone { width: 220px; zoom: .62; }
+  .sd-product__title { font-size: clamp(46px, 13vw, 64px); }
+  .sd-product .sd-lede { font-size: 16px; }
+  .sd-figs { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5svh 16px; }
+  .sd-stats--1 .sd-figs { grid-template-columns: minmax(0, 1fr); }
+  .sd-fig__v { font-size: clamp(54px, min(24vw, calc(84vw / 2 / var(--chars, 3) * 2)), 120px); }
+  .sd-fig__l { font-size: 15px; }
+  .sd-timeline .sd-stage { align-content: start; gap: 2svh; }
+  .sd-timeline__title { font-size: clamp(46px, 13vw, 64px); }
+  .sd-walk { grid-template-columns: minmax(0, 1fr); gap: 2.2svh; padding-left: 4px; }
+  .sd-walk__item { grid-template-columns: 34px minmax(0, 1fr); gap: 14px; }
+  .sd-stop { width: 30px; height: 30px; }
+  .sd-walk__when { font-size: 26px; }
+  .sd-walk__text h3 { font-size: 18px; }
+  .sd-walk__text p { font-size: 15px; }
+  .sd-quote__fig { width: 76vw; }
+  .sd-quote__fig blockquote { font-size: clamp(24px, 6.6vw, 30px); }
+  .sd-quote__mark { font-size: 24svh; left: 22px; top: calc(var(--rim) + 60px); }
+  .sd-faq .sd-stage { align-content: start; }
+  .sd-column { position: absolute; right: 10px; top: calc(var(--rim) + 50px); width: 40vw; height: 26svh; }
+  .sd-faq__q { font-size: 22svh; }
+  .sd-faq__title { font-size: clamp(54px, 15vw, 76px); }
+  .sd-faq__list summary { font-size: 19px; }
+  .sd-faq__list p { margin-left: 0; font-size: 16px; }
+  .sd-cta__title { font-size: clamp(58px, 17vw, 88px); }
+  .sd-cta__well { padding: 44px 36px; }
+}

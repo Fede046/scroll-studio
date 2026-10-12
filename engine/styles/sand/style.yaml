@@ -1,0 +1,23 @@
+# Sand animation: sand on a light table (Caroline Leaf, Ferenc Cakó, Kseniya Simonova). See docs/styles/styles-22-23.md
+# section 23 for the research.
+label: Sand
+about: One sand picture on a warm light table, never cut. Each scroll swings the side of a hand across it in an arm's arc, piling the old scene into a ridge and leaving the next behind it, words uncovered with the sand; a fingertip carves the headlines, a pinch of sand pours the numbers, and your pointer draws furrows that stay until the next sweep.
+mode: light
+colors:
+  bg: '#f2d8a4'
+  bg2: '#ebc98e'
+  ink: '#24150a'
+  accent: '#2c1a0c'
+  accent2: '#7a3f14'
+  accent_ink: '#f6e3bc'
+  accent_text: '#24150a'
+fonts:
+  display: Caveat
+  body: Alegreya
+  mono: Alegreya Sans SC
+font_axes:
+  Caveat: "wght@400..700"
+  Alegreya: "ital,wght@0,400..900;1,400..900"
+  Alegreya Sans SC: "wght@500;700"
+display_weight: 700
+radius: 999px

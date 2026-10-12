@@ -6,6 +6,10 @@ commits it spans so you can check out any earlier state (`git checkout <commit>`
 ## Unreleased
 
 ### Added
+- Styles `pinscreen` (a dark, lamp-lit board of pins after Alexeieff and Parker: each plate is a pin picture and a wave
+  of pins rolls it into the next; the pointer moves the lamp and presses pins) and `sand` (a backlit sand table after
+  Caroline Leaf: one scroll sweeps a mound of grains across into the next scene; pictures are poured and cleared in
+  sand, the pointer draws furrows). Research: docs/styles/styles-22-23.md.
 - Styles from classic animation: `flipbook` (a pad of animation paper; one scroll notch lets go of one page, so
   pencil drawings animate; drag the dog-ear to flip) and `pop-up-book` (one book on a table; scroll is the hinge angle,
   scenes rise out of the gutter, pull-tabs raise the stats, a paper wheel turns the timeline). Research:

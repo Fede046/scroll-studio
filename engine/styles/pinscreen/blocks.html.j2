@@ -1,0 +1,188 @@
+{# Pinscreen: every section is a plate set on one lamp-lit board of pins. A plate is a scroll spacer with a stage that
+   holds its copy; the runtime fixes the stage over the board and composes the plate's picture (a full tonal pinscreen
+   picture: lamp pool, smoky grain, sculpted lit relief) from the stage itself:
+     data-pin="sculpt"  a sculpted relief of this element's own glyphs, modelled by the lamp (decorative, aria-hidden)
+     data-pin="halo"    a crisp HTML heading whose words the pins answer with a soft lit relief behind them
+     data-pin="art|img|phone|slab|boss|ridge"   other relief sources
+     data-step="0 2"    only on these steps of a multi-step plate (absent = every step)
+     data-on="k"        the active one on step k (stats)
+   .pn-calm marks the copy: the pins behind it stand fully out, so ivory text always sits on deep black.
+   Without JavaScript the plates are ordinary sections in reading order. #}
+{% set types = ["hero", "intro", "features", "product", "stats", "timeline", "quote", "faq", "cta"] %}
+
+{% macro btns(list) %}{% if list %}<div class="pn-btns">{% for l in list %}<a class="pn-btn{% if loop.first %} pn-btn--hot{% endif %}" href="{{ l.href }}">{{ l.label }}</a>{% endfor %}</div>{% endif %}{% endmacro %}
+{% macro label(text, n=None) %}<p class="pn-label">{% if n %}<span class="pn-label__n">pl. {{ n }}</span>{% endif %}{{ text }}</p>{% endmacro %}
+{# the word a plate sculpts when it has no picture of its own: the title's emphasis, else its last word #}
+{% macro ghost(title) %}{% set parts = title.split('<em>') %}{% if parts | length > 1 %}{{ parts[1].split('</em>')[0] | striptags | trim }}{% else %}{{ (title | striptags).split() | last }}{% endif %}{% endmacro %}
+
+{% macro render(b, e, base, loop) %}
+{% set idattr %}{% if b.id %} id="{{ b.id }}"{% endif %}{% endset %}
+{% set num = "%02d" | format(loop.index) %}
+
+{% if b.type == "hero" %}
+<section class="pn-plate pn-hero" data-pn="hero" data-steps="1"{{ idattr }}>
+  <div class="pn-stage">
+    <div class="pn-copy pn-calm pn-hero__copy">
+      {% if b.badge %}{{ label(b.badge) }}{% endif %}
+      {% if e.first %}<h1 class="pn-head pn-hero__title" data-pin="halo">{{ b.title | rich }}</h1>{% else %}<h2 class="pn-head pn-hero__title" data-pin="halo">{{ b.title | rich }}</h2>{% endif %}
+      {% if b.body %}<p class="pn-lede">{{ b.body | rich }}</p>{% endif %}
+      {{ btns(b.buttons) }}
+    </div>
+    <div class="pn-subject">
+    {% if b.device %}<div class="pn-phonebox" data-pin="phone" data-origin>{{ base.phone(b.device, e.screen, e.clip) }}</div>
+    {% elif e.img %}<figure class="pn-pic" data-pin="img" data-origin><img src="{{ e.img }}" alt="" fetchpriority="high"></figure>
+    {% elif e.video %}<figure class="pn-pic" data-pin="img" data-origin><video src="{{ e.video }}" autoplay muted loop playsinline></video></figure>
+    {% elif art %}<figure class="pn-pic" data-pin="art" data-origin role="img" aria-label="{{ art.label }}"></figure>
+    {% else %}<span class="pn-sculpt pn-sculpt--word" data-pin="sculpt" data-origin aria-hidden="true">{{ ghost(b.title) }}</span>{% endif %}
+    </div>
+    <p class="pn-cue" aria-hidden="true">scroll to press the next plate · press and drag to draw</p>
+  </div>
+</section>
+
+{% elif b.type == "intro" %}
+<section class="pn-plate pn-intro" data-pn="intro" data-steps="1"{{ idattr }}>
+  <div class="pn-stage">
+    <span class="pn-sculpt pn-sculpt--word pn-intro__ghost" data-pin="sculpt" data-origin aria-hidden="true">{{ ghost(b.title) }}</span>
+    <div class="pn-copy pn-calm pn-intro__copy">
+      {% if b.kicker %}{{ label(b.kicker, num) }}{% endif %}
+      <h2 class="pn-head pn-intro__title" data-pin="halo">{{ b.title | rich }}</h2>
+      {% if b.body %}<p class="pn-lede">{{ b.body | rich }}</p>{% endif %}
+      {% if b.button %}<div class="pn-btns"><a class="pn-btn pn-btn--hot" href="{{ b.button.href }}">{{ b.button.label }}</a></div>{% endif %}
+    </div>
+  </div>
+</section>
+
+{% elif b.type == "features" %}
+{% set off = 1 if (b.title or b.kicker) else 0 %}
+<section class="pn-plate pn-features" data-pn="features" data-steps="{{ b.items | length + off }}"{{ idattr }}>
+  <div class="pn-stage">
+    {% if off %}<div class="pn-step-wrap" data-step="0">
+      <span class="pn-sculpt pn-sculpt--word pn-feats__ghost" data-pin="sculpt" data-origin aria-hidden="true">{{ ghost(b.title) if b.title else (b.items | length) }}</span>
+      <header class="pn-copy pn-calm pn-features__head">
+        {% if b.kicker %}{{ label(b.kicker, num) }}{% endif %}
+        {% if b.title %}<h2 class="pn-head pn-features__title" data-pin="halo">{{ b.title | rich }}</h2>{% endif %}
+        <p class="pn-note">{{ b.items | length }} plates follow</p>
+      </header>
+    </div>{% endif %}
+    <ol class="pn-feats">
+      {% for f in b.items %}
+      {% set short = f.tag and (f.tag | length) <= 3 %}
+      <li class="pn-feat pn-step-wrap" data-step="{{ loop.index0 + off }}">
+        <span class="pn-sculpt pn-sculpt--num" data-pin="sculpt" data-origin aria-hidden="true">{{ f.tag if short else ("%02d" | format(loop.index)) }}</span>
+        <div class="pn-copy pn-calm pn-feat__copy">
+          <p class="pn-label"><span class="pn-label__n">{{ loop.index }} / {{ b.items | length }}</span>{% if f.tag and not short %}{{ f.tag }}{% endif %}</p>
+          <h3 class="pn-head pn-feat__title" data-pin="halo">{{ f.title | rich }}</h3>
+          {% if f.body %}<p class="pn-lede">{{ f.body | rich }}</p>{% endif %}
+          {% if f.meter is not none %}<div class="pn-meter" role="img" aria-label="{{ (f.meter * 100) | round | int }}%"><i style="width: {{ (f.meter * 100) | round }}%"></i></div>{% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ol>
+  </div>
+</section>
+
+{% elif b.type == "product" %}
+<section class="pn-plate pn-product pn-product--{{ b.side }}" data-pn="product" data-steps="1"{{ idattr }}>
+  <div class="pn-stage">
+    <div class="pn-subject">
+      {% if b.device %}<div class="pn-phonebox" data-pin="phone" data-origin>{{ base.phone(b.device, e.screen, e.clip) }}</div>
+      {% elif e.img %}<figure class="pn-pic" data-pin="img" data-origin><img src="{{ e.img }}" alt="" loading="lazy"></figure>
+      {% else %}<span class="pn-sculpt pn-sculpt--word" data-pin="sculpt" data-origin aria-hidden="true">{{ ghost(b.title) }}</span>{% endif %}
+    </div>
+    <div class="pn-copy pn-calm pn-product__copy">
+      {% if b.kicker %}{{ label(b.kicker, num) }}{% endif %}
+      <h2 class="pn-head pn-product__title" data-pin="halo">{{ b.title | rich }}</h2>
+      {% if b.body %}<p class="pn-lede">{{ b.body | rich }}</p>{% endif %}
+      {% if b.stats %}<dl class="pn-pstats">{% for st in b.stats %}<div><dd>{{ st.value }}{% if st.unit %}<small>{{ st.unit }}</small>{% endif %}</dd><dt>{{ st.label }}</dt></div>{% endfor %}</dl>
+      {% elif b.tags %}<ul class="pn-tags">{% for t in b.tags %}<li>{{ t }}</li>{% endfor %}</ul>{% endif %}
+      {{ btns(b.buttons) }}
+      {% if b.note %}<p class="pn-note">{{ b.note | rich }}</p>{% endif %}
+    </div>
+  </div>
+</section>
+
+{% elif b.type == "stats" %}
+<section class="pn-plate pn-stats pn-stats--{{ [b.items | length, 5] | min }}" data-pn="stats" data-steps="{{ b.items | length }}" data-sundial{{ idattr }}>
+  <div class="pn-stage">
+    {% for st in b.items %}<span class="pn-sculpt pn-sculpt--stat" data-pin="sculpt" data-step="{{ loop.index0 }}" data-origin aria-hidden="true" style="--len: {{ (st.value | length) + ((st.unit or '') | length) * 0.5 }}">{{ st.value }}{% if st.unit %}<small>{{ st.unit }}</small>{% endif %}</span>{% endfor %}
+    <p class="pn-label pn-stats__cap"><span class="pn-label__n">pl. {{ num }}</span>the figures, lit one by one</p>
+    <dl class="pn-dial pn-calm">
+      {% for st in b.items %}
+      <div class="pn-stat" data-on="{{ loop.index0 }}">
+        <dd class="pn-stat__v">{{ st.value }}{% if st.unit %}<small>{{ st.unit }}</small>{% endif %}</dd>
+        <dt class="pn-stat__l">{{ st.label }}</dt>
+      </div>
+      {% endfor %}
+    </dl>
+  </div>
+</section>
+
+{% elif b.type == "timeline" %}
+{% set off = 1 if (b.title or b.kicker) else 0 %}
+{% set n = b.items | length %}
+<section class="pn-plate pn-timeline" data-pn="timeline" data-steps="{{ n + off }}"{{ idattr }}>
+  <div class="pn-stage">
+    {% if off %}<div class="pn-step-wrap" data-step="0">
+      <span class="pn-sculpt pn-sculpt--word pn-tl__ghost" data-pin="sculpt" data-origin aria-hidden="true">{{ ghost(b.title) if b.title else b.kicker }}</span>
+      <header class="pn-copy pn-calm pn-timeline__head">
+        {% if b.kicker %}{{ label(b.kicker, num) }}{% endif %}
+        {% if b.title %}<h2 class="pn-head pn-timeline__title" data-pin="halo">{{ b.title | rich }}</h2>{% endif %}
+      </header>
+    </div>{% endif %}
+    <div class="pn-ridge" aria-hidden="true">
+      {% for t in b.items %}<span class="pn-ridge__seg" data-pin="ridge" data-step="{% for k in range(loop.index0 + off, n + off) %}{{ k }} {% endfor %}" style="--a: {{ loop.index0 / n }}; --b: {{ (loop.index0 + 1) / n }}"></span>{% endfor %}
+      {% for t in b.items %}<span class="pn-ridge__boss" data-pin="boss" data-on="{{ loop.index0 + off }}" data-step="{% for k in range(loop.index0 + off, n + off) %}{{ k }} {% endfor %}" style="--x: {{ (loop.index0 + 1) / n }}"></span>{% endfor %}
+    </div>
+    <ol class="pn-steps">
+      {% for t in b.items %}
+      <li class="pn-step pn-step-wrap" data-step="{{ loop.index0 + off }}">
+        <span class="pn-sculpt pn-sculpt--when" data-pin="sculpt" data-origin aria-hidden="true">{{ t.when }}</span>
+        <div class="pn-copy pn-calm pn-step__copy">
+          <p class="pn-label"><span class="pn-label__n">{{ loop.index }} / {{ n }}</span>{{ t.when }}</p>
+          <h3 class="pn-head pn-step__title" data-pin="halo">{{ t.title | rich }}</h3>
+          {% if t.body %}<p class="pn-lede">{{ t.body | rich }}</p>{% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ol>
+  </div>
+</section>
+
+{% elif b.type == "quote" %}
+<section class="pn-plate pn-quote" data-pn="quote" data-steps="1" data-lamp="low"{{ idattr }}>
+  <div class="pn-stage">
+    <span class="pn-sculpt pn-sculpt--mark" data-pin="sculpt" data-origin aria-hidden="true">“</span>
+    <span class="pn-sculpt pn-sculpt--mark pn-sculpt--end" data-pin="sculpt" aria-hidden="true">”</span>
+    <figure class="pn-copy pn-calm pn-quote__fig">
+      <blockquote>{{ b.text | rich }}</blockquote>
+      {% if b.who %}<figcaption>{{ b.who }}</figcaption>{% endif %}
+    </figure>
+  </div>
+</section>
+
+{% elif b.type == "faq" %}
+<section class="pn-plate pn-faq" data-pn="faq" data-steps="1"{{ idattr }}>
+  <div class="pn-stage">
+    <span class="pn-sculpt pn-sculpt--q" data-pin="sculpt" data-origin aria-hidden="true">?</span>
+    <div class="pn-copy pn-calm pn-faq__copy">
+      {% if b.kicker %}{{ label(b.kicker, num) }}{% endif %}
+      <h2 class="pn-head pn-faq__title" data-pin="halo">{{ b.title | rich }}</h2>
+      <div class="pn-faq__list">
+        {% for it in b.items %}<details{% if loop.first %} open{% endif %}><summary><span class="pn-faq__n">{{ "%02d" | format(loop.index) }}</span>{{ it.q | rich }}</summary><p>{{ it.a | rich }}</p></details>{% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+
+{% elif b.type == "cta" %}
+<section class="pn-plate pn-cta" data-pn="cta" data-steps="1"{{ idattr }}>
+  <div class="pn-stage">
+    <div class="pn-copy pn-calm pn-cta__copy">
+      {% if b.kicker %}{{ label(b.kicker) }}{% endif %}
+      <h2 class="pn-head pn-cta__title" data-pin="halo">{{ b.title | rich }}</h2>
+    </div>
+    {% if b.button %}<div class="pn-cta__slab" data-pin="slab" data-origin><a class="pn-btn pn-btn--hot pn-btn--big" href="{{ b.button.href }}">{{ b.button.label }}</a></div>{% endif %}
+  </div>
+</section>
+{% endif %}
+{% endmacro %}
