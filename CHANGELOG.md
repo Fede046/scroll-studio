@@ -10,6 +10,13 @@ commits it spans so you can check out any earlier state (`git checkout <commit>`
   of pins rolls it into the next; the pointer moves the lamp and presses pins) and `sand` (a backlit sand table after
   Caroline Leaf: one scroll sweeps a mound of grains across into the next scene; pictures are poured and cleared in
   sand, the pointer draws furrows). Research: docs/styles/styles-22-23.md.
+- `type` scene `mode: weight`: words grow from thin and faint to heavy and solid in reading order, on a variable
+  display face (`weights: [200, 800]`). Lines (split with ` / `) are sized at the heaviest weight so the finished
+  passage fits the screen and nothing reflows on the way.
+- `theme.labels: plain`: kickers, tags, timeline dates and the footer in sentence case in the body face, for brands
+  that never set spaced capitals.
+- `theme.display_em: heavy`: emphasis as a change of weight (upright, the text's own colour, the heaviest weight).
+- `footer.links`: links in the footer to pages hosted elsewhere, such as a privacy policy.
 - Styles from classic animation: `flipbook` (a pad of animation paper; one scroll notch lets go of one page, so
   pencil drawings animate; drag the dog-ear to flip) and `pop-up-book` (one book on a table; scroll is the hinge angle,
   scenes rise out of the gutter, pull-tabs raise the stats, a paper wheel turns the timeline). Research:
@@ -31,6 +38,8 @@ commits it spans so you can check out any earlier state (`git checkout <commit>`
   background, a light one on black.
 
 ### Changed
+- `type` scene `mode: swap`: on a narrow screen the rolling word shrinks until the longest one fits (it used to run off
+  the edge on phones); the fixed words keep their size.
 - `code` scene follows the scroll exactly (no trailing flight after you stop), draws lighter frames, and warms up the GPU
   behind the loader.
 - `particles`: the hero is a field that fills the whole screen (the art, when there is one) and drifts apart as you

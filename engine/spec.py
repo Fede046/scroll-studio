@@ -377,9 +377,14 @@ class SplatScene(SceneBase):
 class TypeScene(SceneBase):
     """Kinetic typography driven by scroll."""
     type: Literal["type"] = "type"
-    mode: Literal["reveal", "stack", "swap", "scale"] = "reveal"
-    text: str = Field("", description="reveal/scale: the passage; swap: the fixed part")
+    mode: Literal["reveal", "stack", "swap", "scale", "weight"] = Field(
+        "reveal", description="reveal: words light up in reading order; stack: lines slam in; swap: one word rolls "
+                              "through `words`; scale: one phrase settles then bursts; weight: words grow from thin and "
+                              "faint to heavy and solid in reading order (a variable display face; ' / ' breaks lines)")
+    text: str = Field("", description="reveal/scale/weight: the passage; swap: the fixed part")
     words: list[str] = Field(default_factory=list, description="swap: the words that cycle")
+    weights: list[int] = Field(default_factory=lambda: [200, 800], min_length=2, max_length=2,
+                               description="weight: the display face's weight at the start and at the end")
     length: float = 3.0
     size: Literal["passage", "display"] = Field(
         "passage", description="passage: reading size, left-aligned. display: a headline, bigger and centred")
@@ -664,9 +669,14 @@ class Theme(Model):
     fonts: dict[str, str] = Field(default_factory=dict, description="Google Fonts families: display, body, mono")
     display_weight: Optional[int] = None
     display_italic_em: Optional[bool] = Field(None, description="Render <em> accent words in italic")
-    display_em: Optional[Literal["accent", "bold"]] = Field(
-        None, description="How <em> words are set: accent (the accent colour, italic when display_italic_em) or "
-                          "bold (bold italics in the text's own colour, so a headline reads as one face)")
+    display_em: Optional[Literal["accent", "bold", "heavy"]] = Field(
+        None, description="How <em> words are set: accent (the accent colour, italic when display_italic_em), "
+                          "bold (bold italics in the text's own colour, so a headline reads as one face) or heavy "
+                          "(upright, the text's own colour, at the face's heaviest weight: pair with a light "
+                          "display_weight so emphasis is a change of weight)")
+    labels: Optional[Literal["caps", "plain"]] = Field(
+        None, description="Small labels (kickers, tags, timeline dates): caps (spaced capitals in the mono face, the "
+                          "default) or plain (sentence case in the body face, for brands that never set all-caps)")
     display_optical_size: Optional[int] = Field(
         None, description="Pin the display face's optical size (variable fonts such as Fraunces or Newsreader grow "
                           "more expressive at large sizes; 36-48 keeps headlines calm)")
@@ -693,6 +703,8 @@ class Loader(Model):
 class Footer(Model):
     left: Optional[str] = None
     right: Optional[str] = None
+    links: list[Link] = Field(default_factory=list, description="Links shown before `right`, e.g. a privacy policy "
+                                                                 "or terms hosted elsewhere (`pages:` adds its own)")
 
 
 class Scroll(Model):

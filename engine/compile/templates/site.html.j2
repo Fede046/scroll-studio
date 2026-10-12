@@ -104,6 +104,16 @@
   em, .mode-light em, [class*="ss-surface-"] em { color: inherit; font-style: italic; font-weight: 650; }
   .ss-surface-dark .ss-type--swap .roll { color: inherit; }
 {% endif %}
+{% if theme.em == "heavy" %}
+  /* Emphasis as a change of weight (theme.display_em: heavy): upright, the text's own colour, the heaviest weight. */
+  em, .mode-light em, [class*="ss-surface-"] em { color: inherit; font-style: normal; font-weight: 800; }
+  .ss-surface-dark .ss-type--swap .roll { color: inherit; }
+{% endif %}
+{% if theme.labels == "plain" %}
+  /* Small labels in sentence case in the body face (theme.labels: plain). */
+  .ss-kicker, .ss-num, .ss-eyebrow, .ss-tag, .ss-when { font-family: var(--font-body); font-size: 14px; font-weight: 500; letter-spacing: 0; text-transform: none; }
+  .ss-footer__in { font-family: var(--font-body); }
+{% endif %}
   .ss-h1, .ss-display { text-wrap: balance; }
 </style>
 {% if site.loader.enabled %}
@@ -166,7 +176,7 @@
 
 <footer class="ss-footer"><div class="ss-wrap ss-footer__in">
   <span>{{ (site.footer.left or ("© " ~ site.name)) | rich }}</span>
-  <span>{% for l in page_links %}<a href="{{ l.href }}">{{ l.label }}</a> · {% endfor %}{{ (site.footer.right or "") | rich }}{% for c in credits %}{% if loop.first and site.footer.right %} · {% endif %}{{ c }}{% if not loop.last %} · {% endif %}{% endfor %}</span>
+  <span>{% for l in page_links %}<a href="{{ l.href }}">{{ l.label }}</a> · {% endfor %}{% for l in site.footer.links %}<a href="{{ l.href }}">{{ l.label }}</a> · {% endfor %}{{ (site.footer.right or "") | rich }}{% for c in credits %}{% if loop.first and site.footer.right %} · {% endif %}{{ c }}{% if not loop.last %} · {% endif %}{% endfor %}</span>
 </div></footer>
 
 <script>window.__ssScroll = { speed: {{ site.scroll.speed }} };</script>

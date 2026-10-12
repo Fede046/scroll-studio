@@ -112,6 +112,7 @@ def resolve(theme: Theme) -> dict:
         "display_weight": theme.display_weight or base.get("display_weight", 500),
         "em_italic": base.get("em_italic", False) if theme.display_italic_em is None else theme.display_italic_em,
         "em": theme.display_em or base.get("display_em", "accent"),
+        "labels": theme.labels or base.get("labels", "caps"),
         "display_opsz": theme.display_optical_size or base.get("display_optical_size"),
         "radius": theme.radius or base.get("radius", "4px"),
     }
