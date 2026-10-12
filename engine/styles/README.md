@@ -5,7 +5,7 @@ content is laid out and arrives, how the pointer behaves, and how sections hand 
 same scroll mechanic, layout and transitions are one style in two colours, and fail review.
 
 The research behind each style (origin, layout, scroll and pointer behaviour, components, type, implementation,
-anti-patterns, and a one-paragraph UX signature) is in [docs/styles/](../../docs/styles/) (styles-01-05.md ... styles-16-21.md).
+anti-patterns, and a one-paragraph UX signature) is in [docs/styles/](../../docs/styles/) (styles-01-05.md ... styles-26-27.md).
 
 ## A style is a folder
 

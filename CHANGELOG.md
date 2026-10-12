@@ -6,6 +6,10 @@ commits it spans so you can check out any earlier state (`git checkout <commit>`
 ## Unreleased
 
 ### Added
+- Styles from classic animation: `flipbook` (a pad of animation paper; one scroll notch lets go of one page, so
+  pencil drawings animate; drag the dog-ear to flip) and `pop-up-book` (one book on a table; scroll is the hinge angle,
+  scenes rise out of the gutter, pull-tabs raise the stats, a paper wheel turns the timeline). Research:
+  docs/styles/styles-24-25.md and styles-26-27.md.
 - `film` with `beats:`: a story told in shots. Each beat is a generated still animated by LTX-2.3, cached on its own and
   crossfaded into the next; captions pin to beats (`state: { beat: … }`). Example: Feel.
   Beats take `strength`, `motion_seed` and `trim` for action shots that freeze on their first frame.

@@ -46,7 +46,7 @@ Full history of every version: [CHANGELOG.md](CHANGELOG.md).
   compressed to SPZ at build time and walked through on scroll. ([Hollis House](examples/hollis-house/site.yaml))
 - **Numbers you can check** (`chart` callouts, `stats` bound to data): headline figures and chart notes are read
   from the source CSV when the site is built, so the copy can't drift from the data. ([Pelorus](examples/pelorus/site.yaml))
-- **Twenty-one styles that change the experience, not just the paint** (`theme: { style: … }`). Each style has its
+- **Twenty-three styles that change the experience, not just the paint** (`theme: { style: … }`). Each style has its
   own scroll mechanic, layout, transitions and components, built from in-depth research
   ([docs/styles](docs/styles/)): split-flap is a departures board that updates as the clock advances, comic-book is
   read panel by panel, anime-intro cuts like an anime opening, ASCII is a terminal session, blueprint is a drawing
@@ -192,6 +192,8 @@ as a departures board, a comic, a terminal session, a game level or an anime ope
 | `art-deco` | An opening night: doors, sunbursts, marquees |
 | `neo-brutalism` | A desk you fill up and can mess with |
 | `anime-intro` | Scrubbing the playhead of an anime opening, cut by cut |
+| `flipbook` | Thumbing a pad of pencil drawings, one page per notch |
+| `pop-up-book` | Opening a pop-up book: scenes fold up out of the gutter, tabs pull |
 
 ```bash
 studio looks examples/halcyon            # dist/looks/<style>/ for every style, plus a gallery at dist/looks/

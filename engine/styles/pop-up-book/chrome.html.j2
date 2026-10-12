@@ -1,0 +1,24 @@
+{# Pop-up book furniture: a running head across the top (the book's title in small caps, the contents as ribbon
+   bookmarks, the call to action as a red ribbon), a spread counter, and a spare cover the runtime binds onto a book
+   whose first section is not a hero. The colophon at the foot replaces the default footer's look. #}
+{% macro top(site, sections, nav_links) %}
+<header class="pb-head">
+  <a class="pb-head__title" href="#">{{ site.name }}</a>
+  <nav class="pb-head__ribbons" aria-label="Contents">{% for l in nav_links %}<a href="{{ l.href }}"><span>{{ l.label }}</span></a>{% endfor %}</nav>
+  {% if site.nav.cta %}<a class="pb-head__cta" href="{{ site.nav.cta.href }}">{{ site.nav.cta.label }}</a>{% endif %}
+</header>
+<p class="pb-pages" aria-hidden="true"><span data-pb="pages">Cover</span></p>
+<template id="pb-gencover">
+  <div class="pb-cover pb-cover--plain" aria-hidden="true">
+    <div class="pb-cover__cloth"></div>
+    <div class="pb-cover__label">
+      <p class="pb-cover__title">{{ site.name }}</p>
+      <span class="pb-rule"></span>
+      {% if site.description %}<p class="pb-cover__body">{{ site.description }}</p>{% endif %}
+    </div>
+    <p class="pb-cover__cue"><span>Scroll to open the book</span><i></i></p>
+  </div>
+</template>
+{% endmacro %}
+
+{% macro bottom(site, sections) %}{% endmacro %}

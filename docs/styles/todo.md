@@ -2,7 +2,7 @@
 
 Styles 22 to 33 come from classic animation techniques. Each one is a way of moving through a page, not a skin.
 
-## In progress (styles 22 to 27)
+## Shipped: `flipbook`, `pop-up-book`. In rework: `pinscreen`, `sand`, `zoetrope`, `rotoscope` (styles 22 to 27)
 
 | Style | Technique | What moving through the page does |
 |---|---|---|

@@ -1,0 +1,250 @@
+{# Pop-up book: every section is a SPREAD of a 90-degree "stage" pop-up book (Kubasta's panoramas): the back page
+   stands upright (the WALL, printed with the reading text), the base page lies flat (the FLOOR), and die-cut paper
+   pieces stand between them on parallel folds. Without JavaScript (and with reduced motion) each spread is a still,
+   fully opened diorama in CSS 3D; runtime/src/styles/pop-up-book.ts gathers the spreads into one book on a table and
+   ties every fold, tab and wheel to the page's opening angle as you scroll.
+   Pieces: .pb-flat stands at depth --d (share of the floor, measured from the spine), centred on --x, --w wide; it
+   rises with the spread's opening angle --a. A paper-engineering rule is kept: a piece at depth d is never taller than
+   the floor left in front of it (1 - d), so it folds flat inside the closed book. #}
+{% set types = ["hero", "intro", "features", "product", "stats", "timeline", "quote", "faq", "cta"] %}
+
+{% macro folio(loop, side) %}<span class="pb-folio pb-folio--{{ side }}" aria-hidden="true">{{ loop.index * 2 + (0 if side == "wall" else 1) }}</span>{% endmacro %}
+
+{# a headline cut out of card and stood up on the floor: the part before <em> and the emphasised part are separate
+   pieces at two depths. data-t carries the plain words so the piece can cast a letter-shaped shadow. #}
+{% macro diecut(title, e, d1=34, d2=56, cls="") %}
+{% set tag = "h1" if e.first else "h2" %}
+{% set parts = title.split("<em>") %}
+<{{ tag }} class="pb-diecut {{ cls }}">
+{%- if parts | length > 1 %}{% set rest = parts[1].split("</em>") %}
+{%- if parts[0] | trim %}<span class="pb-flat pb-word pb-word--a" style="--d: {{ d1 }}%" data-t="{{ parts[0] | striptags | trim }}">{{ parts[0] | rich }}</span> {% endif -%}
+<span class="pb-flat pb-word pb-word--b" style="--d: {{ d2 if parts[0] | trim else d1 }}%" data-t="{{ (rest[0] ~ (rest[1] if rest | length > 1 else '')) | striptags | trim }}"><em>{{ rest[0] | rich }}</em>{% if rest | length > 1 %}{{ rest[1] | rich }}{% endif %}</span>
+{%- else %}<span class="pb-flat pb-word pb-word--a" style="--d: {{ d1 }}%" data-t="{{ title | striptags | trim }}">{{ title | rich }}</span>{% endif -%}
+</{{ tag }}>
+{% endmacro %}
+
+{% macro btns(list, cls="") %}{% if list %}<div class="pb-btns {{ cls }}">{% for l in list %}<a class="pb-btn{% if loop.first %} pb-btn--hot{% endif %}" href="{{ l.href }}">{{ l.label }}{% if loop.first %} <span class="pb-arrow" aria-hidden="true">→</span>{% endif %}</a>{% endfor %}</div>{% endif %}{% endmacro %}
+
+{# a pull-tab poking out of the floor's front edge; the runtime slides it as the spread's mechanism runs #}
+{% macro tab(label="Pull", x=50, cls="") %}<span class="pb-tab {{ cls }}" style="--x: {{ x }}%" aria-hidden="true"><b>{{ label }}</b><i></i></span>{% endmacro %}
+
+{% macro render(b, e, base, loop) %}
+{% set no = loop.index %}
+
+{# ---------------------------------------------------------------- hero: the book's cover (first section) or a title spread #}
+{% if b.type == "hero" and e.first %}
+<section class="pb-spread pb-spread--cover{% if e.img or e.video %} pb-cover--plate{% endif %}" data-kind="cover"{% if b.id %} id="{{ b.id }}"{% endif %}>
+  <div class="pb-cover">
+    <div class="pb-cover__cloth" aria-hidden="true"></div>
+    <div class="pb-cover__label">
+      {% if b.badge %}<p class="pb-seal"><span>{{ b.badge }}</span></p>{% endif %}
+      {% if e.img or e.video %}<figure class="pb-plate">{% if e.video %}<video src="{{ e.video }}" autoplay muted loop playsinline{% if e.img %} poster="{{ e.img }}"{% endif %}></video>{% else %}<img src="{{ e.img }}" alt="" fetchpriority="high">{% endif %}</figure>{% endif %}
+      <h1 class="pb-cover__title">{{ b.title | rich }}</h1>
+      <span class="pb-rule" aria-hidden="true"></span>
+      {% if b.body %}<p class="pb-cover__body">{{ b.body | rich }}</p>{% endif %}
+      {{ btns(b.buttons, "pb-btns--cover") }}
+      {% if b.device %}<div class="pb-cover__phone">{{ base.phone(b.device, e.screen, e.clip) }}</div>{% endif %}
+    </div>
+    <p class="pb-cover__cue" aria-hidden="true"><span>Scroll to open the book</span><i></i></p>
+  </div>
+</section>
+
+{% elif b.type == "hero" %}
+<section class="pb-spread pb-spread--hero" data-kind="hero" data-hold="0.5"{% if b.id %} id="{{ b.id }}"{% endif %}>
+  <div class="pb-floor">
+    {{ diecut(b.title, e, 40, 60) }}
+    {% if e.img or e.video %}<figure class="pb-flat pb-frame" style="--d: 18%; --x: 50%"><span class="pb-frame__in">{% if e.video %}<video src="{{ e.video }}" autoplay muted loop playsinline{% if e.img %} poster="{{ e.img }}"{% endif %}></video>{% else %}<img src="{{ e.img }}" alt="" loading="lazy">{% endif %}</span></figure>{% endif %}
+    {{ folio(loop, "floor") }}
+  </div>
+  <div class="pb-wall">
+    <div class="pb-print pb-print--side">
+      {% if b.badge %}<p class="pb-kicker">{{ b.badge }}</p>{% endif %}
+      {% if b.body %}<p class="pb-body">{{ b.body | rich }}</p>{% endif %}
+      {{ btns(b.buttons) }}
+    </div>
+    {{ folio(loop, "wall") }}
+  </div>
+</section>
+
+{# ---------------------------------------------------------------- intro: the headline stands up out of the gutter #}
+{% elif b.type == "intro" %}
+<section class="pb-spread pb-spread--intro" data-kind="intro" data-hold="0.45"{% if b.id %} id="{{ b.id }}"{% endif %}>
+  <div class="pb-floor">
+    {{ diecut(b.title, e, 36, 58) }}
+    <span class="pb-hill pb-hill--a pb-flat" style="--d: 14%" aria-hidden="true"></span>
+    <span class="pb-hill pb-hill--b pb-flat" style="--d: 22%" aria-hidden="true"></span>
+    {{ folio(loop, "floor") }}
+  </div>
+  <div class="pb-wall">
+    <div class="pb-print pb-print--top">
+      {% if b.kicker %}<p class="pb-kicker">{{ b.kicker }}</p>{% endif %}
+      {% if b.body %}<p class="pb-body pb-body--lead">{{ b.body | rich }}</p>{% endif %}
+      {% if b.button %}<div class="pb-btns"><a class="pb-btn pb-btn--hot" href="{{ b.button.href }}">{{ b.button.label }} <span class="pb-arrow" aria-hidden="true">→</span></a></div>{% endif %}
+    </div>
+    <span class="pb-sun" aria-hidden="true"></span>
+    {{ folio(loop, "wall") }}
+  </div>
+</section>
+
+{# ---------------------------------------------------------------- features: a row of standing cards, pushed forward one at a time by a pull-tab #}
+{% elif b.type == "features" %}
+{% set n = b.items | length %}
+<section class="pb-spread pb-spread--features" data-kind="features" data-hold="{{ (0.55 * n) | round(2) }}" style="--n: {{ n }}"{% if b.id %} id="{{ b.id }}"{% endif %}>
+  <div class="pb-wall">
+    <div class="pb-print pb-print--top pb-print--center">
+      {% if b.kicker %}<p class="pb-kicker">{{ b.kicker }}</p>{% endif %}
+      {% if b.title %}{% if e.first %}<h1 class="pb-title">{{ b.title | rich }}</h1>{% else %}<h2 class="pb-title">{{ b.title | rich }}</h2>{% endif %}{% endif %}
+    </div>
+    {{ folio(loop, "wall") }}
+  </div>
+  <div class="pb-floor">
+    <ul class="pb-cards pb-cards--{{ n }}">
+      {% for f in b.items %}
+      <li class="pb-flat pb-card pb-card--{{ loop.index0 % 4 }}" style="--i: {{ loop.index0 }}">
+        <span class="pb-card__no" aria-hidden="true">{{ f.tag or loop.index }}</span>
+        <h3>{{ f.title | rich }}</h3>
+        {% if f.body %}<p>{{ f.body | rich }}</p>{% endif %}
+        {% if f.meter is not none %}<span class="pb-meter" aria-hidden="true"><i style="width: {{ (f.meter * 100) | round }}%"></i></span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {{ tab("Pull", 88, "pb-tab--slide") }}
+    {{ folio(loop, "floor") }}
+  </div>
+</section>
+
+{# ---------------------------------------------------------------- product: the phone stands up; a tab slides the selection down its screen #}
+{% elif b.type == "product" %}
+{% set opts = (b.device.options | length) if b.device else 0 %}
+<section class="pb-spread pb-spread--product pb-side--{{ b.side }}" data-kind="product" data-hold="{{ ([opts, 1] | max * 0.4) | round(2) }}"{% if b.id %} id="{{ b.id }}"{% endif %}>
+  <div class="pb-wall">
+    <div class="pb-print pb-print--side">
+      {% if b.kicker %}<p class="pb-kicker">{{ b.kicker }}</p>{% endif %}
+      {% if e.first %}<h1 class="pb-title">{{ b.title | rich }}</h1>{% else %}<h2 class="pb-title">{{ b.title | rich }}</h2>{% endif %}
+      {% if b.body %}<p class="pb-body">{{ b.body | rich }}</p>{% endif %}
+      {% if b.stats %}<ul class="pb-figs">{% for st in b.stats %}<li><b>{{ st.value }}{% if st.unit %}<small>{{ st.unit }}</small>{% endif %}</b><span>{{ st.label }}</span></li>{% endfor %}</ul>
+      {% elif b.tags %}<ul class="pb-labels">{% for t in b.tags %}<li>{{ t }}</li>{% endfor %}</ul>{% endif %}
+      {{ btns(b.buttons) }}
+      {% if b.note %}<p class="pb-small">{{ b.note | rich }}</p>{% endif %}
+    </div>
+    <span class="pb-sun pb-sun--product" aria-hidden="true"></span>
+    {{ folio(loop, "wall") }}
+  </div>
+  <div class="pb-floor">
+    <span class="pb-flat pb-halo" style="--d: 16%" aria-hidden="true"></span>
+    {% if b.device %}<div class="pb-flat pb-device" style="--d: 30%"><div class="pb-device__in">{{ base.phone(b.device, e.screen, e.clip) }}</div></div>
+    {% elif e.img %}<figure class="pb-flat pb-frame pb-frame--product" style="--d: 26%"><span class="pb-frame__in"><img src="{{ e.img }}" alt="" loading="lazy"></span></figure>{% endif %}
+    {% if b.behind %}<div class="pb-flat pb-device pb-device--behind" style="--d: 20%"><div class="pb-device__in">{{ base.phone(b.behind, e.behind, e.behind_clip) }}</div></div>{% endif %}
+    {% if opts > 1 %}{{ tab("Pull", 50, "pb-tab--slide pb-tab--device") }}{% endif %}
+    {{ folio(loop, "floor") }}
+  </div>
+</section>
+
+{# ---------------------------------------------------------------- stats: pull a tab and a strip with the figure rises out of a slot #}
+{% elif b.type == "stats" %}
+{% set n = b.items | length %}
+<section class="pb-spread pb-spread--stats" data-kind="stats" data-hold="{{ (0.32 * n + 0.3) | round(2) }}" style="--n: {{ n }}"{% if b.id %} id="{{ b.id }}"{% endif %}>
+  <div class="pb-wall">
+    <div class="pb-print pb-print--fill">
+      <ul class="pb-slots pb-slots--{{ n }}">
+        {% for st in b.items %}
+        <li class="pb-slot" style="--i: {{ loop.index0 }}">
+          <span class="pb-slot__win"><span class="pb-strip"><b>{{ st.value }}{% if st.unit %}<small>{{ st.unit }}</small>{% endif %}</b></span></span>
+          <span class="pb-slot__label">{{ st.label }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {{ folio(loop, "wall") }}
+  </div>
+  <div class="pb-floor">
+    <div class="pb-tabs">{% for st in b.items %}{{ tab("Pull", (100 / n) * (loop.index0 + 0.5), "pb-tab--stat") }}{% endfor %}</div>
+    <span class="pb-flat pb-bunting" style="--d: 20%" aria-hidden="true"></span>
+    {{ folio(loop, "floor") }}
+  </div>
+</section>
+
+{# ---------------------------------------------------------------- timeline: a wheel (volvelle) behind a window; flags stand along a path #}
+{% elif b.type == "timeline" %}
+{% set n = b.items | length %}
+<section class="pb-spread pb-spread--timeline" data-kind="timeline" data-hold="{{ (0.6 * n) | round(2) }}" style="--n: {{ n }}"{% if b.id %} id="{{ b.id }}"{% endif %}>
+  <div class="pb-wall">
+    <div class="pb-print pb-print--split">
+      <div class="pb-split__head">
+        {% if b.kicker %}<p class="pb-kicker">{{ b.kicker }}</p>{% endif %}
+        {% if b.title %}{% if e.first %}<h1 class="pb-title">{{ b.title | rich }}</h1>{% else %}<h2 class="pb-title">{{ b.title | rich }}</h2>{% endif %}{% endif %}
+      </div>
+      <ol class="pb-steps">
+        {% for t in b.items %}<li class="pb-step" style="--i: {{ loop.index0 }}"><span class="pb-step__when">{{ t.when }}</span><b class="pb-step__t">{{ t.title | rich }}</b>{% if t.body %}<span class="pb-step__b">{{ t.body | rich }}</span>{% endif %}</li>{% endfor %}
+      </ol>
+    </div>
+    {{ folio(loop, "wall") }}
+  </div>
+  <div class="pb-floor">
+    <div class="pb-path" aria-hidden="true">{% for t in b.items %}<span class="pb-flat pb-flag" style="--i: {{ loop.index0 }}; --x: {{ 14 + (72 / ([n - 1, 1] | max)) * loop.index0 }}%; --d: {{ 70 - (44 / ([n - 1, 1] | max)) * loop.index0 }}%"><b>{{ t.when }}</b></span>{% endfor %}</div>
+    {{ folio(loop, "floor") }}
+  </div>
+</section>
+
+{# ---------------------------------------------------------------- quote: a speech balloon cut from card #}
+{% elif b.type == "quote" %}
+<section class="pb-spread pb-spread--quote" data-kind="quote" data-hold="0.4"{% if b.id %} id="{{ b.id }}"{% endif %}>
+  <div class="pb-floor">
+    <figure class="pb-flat pb-balloon" style="--d: 34%">
+      <blockquote>{{ b.text | rich }}</blockquote>
+    </figure>
+    {% if b.who %}<p class="pb-caption">— {{ b.who }}</p>{% endif %}
+    {{ folio(loop, "floor") }}
+  </div>
+  <div class="pb-wall">
+    <span class="pb-quotemark" aria-hidden="true">“</span>
+    <span class="pb-stars" aria-hidden="true"></span>
+    {{ folio(loop, "wall") }}
+  </div>
+</section>
+
+{# ---------------------------------------------------------------- faq: lift-the-flap; three flaps a spread #}
+{% elif b.type == "faq" %}
+{% for chunk in b.items | batch(3) %}
+<section class="pb-spread pb-spread--faq" data-kind="faq" data-hold="{{ (0.45 * (chunk | length)) | round(2) }}"{% if b.id and loop.first %} id="{{ b.id }}"{% endif %}>
+  <div class="pb-wall">
+    <div class="pb-print pb-print--faq">
+      {% if loop.first %}
+        {% if b.kicker %}<p class="pb-kicker">{{ b.kicker }}</p>{% endif %}
+        {% if e.first %}<h1 class="pb-title">{{ b.title | rich }}</h1>{% else %}<h2 class="pb-title">{{ b.title | rich }}</h2>{% endif %}
+      {% else %}<p class="pb-title pb-title--cont" aria-hidden="true">{{ b.title | striptags }}, continued</p>{% endif %}
+      <div class="pb-flaps pb-flaps--{{ chunk | length }}">
+        {% for it in chunk %}<details class="pb-flapbox"><summary class="pb-flap"><span class="pb-flap__q">{{ it.q | rich }}</span><span class="pb-flap__lift" aria-hidden="true">Lift</span></summary><span class="pb-flap__echo" aria-hidden="true">{{ it.q | striptags }}</span><p class="pb-flap__a">{{ it.a | rich }}</p></details>{% endfor %}
+      </div>
+    </div>
+    {{ folio(loop, "wall") }}
+  </div>
+  <div class="pb-floor">
+    <p class="pb-hint" aria-hidden="true">Lift the flaps</p>
+    <span class="pb-flat pb-qmark pb-qmark--a" style="--d: 30%" aria-hidden="true">?</span>
+    <span class="pb-flat pb-qmark pb-qmark--b" style="--d: 46%" aria-hidden="true">?</span>
+    <span class="pb-flat pb-qmark pb-qmark--c" style="--d: 38%" aria-hidden="true">?</span>
+    {{ folio(loop, "floor") }}
+  </div>
+</section>
+{% endfor %}
+
+{# ---------------------------------------------------------------- cta: the finale; a wheel turns behind the title and the button is the last tab #}
+{% elif b.type == "cta" %}
+<section class="pb-spread pb-spread--cta" data-kind="cta" data-hold="0.7"{% if b.id %} id="{{ b.id }}"{% endif %}>
+  <div class="pb-floor">
+    {{ diecut(b.title, e, 30, 50) }}
+    <span class="pb-flat pb-burst" style="--d: 10%" aria-hidden="true"><i></i></span>
+    {% if b.button %}<div class="pb-flat pb-ticket" style="--d: 76%"><a class="pb-btn pb-btn--hot pb-btn--ticket" href="{{ b.button.href }}">{{ b.button.label }} <span class="pb-arrow" aria-hidden="true">→</span></a></div>{% endif %}
+    {{ folio(loop, "floor") }}
+  </div>
+  <div class="pb-wall">
+    <div class="pb-print pb-print--top pb-print--center">
+      {% if b.kicker %}<p class="pb-kicker pb-kicker--ribbon">{{ b.kicker }}</p>{% endif %}
+    </div>
+    <span class="pb-stars" aria-hidden="true"></span>
+    {{ folio(loop, "wall") }}
+  </div>
+</section>
+{% endif %}
+{% endmacro %}
