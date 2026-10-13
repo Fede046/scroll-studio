@@ -368,12 +368,30 @@ def build_seedvr2_graph(ucfg, video, prefix):
     }
 
 
-def interrupt():
-    _req("/interrupt", b"{}", {"Content-Type": "application/json"})
+def interrupt(prompt_id=None):
+    """Stop the running job. With prompt_id, only when that job is the one running (ComfyUI may be shared)."""
+    body = json.dumps({"prompt_id": prompt_id} if prompt_id else {}).encode()
+    _req("/interrupt", body, {"Content-Type": "application/json"})
+
+
+def _queue_state(pid):
+    """'running', 'pending' (with how many jobs are ahead) or None (finished or unknown)."""
+    q = json.loads(_req("/queue"))
+    if any(x[1] == pid for x in q.get("queue_running", [])):
+        return "running", 0
+    pending = sorted(q.get("queue_pending", []), key=lambda x: x[0])
+    for i, x in enumerate(pending):
+        if x[1] == pid:
+            return "pending", i + len(q.get("queue_running", []))
+    return None, 0
 
 
 def run(graph, poll=5, timeout=45 * 60):
-    """Queue a graph and block until it finishes; returns the list of saved image records."""
+    """Queue a graph and block until it finishes; returns the list of saved image records.
+
+    ComfyUI may be shared with other jobs: time spent waiting in its queue does not count towards `timeout`
+    (which limits our own execution), and a timed-out job is interrupted only while it is the one running, or
+    taken out of the queue while it is still waiting."""
     body = json.dumps({"prompt": graph, "client_id": uuid.uuid4().hex}).encode()
     try:
         res = json.loads(_req("/prompt", body, {"Content-Type": "application/json"}))
@@ -381,7 +399,8 @@ def run(graph, poll=5, timeout=45 * 60):
         raise SystemExit(f"ComfyUI rejected the graph: {e.read().decode(errors='replace')}")
     pid = res["prompt_id"]
     start = time.time()
-    while time.time() - start < timeout:
+    run_start, told = None, 0.0
+    while run_start is None or time.time() - run_start < timeout:
         hist = json.loads(_req(f"/history/{pid}"))
         if pid in hist:
             status = hist[pid].get("status", {})
@@ -391,9 +410,20 @@ def run(graph, poll=5, timeout=45 * 60):
             if status.get("completed"):
                 print(f"  done in {int(time.time() - start)}s", flush=True)
                 return hist[pid]["outputs"]["save"]["images"]
+        if run_start is None:
+            state, ahead = _queue_state(pid)
+            if state == "running" or (state is None and pid not in hist):
+                run_start = time.time()
+            elif state == "pending" and time.time() - told > 300:
+                print(f"  waiting in ComfyUI's queue ({ahead} job(s) ahead)", flush=True)
+                told = time.time()
         time.sleep(poll)
-    interrupt()  # don't leave a stalled job hogging the GPU
-    raise SystemExit(f"Timed out after {timeout // 60} min waiting for ComfyUI prompt {pid} and cancelled it. "
+    state, _ = _queue_state(pid)
+    if state == "running":
+        interrupt(pid)   # don't leave a stalled job hogging the GPU (only ours)
+    elif state == "pending":
+        _req("/queue", json.dumps({"delete": [pid]}).encode(), {"Content-Type": "application/json"})
+    raise SystemExit(f"Timed out after {timeout // 60} min of ComfyUI running prompt {pid}, and cancelled it. "
                      "A render this slow usually means VRAM overflowed into system RAM: split the segment "
                      "or lower ltx.res, and close games or other GPU apps.")
 
