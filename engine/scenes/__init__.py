@@ -17,6 +17,7 @@ MODULES = {
     "map": "map",
     "splat": "splat",
     "code": "code",
+    "showroom": "showroom",
 }
 
 

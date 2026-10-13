@@ -2,3 +2,6 @@
 # torch must be the CUDA build that matches your driver, installed first:
 #   pip install torch --index-url https://download.pytorch.org/whl/cu128   (see docs/INSTALL.md)
 -e .[all]
+# Product models (site.product): STEP/STP via OpenCascade, 3MF via trimesh. Also in the `cad` extra.
+cascadio>=0.1.1
+lxml>=5.0

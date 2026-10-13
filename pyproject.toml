@@ -41,11 +41,13 @@ ml = [
 ]
 vector = ["vtracer>=0.6"]
 mesh = ["trimesh>=4.4", "pygltflib>=1.16"]
+# site.product: STEP/STP through OpenCascade (cascadio), 3MF through trimesh
+cad = ["cascadio>=0.1.1", "trimesh>=4.4", "lxml>=5.0"]
 data = ["pandas>=2.2"]
 audio = ["soundfile>=0.12"]
 splat = ["gsplat>=1.3"]
 dev = ["pytest>=8.0"]
-all = ["scroll-studio[ml,vector,mesh,data,audio,dev]"]
+all = ["scroll-studio[ml,vector,mesh,cad,data,audio,dev]"]
 
 [project.scripts]
 studio = "engine.cli:app"

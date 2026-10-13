@@ -43,11 +43,110 @@ class Gradient(Model):
     stars: int = Field(0, description="Faint stars scattered over the upper part, for night skies")
 
 
+# ---------------------------------------------------------------- the product (feature: product integration)
+
+ProductView = Literal["front", "three-quarter", "side", "top", "back", "hero-low", "exploded", "detail"]
+
+
+class PartMaterial(Model):
+    """A material override for the product's parts whose names match. `studio product <project> --parts` lists the
+    part, mesh and material names. Rules apply in order, so a later rule wins where two match."""
+    match: str = Field("*", description="Glob on the part, mesh or assembly name, case-insensitive: 'Case*', '*knob*', "
+                                        "'Housing/*' (an assembly name matches every part inside it)")
+    material: Optional[str] = Field(None, description="Only the faces using a material whose name matches this glob "
+                                                      "(as listed by --parts), e.g. 'mat_2' or '*Rubber*'")
+    color: Optional[str] = Field(None, description="Base colour, hex (sRGB)")
+    metallic: Optional[float] = Field(None, ge=0, le=1, description="0 plastic/paint, 1 bare metal")
+    roughness: Optional[float] = Field(None, ge=0, le=1, description="0 mirror, 0.3 satin, 0.6 bead-blasted, 0.9 matte")
+    emission: Optional[str] = Field(None, description="Glow colour, hex (screens, LEDs)")
+    emission_strength: float = Field(1.0, ge=0, description="Glow brightness when `emission` is set")
+    transmission: Optional[float] = Field(None, ge=0, le=1, description="See-through amount: 1 glass or clear acrylic")
+    texture: Optional[str] = Field(None, description="Base-colour image (project file or URL). Meshes without UVs get a box projection")
+    texture_scale: float = Field(0.05, gt=0, description="Box projection: metres per repeat of the texture")
+    region: Optional[tuple[float, float, float, float, float, float]] = Field(
+        None, description="Only faces whose centre lies in this box, x0 y0 z0 x1 y1 z1 in 0-1 of the product's bounds "
+                          "(x left to right seen from the front, y front to back, z bottom to top): paint a screen "
+                          "window or a button on a one-piece body")
+    facing: Optional[Literal["front", "back", "left", "right", "top", "bottom"]] = Field(
+        None, description="Only faces pointing this way (seen from the front view)")
+
+
+class Product(Model):
+    """The product the site is about, declared once. The model is converted, fixed (axes, units), centred on its
+    base, given its part materials and cached as one GLB; then takes (`product: {}`), sequences (`model: product`),
+    showroom scenes and product stills (`image: {product: three-quarter}`) all use it, and its credit and licence go
+    in the footer. One of `model` or `from_photo`."""
+    name: str = Field(..., description="Product name, e.g. 'Flipper Zero'")
+    maker: Optional[str] = Field(None, description="Who makes it, e.g. 'Flipper Devices'")
+    url: Optional[str] = Field(None, description="The maker's page for the product")
+    model: Optional[str] = Field(None, description="3D model: GLB/glTF, OBJ, FBX, STL, PLY, STEP/STP (converted locally "
+                                                   "with OpenCascade, parts kept with their names) or 3MF; a project "
+                                                   "file or an https URL (downloaded once)")
+    from_photo: Optional[str] = Field(None, description="A cut-out PNG turned into a 3D model with TRELLIS.2 (see ProductLayer)")
+    up: Literal["auto", "z", "y", "x", "-z", "-y", "-x"] = Field(
+        "auto", description="Which axis of the file points up. auto: the format's convention (glTF, FBX and OBJ: y; "
+                            "STL, PLY, STEP and 3MF: z)")
+    units: Literal["auto", "m", "cm", "mm", "in", "ft"] = Field(
+        "auto", description="Units the file is in. auto: metres for glTF/FBX/OBJ/PLY, millimetres for STL; STEP and 3MF "
+                            "carry their own; anything over 20 m is taken as millimetres")
+    rotation: tuple[float, float, float] = Field((0, 0, 0), description="Euler degrees applied after the up fix: turn "
+                                                                        "the product so its front faces -y (the front view)")
+    parts: list[PartMaterial] = Field(default_factory=list, description="Material overrides by part name")
+    exclude: list[str] = Field(default_factory=list, description="Globs on part or assembly names to leave out: "
+                                                                 "alternate variants stacked in one CAD file, internal "
+                                                                 "parts, packaging")
+    tessellation: Literal["draft", "normal", "fine"] = Field(
+        "normal", description="STEP: how finely curved surfaces are meshed (fine is smoother and heavier)")
+    max_triangles: int = Field(1_500_000, ge=10_000, description="Decimate only above this many triangles")
+    licence: Optional[str] = Field(None, description="The model's licence, e.g. 'CC BY 4.0'; shown with the credit")
+    credit: Optional[str] = Field(None, description="Attribution for the model, e.g. '3D model by Framework Computer Inc' "
+                                                    "(default: '<name> 3D model by <maker>')")
+    concept: bool = Field(False, description="Mark the page as a concept: the footer (and the trailer's end card) say "
+                                             "'Concept page. Not affiliated with <maker>.'")
+
+
+class ProductShot(Model):
+    """A still of the site's product, rendered by Cycles in a studio light and cached."""
+    view: ProductView = Field("three-quarter", description="front, three-quarter, side, top, back, hero-low (a low "
+                                                           "camera looking up), exploded (parts pulled apart) or "
+                                                           "detail (a close macro view of `part`)")
+    part: Optional[str] = Field(None, description="detail: glob on the part/mesh name to frame, e.g. '*port*' "
+                                                  "(see studio product --parts); also aims any other view at that part")
+    yaw: Optional[float] = Field(None, description="Override the view's turn, degrees (0 front, 90 right side)")
+    pitch: Optional[float] = Field(None, description="Override the view's camera height, degrees above the horizon")
+    zoom: float = Field(1.0, gt=0, description="1 fits the product in the frame with a margin; 1.3 is closer")
+    explode: Optional[float] = Field(None, ge=0, le=1.5, description="How far parts pull apart (exploded view: 1)")
+    lens: Optional[float] = Field(None, description="Focal length in mm (default 50; hero-low 32)")
+    background: str = Field("auto", description="auto (transparent where the page shows it, such as hero and product "
+                                                "blocks, else the theme background), transparent, theme, or a hex colour")
+    hdri: str = Field("studio", description="Blender studio light: studio, city, courtyard, forest, interior, night, sunrise, sunset")
+    samples: int = Field(128, ge=4, le=4096, description="Cycles samples (denoised)")
+    shadow: bool = Field(True, description="A soft contact shadow under the product")
+    exposure: float = Field(0.0, ge=-4, le=4, description="Exposure in stops (-0.7 tames a pale metal lid in a bright scene)")
+    fstop: Optional[float] = Field(None, gt=0, description="Depth of field, focused on the product (or `part`); "
+                                                          "detail views default to f/8, a macro look")
+    scene: Optional[str] = Field(None, description="Render the product into a generated scene instead of the studio: "
+                                                   "a prompt for the place it stands ('a walnut desk by a window, "
+                                                   "morning light'). Z-Image paints the scene to the product's camera "
+                                                   "(perspective-matched), the product is lit by it, and a light "
+                                                   "Qwen-Image-Edit pass blends it in (needs ComfyUI)")
+    harmonise: float = Field(0.3, ge=0, le=1, description="scene: strength of the blending pass (0 skips it); the "
+                                                          "product's own pixels are put back if the pass changes them")
+    seed: int = Field(7, description="scene: seed for the generated scene")
+
+
 class ImageInput(Model):
-    """An image the engine uses as input: a file in the project's inputs/, one generated locally, or a gradient."""
+    """An image the engine uses as input: a file in the project's inputs/, one generated locally, a gradient, or a
+    still of the site's product."""
     file: Optional[str] = Field(None, description="Path relative to the project folder (inputs/photo.jpg) or an https URL")
     generate: Optional[str] = Field(None, description="Prompt for a local text-to-image model (Z-Image Turbo)")
     gradient: Optional[Gradient] = Field(None, description="Render a gradient backdrop (no model needed) at `size`")
+    product: Optional[Union[ProductView, ProductShot]] = Field(
+        None, description="A still of `site.product` at `size`: a view name (three-quarter, front, side, top, back, "
+                          "hero-low, exploded, detail) or a shot {view, part, yaw, pitch, zoom, explode, background, "
+                          "scene ...}")
+    scene: Optional[str] = Field(None, description="With `product`: render it into a generated scene described by this "
+                                                   "prompt (see ProductShot.scene)")
     size: tuple[int, int] = Field((1920, 1088), description="Generated size (multiples of 16)")
     seed: int = 7
     crop: Optional[tuple[float, float, float, float]] = Field(None, description="Crop [x0, y0, x1, y1] in 0-1 image coordinates")
@@ -146,21 +245,36 @@ class CameraKey(Model):
 
 class ProductLayer(Model):
     """The real thing in a take: rendered from its own 3D model through the take's camera and composited over the
-    generated world, so it never warps. One of `model` or `from_photo`."""
-    model: Optional[str] = Field(None, description="GLB/glTF, OBJ, FBX, STL or PLY: a project file or an https URL")
+    generated world, so it never warps. One of `model` or `from_photo`, or neither (`product: {}`) to use the site's
+    `product:` (its normalised model, materials and credit)."""
+    model: Optional[str] = Field(None, description="GLB/glTF, OBJ, FBX, STL or PLY: a project file or an https URL. "
+                                                   "Omit to use site.product")
     from_photo: Optional[str] = Field(None, description="A cut-out PNG (transparent background) turned into a 3D model "
                                                          "with TRELLIS.2 (needs `trellis_python`/`trellis_script` in studio.toml)")
     credit: Optional[str] = Field(None, description="Attribution shown in the footer")
     at: tuple[float, float, float] = Field((0, 0, 0), description="Where the base centre of the product sits in the world")
-    height: float = Field(1.0, description="Height of the product in world units")
+    height: Optional[float] = Field(None, description="Height of the product in world units (default: site.product's "
+                                                      "real height in metres, else 1)")
     rotation: tuple[float, float, float] = Field((0, 0, 0), description="Euler degrees")
     spin: float = Field(0.0, description="Extra yaw, in degrees, turned evenly over the whole take")
-    hdri: str = Field("sunrise", description="Blender studio light for the product: studio, forest, city, courtyard, night, interior, sunrise, sunset")
+    hdri: Optional[str] = Field(None, description="Light for the product. Default: the plate itself (an environment "
+                                                  "built from the generated frames around each moment, so the product "
+                                                  "takes the scene's light and reflections). Or a Blender studio light: "
+                                                  "studio, forest, city, courtyard, night, interior, sunrise, sunset")
     sun_strength: float = Field(3.0, description="A sun lamp along the take's light direction; 0 to turn it off")
-    samples: int = Field(32, description="Cycles samples per frame (denoised)")
+    samples: int = Field(64, description="Cycles samples per frame (denoised)")
     shadow: bool = Field(True, description="Cast the product's shadow onto the generated ground")
     shadow_size: Optional[float] = Field(None, description="Side of the square the shadow falls on, in metres (the table or floor patch); default 3x the height")
-    res: tuple[int, int] = Field((1920, 1080), description="Render size of the product pass (also the final film size)")
+    res: Optional[tuple[int, int]] = Field(None, description="Render size of the product pass, which is also the final "
+                                                             "film size (default 1920x1080; 2560x1440 when the take "
+                                                             "is upscaled)")
+    fstop: Optional[float] = Field(2.8, description="Depth of field: focused where the camera looks, at this f-stop "
+                                                    "(real scale); none for everything sharp")
+    motion_blur: float = Field(0.5, ge=0, le=1, description="Shutter as a fraction of a frame (0: off)")
+    grade: bool = Field(True, description="Match the product pass to the plate: black level, white balance, saturation, "
+                                          "softness, and a light wrap at the edges")
+    grain: Optional[float] = Field(None, ge=0, description="Film grain on the product (0-255 sigma); default: measured "
+                                                          "from the plate")
 
 
 class Take(Model):
@@ -260,7 +374,8 @@ class Scene3DScene(SceneBase):
 class SequenceScene(SceneBase):
     """A 3D model rendered to an image sequence (turntable, explode, assemble) and scrubbed by scroll."""
     type: Literal["sequence"] = "sequence"
-    model: str = Field(..., description="glTF/GLB, OBJ, FBX or STL: a project file or an https URL (downloaded once)")
+    model: Optional[str] = Field(None, description="glTF/GLB, OBJ, FBX or STL: a project file or an https URL (downloaded "
+                                                   "once). Omit, or write 'product', to use site.product")
     credit: Optional[str] = Field(None, description="Attribution shown in the footer (e.g. for CC-BY models)")
     frames: int = 120
     size: tuple[int, int] = (1920, 1080)
@@ -272,6 +387,27 @@ class SequenceScene(SceneBase):
         description="Camera/explode keys over progress: yaw/pitch degrees, explode 0-1, zoom")
     background: Optional[str] = Field(None, description="Backdrop colour (defaults to the theme background)")
     hdri: str = Field("studio", description="Blender studio light: studio, forest, city, courtyard, night, interior, sunrise, sunset")
+
+
+class ShowroomScene(SceneBase):
+    """The real product, live in the page: three.js renders the product's normalised GLB with studio environment
+    lighting and a soft shadow; scroll turns, explodes and zooms it along `keys`, and the pointer nudges the view."""
+    type: Literal["showroom"] = "showroom"
+    layout: Literal["overlay", "split", "cards"] = "cards"
+    model: str = Field("product", description="'product' (site.product) or a model file/URL in any product format")
+    keys: list[dict[str, Any]] = Field(default_factory=lambda: [
+        {"t": 0, "yaw": -35, "pitch": 18, "explode": 0, "zoom": 1.0},
+        {"t": 0.5, "yaw": 50, "pitch": 26, "explode": 1, "zoom": 0.9},
+        {"t": 1, "yaw": 160, "pitch": 12, "explode": 0, "zoom": 1.05}],
+        description="Over scene progress: yaw/pitch degrees (yaw 0 is the front), explode 0-1, zoom")
+    background: Optional[str] = Field(None, description="Colour behind the product (default: the theme background); "
+                                                        "'transparent' shows the section's backdrop")
+    lighting: Literal["studio", "soft", "contrast"] = Field(
+        "studio", description="studio: environment light plus a key; soft: even, low-contrast; contrast: a hard key and rim")
+    exposure: float = Field(1.0, gt=0, description="Tone-mapping exposure")
+    shadow: bool = Field(True, description="Soft shadow on an invisible floor")
+    spin: float = Field(0.0, description="Idle turn in degrees per second on top of the keys (0: scroll only)")
+    poster: bool = Field(True, description="Render a Cycles still shown until the live model has loaded (and without WebGL)")
 
 
 class ParallaxScene(SceneBase):
@@ -649,12 +785,13 @@ class FaqBlock(BlockBase):
 
 Section = Annotated[Union[
     FilmScene, ArtworkScene, Scene3DScene, SequenceScene, ParallaxScene, TypeScene, StageScene, VectorScene, ChartScene,
-    MapScene, SplatScene, CodeScene,
+    MapScene, SplatScene, CodeScene, ShowroomScene,
     IntroBlock, FeaturesBlock, StatsBlock, TimelineBlock, QuoteBlock, CtaBlock, GalleryBlock,
     HeroBlock, ProductBlock, StripBlock, OrbitBlock, FaqBlock,
 ], Field(discriminator="type")]
 
-SCENE_TYPES = ("film", "artwork", "scene3d", "sequence", "parallax", "type", "stage", "vector", "chart", "map", "splat", "code")
+SCENE_TYPES = ("film", "artwork", "scene3d", "sequence", "parallax", "type", "stage", "vector", "chart", "map", "splat", "code",
+               "showroom")
 
 
 # ---------------------------------------------------------------- site
@@ -756,6 +893,8 @@ class Site(Model):
     sections: list[Section]
     footer: Footer = Field(default_factory=Footer)
     pages: list[Page] = Field(default_factory=list, description="Plain Markdown pages beside the site (privacy, support)")
+    product: Optional[Product] = Field(None, description="The product the site is about, declared once: takes, sequences, "
+                                                         "showroom scenes and `image: {product: <view>}` stills use it")
 
 
 def is_scene(section) -> bool:

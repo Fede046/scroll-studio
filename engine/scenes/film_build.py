@@ -261,33 +261,263 @@ def stage_generate(shot, out, args):
     print(f"  gen.mp4: {n} frames from {len(segments)} segment(s)")
 
 
-def stage_product(shot, out, res, samples, ctx):
-    """Cycles renders the product alone, RGBA with its shadow, through the take's camera (take.py --pass product)."""
+PLATE_ENV_VERSION = 1
+COMPOSITE_VERSION = 3
+
+
+def _blender_pass(cmd, ctx, label):
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
+    tail = []
+    for line in p.stdout:
+        tail = (tail + [line])[-40:]
+        if line.startswith("FRAME ") and ctx is not None:
+            n, total = line.split()[1].split("/")
+            ctx.progress(int(n) / int(total) * 0.9, f"{label} frame {n}/{total}")
+    if p.wait() != 0:
+        raise RuntimeError(f"Blender {label} pass failed:\n" + "".join(tail))
+
+
+def stage_track(out, res):
+    """take.py --pass track: the camera per frame and the product's place on screen (product/track.json)."""
+    pdir = os.path.join(out, "product")
+    _blender_pass([BLENDER, "-b", "--factory-startup", "--python-exit-code", "1", "-P", os.path.join(SCRIPTS, "take.py"), "--",
+                   "--take", os.path.join(out, "take.json"), "--pass", "track", "--out", pdir, "--res", f"{res[0]}x{res[1]}"],
+                  None, "track")
+
+
+def stage_product(shot, out, res, samples, ctx, env=None):
+    """Cycles renders the product alone, RGBA with its shadow, through the take's camera (take.py --pass product),
+    lit by the plate environments (env.json) unless the layer names a studio `hdri`."""
     pdir = os.path.join(out, "product")
     shutil.rmtree(os.path.join(pdir, "frames"), ignore_errors=True)
     cmd = [BLENDER, "-b", "--factory-startup", "--python-exit-code", "1", "-P", os.path.join(SCRIPTS, "take.py"), "--",
            "--take", os.path.join(out, "take.json"), "--pass", "product", "--out", pdir,
            "--res", f"{res[0]}x{res[1]}", "--samples", str(samples)]
-    print("  $ blender take.py --pass product", flush=True)
-    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
-    tail = []
-    for line in p.stdout:
-        tail = (tail + [line])[-40:]
-        if line.startswith("FRAME "):
-            n, total = line.split()[1].split("/")
-            ctx.progress(int(n) / int(total) * 0.9, f"product frame {n}/{total}")
-    if p.wait() != 0:
-        raise RuntimeError("Blender product pass failed:\n" + "".join(tail))
+    if env:
+        cmd += ["--env", str(env)]
+    print("  $ blender take.py --pass product" + (" (plate light)" if env else ""), flush=True)
+    _blender_pass(cmd, ctx, "product")
 
 
-def stage_composite(film, pdir, dst, fps, res):
-    """The product frames (straight alpha, with shadow) over the generated world, scaled to the product's size."""
+def _read_frame(film, t, w, h):
+    """One frame of the plate at t seconds, as float RGB 0-1 at w x h."""
+    import numpy as np
+    p = subprocess.run([FFMPEG, "-hide_banner", "-loglevel", "error", "-ss", f"{t:.3f}", "-i", str(film), "-frames:v", "1",
+                        "-vf", f"scale={w}:{h}:flags=lanczos", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+                       capture_output=True)
+    if p.returncode != 0 or len(p.stdout) < w * h * 3:
+        raise RuntimeError(f"could not read the plate at {t:.2f}s: {p.stderr.decode(errors='replace')[-400:]}")
+    return np.frombuffer(p.stdout[:w * h * 3], np.uint8).reshape(h, w, 3).astype(np.float32) / 255
+
+
+def _srgb_to_linear(x):
+    import numpy as np
+    return np.where(x <= 0.04045, x / 12.92, ((x + 0.055) / 1.055) ** 2.4)
+
+
+def env_from_frame(lin, M, lens, sensor, aspect, W=1024, H=512, lift=3.0):
+    """An equirect environment (Blender's layout, world axes, float linear RGB) from one frame seen by a camera.
+
+    lin: the frame as linear float RGB (h, w, 3); M: the camera's 4x4 matrix_world; lens/sensor in mm (sensor fit
+    AUTO); aspect: the frame's width / height. Directions inside the frame sample it (lightly blurred); outside,
+    its blurred edges continue and fade towards its own sky (top band) and ground (bottom band). Highlights are
+    lifted, since a plate is LDR and its bright sky stands in for the light sources."""
+    import cv2
+    import numpy as np
+    fh, fw = lin.shape[:2]
+    u = (np.arange(W) + 0.5) / W
+    v = 1 - (np.arange(H) + 0.5) / H
+    LON, LAT = np.meshgrid((u - 0.5) * 2 * np.pi, (v - 0.5) * np.pi)
+    dx, dy, dz = -np.cos(LAT) * np.cos(LON), np.cos(LAT) * np.sin(LON), np.sin(LAT)
+    R = np.array(M, dtype=np.float64)[:3, :3]
+    cx = R[0, 0] * dx + R[1, 0] * dy + R[2, 0] * dz
+    cy = R[0, 1] * dx + R[1, 1] * dy + R[2, 1] * dz
+    fwd = -(R[0, 2] * dx + R[1, 2] * dy + R[2, 2] * dz)
+    k = lens / sensor
+    safe = np.maximum(fwd, 1e-4)
+    if aspect >= 1:
+        px, py = 0.5 + k * cx / safe, 0.5 - k * aspect * cy / safe
+    else:
+        px, py = 0.5 + k / aspect * cx / safe, 0.5 - k * cy / safe
+    inside = (fwd > 0) & (px >= 0) & (px <= 1) & (py >= 0) & (py <= 1)
+    sky = lin[: max(1, fh // 6)].reshape(-1, 3).mean(0)
+    ground = lin[-max(1, fh // 6):].reshape(-1, 3).mean(0)
+    sharp = cv2.GaussianBlur(lin, (0, 0), 1.2)
+    soft = cv2.GaussianBlur(lin, (0, 0), 18 * max(fw, fh) / 480)
+    mx = (np.clip(px, 0, 1) * (fw - 1)).astype(np.float32)
+    my = (np.clip(py, 0, 1) * (fh - 1)).astype(np.float32)
+    a = cv2.remap(sharp, mx, my, cv2.INTER_LINEAR)
+    b = cv2.remap(soft, mx, my, cv2.INTER_LINEAR)
+    outside = np.maximum(np.maximum(-px, px - 1), np.maximum(-py, py - 1))
+    outside = np.where(fwd > 0, np.clip(outside, 0, None), 9.0)
+    horizon = np.clip(np.abs(dz) / 0.25, 0, 1)[..., None]
+    fall = np.where(dz[..., None] > 0, sky, ground) * horizon + ((sky + ground) / 2) * (1 - horizon)
+    wout = np.clip(outside / 0.6, 0, 1)[..., None]
+    env = np.where(inside[..., None], a, b * (1 - wout) + fall * wout)
+    env = cv2.GaussianBlur(env.astype(np.float32), (0, 0), 3)
+    lum = env @ np.array([0.2126, 0.7152, 0.0722], np.float32)
+    gain = 1 + lift * np.clip((lum - 0.55) / 0.45, 0, 1) ** 2
+    return (env * gain[..., None]).astype(np.float32)
+
+
+def env_sun(env):
+    """Direction (world, unit) and relative strength of the brightest region of an equirect environment."""
+    import cv2
+    import numpy as np
+    H, W = env.shape[:2]
+    lum = cv2.GaussianBlur(env @ np.array([0.2126, 0.7152, 0.0722], np.float32), (0, 0), 6)
+    lum[H // 2 + H // 20:] *= 0.2           # the light comes from above the horizon
+    y, x = np.unravel_index(int(np.argmax(lum)), lum.shape)
+    lon, lat = ((x + 0.5) / W - 0.5) * 2 * np.pi, ((1 - (y + 0.5) / H) - 0.5) * np.pi
+    lat = max(lat, np.radians(28))           # a window behind the subject still lights it from above, never below
+    d = [-np.cos(lat) * np.cos(lon), np.cos(lat) * np.sin(lon), np.sin(lat)]
+    contrast = float(lum.max() / max(float(np.median(lum)), 1e-4))
+    return [round(float(c), 4) for c in d], round(min(contrast, 8.0), 3)
+
+
+def stage_plate_env(film, track, env_json, fps, log=print):
+    """Environment maps made from the generated frames themselves, one every ~2.5 s of the take (env_from_frame),
+    cross-faded by take.py, plus the ground's colour under the product for the shadow catcher."""
+    import cv2
+    import numpy as np
+    with open(track, encoding="utf-8") as f:
+        T = json.load(f)
+    frames = T["frames"]
+    n = len(frames)
+    dur = n / fps
+    count = max(2, int(round(dur / 2.5)) + 1)
+    times = [min(dur - 1.0 / fps, i * dur / (count - 1)) for i in range(count)]
+    out_dir = os.path.dirname(str(env_json))
+    os.makedirs(out_dir, exist_ok=True)
+    fw, fh = 480, 270
+    sw, sh = T["size"]
+    keys, grounds = [], []
+    for i, t in enumerate(times):
+        rec = frames[min(n - 1, int(round(t * fps)))]
+        lin = _srgb_to_linear(_read_frame(film, t, fw, fh)).astype(np.float32)
+        if rec.get("visible") and rec.get("base"):
+            bx, by = rec["base"]
+            x, y = int(np.clip(bx * fw, 4, fw - 5)), int(np.clip(by * fh + fh * 0.03, 4, fh - 5))
+            patch = lin[max(0, y - 8):y + 8, max(0, x - 16):x + 16].reshape(-1, 3)
+            if len(patch):
+                grounds.append(patch.mean(0))
+        env = env_from_frame(lin, rec["camera"], float(T["lens"]), float(T["sensor"]), sw / sh)
+        path = os.path.join(out_dir, f"env_{i:02d}.hdr")
+        cv2.imwrite(path, env[..., ::-1])
+        keys.append({"t": round(t, 3), "file": path})
+    ground = (np.median(np.array(grounds), axis=0) if grounds else np.array([0.18, 0.18, 0.18])).tolist()
+    with open(env_json, "w", encoding="utf-8") as f:
+        json.dump({"keys": keys, "ground": [round(c, 4) for c in ground], "strength": 1.0}, f, indent=1)
+    log(f"  plate light: {len(keys)} environments from the generated frames")
+
+
+class PlateMatch:
+    """Grades a product pass to its plate, frame after frame: black level, white balance and saturation from the
+    plate (smoothed over time so nothing flickers), the plate's softness and grain, and a light wrap of the plate's
+    colour at the product's rim. The shadow (alpha over black RGB) takes the plate's black level."""
+
+    def __init__(self, grade=True, grain=None, soften=0.0, seed=7, tint=0.25):
+        import numpy as np
+        self.grade, self.sigma, self.soften, self.tint = grade, grain, soften, tint
+        self.state = None
+        self.rng = np.random.default_rng(seed)
+        self.luma = np.array([0.2126, 0.7152, 0.0722], np.float32)
+
+    def apply(self, plate, rgba):
+        """plate: float RGB 0-1 (h, w, 3); rgba: float straight-alpha RGBA 0-1, same size. Returns float RGB."""
+        import cv2
+        import numpy as np
+        rgb, al = rgba[..., :3], rgba[..., 3:4]
+        if self.grade:
+            luma = self.luma
+            small = cv2.resize(plate, (160, 90), interpolation=cv2.INTER_AREA).reshape(-1, 3)
+            lum = small @ luma
+            black = np.percentile(small, 1.0, axis=0)
+            mid = small[(lum > np.percentile(lum, 25)) & (lum < np.percentile(lum, 85))]
+            mean = mid.mean(0) if len(mid) else small.mean(0)
+            tint = mean / max(float(mean @ luma), 1e-3)
+            sat = float(np.mean(small.max(1) - small.min(1)))
+            if self.sigma is None:
+                g = cv2.cvtColor((plate * 255).astype(np.uint8), cv2.COLOR_RGB2GRAY).astype(np.float32)
+                hp = g - cv2.GaussianBlur(g, (0, 0), 1.5)
+                self.sigma = float(np.clip(np.median(np.abs(hp)) * 1.4826, 0, 6))
+            cur = np.concatenate([black, tint, [sat]])
+            self.state = cur if self.state is None else self.state * 0.92 + cur * 0.08
+            black, tint, sat = self.state[:3], self.state[3:6], self.state[6]
+            # white balance a quarter of the way to the plate's mid-tone tint (the plate light already colours
+            # it), saturation nudged towards the plate's
+            rgb = rgb * (1 + self.tint * (tint - 1))
+            solid = al[..., 0] > 0.5
+            prod_sat = float(np.mean((rgb.max(2) - rgb.min(2))[solid])) if solid.any() else sat
+            k = float(np.clip(sat / max(prod_sat, 1e-3), 0.75, 1.1))
+            y = (rgb @ luma)[..., None]
+            rgb = y + (rgb - y) * k
+            rgb = black + (1 - black) * np.clip(rgb, 0, 1)            # lift blacks to the plate's black level
+            if self.soften > 0.05:
+                rgb = cv2.GaussianBlur(rgb, (0, 0), self.soften)
+                al = cv2.GaussianBlur(al[..., 0], (0, 0), self.soften * 0.8)[..., None]
+            blur_pl = cv2.GaussianBlur(plate, (0, 0), 6)
+            edge = np.clip(al[..., 0] - cv2.erode(al[..., 0], np.ones((5, 5), np.uint8)), 0, 1)[..., None]
+            rgb = rgb * (1 - 0.35 * edge) + blur_pl * 0.35 * edge
+            if self.sigma:
+                rgb = rgb + self.rng.normal(0, self.sigma / 255, rgb.shape[:2] + (1,)).astype(np.float32)
+        return plate * (1 - al) + np.clip(rgb, 0, 1) * al
+
+
+def read_rgba(path, size):
+    """A product frame as float straight-alpha RGBA at size (w, h), or None when it is empty."""
+    import cv2
+    import numpy as np
+    rgba = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
+    if rgba is None or rgba.ndim < 3 or rgba.shape[2] < 4 or not rgba[..., 3].any():
+        return None
+    rgba = cv2.cvtColor(rgba, cv2.COLOR_BGRA2RGBA).astype(np.float32) / (65535 if rgba.dtype == np.uint16 else 255)
+    if rgba.shape[1::-1] != tuple(size):
+        rgba = cv2.resize(rgba, tuple(size), interpolation=cv2.INTER_AREA)
+    return rgba
+
+
+def plate_softness(film, height):
+    """Blur (px) that matches a crisp render to a plate upscaled from a lower resolution."""
+    src_h = int(subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=height",
+                                "-of", "csv=p=0", str(film)], capture_output=True, text=True).stdout.strip() or height)
+    return max(0.0, 0.45 * (height / max(src_h, 1) - 1))
+
+
+def stage_composite(film, pdir, dst, fps, res, grade=True, grain=None, track=None, log=print):
+    """The product frames over the generated world, graded to it (PlateMatch), encoded for the film stages."""
+    import numpy as np
     w, h = res
-    n = len(glob.glob(os.path.join(pdir, "frames", "*.png")))
-    ff("-i", film, "-framerate", str(fps), "-i", os.path.join(pdir, "frames", "%04d.png"),
-       "-filter_complex", f"[0:v]scale={w}:{h}:flags=lanczos,fps={fps}[bg];[bg][1:v]overlay=0:0:format=auto:shortest=1[v]",
-       "-map", "[v]", "-c:v", "libx264", "-crf", "12", "-pix_fmt", "yuv420p", "-movflags", "+faststart", dst)
-    print(f"  take.mp4: world + product ({n} product frames) at {w}x{h}", flush=True)
+    pngs = sorted(glob.glob(os.path.join(pdir, "frames", "*.png")))
+    match = PlateMatch(grade, grain, plate_softness(film, h) if grade else 0.0)
+    dec = subprocess.Popen([FFMPEG, "-hide_banner", "-loglevel", "error", "-i", str(film),
+                            "-vf", f"scale={w}:{h}:flags=lanczos,fps={fps}", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+                           stdout=subprocess.PIPE)
+    enc = subprocess.Popen([FFMPEG, "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24",
+                            "-s", f"{w}x{h}", "-r", str(fps), "-i", "-", "-c:v", "libx264", "-crf", "12", "-preset", "medium",
+                            "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(dst)], stdin=subprocess.PIPE)
+    count = 0
+    for path in pngs:
+        raw = dec.stdout.read(w * h * 3)
+        if len(raw) < w * h * 3:
+            break
+        rgba = read_rgba(path, (w, h))
+        if rgba is None:
+            enc.stdin.write(raw)
+        else:
+            plate = np.frombuffer(raw, np.uint8).reshape(h, w, 3).astype(np.float32) / 255
+            out = match.apply(plate, rgba)
+            enc.stdin.write((np.clip(out, 0, 1) * 255 + 0.5).astype(np.uint8).tobytes())
+        count += 1
+    # the film ends with the product pass (LTX's 8k+1 frames leave one plate frame over): never a frame without it
+    dec.stdout.close()
+    dec.kill()
+    enc.stdin.close()
+    if enc.wait() != 0:
+        raise RuntimeError("compositing the take failed (ffmpeg)")
+    dec.wait()
+    print(f"  take.mp4: world + product ({count} frames) at {w}x{h}"
+          + (f", graded to the plate (grain {match.sigma or 0:.1f}, soften {match.soften:.2f}px)" if grade else ""), flush=True)
 
 
 def stage_upscale(shot, out, args):
