@@ -194,6 +194,24 @@ def record(project: str, section: Optional[str] = None, seconds: float = 12.0) -
 
 
 @mcp.tool()
+def trailer(project: str, formats: Optional[list[str]] = None, force: bool = False, plan_only: bool = False) -> dict:
+    """Cut the launch trailer from the site's own renders (background job): dist/trailer/trailer-16x9.mp4 and
+    trailer-9x16.mp4 + posters, from the spec's `trailer:` (an empty `trailer: {}` derives the cut). formats: 16x9,
+    9x16. plan_only=True returns the cut (shots, timings, captions) at once without rendering."""
+    from .trailer import build_trailer, plan_only as plan
+    p = _find(project)
+    if plan_only:
+        lines: list[str] = []
+        plan(p, log=lines.append)
+        return {"plan": lines}
+
+    def run(job):
+        log, progress = logger(job)
+        return build_trailer(p, formats=formats, force=force, log=log, progress=progress)
+    return jobs.submit("trailer", p.name, "trailer", run).public(tail=5)
+
+
+@mcp.tool()
 def list_styles() -> list[dict]:
     """The twenty-one looks a site can take with theme.style (name, label, what it looks like)."""
     from .compile import themes

@@ -252,6 +252,18 @@ def build_site(project: Project, log: Callable[[str], None] = print,
         art_cfg = art_mod.build(project, site.theme.art, dist, log)
     env.globals["art"] = art_cfg
     css_vars = themes.css_vars(theme, log)
+    # launch trailer (`trailer.embed`): a button and a modal player, once `studio trailer` has made the film
+    trailer = None
+    if site.trailer and site.trailer.embed:
+        tdir = project.dist / "trailer"
+        if (tdir / "trailer-16x9.mp4").exists():
+            rel = "" if dist == project.dist else link_base
+            tall = (tdir / "trailer-9x16.mp4").exists()
+            trailer = {"label": site.trailer.embed_label, "wide": rel + "trailer/trailer-16x9.mp4",
+                       "poster": rel + "trailer/trailer-16x9.jpg", "tall": rel + "trailer/trailer-9x16.mp4" if tall else None,
+                       "tall_poster": rel + "trailer/trailer-9x16.jpg"}
+        else:
+            log("  note: trailer.embed is on but there is no trailer yet: run `studio trailer`, then build again")
     page_links = [{"label": p.title, "href": f"{p.slug}/"} for p in site.pages]
     nav = nav_links(site) + [l for l, p in zip(page_links, site.pages) if p.nav]
     html = env.get_template("site.html.j2").render(
@@ -262,7 +274,7 @@ def build_site(project: Project, log: Callable[[str], None] = print,
         style_blocks=bool(sdir and (sdir / "blocks.html.j2").exists()),
         style_chrome=bool(sdir and (sdir / "chrome.html.j2").exists()),
         style_scenes=bool(sdir and (sdir / "scenes.html.j2").exists()),
-        runtime=runtime_href or "runtime/", looks=looks, icon=favicon(site, theme),
+        runtime=runtime_href or "runtime/", looks=looks, icon=favicon(site, theme), trailer=trailer,
     )
     if link_base:
         html = re.sub(r'(<a\s[^>]*?href=")(?!#|[a-z][a-z0-9+.-]*:|/|\.\./)([^"]*")', lambda m: m.group(1) + link_base + m.group(2), html)
