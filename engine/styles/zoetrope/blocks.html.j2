@@ -1,0 +1,140 @@
+{# Zoetrope blocks: the landing page is one wheel of cards, and every landing-page element is a card: the hero, each
+   feature, the product, each stat, each step, the quote, each question, the call to action. Each <article class="zt-el">
+   is one card, complete in itself and real HTML in reading order. Without JavaScript (and with reduced motion) the page
+   is this list of cards; with it, runtime/src/styles/zoetrope.ts puts every card on the turntable (its short title and
+   its own animated figure on the face) and opens an article as a dialog when its card is picked. Scenes and blocks
+   without a template here become cards at runtime. #}
+{% set types = ["hero", "intro", "features", "product", "stats", "timeline", "quote", "faq", "cta"] %}
+
+{% macro tickets(list) %}{% if list %}<div class="zt-tickets">{% for l in list %}<a class="zt-ticket{% if loop.first %} zt-ticket--hot{% endif %}" href="{{ l.href }}">{{ l.label }}{% if loop.first %} <i aria-hidden="true">☞</i>{% endif %}</a>{% endfor %}</div>{% endif %}{% endmacro %}
+{% macro plain(t) %}{{ (t or "") | striptags | replace("&amp;", "&") | trim }}{% endmacro %}
+{% macro from(b) %}{% if b.kicker or b.title %}<p class="zt-from">{% if b.kicker %}<span>{{ b.kicker }}</span>{% endif %}{% if b.kicker and b.title %} · {% endif %}{% if b.title %}{{ b.title | rich }}{% endif %}</p>{% endif %}{% endmacro %}
+{% macro sechead(b, h) %}{% if b.kicker or b.title %}<header class="zt-sechead">{% if b.kicker %}<span class="zt-kicker">{{ b.kicker }}</span>{% endif %}{% if b.title %}<{{ h }} class="zt-sechead__t">{{ b.title | rich }}</{{ h }}>{% endif %}</header>{% endif %}{% endmacro %}
+
+{% macro render(b, e, base, loop) %}
+{% set h = "h1" if e.first else "h2" %}
+{% set surf = (" ss-surface-" ~ b.surface) if b.surface else "" %}
+<section class="zt-sec zt-sec--{{ b.type }}{{ surf }}" data-zt="{{ b.type }}"{% if b.id %} id="{{ b.id }}"{% endif %}>
+
+{% if b.type == "hero" %}
+  <article class="zt-el zt-el--hero" data-zt-kind="hero" data-zt-title="{{ plain(b.title) }}" data-zt-label="{{ b.badge or 'Start here' }}">
+    <div class="zt-fig" aria-hidden="true"></div>
+    <div class="zt-body">
+      {% if b.badge %}<span class="zt-kicker">{{ b.badge }}</span>{% endif %}
+      <{{ h }} class="zt-h zt-h--hero">{{ b.title | rich }}</{{ h }}>
+      {% if b.body %}<p class="zt-lede">{{ b.body | rich }}</p>{% endif %}
+      {{ tickets(b.buttons) }}
+      {% if e.img %}<img class="zt-img" src="{{ e.img }}" alt="" data-zt-img>{% endif %}
+      {% if b.device %}<div class="zt-device">{{ base.phone(b.device, e.screen, e.clip) }}</div>{% endif %}
+    </div>
+  </article>
+
+{% elif b.type == "intro" %}
+  <article class="zt-el zt-el--intro" data-zt-kind="intro" data-zt-title="{{ plain(b.title) }}" data-zt-label="{{ b.kicker or 'Why' }}">
+    <div class="zt-fig" aria-hidden="true"></div>
+    <div class="zt-body">
+      {% if b.kicker %}<span class="zt-kicker">{{ b.kicker }}</span>{% endif %}
+      <{{ h }} class="zt-h">{{ b.title | rich }}</{{ h }}>
+      {% if b.body %}<p class="zt-lede">{{ b.body | rich }}</p>{% endif %}
+      {% if b.button %}{{ tickets([b.button]) }}{% endif %}
+    </div>
+  </article>
+
+{% elif b.type == "features" %}
+  {{ sechead(b, h) }}
+  {% for f in b.items %}
+  <article class="zt-el zt-el--feature" data-zt-kind="feature" data-zt-title="{{ plain(f.title) }}" data-zt-label="{{ b.kicker or 'Feature' }} · {{ loop.index }} of {{ b.items | length }}" data-zt-tag="{{ (f.tag or ('%02d' | format(loop.index)))[:3] }}">
+    <div class="zt-fig" aria-hidden="true"></div>
+    <div class="zt-body">
+      {{ from(b) }}
+      {% if f.tag %}<span class="zt-tag">{{ f.tag }}</span>{% endif %}
+      <h3 class="zt-h">{{ f.title | rich }}</h3>
+      {% if f.body %}<p class="zt-lede">{{ f.body | rich }}</p>{% endif %}
+      {% if f.meter is not none %}<span class="zt-meter" style="--m: {{ f.meter }}" role="img" aria-label="{{ (f.meter * 100) | round | int }}%"><i></i></span>{% endif %}
+    </div>
+  </article>
+  {% endfor %}
+
+{% elif b.type == "product" %}
+  <article class="zt-el zt-el--product" data-zt-kind="product" data-zt-title="{{ plain(b.title) }}" data-zt-label="{{ b.kicker or 'The product' }}">
+    <div class="zt-fig" aria-hidden="true"></div>
+    <div class="zt-body zt-body--split">
+      <div class="zt-copy">
+        {% if b.kicker %}<span class="zt-kicker">{{ b.kicker }}</span>{% endif %}
+        <{{ h }} class="zt-h">{{ b.title | rich }}</{{ h }}>
+        {% if b.body %}<p class="zt-lede">{{ b.body | rich }}</p>{% endif %}
+        {% if b.stats %}<dl class="zt-mini">{% for st in b.stats %}<div><dd>{{ st.value }}{% if st.unit %}<small>{{ st.unit }}</small>{% endif %}</dd><dt>{{ st.label }}</dt></div>{% endfor %}</dl>
+        {% elif b.tags %}<ul class="zt-labels">{% for t in b.tags %}<li>{{ t }}</li>{% endfor %}</ul>{% endif %}
+        {{ tickets(b.buttons) }}
+        {% if b.note %}<p class="zt-note">{{ b.note | rich }}</p>{% endif %}
+      </div>
+      {% if b.device %}<div class="zt-device">{{ base.phone(b.device, e.screen, e.clip) }}</div>
+      {% elif e.img %}<img class="zt-shot" src="{{ e.img }}" alt="">{% endif %}
+      {% if e.img %}<img class="zt-img" src="{{ e.img }}" alt="" data-zt-img>{% endif %}
+    </div>
+    {% if b.device %}<script type="application/json" class="zt-devdata">{{ {"app": b.device.app, "title": b.device.title, "label": b.device.label, "note": b.device.note, "button": b.device.button, "time": b.device.time, "options": b.device.options | map(attribute="title") | list, "selected": (b.device.options | selectattr("selected") | map(attribute="title") | first) or ""} | tojson }}</script>{% endif %}
+  </article>
+
+{% elif b.type == "stats" %}
+  {{ sechead(b, h) }}
+  {% for st in b.items %}
+  <article class="zt-el zt-el--stat" data-zt-kind="stat" data-zt-title="{{ st.value }}{{ st.unit or '' }}" data-zt-label="By the numbers · {{ loop.index }} of {{ b.items | length }}" data-zt-value="{{ st.value }}" data-zt-unit="{{ st.unit or '' }}">
+    <div class="zt-fig" aria-hidden="true"></div>
+    <div class="zt-body">
+      <p class="zt-from"><span>By the numbers</span></p>
+      <p class="zt-stat"><b>{{ st.value }}</b>{% if st.unit %}<small>{{ st.unit }}</small>{% endif %}</p>
+      <h3 class="zt-h zt-h--stat">{{ st.label }}</h3>
+    </div>
+  </article>
+  {% endfor %}
+
+{% elif b.type == "timeline" %}
+  {{ sechead(b, h) }}
+  {% for t in b.items %}
+  <article class="zt-el zt-el--step" data-zt-kind="step" data-zt-title="{{ plain(t.title) }}" data-zt-label="{{ t.when }} · step {{ loop.index }} of {{ b.items | length }}">
+    <div class="zt-fig" aria-hidden="true"></div>
+    <div class="zt-body">
+      {{ from(b) }}
+      <span class="zt-when">{{ t.when }}</span>
+      <h3 class="zt-h">{{ t.title | rich }}</h3>
+      {% if t.body %}<p class="zt-lede">{{ t.body | rich }}</p>{% endif %}
+    </div>
+  </article>
+  {% endfor %}
+
+{% elif b.type == "quote" %}
+  <article class="zt-el zt-el--quote" data-zt-kind="quote" data-zt-title="{{ (b.who or 'In their words').split(',')[0] }}" data-zt-label="In their words">
+    <div class="zt-fig" aria-hidden="true"></div>
+    <div class="zt-body">
+      <figure class="zt-quote">
+        <blockquote class="zt-quote__t">{{ b.text | rich }}</blockquote>
+        {% if b.who %}<figcaption>☞ {{ b.who }}</figcaption>{% endif %}
+      </figure>
+    </div>
+  </article>
+
+{% elif b.type == "faq" %}
+  {{ sechead(b, h) }}
+  {% for it in b.items %}
+  <article class="zt-el zt-el--faq" data-zt-kind="faq" data-zt-title="{{ plain(it.q) }}" data-zt-label="{{ plain(b.title) or 'Question' }} · {{ loop.index }} of {{ b.items | length }}">
+    <div class="zt-fig" aria-hidden="true"></div>
+    <div class="zt-body">
+      {{ from(b) }}
+      <h3 class="zt-h zt-h--q">{{ it.q | rich }}</h3>
+      <p class="zt-lede">{{ it.a | rich }}</p>
+    </div>
+  </article>
+  {% endfor %}
+
+{% elif b.type == "cta" %}
+  <article class="zt-el zt-el--cta" data-zt-kind="cta" data-zt-title="{{ plain(b.title) }}" data-zt-label="{{ b.kicker or 'The offer' }}">
+    <div class="zt-fig" aria-hidden="true"></div>
+    <div class="zt-body">
+      {% if b.kicker %}<span class="zt-kicker">{{ b.kicker }}</span>{% endif %}
+      <{{ h }} class="zt-h zt-h--hero">{{ b.title | rich }}</{{ h }}>
+      {% if b.button %}{{ tickets([b.button]) }}{% endif %}
+    </div>
+  </article>
+{% endif %}
+</section>
+{% endmacro %}

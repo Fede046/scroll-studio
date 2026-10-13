@@ -1,0 +1,34 @@
+{# Zoetrope chrome: the lid band (wordmark, section links that turn the wheel to their card, the call to action), the stage
+   the runtime draws the turntable into, the brass pointer that ticks over the cards and marks the winner, the strobe lamp
+   and spin button, the winner's label, and the dialog an opened card is shown in. Without JavaScript only the lid band
+   remains and the page is the plain list of cards. #}
+
+{% macro top(site, sections, nav_links) %}
+<header class="zt-lid">
+  <a class="zt-lid__mark" href="#"><span class="zt-lid__name">{{ site.name }}</span><span class="zt-lid__sub" aria-hidden="true">The Wheel of Life</span></a>
+  {% if nav_links %}<nav class="zt-lid__nav" aria-label="Sections">{% for l in nav_links %}<a href="{{ l.href }}"><b aria-hidden="true">{{ loop.index }}</b> {{ l.label }}</a>{% endfor %}</nav>{% endif %}
+  {% if site.nav.cta %}<a class="zt-ticket zt-ticket--hot zt-lid__cta" href="{{ site.nav.cta.href }}">{{ site.nav.cta.label }}</a>{% endif %}
+</header>
+<div class="zt-stage" id="zt-stage" aria-hidden="true"></div>
+<div class="zt-wheel" tabindex="0" role="group" aria-roledescription="turntable" aria-label="{{ site.name }}: a wheel of cards. Left and right arrows turn it one card, Enter opens the card at the front, Space spins it." hidden>
+  <p class="zt-live" aria-live="polite"></p>
+</div>
+<div class="zt-pointer" aria-hidden="true" hidden><svg viewBox="0 0 40 64"><path d="M20 62 L6 18 A15 15 0 1 1 34 18 Z"/><circle cx="20" cy="15" r="5.5"/></svg></div>
+<div class="zt-winner" hidden><span class="zt-winner__no"></span> <span class="zt-winner__t"></span> <button type="button" class="zt-winner__open">Open <span aria-hidden="true">↗</span></button></div>
+<div class="zt-strobe" hidden>
+  <span class="zt-strobe__lamp" aria-hidden="true"></span>
+  <span class="zt-strobe__state" aria-hidden="true"><b>Lamp</b> <span class="zt-strobe__fps">still</span></span>
+  <button class="zt-spin" type="button">Give it a spin</button>
+</div>
+<p class="zt-hint" aria-hidden="true" hidden>Scroll, swipe or drag to spin the wheel · click a card to open it</p>
+<div class="zt-open" hidden>
+  <div class="zt-open__dim"></div>
+  <div class="zt-open__card" role="dialog" aria-modal="true">
+    <div class="zt-open__head"><span class="zt-open__no"></span><span class="zt-open__label"></span><button type="button" class="zt-open__close" aria-label="Close card">×</button></div>
+    <div class="zt-open__fig" aria-hidden="true"></div>
+    <div class="zt-open__slot"></div>
+  </div>
+</div>
+{% endmacro %}
+
+{% macro bottom(site, sections) %}{% endmacro %}

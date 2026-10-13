@@ -6,6 +6,11 @@ commits it spans so you can check out any earlier state (`git checkout <commit>`
 ## Unreleased
 
 ### Added
+- Style `zoetrope`: the whole landing page is one wheel of printed cards on a giant strobe zoetrope. Every element
+  (hero, each feature, each stat, each step, each question, the call to action) is a card with its own animation.
+  Spin it with scroll, swipe, drag or the button; it strobes alive, slows with real friction and lands on a card;
+  click a card and it flies out to be read. Research: docs/styles/styles-24-25.md.
+- README: why Scroll Studio (local only, 10 to 30 times fewer tokens) with a worked token breakdown.
 - Styles `pinscreen` (a dark, lamp-lit board of pins after Alexeieff and Parker: each plate is a pin picture and a wave
   of pins rolls it into the next; the pointer moves the lamp and presses pins) and `sand` (a backlit sand table after
   Caroline Leaf: one scroll sweeps a mound of grains across into the next scene; pictures are poured and cleared in

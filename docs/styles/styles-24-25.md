@@ -4,7 +4,7 @@
 
 **Zoetrope, Flipbook**
 
-Prepared 2026-10-12 for the Scroll Studio engine, as part of the animation-technique batch (styles 22 to 27). These two styles come from the two oldest ways of making drawings move by hand: a drum you spin and a pad you thumb. Both are pre-cinema toys, and both answer the batch's question in a different way: *what does scrolling become inside this technique?* In the zoetrope, scrolling is **force**: it spins a flywheel, and the animation only exists above a certain speed. In the flipbook, scrolling is **the thumb**: every notch lets go of one page, and the drawing is wherever your thumb has got to.
+Prepared 2026-10-12 for the Scroll Studio engine, as part of the animation-technique batch (styles 22 to 27). These two styles come from the two oldest ways of making drawings move by hand: a drum you spin and a pad you thumb. Both are pre-cinema toys, and both answer the batch's question in a different way: *what does scrolling become inside this technique?* In the zoetrope, the page is **a prize wheel of cards under a strobe**: you spin it, the figures come alive while it is fast, and it lands on one card you can open. In the flipbook, scrolling is **the thumb**: every notch lets go of one page, and the drawing is wherever your thumb has got to.
 
 > **How to read the citations.** URLs are inline. Where a claim comes from general animation or design knowledge and not from a source I retrieved, I say "(general knowledge)". Some figures (frame counts, installation sizes) differ between sources; where they do I say so instead of picking one silently.
 
@@ -14,10 +14,10 @@ Prepared 2026-10-12 for the Scroll Studio engine, as part of the animation-techn
 
 | Style | What scroll *is* | Time quantisation | Motion curve | Spatial axis | Primary renderer |
 |---|---|---|---|---|---|
-| Zoetrope | **Torque on a flywheel.** Scroll speed (and a sideways drag) spins a slotted drum; scroll *position* only decides which strip is loaded | A closed loop of 12 frames. Below the fusion speed you see the drum turn continuously and the frames slide past one by one; above it the slits strobe and the frames lock in place and animate | Physics, not tweens: impulse in, exponential friction out (a spin-down lasts seconds). Strip swaps are lifts on a scrubbed scroll window | Rotation about a vertical axis: a cylinder seen from just above its rim; the camera drops to slit height as the drum speeds up | One WebGL canvas (three.js drum, strips drawn into canvas textures) plus DOM caption card |
+| Zoetrope | **A prize wheel you spin and land.** The whole landing page is one ring of cards on a turntable, one card per element; the scroll wheel, a swipe or fling, a drag, the spin button or the arrows give it a spin | A closed loop of 12 poses on every card. While the wheel is fast the strobe steps every figure on one pose per card past the pointer, so the whole ring is alive; slow, it is still pictures | Real inertia: impulse in, friction out, then a spring that lands square on one card with a small overshoot; the pointer ticks over the pegs | Rotation about a vertical axis: a ring of printed cards, the front one square on and largest, the far side of the ring above it | One WebGL canvas (three.js turntable, a printed face and a 12-pose atlas per card) plus the real HTML of a card shown in a dialog when it is picked |
 | Flipbook | **The thumb on a pad.** One wheel notch (about 100 px) releases one page; scroll position is the page number, forwards and backwards | Discrete pages. Each page is one drawing; a slow scroll bends the next page's corner, the notch lets it go | A released page peels over in about a quarter of a second (fast start, settling as it lies over). A fast scroll riffles several pages in flight at once | Depth: a pad of paper seen from above, hinged at a peg bar along its top edge; pages peel up from the lower corner and fold over the top | Canvas 2D (a fold-and-reflect page peel, pencil drawings with line boil) plus real DOM text on the resting page |
 
-Neither model is used by any of the 21 existing styles. Kinetic type and liquid morph react to scroll *velocity* too, but as a deformation of the content (skew, wobble); in the zoetrope velocity is the only thing that makes the picture *exist as motion*, and position plays no part in the animation. Pixel art steps frames, but its frames are a sprite walking through a level; the flipbook's frames are the pages of the site itself, and you move through them like paper.
+Neither model is used by any of the 21 existing styles. Kinetic type and liquid morph react to scroll *velocity* too, but as a deformation of the content (skew, wobble); in the zoetrope speed decides whether the figures are alive, and the page itself is an object you spin and land rather than a column you read down. Pixel art steps frames, but its frames are a sprite walking through a level; the flipbook's frames are the pages of the site itself, and you move through them like paper.
 
 ---
 
@@ -38,91 +38,85 @@ The most important reference for a *scroll* site is the **linear zoetrope**. Bil
 4. **The box of strips.** The toy came with a box of interchangeable strips; part of the ritual is choosing the next one, dropping it into the drum and giving it a spin.
 5. **Flicker and darkness.** Through the slits the picture is dim and slightly flickering; the eye fills it in (general knowledge).
 
-**How the illusion works, and why it matters for the mechanic.** Each slit gives the eye a brief look at the frame opposite, then blocks the view until the next slit arrives with the next frame in the same place, so the frames do not smear (Wikipedia, above). With as many slits as frames, the subject animates on the spot; draw one frame more or fewer than there are slits and the figures appear to travel round the drum (general knowledge). Below a certain rate the pictures read as separate snapshots; the brain links them into motion (the beta effect, not retinal "persistence") once they arrive fast enough. Early film ran between 12 and 24 frames a second ([UAL research paper on persistence of vision and apparent motion](https://ualresearchonline.arts.ac.uk/id/eprint/21202/2/f4fb8655-0e0a-461f-8852-163a38bd629c.pdf)); hand-made flip animation is commonly said to look smooth from about 12 to 15 ([RAFT activity guide](https://raft.net/wp-content/uploads/2020/08/280-Animated-Flip-Books.pdf)). So the style sets its fusion point at about 10 frames per second through the slits: under it, frames; over it, motion.
+**How the illusion works, and why it matters for the mechanic.** Each slit gives the eye a brief look at the frame opposite, then blocks the view until the next slit arrives with the next frame in the same place, so the frames do not smear (Wikipedia, above). With as many slits as frames, the subject animates on the spot; draw one frame more or fewer than there are slits and the figures appear to travel round the drum (general knowledge). Below a certain rate the pictures read as separate snapshots; the brain links them into motion (the beta effect, not retinal "persistence") once they arrive fast enough. Early film ran between 12 and 24 frames a second ([UAL research paper on persistence of vision and apparent motion](https://ualresearchonline.arts.ac.uk/id/eprint/21202/2/f4fb8655-0e0a-461f-8852-163a38bd629c.pdf)); hand-made flip animation is commonly said to look smooth from about 12 to 15 ([RAFT activity guide](https://raft.net/wp-content/uploads/2020/08/280-Animated-Flip-Books.pdf)). A strobe zoetrope does not need the eye's threshold at all: the strobe freezes each pose, and the figures read as alive as soon as the flashes step them on. So the style lights its strobe at about two and a half cards a second past the pointer, which any spin crosses: under it, still pictures travelling round a ring; over it, every figure on the ring alive at once.
+
+> **Revisions (2026-10-12).** *v1* was a small lacquered drum in a dark parlour, spun by scroll speed, with the copy beside it: too small, too dark, the animation hard to see, the copy disconnected. *v2* rebuilt it as a giant bright 3D strobe zoetrope (Ghibli Museum, Pixar), one deck of twelve cards per section of a scrolling page. The owner liked it and asked for more: "every question should be different, and I should be able to spin it and land on something... each card is a landing page element and when I click the card shoots out and I can read it. So rather than sections on a landing page it's these cards." What follows is *v3*.
 
 ### 24.2 Layout and information architecture
 
-- **One instrument, not a stack of panels.** The screen is a parlour table under a lamp. A large drum stands right of centre (desktop) or across the top half (phone). It is the only picture on the page, and it never scrolls away.
-- **Every section is a strip.** Each block becomes a 12-frame strip drawn from its own content (the hero's headline word, the product's phone, the stats, a walking figure for the timeline). Moving to the next section means **lifting the strip out of the drum and dropping in the next one**. Lists with real weight (features) are one strip per item, so each feature gets its own swap.
-- **The caption card.** Left of the drum (below it on a phone) sits the printed card for the strip that is loaded: series number ("Strip No. 4 of 12"), title, body, buttons. It is real HTML, always fully readable at rest.
-- **The box of strips (nav).** A column of strip labels, each a numbered paper tab, stands at the right edge; the loaded strip's tab is pulled out. Clicking one scrolls to it. On phones it collapses into the header.
-- **The tachometer.** A small brass dial reads the drum's rate in frames per second, with two zones printed on its face, *frames* and *motion*. It teaches the mechanic without a word of instruction, and carries the "give it a spin" button.
+- **The landing page is one wheel.** There is no column of sections. One turntable fills the screen, and on it stands one printed card for every element of the page, in reading order: the hero, each feature, the product, each stat, each step, the quote, each question, the call to action, and any scene or other block. The ring grows with the content (8 to 30 cards and more): the radius follows the card count, the card keeps its size, so a big site is a bigger wheel, not smaller print.
+- **A card face is a title and a figure.** Each face is the same Victorian printed card (number, the element's label such as "What it does · 2 of 3", the figure in a ruled frame, a short title, the maker's line). The full text is not on the face: it is in the card you open.
+- **Every figure is different.** Each card gets its own 12-pose loop, chosen from about forty figures (a bulb glowing on, a magnifier sweeping a line of text, a door swinging open, a key turning, scales tipping, a jack-in-the-box, a paper plane looping, a clock running through twelve hours, an hourglass flipping, gears meshing, a spinning top, a juggler, a rocket, a tear-off calendar, an envelope opening, a tumbler, a bell, a kite, the moon's phases, a die, a pie filling to the stat's percentage, an odometer rolling to the stat's figure, the phone turning on its turntable, the theme artwork, a photograph panned like the view from a train, twelve frames sampled from a film, a strip's photos passing behind slits like the *Masstransiscope*...). The choice reads the card's words (a question about price gets the scales, "who" the magnifier, a step on "Day 1" the calendar, a stat in hours the clock) and the card's kind, and never repeats on one wheel.
+- **The open card.** Picking a card opens it as a dialog over a dimmed table: the printed card, large, its figure still playing, and the element's complete real HTML (headline, body, buttons, the phone for the product, the answer to the question, a film's footage with its captions).
+- **Furniture.** A lid band (wordmark, the site's section links, the call to action), a brass pointer over the front card, the winner's label under it with an Open button, a strobe lamp with the spin button at the lower left, a one-line hint.
 
 ### 24.3 Signature interactions and scroll behaviour
 
-**How scroll feels:** like pushing a heavy wheel. Scroll speed is turned into torque on a flywheel; the drum keeps turning after you stop and winds down over several seconds. Scroll up and it spins backwards, so the loop plays in reverse. Position matters only at the boundaries between strips.
+**How it feels:** a prize wheel at a fair, printed in 1870. You flick the scroll wheel or swipe and the table spins; the pointer chatters over the brass pegs; while it is fast the strobe lamp lights and every figure on the ring comes alive at once; it slows with real inertia, the pointer ticks, and it lands square on one card with a little bounce. The pointer turns gold, the lamp stays lit, the winning card leans forward and plays its loop, and its title appears under it with an Open button. Spin again, or open what you won.
 
-**What scroll drives:**
-- **Spin.** Angular speed comes from scroll velocity (impulse plus friction, capped). The rate in frames per second (slits passing per second) drives everything else.
-- **Three regimes.** *Stopped:* the camera rises and looks over the rim, so you see the inside of the strip as printed, frames side by side. *Slow* (under about 8 frames a second): the drum turns, the slats sweep past and the frames slide by as separate pictures. *Fast* (over about 10): the slits strobe; the frames lock into place and the loop comes alive, while the slatted wall blurs to a grey veil and the camera drops to slit height. The lock-in moment is the signature beat.
-- **Strip swap (section transition).** At each boundary a short scrubbed window lifts the old strip straight up out of the open drum, a curling paper ring rising off the top, and lowers the next one in. It is tied to scroll position, so it reverses if you scroll back. When a strip lands, the drum gets a push, as a hand would give it, so each section opens with its loop alive and then winds down through separate frames to a halt. That rhythm (alive, frames, still) repeats for every section.
-- **Travel strips.** For lists that are a procession (stats), the strip is drawn as a *parade*: the figures advance a little each time a slit passes, like a 13-frame strip in a 12-slit drum, so at speed the numbers march round the drum past the viewing slits.
+**The inputs:**
+- **Scroll wheel or trackpad:** each notch is a push of about 3 cards a second; pushes in the same direction build speed but saturate near 12 cards a second (a burst cannot stack without limit, and a trackpad's momentum tail only tops it up); scrolling the other way brakes and can reverse it. The page does not scroll: the wheel is the page.
+- **Touch:** swipe sideways or up to spin, the release speed is the fling; tap a card to open it.
+- **Mouse:** drag to turn it directly, release to fling; click any visible card to open it; click the table while it spins and a hand brake slows it onto a card.
+- **The spin button (and Space):** a spin of at least one full turn that lands on a random card in about three and a half seconds. The launch speed is found by bisection on the wheel's own coasting, so it is real inertia and still ends on the chosen card.
+- **Arrow keys:** turn one card; Enter opens the front card; Home and End go to the first and last.
+- **Section links (nav, buttons, `#` links):** turn the wheel the short way round to that section's first card; from inside an open card they close it first.
 
-**Headline arrival:** through the slits. A new caption's heading is first seen through a moving vertical slit mask that sweeps with the drum; as the strip settles the slits widen until the text is solid. The headline is never typed, faded or slid; it *fuses*, the way the picture does.
+**The strobe:** above about 3 cards a second the lamp lights and the figures step on one pose per card that passes the pointer (each card offset in its loop), so the whole ring is animated; below about 2.2 they freeze. The wheel is always drawn at its true speed, so you watch it decelerate. Nothing flashes on screen: the effect is in what each frame draws.
 
-**Stats:** a parade. The figures are printed as cartouches on one travelling strip and march round the drum when it spins; the caption card prints them as a playbill of large numerals.
+**The landing:** friction is mostly constant (Coulomb) with a little drag, so speed falls almost linearly: a single notch moves a card or two and lands in under a second, three notches in about two seconds, a hard spin or a fling in about three. Below 1.6 cards a second the wheel picks the card it will stop on and decelerates onto it at a believable constant rate (the pointer ticking past the last pegs), then the clapper catches: a small spring with a little overshoot. The landing is announced to assistive technology ("Card 7 of 19, Feature: Smart batching. Press Enter to open it.").
 
-**Feature list:** one strip per feature. The feature's title becomes the strip's subject (its letters hop in a wave round the drum), its tag is the strip number. The caption card lists all features and pulls the loaded one forward.
+**Opening a card:** the card leaves its slot and flies at the viewer, turning edge-on, and the paper card turns the rest of the way in front of a dimmed, blurred table. Close it (close button, a click outside, Esc, a swipe down on touch) and it turns back and flies home to its slot. The wheel stays where it was. The dialog is modal, focus moves into it and is trapped there, and returns to where it was on close.
 
-**Section transitions:** strip out, strip in, push. No fades, no cuts, no sideways slides.
+**Headline, stats, features, transitions, CTA:** the headline is the hero card's title and opens to the full `<h1>` card; each stat is its own card (a clock, a pie, an odometer, an hourglass...); each feature, step and question is its own card with its own figure; there are no section transitions, only the turning of the wheel; the call to action is a card like the others, with a sunburst, whose button is the real link.
 
-**Pointer:** grab the drum and spin it. A horizontal drag on the drum turns it directly; letting go flings it with the drag speed. Vertical swipes still scroll (the drum uses `touch-action: pan-y`). The tachometer's button gives the same push from the keyboard.
-
-**CTA:** the last strip carries the call to action as its subject, its letters bouncing round the drum, and the caption card holds the button. The tachometer reads "motion" as you arrive: the page ends with the wheel alive.
-
-**Real-world references:** *Masstransiscope* (above) for the moving-viewer principle; the Ghibli and Pixar strobe zoetropes for the moment of lock-in; Milton Bradley and *Wheel of Life* strips for the printed look; Edmark for how a strobe rate can make one object perform.
+**Real-world references:** prize wheels and roulette for the spin, the pegs and the landing; the Ghibli Museum and Pixar strobe zoetropes for a ring of figures that comes alive under a strobe; Milton Bradley and *Wheel of Life* strips for the printed look; *Masstransiscope* for the strip seen through slits.
 
 ### 24.4 Component treatments
 
-| Component | Treatment |
-|---|---|
-| Nav | The box of strips: numbered paper tabs at the right edge, the loaded one pulled out. A slim lid band at the top with the wordmark in wood-type capitals and the nav CTA. |
-| Buttons | Printed tickets: cream card, double rule border, small caps. Primary is vermilion with cream text. Hover lifts the ticket a few pixels. |
-| Hero | Strip No. 1. Subject: the theme artwork's frames if the site has `theme.art`, otherwise the headline's accent word leaping in a squash-and-stretch arc. Caption carries the `<h1>`. |
-| Intro | A bird in flight (Marey's gull, flapping on the spot). Caption: kicker, title, body. |
-| Features | One strip per feature: the title's letters in a travelling wave, the tag numeral printed in the corner of each frame. |
-| Product | A phone turning on a turntable, 12 views round 360°, its screen drawn from the device data. Caption: kicker, title, body, tags as printed labels. |
-| Stats | One parade strip: each stat a cartouche (value, unit). Caption: a playbill of large Didone numerals with small-caps labels. |
-| Timeline | A walking figure with milestone posts (each `when`) sliding past behind it. Caption: steps listed as numbered stations, the current one marked by scroll position. |
-| Quote | A speaking profile in a cameo frame, a speech balloon swelling and shrinking. Caption: the quote set large in italic with a printer's manicule before the attribution. |
-| FAQ | A question mark tumbling end over end. Caption: native `<details>` list styled as a Q and A leaflet. |
-| CTA | The button label's letters hopping round the drum over a turning sunburst. Caption: kicker, title, the ticket button. |
-| Gallery, strip, orbit, unknown | A bouncing ball strip (the first exercise of every animator); default markup in the caption, restyled. |
-| Film and other scenes | Intermissions: the scene slides up over the parlour and plays full width; the drum is waiting underneath when it has passed. Unknown block types are treated the same way. |
+| Element | Card face (title + figure) | Opened card |
+|---|---|---|
+| Hero | The headline; the theme artwork, a photograph panned, or a steaming cup | Badge, `<h1>`, body, buttons (and a hero phone, if any) |
+| Intro | Its title; a bird in flight | Kicker, title, body, button |
+| Each feature | Its title; a figure of its own (a coin with its number, a bell, gears...) | Section line, tag, title, body, meter |
+| Product | Its title; the phone turning, or the product picture | Kicker, title, body, tags or stats, buttons, note, and the real HTML phone |
+| Each stat | Its figure (value and unit); a clock, pie, odometer or hourglass | The figure set huge, its label |
+| Each step | Its title; a calendar, key, walker, sunrise... | Section line, when, title, body |
+| Quote | The speaker; a speaking cameo | The quote, the attribution |
+| Each question | The question; a bulb, magnifier, door, key, scales... | Section line, the question, the answer |
+| CTA | Its title; a sunburst | Kicker, title, the button (a real link) |
+| Film scene | Its first caption; twelve frames sampled from the film | The film playing, every caption |
+| Strip, gallery | Its title; its photos passing behind slits | The block's own markup |
+| Orbit, other blocks | Its title; satellites circling | The block's own markup |
 
 ### 24.5 Typography and colour
 
-- **Display:** **Bodoni Moda** (variable, optical sizes 6 to 96, weights 400 to 900): the high-contrast Didone of 1860s and 70s posters and toy-box lids.
-- **Labels:** **Alfa Slab One**, a heavy slab in the spirit of the wood types on playbills, used for strip numbers and the tachometer.
-- **Body:** **Libre Caslon Text**, a book face of the period, comfortable at body sizes.
-- **Mono:** **Cutive Mono** for frame numbers and small readouts.
-- **Palette:** a dark parlour (walnut black `#14100d`) lit by a warm lamp; cream text `#efe3c8`; strip paper `#efe2c4`; vermilion `#d4482c` as the accent (buttons, strip numerals); brass `#c9a24a` for rules and the dial; Prussian blue `#24476b` and ochre `#c78f2a` in the printed strips only.
+As v2: **Bodoni Moda** (display), **Alfa Slab One** (labels, numbers, buttons), **Libre Caslon Text** (body), **Cutive Mono**; ivory wall `#f3ead6`, card paper `#f8f1df`, ink `#1d1611`, vermilion `#c8371e`, Prussian blue `#1f4f8a`, gold `#b8892e`, red patterned card backs. The landed state turns the pointer gold and lights the lamp; the strobe cools the room and dims its edges a little.
 
 ### 24.6 Implementation
 
-- **Stage:** a fixed full-screen WebGL canvas (three.js, lazy chunk). The drum is a slatted outer wall (an alpha-cut cylinder, front side lacquer, back side dark), an inner strip ring (canvas texture of 12 frames, seen through the slits and over the rim), a printed base disc, a turned stand. One warm key light and ambient.
-- **Strobe model:** keep two angles, the drum's true angle θ and the strip's displayed angle. Below the fusion rate they are equal (frames slide past). Above it the strip is drawn at θ rounded to the nearest slit pitch while the outer wall keeps turning and fades to a veil: what the eye integrates through a strobing slit is precisely the strip at those aligned instants. Hysteresis (lock at 10 fps, release at 8) avoids chatter.
-- **Flywheel:** `ω += gain · scrollVelocity`, `ω *= exp(-friction · dt)`, capped; dragging the drum sets θ directly and releases with the drag speed.
-- **Strips:** drawn once per section into a 2D canvas (12 frames plus the printed margins), uploaded as textures; at most two are alive (the leaving and the arriving strip).
-- **Sections:** each block becomes a spacer whose height is its share of the scroll; its caption is fixed in the card area and shown while its section holds the middle of the screen. Strip swaps are scrubbed over a window around each boundary.
-- **Performance:** pixel ratio capped (1.5 on phones), the render loop sleeps when the drum is still and nothing is swapping, and while a scene section covers the screen.
+- **Markup:** every element is an `<article class="zt-el">` with its title, label and kind as data attributes, the cards grouped in their sections in reading order. Without JavaScript, and with reduced motion, this is the page: a grid of printed cards under the section headings, each figure drawn still. With JavaScript the list stays in the page, visually hidden, for assistive technology; the article moves into the dialog when its card is opened and back when it closes. Scenes get a card built from their captions and footage; other blocks open as their own markup.
+- **Turntable:** three.js; a disc and rim sized from the card count, a plinth and a brass peg per card, each card a thin box with an unlit printed face (exact colours) and a printed back, leaning back by the camera's elevation so the front card faces the camera square on. Faces are drawn into canvases a couple per frame; the twelve poses of each figure near the front are drawn into a 4 × 3 atlas shown on a plane over the face's figure frame, and the pose is chosen by moving the atlas offset (no redrawing per frame). Atlases far from the front are dropped.
+- **Physics:** integrated in real time with fixed 1/240 s sub-steps (a long frame takes several steps; time is never slowed). Free: `dω/dt = −(2.9 + 0.42|ω|)·sign ω` cards a second; a wheel push adds `3 × deltaY/100` scaled by the room left under 12 cards a second; the other way brakes at 1.7×. Land: from 1.6 cards a second, constant deceleration onto the chosen card (kept between 0.8 and 2.4 × the friction). Bounce: spring k 300, damping 22. Hand brake: 5 × friction. Button and links: firmer friction (3.5) and a launch speed found by bisection on the coast. Rendering happens only when the wheel, a pose, a flight or a texture changes; the winner plays its loop twice, then the page is still.
+- **Figures:** `_zoetrope-figures.ts`, one function per figure, pose 0 always a good still; the choice reads the card's words with a table of hints, then the kind's own list, then anything unused.
+- **Performance:** pixel ratio capped at 2, textures sized to the card, a film's twelve frames sampled once at 320 px, the dialog's figure redrawn at 8 frames a second while it is open.
 
 ### 24.7 Anti-patterns
 
-- **A spinning carousel of cards.** A 3D ring of feature cards that rotates as you scroll is a coverflow, not a zoetrope. The zoetrope's picture comes *from the spin* and is seen *through slits*.
-- **Velocity as decoration.** If the page looks the same at every scroll speed, the mechanic is lost. Speed must change what you see: separate frames below the threshold, a living loop above it.
-- **Real flashing.** Do not simulate the strobe by flashing the screen. The lock-in is shown by holding the frames still while the drum turns; luminance stays steady (WCAG 2.3.1).
-- **Same-as-Kinetic-type trap:** both react to speed. Kinetic type *distorts the type* with velocity; here velocity *animates a separate picture*, and the type never moves except through the slit mask on arrival.
-- **Same-as-Liquid-morph trap:** liquid morph stretches its world when flung and settles with surface tension. The zoetrope has rigid parts only: a wheel, a strip, slits.
-- **Same-as-Retro-VHS trap:** VHS turns speed into fast-forward noise on a tape. The zoetrope has no timeline to search: the loop is closed, and speed decides only whether it lives.
+- **A vertical page with a wheel in it.** The wheel is the page; a scrolling column under it would make the wheel decoration.
+- **Repeated figures.** Two cards with the same loop make the ring read as a pattern, not a deck of different things. Every card has its own.
+- **Spinning without landing.** A wheel that drifts to a stop between cards, or that you cannot steer to a card, misses the point. It always lands square on one card, and the pointer and lamp say which.
+- **Text on the turntable.** The faces carry a title and a figure only; reading happens in the opened card, at a comfortable size.
+- **Real flashing.** Never flash the screen for the strobe (WCAG 2.3.1).
+- **Same-as-Pop-up-book trap:** paper on a table, but the pop-up book is a hinge you open; this is a wheel you spin, and its pieces never fold.
 
 ### 24.8 Reduced-motion fallback
 
-The drum is not shown. Each section prints its strip **laid flat** beside its caption, in a normal reading flow: the 12 frames with their numbers and the printed title, cut in two and laid one half above the other so the drawings read at a useful size, like a strip lifted out of the box. Nothing turns, no slit masks. The technique stays recognisable as an object: a printed zoetrope strip is the zoetrope at rest.
+No turntable. The page is the list of cards: section headings, then each element as a printed card with its figure drawn still and its full text. Nothing moves; it reads as a deck of zoetrope cards laid out on the table.
 
 ### 24.9 UX signature
 
-**Your scroll is the hand on the wheel.** One lacquered drum stands under a lamp and every section is a paper strip dropped into it. Scroll gently and the drum turns, and you see the drawings slide past the slits one by one. Scroll hard and the slits start to strobe: the frames lock in place and the loop comes alive (a word leaping, a phone turning, a figure walking past the milestones), while the dial swings from *frames* into *motion*. Stop and it winds down, and the camera lifts to look over the rim at the strip itself. Between sections the strip is lifted out and the next dropped in with a push. The feeling is *the illusion explained by your own hand*: the visitor discovers that the picture only exists while they keep the wheel going.
+**You spin the page and land on what you read.** The whole site is a fairground wheel of printed cards on a strobe zoetrope, one card for every part of the page, each with a figure of its own: a bulb for one question, a magnifier for the next, scales for the third. Flick it and it spins, the pointer chattering over the pegs and every figure coming alive under the strobe; it slows, ticks, and lands with a little bounce, the lamp lit and the winner leaning forward. Click it and the card flies out, flips and opens in your hands. The feeling is *a toy you keep spinning*.
 
 ---
 
@@ -230,14 +224,14 @@ No flights, no riffle, no writing-in. Each section is shown as **one finished pa
 
 | | **Zoetrope** | **Flipbook** | Kinetic type | Pixel art | Split-flap |
 |---|---|---|---|---|---|
-| **One scroll notch =** | Torque on a flywheel; speed, not position, animates | Releases one page | Skews and stretches words with speed | One step of a walking sprite | Advances the station clock |
-| **Time feel** | Physics: impulse and long spin-down; frames below 10 fps, motion above | Discrete pages, each released page whips over | Spring back when you stop | Turn-based, 8 to 12 fps | Events with a mechanical riffle |
-| **Spatial logic** | A cylinder turning about a vertical axis, camera over the rim | A pad seen from above, pages hinged at the top | Full-bleed type | Side-scrolling level | A fixed board of rows |
-| **Persistence** | One drum; strips swap in and out | One pad; pages leave, the stack thins | None | Avatar and HUD | Board persists, rows shift |
-| **Headline arrives by** | Fusing through a moving slit mask | Hand-lettered, a few letters per page | Inflates across the screen | Typewriter in a dialog box | Flaps riffle to the letters |
-| **Stats as** | A parade strip marching round the drum | Tally marks, pie shading, a hatched bar, counted per page | Huge type | RPG bars | Board cells |
-| **Feature list as** | One strip per feature, its title leaping | A shape morphing between features; checklist ticks | Marquees | ITEM GET! | Departures |
-| **Section transition** | Strip lifted out, next dropped in, push | None: the next page is the next section | Type surge | Mosaic or iris | Whole board re-flips |
-| **Pointer** | Grab and spin the drum | Grab the corner and flip; hold the edge to riffle | Hover skew | Menu cursor | Sound toggle |
-| **CTA** | Last strip alive, dial on "motion" | Ball lands on the drawn button, "The End" | Big type | CONTINUE? | Boarding row |
-| **Reduced motion** | The strip laid flat | A finished pad page per section | Static type | Plain page | Instant board |
+| **One scroll notch =** | Adds spin to a prize wheel of cards; it slows with inertia and lands on one | Releases one page | Skews and stretches words with speed | One step of a walking sprite | Advances the station clock |
+| **Time feel** | Fling, coast, tick, land with a bounce; figures alive while fast | Discrete pages, each released page whips over | Spring back when you stop | Turn-based, 8 to 12 fps | Events with a mechanical riffle |
+| **Spatial logic** | The whole page is one ring of element cards on a turntable | A pad seen from above, pages hinged at the top | Full-bleed type | Side-scrolling level | A fixed board of rows |
+| **Persistence** | One wheel, every element always on it | One pad; pages leave, the stack thins | None | Avatar and HUD | Board persists, rows shift |
+| **Headline arrives by** | Landing on the hero card and opening it | Hand-lettered, a few letters per page | Inflates across the screen | Typewriter in a dialog box | Flaps riffle to the letters |
+| **Stats as** | A card each: clock, pie, odometer, hourglass | Tally marks, pie shading, a hatched bar, counted per page | Huge type | RPG bars | Board cells |
+| **Feature list as** | A card each, every one with its own figure | A shape morphing between features; checklist ticks | Marquees | ITEM GET! | Departures |
+| **Section transition** | None: the wheel turns to the next card | None: the next page is the next section | Type surge | Mosaic or iris | Whole board re-flips |
+| **Pointer** | Drag or fling to spin; click a card to open it | Grab the corner and flip; hold the edge to riffle | Hover skew | Menu cursor | Sound toggle |
+| **CTA** | A card on the wheel; the button inside is the real link | Ball lands on the drawn button, "The End" | Big type | CONTINUE? | Boarding row |
+| **Reduced motion** | The deck of cards as a list | A finished pad page per section | Static type | Plain page | Instant board |

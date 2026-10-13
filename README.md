@@ -6,7 +6,7 @@ through MCP.**
 [![Lodestar Orbital: a rocket launch that plays as you scroll](docs/media/lodestar.gif)](https://okohedeki.github.io/scroll-studio-showcase/)
 
 **[See every example site live →](https://okohedeki.github.io/scroll-studio-showcase/)** ·
-**[One page, twenty-one experiences →](https://okohedeki.github.io/scroll-studio-showcase/halcyon/looks/)**
+**[One page, twenty-six experiences →](https://okohedeki.github.io/scroll-studio-showcase/halcyon/looks/)**
 
 Give it a brief, a photo, a painting, a 3D model, a CSV or a film idea. It builds a static site where scrolling
 plays the visuals: generated video, a painting drawn stroke by stroke, a live 3D zoom, a data story, a map flight.
@@ -32,6 +32,41 @@ site.yaml ──► studio build ──► dist/  (plain static files: host anyw
                    └─ splat     a Gaussian-splat scan of a real place, walked through on scroll (Spark)
 ```
 
+## Why Scroll Studio
+
+- **Local only. Nothing to pay per site.** Every image and video is generated on your own GPU with open models
+  (Z-Image, Qwen-Image-Edit, LTX-2.3, SeedVR2). No API keys, no credits, no cloud account, no per-clip bill. Your
+  brief, your brand and your footage never leave your machine, and a site costs the electricity to render it.
+- **10 to 30 times fewer tokens.** When an AI agent builds the site, it writes a short spec, not the code. The
+  engine already holds the markup, the stylesheets, the scroll physics and the players, so the agent only writes
+  the words and the choices. An agent coding the same page by hand has to write and debug all of it, for every
+  site and every revision.
+- **An engine, not one effect.** Twenty-six styles and eleven scene types from the same spec. Switching a whole site
+  from a pop-up book to a pinscreen is one word, not a rebuild.
+- **Plain output.** Static HTML, CSS and JS that drops into any host or framework.
+
+### Token savings, worked example: Halcyon as a zoetrope
+
+[Halcyon](examples/halcyon/site.yaml) with `theme: { style: zoetrope }` is a landing page that is one spinning wheel
+of cards: 19 cards, each with its own animation, prize-wheel physics, cards that fly out to be read. What an agent
+writes for it:
+
+| | Tokens the agent writes |
+|---|---:|
+| **With Scroll Studio:** `site.yaml` (content, order, `style: zoetrope`) | **1,241** |
+| **By hand,** the same page: | |
+| &nbsp;&nbsp;Page markup and copy | 15,934 |
+| &nbsp;&nbsp;Stylesheets | 16,821 |
+| &nbsp;&nbsp;Wheel, physics, strobe, open and close | 15,321 |
+| &nbsp;&nbsp;The 45 card animations | 29,882 |
+| &nbsp;&nbsp;Scrolling, loader and art helpers | 6,574 |
+| &nbsp;&nbsp;**Total** | **84,532** |
+
+That is about **68 times fewer** for a full experience like this one, before counting the debugging rounds a
+hand-built page needs. A simpler hand-built scroll page lands at 10 to 30 times. Every later change is a line in the
+spec rather than a rewrite, and the agent reads the skill once per session (about 1,100 tokens). Counted with
+tiktoken (`cl100k_base`) on the files in this repo; other tokenizers differ by roughly 10 to 20%.
+
 ### New in v3
 
 Full history of every version: [CHANGELOG.md](CHANGELOG.md).
@@ -46,7 +81,7 @@ Full history of every version: [CHANGELOG.md](CHANGELOG.md).
   compressed to SPZ at build time and walked through on scroll. ([Hollis House](examples/hollis-house/site.yaml))
 - **Numbers you can check** (`chart` callouts, `stats` bound to data): headline figures and chart notes are read
   from the source CSV when the site is built, so the copy can't drift from the data. ([Pelorus](examples/pelorus/site.yaml))
-- **Twenty-five styles that change the experience, not just the paint** (`theme: { style: … }`). Each style has its
+- **Twenty-six styles that change the experience, not just the paint** (`theme: { style: … }`). Each style has its
   own scroll mechanic, layout, transitions and components, built from in-depth research
   ([docs/styles](docs/styles/)): split-flap is a departures board that updates as the clock advances, comic-book is
   read panel by panel, anime-intro cuts like an anime opening, ASCII is a terminal session, blueprint is a drawing
@@ -196,6 +231,7 @@ as a departures board, a comic, a terminal session, a game level or an anime ope
 | `pop-up-book` | Opening a pop-up book: scenes fold up out of the gutter, tabs pull |
 | `pinscreen` | A lamp-lit wall of pins; each picture rolls into the next in a wave |
 | `sand` | A backlit sand table; a hand sweeps the grains into each scene |
+| `zoetrope` | The page is one wheel of cards: spin it, land on one, open it to read |
 
 ```bash
 studio looks examples/halcyon            # dist/looks/<style>/ for every style, plus a gallery at dist/looks/
