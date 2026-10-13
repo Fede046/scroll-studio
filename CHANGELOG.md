@@ -3,7 +3,15 @@
 What changed in each version of Scroll Studio, newest first. Versions follow the project's milestones; each lists the
 commits it spans so you can check out any earlier state (`git checkout <commit>`).
 
-## Unreleased
+Everything so far is version 1. On 2026-10-12 the releases first published as 2.0.0 and 3.0.0 were renumbered
+1.1.0 and 1.2.0 (tags `v1.1.0` and `v1.2.0`).
+
+## 1.3.0 · 2026-10-11 to 2026-10-12
+
+Commits after `83bfbc7` to the `v1.3.0` tag.
+
+The headline: five styles from classic animation (flipbook, pop-up book, pinscreen, sand and a zoetrope you spin),
+story films told in shots, a live 3D codebase flight, and local image edits.
 
 ### Added
 - Style `zoetrope`: the whole landing page is one wheel of printed cards on a giant strobe zoetrope. Every element
@@ -26,6 +34,9 @@ commits it spans so you can check out any earlier state (`git checkout <commit>`
   pencil drawings animate; drag the dog-ear to flip) and `pop-up-book` (one book on a table; scroll is the hinge angle,
   scenes rise out of the gutter, pull-tabs raise the stats, a paper wheel turns the timeline). Research:
   docs/styles/styles-24-25.md and styles-26-27.md.
+- Image edits: an image input can be an `edit:` of another (Qwen-Image-Edit, local), with up to two reference images.
+  Beats take an `end_image:` so a shot lands exactly on a chosen frame, and `beat_restore:` cleans the joined film
+  with SeedVR2.
 - `film` with `beats:`: a story told in shots. Each beat is a generated still animated by LTX-2.3, cached on its own and
   crossfaded into the next; captions pin to beats (`state: { beat: … }`). Example: Feel.
   Beats take `strength`, `motion_seed` and `trim` for action shots that freeze on their first frame.
@@ -56,9 +67,9 @@ commits it spans so you can check out any earlier state (`git checkout <commit>`
 - An animation re-rendered shorter than before no longer keeps the old render's trailing frames.
 - `studio looks` refreshes the site's runtime, so rebuilding only the looks never runs a stale one.
 
-## 3.0.0 · 2026-10-10
+## 1.2.0 · 2026-10-10 (first published as 3.0.0)
 
-Commits `34dd0c5` to the latest commit on `main`.
+Commits `34dd0c5` to `83bfbc7`.
 
 The headline: your real product in a generated world, real places, numbers read from the data, twenty-one styles that
 change how a site is experienced, tools for client work, and a new licence.
@@ -93,7 +104,7 @@ change how a site is experienced, tools for client work, and a new licence.
 - MCP tools: `list_styles`, `looks`, `copy_deck`, `apply_copy_deck`, `brand_from_logo`.
 - `theme.mode` override; extra font roles in a style (`--font-<role>` CSS variables).
 - An SVG favicon on every page.
-- Showcase: the v3 examples and a "New in v3" section.
+- Showcase: the 1.2 examples and a "New in 1.2" section.
 
 ### Changed
 - One Take product pass renders only the product's screen region (about 9 times faster), its shadow ends at the surface
@@ -114,7 +125,7 @@ change how a site is experienced, tools for client work, and a new licence.
 - The first, CSS-only version of the styles and its shared effects layer (`runtime/src/fx`), replaced by the
   per-style experiences.
 
-## 2.0.0 · 2026-10-06 to 2026-10-08
+## 1.1.0 · 2026-10-06 to 2026-10-08 (first published as 2.0.0)
 
 Commits `387962c` to `c566ea5`.
 

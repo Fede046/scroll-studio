@@ -10,7 +10,7 @@ theme:
 nav:
   links:
     - { label: Examples, href: "#examples" }
-    - { label: New in v3, href: "#v3" }
+    - { label: New in 1.2, href: "#v3" }
     - { label: Story, href: ../feel/dist/index.html }
     - { label: Concepts, href: ../concepts/dist/index.html }
   cta: { label: GitHub, href: "https://github.com/Okohedeki/scroll-studio" }
@@ -44,8 +44,8 @@ sections:
       - { title: Hushwell, kicker: "stack layout · healthcare", href: ../hushwell/dist/index.html, image: previews/hushwell.jpg, video: previews/hushwell.mp4, body: "Full-screen panels that slide over each other, with a phone, a photo strip and an orbit." }
   - type: features
     id: v3
-    nav_label: New in v3
-    kicker: New in v3
+    nav_label: New in 1.2
+    kicker: New in 1.2
     title: Your real product, <em>real places, real numbers.</em>
     items:
       - { tag: One Take, title: The product never warps, body: "A generated world in one continuous camera move, with your product rendered from its 3D model through the same camera." }

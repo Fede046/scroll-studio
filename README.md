@@ -67,7 +67,17 @@ hand-built page needs. A simpler hand-built scroll page lands at 10 to 30 times.
 spec rather than a rewrite, and the agent reads the skill once per session (about 1,100 tokens). Counted with
 tiktoken (`cl100k_base`) on the files in this repo; other tokenizers differ by roughly 10 to 20%.
 
-### New in v3
+### New in 1.3
+
+- **Five styles from classic animation.** `zoetrope`: the landing page is one wheel of cards you spin, land on and
+  open to read. `pop-up-book`: scenes fold up out of the gutter as the book opens. `flipbook`: one scroll notch, one
+  pencil page. `pinscreen`: a lamp-lit wall of pins rolling from picture to picture. `sand`: a backlit sand table swept
+  scene to scene. ([try them on Halcyon](https://okohedeki.github.io/scroll-studio-showcase/halcyon/looks/))
+- **Story films told in shots** (`film` with `beats:`): every sentence its own generated shot, with end frames, local
+  image edits and SeedVR2 clean-up. ([Feel](examples/feel/site.yaml), the showcase's front door)
+- **Fly through a codebase** (`code` scene): live 3D, real text, diffs applied as you scroll.
+
+### New in 1.2
 
 Full history of every version: [CHANGELOG.md](CHANGELOG.md).
 
