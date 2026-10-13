@@ -120,6 +120,9 @@ sections:
     kicker: Pre-orders open
     title: Yours <em>this spring.</em>
     button: { label: Pre-order, href: "#" }
+# Launch trailer: `studio trailer examples/one-take` cuts dist/trailer/trailer-16x9.mp4 and trailer-9x16.mp4 from the
+# take (the 9:16 crop follows the bottle through the take's camera); `embed` adds a "Watch the launch film" button.
+trailer: { embed: true }
 footer:
   left: "© Stillwater. A concept site; the company and product are fictional."
   right: World generated locally with LTX-2.3; the bottle is rendered from its 3D model

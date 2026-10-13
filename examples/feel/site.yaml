@@ -199,6 +199,8 @@ sections:
   button:
     label: Open the showcase
     href: ../showcase/dist/index.html
+# Launch trailer: `studio trailer examples/feel` cuts a 16:9 and a 9:16 film from the beats, captioned with the steps.
+trailer: {}
 footer:
   left: Scroll Studio · AGPL-3.0
   right: Made with Scroll Studio

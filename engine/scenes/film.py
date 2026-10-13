@@ -5,6 +5,7 @@ Stages (each cached by its own settings):
   keyframes  Z-Image Turbo + depth ControlNet -> detailed stills at chosen times
   generate   LTX-2.3 guided by the depth video + keyframes, in segments -> gen/gen.mp4
   upscale    optional (shot.upscale.method: ltx | seedvr2)
+  restore    take.restore: SeedVR2 over the generated world, before the product composite
   encode     short-GOP H.264 for scrubbing (desktop + mobile), poster and end frames
 
 `video:` skips generation and encodes an existing film instead (remove it to regenerate from `shot:`).
@@ -153,9 +154,26 @@ def generate(sec: FilmScene, ctx: BuildContext) -> Path:
         ctx.stage("upscale", {"g": gkey, "u": up}, [dst], lambda: fb.stage_upscale(shot, out, _args(ctx)),
                   legacy=glegacy and {"g": glegacy, "u": up})
         film = dst
+    if sec.take and sec.take.restore:
+        film = restore_take(sec, ctx, shot, film, up)
     if sec.take and sec.take.product:
         film = product_layer(sec, ctx, shot, film)
     return film
+
+
+def restore_take(sec: FilmScene, ctx: BuildContext, shot: dict, film: Path, up: Optional[dict]) -> Path:
+    """take.restore: SeedVR2 over the generated world (as beat_restore does for beats), before the product composite,
+    so the real product is never touched by restoration. Skipped when the take already upscales with SeedVR2."""
+    from . import film_build as fb
+    if up and up.get("method") == "seedvr2":
+        ctx.log("  restore: skipped, take.upscale already runs SeedVR2")
+        return film
+    restored = ctx.work / "gen" / "gen_sr.mp4"
+    rshot = {"id": sec.id, "fps": shot["fps"], "duration": shot["duration"], "ltx": {},
+             "upscale": {"method": "seedvr2", "resolution": int(sec.take.restore), **ctx.options.get("restore", {})}}
+    ctx.stage("restore", {"src": file_key(film), "res": sec.take.restore}, [restored],
+              lambda: fb.stage_upscale(rshot, str(ctx.work), _restore_args(ctx, film)))
+    return restored
 
 
 def _take_json(ctx: BuildContext) -> dict:

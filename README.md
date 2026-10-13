@@ -341,6 +341,10 @@ balance, saturation, softness, grain, a light wrap). `hdri:` picks a studio ligh
       product: { model: inputs/bottle.glb, at: [0, -5, 0.78], height: 0.27 }
 ```
 
+For detail, render the world at `ltx: { res: [1920, 1088] }` (multiples of 32; 1024x576 is a quick draft) and add
+`restore: 1080`: SeedVR2 cleans and redraws the generated world before the product is composited, so the real
+product is never touched by restoration.
+
 A `splat` scene takes a scan (`source: inputs/house.ply` or a gsplat checkpoint) and camera `keys` with `{t, at,
 look}`; the build trims faint and oversized splats, keeps the `max_splats` most visible and writes SPZ.
 
@@ -408,6 +412,34 @@ progress numbers:
 For an edit, start each line with `+`, `-` or a space, like a diff (use `|2` so YAML keeps the leading markers).
 `tree` lists more paths to scatter around the route so it reads as a whole project.
 
+## Launch trailers
+
+`studio trailer my-site` cuts a launch film from what the site already rendered, in 16:9 and 9:16, with no extra
+generation: `dist/trailer/trailer-16x9.mp4`, `trailer-9x16.mp4` and a poster beside each (H.264, yuv420p, CRF 18,
+faststart; ready for X, TikTok, Reels and Shorts). `trailer: {}` derives the cut: a hook shot, the middle of the
+story, the product reveal, feature callouts and an end card, each captioned with the site's own headlines.
+
+```yaml
+trailer:
+  bpm: 100                       # every cut lands on the beat grid
+  music: inputs/track.mp3        # optional, local; trimmed, faded and loudness-normalised (-14 LUFS)
+  url: stillwater.example        # end card: name, tagline, call to action, address, disclaimer
+  embed: true                    # a "Watch the launch film" button on the opening section
+  shots:                         # optional; leave out for the derived cut
+    - { section: take, step: 0 }                            # the footage under a step, captioned with it
+    - { beat: laugh }                                       # a beat of a story film
+    - { card: "One take. <em>No cuts.</em>", beats: 4 }     # type on the theme background
+    - { section: order, beats: 6 }                          # any other section, recorded scrolling
+    - { product: three-quarter, callouts: [750 ml, 24 h cold] }   # a product still (needs site.product)
+```
+
+The 9:16 cut is reframed, never letterboxed: in a take the crop follows the product through the take's own camera
+(`take.py --pass track`), cuts the reveal where the product is biggest in frame and pushes in on it as far as the
+source resolution allows; other footage follows a saliency-guided crop; recorded sections are recorded at phone size.
+Captions, callouts and the end card are set in the theme's own fonts and colours (HTML in headless Chrome, so `<em>`
+reads as it does on the site), animate on the beat, and keep inside the TikTok/Reels safe areas. Every stage is
+cached, so a re-run costs nothing until something changes; `studio trailer my-site --plan` prints the cut.
+
 ## Client work
 
 ```bash
@@ -423,7 +455,7 @@ text touches.
 ## With Claude
 
 Open the repo in Claude Code and ask for a site. The `scroll-studio` MCP server (`.mcp.json`) gives Claude tools
-to create projects, edit specs, build, take snapshots and look at them, and record videos; the `scroll-site` skill
+to create projects, edit specs, build, take snapshots and look at them, record videos and cut launch trailers; the `scroll-site` skill
 gives it the workflow. Any MCP client can use `python -m engine.mcp_server`.
 
 ## How it's built
