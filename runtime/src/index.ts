@@ -24,6 +24,7 @@ const PLAYERS: Record<string, () => Promise<{ default: PlayerFactory }>> = {
   scene3d: () => import("./players/scene3d"),
   parallax: () => import("./players/parallax"),
   type: () => import("./players/type"),
+  stage: () => import("./players/stage"),
   vector: () => import("./players/vector"),
   chart: () => import("./players/chart"),
   map: () => import("./players/map"),

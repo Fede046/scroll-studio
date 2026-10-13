@@ -139,6 +139,84 @@ blockquote { hanging-punctuation: first last; }
 .ss-cards.ss-side-left .ss-step { width: min(520px, 100%); }
 .ss-steps--over .ss-card { pointer-events: auto; }
 
+/* ---------------------------------------------------------------- stage: someone comes into the light (players/stage.ts) */
+.st { background: var(--st-dark); color: var(--st-light); }
+.st .ss-stage { background: var(--st-dark); }
+.st-shot, .st-flood { position: absolute; inset: 0; }
+.st-front { transform-origin: 50% 62%; }
+.st-shot { will-change: transform, opacity; }
+.st-back { opacity: 0; }
+.st-flood { background: var(--st-page); opacity: 0; will-change: opacity; }
+/* from the house: a floor, light from upstage, and the figure on its mark */
+.st-upstage { position: absolute; left: 50%; top: 26%; width: min(120vw, 1300px); height: 72%; transform: translateX(-50%); opacity: 0; will-change: opacity;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--st-glow) 42%, transparent), color-mix(in srgb, var(--st-glow) 10%, transparent) 55%, transparent); }
+.st-floor { position: absolute; inset: 74% 0 0 0; background: linear-gradient(color-mix(in srgb, var(--st-glow) 6%, var(--st-dark)), var(--st-dark) 80%);
+  border-top: 1px solid color-mix(in srgb, var(--st-glow) 10%, transparent); }
+.st-pool { position: absolute; left: 50%; top: 82%; width: min(70vw, 640px); height: 12vh; transform: translate(-50%, -50%); opacity: 0; will-change: opacity;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--st-glow) 50%, transparent), transparent); }
+.st-lift { position: absolute; inset: 0; clip-path: inset(0 0 18% 0); }
+.st-actor { position: absolute; left: 50%; bottom: 18%; height: 46vh; height: 46svh; aspect-ratio: 160 / 530; transform: translateX(-50%); }
+.st-fig { aspect-ratio: 160 / 530; }
+.st-layer { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; will-change: opacity; }
+.st-fig--front { position: absolute; inset: 0; width: 100%; height: 100%; }
+.st-shape { fill: color-mix(in srgb, var(--st-dark) 55%, #000); }
+.st-rim { opacity: 0; }
+.st-riser { position: absolute; left: 50%; top: calc(100% - 1.6vh); width: 360%; height: 10vh; transform: translateX(-50%); overflow: visible; }
+/* from behind them: the house, a follow-spot finding them, and their back */
+.st-house { position: absolute; inset: 0; background: radial-gradient(90% 60% at 50% 35%, color-mix(in srgb, var(--st-glow) 22%, var(--st-dark)), var(--st-dark) 70%); }
+.st-beam { position: absolute; left: 0; right: 0; top: 35%; height: 66%; will-change: opacity;
+  background: conic-gradient(from 180deg at 50% 0, transparent 154deg, color-mix(in srgb, var(--st-glow) 14%, transparent) 166deg, color-mix(in srgb, var(--st-glow) 26%, transparent) 174deg 186deg, color-mix(in srgb, var(--st-glow) 14%, transparent) 194deg, transparent 206deg); }
+.st-lamp { position: absolute; left: 50%; top: 35%; width: 30vmin; aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%; will-change: transform;
+  background: radial-gradient(closest-side, #fff 4%, var(--st-glow) 16%, color-mix(in srgb, var(--st-glow) 30%, transparent) 42%, transparent); }
+/* a light from directly above them: their head, shoulders and the platform are lit, their face never seen */
+.st-special { position: absolute; left: 50%; top: -6vh; width: 70vh; height: 112vh; transform: translateX(-50%); opacity: 0; will-change: opacity;
+  background: conic-gradient(from 180deg at 50% 0, transparent 166deg, color-mix(in srgb, var(--st-glow) 14%, transparent) 171deg, color-mix(in srgb, var(--st-glow) 24%, transparent) 175deg 185deg, color-mix(in srgb, var(--st-glow) 14%, transparent) 189deg, transparent 194deg),
+    radial-gradient(50% 9% at 50% 94%, color-mix(in srgb, var(--st-glow) 55%, transparent), transparent); }
+.st-mark { position: absolute; left: 50%; bottom: 7vh; height: 44vh; height: 44svh; aspect-ratio: 160 / 530; transform: translateX(-50%); }
+.st-fig--back { position: absolute; inset: 0; width: 100%; height: 100%; }
+.st-mark .st-riser { top: calc(100% - 1.4vh); height: 7vh; width: 420%; }
+.st-fig--back .st-shape { fill: color-mix(in srgb, var(--st-dark) 45%, #000); }
+/* the words: one line at a time, then the name */
+.st-words { position: absolute; inset: 0; pointer-events: none; }
+.st-line, .st-title, .st-name, .st-body, .st-btns, .st-mark, .st-actor { will-change: transform, opacity; }
+.st-line { position: absolute; left: 0; right: 0; top: 12%; margin: 0 auto; max-width: 20em; padding: 0 var(--gutter); text-align: center; opacity: 0;
+  font-family: var(--font-display); font-size: clamp(28px, 3.7vw, 58px); line-height: 1.06; letter-spacing: -.03em; text-wrap: balance; }
+.st-line em { font-style: normal; color: var(--st-accent); }
+.st-title { position: absolute; left: 0; right: 0; top: 10%; padding: 0 var(--gutter); text-align: center; color: var(--ink); }
+.st-name { margin: 0; font-family: var(--font-display); font-size: clamp(60px, 10.5vw, 184px); line-height: .9; letter-spacing: -.05em; opacity: 0; }
+.st-name em { font-style: normal; color: var(--accent-text); }
+.st-body { max-width: 30em; margin: 26px auto 0; font-size: clamp(17px, 1.45vw, 21px); line-height: 1.5; color: var(--ink-2); opacity: 0; text-wrap: balance; }
+.st-btns { justify-content: center; margin-top: 30px; opacity: 0; pointer-events: auto; }
+/* the first frame, painted before the runtime starts: one faint line and the hint of a figure */
+.st-line:first-child { opacity: .5; }
+.st-front .st-shape { opacity: .08; }
+/* with no scripting (or if the player fails): a plain dark panel, every line readable, the figure faint behind */
+.st.ss-failed .st-track { height: auto !important; }
+.st.ss-failed .ss-stage { position: relative; height: auto; min-height: 100vh; }
+.st.ss-failed .st-visual { opacity: .5; }
+.st.ss-failed .st-upstage, .st.ss-failed .st-rim, .st.ss-failed .st-pool, .st.ss-failed .st-shape { opacity: 1; }
+.st.ss-failed .st-words { position: relative; padding: 18vh 0 14vh; }
+.st.ss-failed .st-line, .st.ss-failed .st-title { position: relative; top: auto; opacity: 1; visibility: visible; }
+.st.ss-failed .st-line { margin-bottom: .8em; font-weight: 500; }
+.st.ss-failed .st-title { margin-top: 1.4em; color: inherit; }
+.st.ss-failed .st-name, .st.ss-failed .st-body, .st.ss-failed .st-btns { opacity: 1; visibility: visible; }
+.st.ss-failed .st-body { color: inherit; }
+.st.ss-failed .st-title .ss-btn:not(.ss-btn--hot) { color: inherit; border-color: currentColor; }
+@media (scripting: none) {
+  .st .st-track { height: auto !important; }
+  .st .ss-stage { position: relative; height: auto; min-height: 100vh; }
+  .st .st-visual { opacity: .5; }
+  .st .st-upstage, .st .st-rim, .st .st-pool, .st .st-shape { opacity: 1; }
+  .st .st-words { position: relative; padding: 18vh 0 14vh; }
+  .st .st-line, .st .st-title { position: relative; top: auto; opacity: 1; visibility: visible; }
+  .st .st-line { margin-bottom: .8em; font-weight: 500; }
+  .st .st-title { margin-top: 1.4em; color: inherit; }
+  .st .st-name, .st .st-body, .st .st-btns { opacity: 1; visibility: visible; }
+  .st .st-body { color: inherit; }
+  .st .st-title .ss-btn:not(.ss-btn--hot) { color: inherit; border-color: currentColor; }
+  html.mode-light:has(main > .st:first-child) .ss-nav { --ink: var(--bg); --ink-2: rgba(var(--bg-rgb), .76); --line: rgba(var(--bg-rgb), .16); color: var(--bg); }
+}
+
 /* ---------------------------------------------------------------- blocks */
 .ss-block { position: relative; padding: clamp(90px, 14vh, 160px) var(--gutter); }
 .ss-band { background: var(--bg-2); border-block: 1px solid var(--line); }

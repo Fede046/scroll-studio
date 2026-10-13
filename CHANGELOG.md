@@ -6,6 +6,15 @@ commits it spans so you can check out any earlier state (`git checkout <commit>`
 Everything so far is version 1. On 2026-10-12 the releases first published as 2.0.0 and 3.0.0 were renumbered
 1.1.0 and 1.2.0 (tags `v1.1.0` and `v1.2.0`).
 
+## Unreleased
+
+### Added
+- `stage` scene: an opening on a dark stage. A faceless figure stands in the dark; each scroll brings one `lines:` entry
+  (set heavier than the last) and a little more light, `platform:` raises a stage under them, and on `name:` (the
+  page's <h1>) the view swings round behind them to face a follow-spot that floods the page with light, where `body:`
+  and `buttons:` sit. The figure is a drawn outline and never shows a face. Every word is real text; with no scripting
+  it is a plain dark panel, and reduced motion keeps the beats as fades.
+
 ## 1.3.0 · 2026-10-11 to 2026-10-12
 
 Commits after `83bfbc7` to the `v1.3.0` tag.

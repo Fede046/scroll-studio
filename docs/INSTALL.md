@@ -4,7 +4,7 @@ Scroll Studio runs entirely on your machine. What you need depends on which scen
 
 | Scene type | Needs |
 |---|---|
-| `type`, `scene3d`, `chart`, `map` | Python + a browser. No GPU (they render live in the page). |
+| `type`, `stage`, `scene3d`, `chart`, `map` | Python + a browser. No GPU (they render live in the page). |
 | `vector` | Same; vectorising a raster image (not an SVG) also needs the `vector` extra (vtracer). No GPU. |
 | `artwork` | + OpenCV/NumPy (installed with the package). No GPU. `generate:` images also need ComfyUI. |
 | `parallax` | + PyTorch (depth estimation). Runs on the CPU; a CUDA GPU is much faster. `generate:` images need ComfyUI. |

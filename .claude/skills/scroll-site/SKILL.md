@@ -17,6 +17,7 @@ Use the MCP tools (`scroll-studio` server) when available, otherwise the `studio
 | a physical product with parts | `sequence` | a .glb/.obj/.fbx/.stl (file or https URL) |
 | a place: hotel, home, landscape, venue | `parallax` | one photo per step (`file:` or `generate:`) |
 | a manifesto, event, agency, statement | `type` | text only |
+| a person becoming seen: coaching, a talent or creator platform, a personal brand (an opening) | `stage` | lines to the visitor, a name, buttons |
 | a physical product the client owns, in a cinematic world | `film` + `take:` | the product's .glb (or a photo with TRELLIS) + rough world shapes and camera keys |
 | a real place: house, venue, shop (scanned) | `splat` | a Gaussian-splat scan (.ply or gsplat .pt) + camera keys |
 | a data story with figures that must be right | `chart` + `callouts`, `stats` with `data:` | a CSV (file or URL) |

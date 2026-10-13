@@ -43,6 +43,7 @@ Each scene type is one engine module: a schema, a builder (inputs → assets), a
 | 9 | `chart` | Data story: charts that build, highlight and re-shape | CSV/JSON + narrative | Clean, aggregate, pre-compute states | `chart` (D3) |
 | 10 | `map` | Geographic journey: fly between places, draw routes | places/GeoJSON | Fetch/clip tiles to PMTiles (offline), route geometry | `map` (MapLibre GL) |
 | 11 | `type` | Kinetic typography: headlines that assemble, swap, scale with scroll | text only | none | `type` (GSAP) |
+| 12 | `stage` | An opening on a dark stage: a faceless figure comes into the light one line at a time, a platform rises, the view turns to face the spot and the page floods with light | lines, a name, buttons | none (the figure is a drawn outline) | `stage` |
 
 Mapping the current demos: Lodestar Orbital and Meridian = `film`; Atelier Sfumato = `artwork`;
 Cellwright Bio = `scene3d` with generator presets (cells, chromatin, helix, molecule).
