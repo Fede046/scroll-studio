@@ -6,6 +6,30 @@ commits it spans so you can check out any earlier state (`git checkout <commit>`
 Everything so far is version 1. On 2026-10-12 the releases first published as 2.0.0 and 3.0.0 were renumbered
 1.1.0 and 1.2.0 (tags `v1.1.0` and `v1.2.0`).
 
+## Unreleased
+
+### Added
+- Wan 2.2 A14B as a second local video model beside LTX-2.3: `video_model: ltx | wan` on the site (default for
+  every beat, take and `theme.art`), on a beat, a take or `theme.art`, or in studio.toml (`video_model = "wan"`); LTX
+  stays the default. `wan:` settings (site-wide, or per take): `quality: fast` (the lightx2v 4-step LoRAs, cfg 1) or
+  `full` (~20 steps, cfg 3.5, no LoRAs), `steps`, `cfg`, `shift`, `res`, `interpolate` (mci, blend, dup), `stretch`.
+  Two-stage MoE sampling (high-noise expert for the first half of the steps, low-noise for the rest) at ~1280x720,
+  16 fps, retimed to 24 fps with FFmpeg's motion-compensated interpolation (RIFE isn't installed, so not used).
+- Beats with Wan: `image` is the first frame and `end_image` the last (WanFirstLastFrameToVideo). A clip is at most 81
+  frames; a beat up to 1.35x that is one clip played slower, longer ones chain clips from the previous last frame.
+- Takes with Wan: Wan 2.2 Fun Control paints the world along the Blender depth guide, from the keyframe at each
+  clip's start (and the keyframe in its range as a reference), in the segments and prompts of `ltx:`, chained clip to
+  clip; the product pass and composite are unchanged. Renders live in `.build/<section>/wan/` with their own stage
+  names, so switching models never discards the other model's film.
+- `engine/models.yaml`: the eight Wan files with their Hugging Face URLs and VRAM notes; `studio doctor` checks each
+  one through ComfyUI's own model lists (subfolders and junctions included). Names that differ from the defaults go
+  in studio.toml `[wan]`; a file moved to another subfolder is found by its base name.
+
+### Changed
+- `comfy.run`: time spent waiting behind another client's job on a shared ComfyUI no longer counts toward the
+  timeout, so a timeout can't cancel someone else's render.
+- Cache keys: `video_model` enters a key only when it is not ltx, so every LTX beat, take and art cache stays valid.
+
 ## 1.3.0 · 2026-10-11 to 2026-10-12
 
 Commits after `83bfbc7` to the `v1.3.0` tag.

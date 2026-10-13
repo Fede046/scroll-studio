@@ -58,8 +58,8 @@ def take_shot(sec: FilmScene, ctx: BuildContext) -> dict:
                 k: v for k, v in t.items() if k not in ("ltx", "keyframes", "upscale", "video_model", "wan")}}}
     if t.get("video_model"):
         shot["video_model"] = t["video_model"]
-    if t.get("wan"):
-        shot["wan"] = t["wan"]
+    if sec.take.wan:   # only what the take sets, so the site's `wan:` fills the rest
+        shot["wan"] = sec.take.wan.model_dump(mode="json", exclude_unset=True)
     if t.get("keyframes"):
         shot["keyframes"] = t["keyframes"]
     if t.get("upscale"):
