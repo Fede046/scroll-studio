@@ -37,6 +37,9 @@ Everything so far is version 1. On 2026-10-12 the releases first published as 2.
   world. Stamps written by the old keys are recognised and migrated.
 - Block images keep their transparency (WebP with alpha) instead of being flattened.
 - `sequence` scenes take `model: product` (or no model) and the product's own explode offsets.
+- ComfyUI client: time spent waiting in a shared ComfyUI's queue no longer counts towards the timeout, and a
+  timed-out job is cancelled only if it is ours (it used to interrupt whatever was running).
+- URL models stored with Git LFS on GitHub are fetched from media.githubusercontent.com automatically.
 
 ## 1.3.0 · 2026-10-11 to 2026-10-12
 
