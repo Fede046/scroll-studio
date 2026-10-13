@@ -84,7 +84,8 @@ def spec_schema(part: Optional[str] = None) -> dict:
     if not part:
         return sch
     names = {"film": "FilmScene", "artwork": "ArtworkScene", "scene3d": "Scene3DScene", "sequence": "SequenceScene",
-             "parallax": "ParallaxScene", "type": "TypeScene", "code": "CodeScene", "intro": "IntroBlock", "features": "FeaturesBlock",
+             "parallax": "ParallaxScene", "type": "TypeScene", "code": "CodeScene", "showroom": "ShowroomScene",
+             "product": "Product", "parts": "PartMaterial", "shot": "ProductShot", "intro": "IntroBlock", "features": "FeaturesBlock",
              "stats": "StatsBlock", "timeline": "TimelineBlock", "quote": "QuoteBlock", "cta": "CtaBlock", "gallery": "GalleryBlock"}
     key = names.get(part, part)
     return sch["$defs"].get(key) or (sch if key == "Site" else {"error": f"unknown part {part}"})

@@ -123,7 +123,7 @@ class ProductShot(Model):
     samples: int = Field(128, ge=4, le=4096, description="Cycles samples (denoised)")
     shadow: bool = Field(True, description="A soft contact shadow under the product")
     fstop: Optional[float] = Field(None, gt=0, description="Depth of field, focused on the product (or `part`); "
-                                                          "detail views default to a shallow f/2.8")
+                                                          "detail views default to f/8, a macro look")
     scene: Optional[str] = Field(None, description="Render the product into a generated scene instead of the studio: "
                                                    "a prompt for the place it stands ('a walnut desk by a window, "
                                                    "morning light'). Z-Image paints the scene to the product's camera "

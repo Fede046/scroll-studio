@@ -278,7 +278,7 @@ k = max(W, H)
 cam_data.shift_x = ((x0 + x1) / 2 - 0.5) * W / k
 cam_data.shift_y = ((y0 + y1) / 2 - 0.5) * H / k
 
-fstop = V.get("fstop") or (2.8 if V.get("part") and V.get("aim") else None)
+fstop = V.get("fstop") or (8.0 if V.get("part") and V.get("aim") else None)
 if fstop:
     cam_data.dof.use_dof = True
     cam_data.dof.focus_distance = (target - cam.location).length

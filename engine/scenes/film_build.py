@@ -262,7 +262,7 @@ def stage_generate(shot, out, args):
 
 
 PLATE_ENV_VERSION = 1
-COMPOSITE_VERSION = 1
+COMPOSITE_VERSION = 3
 
 
 def _blender_pass(cmd, ctx, label):
@@ -369,6 +369,7 @@ def env_sun(env):
     lum[H // 2 + H // 20:] *= 0.2           # the light comes from above the horizon
     y, x = np.unravel_index(int(np.argmax(lum)), lum.shape)
     lon, lat = ((x + 0.5) / W - 0.5) * 2 * np.pi, ((1 - (y + 0.5) / H) - 0.5) * np.pi
+    lat = max(lat, np.radians(28))           # a window behind the subject still lights it from above, never below
     d = [-np.cos(lat) * np.cos(lon), np.cos(lat) * np.sin(lon), np.sin(lat)]
     contrast = float(lum.max() / max(float(np.median(lum)), 1e-4))
     return [round(float(c), 4) for c in d], round(min(contrast, 8.0), 3)
@@ -415,9 +416,9 @@ class PlateMatch:
     plate (smoothed over time so nothing flickers), the plate's softness and grain, and a light wrap of the plate's
     colour at the product's rim. The shadow (alpha over black RGB) takes the plate's black level."""
 
-    def __init__(self, grade=True, grain=None, soften=0.0, seed=7):
+    def __init__(self, grade=True, grain=None, soften=0.0, seed=7, tint=0.25):
         import numpy as np
-        self.grade, self.sigma, self.soften = grade, grain, soften
+        self.grade, self.sigma, self.soften, self.tint = grade, grain, soften, tint
         self.state = None
         self.rng = np.random.default_rng(seed)
         self.luma = np.array([0.2126, 0.7152, 0.0722], np.float32)
@@ -443,8 +444,9 @@ class PlateMatch:
             cur = np.concatenate([black, tint, [sat]])
             self.state = cur if self.state is None else self.state * 0.92 + cur * 0.08
             black, tint, sat = self.state[:3], self.state[3:6], self.state[6]
-            # white balance halfway to the plate's mid-tone tint, saturation nudged towards the plate's
-            rgb = rgb * (1 + 0.5 * (tint - 1))
+            # white balance a quarter of the way to the plate's mid-tone tint (the plate light already colours
+            # it), saturation nudged towards the plate's
+            rgb = rgb * (1 + self.tint * (tint - 1))
             solid = al[..., 0] > 0.5
             prod_sat = float(np.mean((rgb.max(2) - rgb.min(2))[solid])) if solid.any() else sat
             k = float(np.clip(sat / max(prod_sat, 1e-3), 0.75, 1.1))
@@ -507,14 +509,10 @@ def stage_composite(film, pdir, dst, fps, res, grade=True, grain=None, track=Non
             out = match.apply(plate, rgba)
             enc.stdin.write((np.clip(out, 0, 1) * 255 + 0.5).astype(np.uint8).tobytes())
         count += 1
-    while True:      # plate frames beyond the product's pass go through untouched
-        raw = dec.stdout.read(w * h * 3)
-        if len(raw) < w * h * 3:
-            break
-        enc.stdin.write(raw)
-        count += 1
-    enc.stdin.close()
+    # the film ends with the product pass (LTX's 8k+1 frames leave one plate frame over): never a frame without it
     dec.stdout.close()
+    dec.kill()
+    enc.stdin.close()
     if enc.wait() != 0:
         raise RuntimeError("compositing the take failed (ffmpeg)")
     dec.wait()

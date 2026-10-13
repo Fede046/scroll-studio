@@ -312,7 +312,7 @@ def take_track(project: Project, section_id: str, log=print) -> Path:
 
 # ---------------------------------------------------------------- the product in a generated scene
 
-SCENE_VERSION = 1
+SCENE_VERSION = 2
 HARMONISE = ("Blend the product naturally into the scene's lighting: match the light direction, colour temperature, "
              "reflections and soft contact shadow of the room. Keep the product's shape, proportions, edges, details, "
              "text and colours exactly as they are. Do not move, resize or redesign the product.")
@@ -412,8 +412,8 @@ def scene_still(project: Project, product: Optional[Product], view: str, size: t
     if not bg.exists():
         depth = d / "depth.png"
         cv2.imwrite(str(depth), _floor_depth(cam))
-        prompt = (f"{scene}. The surface in the foreground is empty, with nothing standing on it. Photograph, natural "
-                  f"light, realistic materials, shallow depth of field.")
+        prompt = (f"{scene}. The surface in the middle of the foreground is clear and empty, no objects on it. "
+                  f"Photograph, natural light, realistic materials, shallow depth of field.")
         log(f"  scene: Z-Image to the product's camera: {scene[:70]}")
         kcfg = dict(comfy.ZIMAGE, control_strength=0.55)
         images = comfy.run(comfy.build_keyframe_graph(kcfg, prompt, comfy.upload(str(depth)), w, h, seed,

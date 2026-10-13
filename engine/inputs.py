@@ -28,11 +28,35 @@ def resolve_path(project: Project, ref: str, log=print) -> Path:
                     for chunk in r.iter_content(1 << 20):
                         f.write(chunk)
                 tmp.replace(out)
+            _lfs_check(ref, out, log)
         return out
     p = project.path(ref)
     if not p.exists():
         raise BuildError(f"input not found: {ref}")
     return p
+
+
+def _lfs_check(url: str, out: Path, log=print) -> None:
+    """A big file in a GitHub repo is often stored with Git LFS: raw.githubusercontent.com then serves a 130-byte
+    pointer, not the file. Fetch the real content from media.githubusercontent.com instead."""
+    if out.stat().st_size > 1024 or not out.read_bytes().startswith(b"version https://git-lfs"):
+        return
+    import re
+    import requests
+    m = re.match(r"https://(?:raw\.githubusercontent\.com/([^/]+)/([^/]+)/(.+)|github\.com/([^/]+)/([^/]+)/(?:raw|blob)/(.+))", url)
+    if not m:
+        out.unlink()
+        raise BuildError(f"{url} is a Git LFS pointer, not the file; use the host's direct download link")
+    owner, repo, rest = (m.group(1), m.group(2), m.group(3)) if m.group(1) else (m.group(4), m.group(5), m.group(6))
+    media = f"https://media.githubusercontent.com/media/{owner}/{repo}/{rest.split('?')[0]}"
+    log(f"  {Path(url.split('?')[0]).name} is stored with Git LFS: downloading it from {media}")
+    tmp = out.with_suffix(out.suffix + ".part")
+    with requests.get(media, stream=True, timeout=120, headers={"User-Agent": "ScrollStudio/0.1"}) as r:
+        r.raise_for_status()
+        with open(tmp, "wb") as f:
+            for chunk in r.iter_content(1 << 20):
+                f.write(chunk)
+    tmp.replace(out)
 
 
 def image_key(ref: ImageRef) -> dict:
