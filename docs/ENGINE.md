@@ -125,6 +125,20 @@ UI (React) ◄─► engine server (FastAPI + job queue + websocket events) ◄�
   sticky stage + scrolling step cards, the players, shared HUD/caption/progress components, theme tokens,
   asset preloading by priority, and mobile and `prefers-reduced-motion` behaviour.
 - **`doctor`** checks the whole stack: Python, Node, FFmpeg, Blender, CUDA/VRAM, ComfyUI, disk space, models.
+- **Plans and storyboards.** `engine/plan.py` runs every builder in a dry run (`engine/fidelity.py` `planning()`):
+  `BuildContext.stage` reports instead of running, a stage that would run marks its outputs dirty so stages keyed on
+  them count too, and code that renders outside a stage (image inputs, product stills, model conversion) raises
+  `WouldRender`. Estimates are seconds per unit of work per stage kind (frames, seconds of film, keyframes, beats),
+  the median of the `seconds` every stamp records on this machine, with RTX 4090 defaults. `studio build` prints the
+  plan first (`--plan` stops there; studio.toml `confirm_over` asks above a threshold, `--yes` doesn't); `--only`
+  renders chosen sections and beats while the rest keep their cache or show their storyboard stand-in.
+  `engine/storyboard/` makes a card per shot from the same stages and caches (`film.world` runs the take's `blockout`
+  and `keyframes` stages; beat stills are the beats' own image inputs), previewing what only the full build needs at
+  full quality (`fidelity.previewing`: product stills at a few samples, keyed apart; at `sketch` no ComfyUI and
+  placeholder cards), builds the real page into `storyboard/site/` with stand-in films (`standin.py`: stills scrubbed
+  by scroll, Ken Burns moves from the motion text or the take's camera at `animatic`), draws the sheet (`sheet.py`)
+  and cuts `animatic.mp4` with the trailer's type layer. `locked: true` (beats, takes, scenes) makes a stage keep
+  existing outputs whatever its key; the `keyframes` stage repaints only keyframes whose own digest changed.
 - **Launch trailers** (`engine/trailer/`, `studio trailer`): a second output from the same spec and the same cache.
   `plan.py` cuts shots from what the builders already rendered (takes, beats, scroll recordings, product stills) onto
   a beat grid; `frame.py` reframes each for 16:9 and 9:16 (the take's product projected through its camera by

@@ -9,6 +9,23 @@ Everything so far is version 1. On 2026-10-12 the releases first published as 2.
 ## Unreleased
 
 ### Added
+- Storyboard first: `studio storyboard <project> [--level sketch|stills|animatic] [--only ids] [--motion] [--open]`
+  and the MCP tool `storyboard`. A card per shot (beat, take, film, product still, block image) with its opening and
+  end frames, prompt, motion, caption, length, fidelity, status (new / changed since the last storyboard / unchanged /
+  locked / rendered) and the full render estimate on this machine, in `storyboard/sheet.jpg` and `storyboard.html`;
+  the real page built into `storyboard/site/` with stills standing in for unrendered films (scrubbed by scroll, a
+  corner badge); `animatic.mp4` at `animatic` (Ken Burns along the take's camera or the beat's motion verb, timed
+  cuts, the page's captions and the trailer's end card); `--motion` adds a 512x288 LTX-2.3 preview per shot. Frames
+  come from the full build's own stages and caches (beat stills, `blockout` + `keyframes`, image inputs, product
+  stills), so approved frames are the films' first frames; low-sample previews are keyed apart. `sketch` needs no
+  ComfyUI (a take's world at a few moments, placeholder cards for images not generated yet).
+- `locked: true` on beats, takes and scene sections: build and storyboard keep what is rendered even when settings
+  change, with a log line.
+- `studio build --only id,id` renders just those sections or beats (other beats keep their clip or stand in with
+  their storyboard still, never stamped); `--plan` prints what would render and the estimate (calibrated from the
+  stage stamps' `seconds`, `engine/plan.py`); every build prints it first, and studio.toml `confirm_over` (minutes)
+  asks before longer builds (`--yes` for unattended runs). MCP `build` takes `only` and `plan_only`.
+- The `keyframes` stage repaints only the keyframes whose own settings changed (stage keys unchanged).
 - `stage` scene: an opening on a dark stage. A faceless figure stands in the dark; each scroll brings one `lines:` entry
   (set heavier than the last) and a little more light, `platform:` raises a stage under them, and on `name:` (the
   page's <h1>) the view swings round behind them to face a follow-spot that floods the page with light, where `body:`

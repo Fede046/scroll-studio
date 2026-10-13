@@ -58,7 +58,7 @@ def sheet_jpg(cards: list[Card], files: dict, out: Path, head: dict) -> Path:
     W, cols, gap, pad = 2400, 3 if len(cards) > 4 else max(1, len(cards)), 28, 40
     cw = (W - 2 * pad - (cols - 1) * gap) // cols
     th = round(cw * 0.36)
-    ch = th + 250
+    ch = th + 300
     rows = (len(cards) + cols - 1) // cols
     H = 190 + rows * (ch + gap) + pad
     im = Image.new("RGB", (W, H), BG)

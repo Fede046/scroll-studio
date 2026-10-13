@@ -217,10 +217,32 @@ def build(name: str, req: BuildReq):
     from ..compile.compiler import build_site
 
     def run(job):
+        from ..plan import announce
         log, progress = logger(job)
+        announce(p, only=[req.section] if req.section else None, force=req.force, options={"draft": req.draft}, log=log)
         build_site(p, log=log, progress=progress, only=req.section, force=req.force, options={"draft": req.draft})
         return {"preview": f"/preview/{name}/index.html?t={int(time.time())}"}
     return jobs.submit("build", name, f"Build {req.section or 'site'}" + (" (draft)" if req.draft else ""), run).public()
+
+
+class StoryboardReq(BaseModel):
+    level: str = "stills"
+    only: list[str] = []
+    motion: bool = False
+
+
+@app.post("/api/projects/{name}/storyboard")
+def storyboard(name: str, req: StoryboardReq):
+    """`studio storyboard` as a job: the result has the sheet, the storyboard page and the stand-in site."""
+    p = find(name)
+
+    def run(job):
+        from ..storyboard import storyboard as run_sb
+        log, progress = logger(job)
+        res = run_sb(p, level=req.level, only=req.only or None, motion=req.motion, log=log, progress=progress)
+        return {k: v for k, v in res.items() if k in ("sheet", "html", "site", "animatic", "shots", "changed",
+                                                       "render_estimate", "seconds")}
+    return jobs.submit("storyboard", name, f"Storyboard ({req.level})", run).public()
 
 
 class SnapReq(BaseModel):

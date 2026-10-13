@@ -425,7 +425,7 @@ def scene_still(project: Project, product: Optional[Product], view: str, size: t
                                                                ("yaw", "pitch", "zoom", "explode", "lens", "part")}))
         card = card.convert("RGBA")
         card.alpha_composite(prod.convert("RGBA").resize(card.size))
-        out = project.build / "_storyboard" / "placeholders" / f"scene_{d.name}_{pv.samples}.png"
+        out = project.build / "_storyboard" / "placeholders" / f"placeholder_scene_{d.name}_{pv.samples}.png"
         card.convert("RGB").save(out)
         return out
     if not comfy.alive():

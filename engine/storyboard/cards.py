@@ -155,7 +155,7 @@ class Maker:
                 return resolve_image(self.project, ref, self.quiet, alpha=alpha), "final"
         except WouldRender:
             pass
-        lvl = "sketch" if cache_only or self.level == "sketch" else self.level
+        lvl = "sketch" if cache_only or self.level == "sketch" else "stills"
         with previewing(lvl):
             p = resolve_image(self.project, ref, self.log, alpha=alpha)
         return p, ("placeholder" if "placeholder" in p.name else lvl)
@@ -442,7 +442,7 @@ class Maker:
             c.frames = [Frame(d / f"{i:04d}.png", f"frame {i}", "final", 0) for i in picks if (d / f"{i:04d}.png").exists()]
         elif not ((c.locked or not self.selected(c.id, sec.id)) and self.reuse(c)):
             p = None if sec.model in (None, "product") else Product(name=sec.id, model=sec.model)
-            lvl = "sketch" if self.level == "sketch" or not self.selected(c.id, sec.id) else self.level
+            lvl = "sketch" if self.level == "sketch" or not self.selected(c.id, sec.id) else "stills"
             with previewing(lvl):
                 for k in sorted(sec.keys, key=lambda k: k.get("t", 0))[:3]:
                     path = prod.product_still(self.project, p, "three-quarter", (960, 540), "transparent", self.log,
@@ -461,7 +461,7 @@ class Maker:
                  fingerprint=_digest(sec.model_dump(mode="json", include={"model", "keys", "lighting", "background"})))
         self.estimate_section(c)
         if not ((c.locked or not self.selected(c.id, sec.id)) and self.reuse(c)):
-            lvl = "sketch" if self.level == "sketch" else self.level
+            lvl = "sketch" if self.level == "sketch" else "stills"
             with previewing(lvl):
                 path = prod.product_still(self.project, None, "three-quarter", (960, 600), "transparent", self.log,
                                           yaw=k0.get("yaw", -35), pitch=k0.get("pitch", 18), explode=k0.get("explode") or None)

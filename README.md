@@ -152,6 +152,7 @@ Full setup (GPU, Blender, ComfyUI and models) is in [docs/INSTALL.md](docs/INSTA
 ```bash
 studio new harbour-hotel --example atelier-sfumato   # or start blank: studio new harbour-hotel
 # edit projects/harbour-hotel/site.yaml (or use studio ui), drop files in inputs/
+studio storyboard harbour-hotel                      # every shot's real first frame, before any film renders
 studio build harbour-hotel --draft
 studio snapshot harbour-hotel --at top --at studio:0.5   # screenshots + contact sheet
 studio build harbour-hotel && studio record harbour-hotel   # final build + an MP4 scroll-through
@@ -207,6 +208,52 @@ model: colour stops, glows, stars and grain, enough for colour cards, dusk skies
         stars: 120
     title: Your words stay <em>on your phone.</em>
 ```
+
+## Storyboard first
+
+A film costs an hour or more to render (LTX-2.3 or Wan 2.2, SeedVR2, a Cycles product pass over every frame), so
+look at it before you pay for it. `studio storyboard` shows every shot of the page at a fraction of the cost, through
+the same stages and caches the full build uses:
+
+```bash
+studio storyboard my-site --level sketch     # seconds, no ComfyUI: a take's grey world, cached stills, prompt cards
+studio storyboard my-site                    # stills (default): the real first (and end) frame of every shot
+studio storyboard my-site --level animatic   # the stills in motion, timed cuts and captions -> animatic.mp4
+studio storyboard my-site --level animatic --motion --only door   # plus a tiny LTX preview of one shot's motion
+studio build my-site --plan                  # what a build would render, and about how long it takes here
+studio build my-site --only door,enter       # render just those beats (or sections); the rest keep their cache
+```
+
+It writes `<project>/storyboard/` (not committed, like `dist/`):
+
+- `site/`: the real page, built with the storyboard's frames standing in for every film that isn't rendered yet
+  (stills that dissolve into one another as you scroll; with a slow camera move at `animatic`), with the real copy,
+  layout and style, and a corner badge so it is never mistaken for the finished site.
+- `sheet.jpg` (one image an agent can read) and `storyboard.html`: a card per shot (a beat, a take, a product still,
+  a block's image) with its frames, prompt, motion, caption, length, the fidelity of its frames (final, stills,
+  sketch, placeholder), its status (new, changed since the last storyboard, unchanged, locked, rendered) and the full
+  render estimate on this machine, calibrated from the seconds every stage records; the total is at the top.
+- `animatic.mp4` at `animatic`: a rough cut with the page's captions in its own fonts and the trailer's end card.
+
+Nothing is thrown away. A beat's still is the very image the beat is animated from (same input, same cache); a
+take's frames are its `blockout` and `keyframes` stages, painted over the depth of the blockout the film is
+generated along. So an approved frame is the film's first frame and the full build only adds motion. What only the
+storyboard makes (a take's sketch, low-sample product stills and the product over its keyframes, motion previews,
+placeholder cards) is cached apart, keyed by its samples, and never read by a full build.
+
+Edit one beat and storyboard again: only that shot is redone, in seconds, and the sheet marks it. Editing one of a
+take's keyframe prompts repaints only that keyframe. When a shot is right, lock it:
+
+```yaml
+beats:
+  - id: door
+    locked: true      # never re-rendered by storyboard or build, even if its prompt or settings change
+```
+
+`locked: true` works on a beat, a take and any scene section; the build logs `locked, kept the existing render` for
+each stage it keeps (a locked shot that was never rendered is rendered once). `studio build` prints its plan and
+estimate before any heavy GPU work; with `confirm_over = 30` in studio.toml it asks first when a build would run
+longer than that many minutes (`--yes` skips the question; without a terminal it stops instead of waiting).
 
 ## Styles
 

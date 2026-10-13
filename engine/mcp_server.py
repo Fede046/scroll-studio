@@ -131,17 +131,56 @@ def add_input(project: str, source_path: str) -> str:
 
 
 @mcp.tool()
-def build(project: str, section: Optional[str] = None, draft: bool = False, force: bool = False) -> dict:
+def build(project: str, section: Optional[str] = None, draft: bool = False, force: bool = False,
+          only: Optional[list[str]] = None, plan_only: bool = False) -> dict:
     """Start building the site into dist/ (in the background). Returns a job id for job_status.
-    draft=True renders sequences at half size for quick checks. Cached stages are skipped."""
+    only: section and beat ids to render (the rest keep their cache or show their storyboard stand-in).
+    plan_only=True returns at once what would render and the estimate on this machine, without building.
+    The job log starts with the same plan. draft=True renders sequences at half size. Cached stages are skipped;
+    locked scenes and beats are kept. Storyboard first (the `storyboard` tool) to check frames cheaply."""
+    from .plan import announce, plan_build
     p = _find(project)
+    ids = list(only or []) + ([section] if section else [])
+    if plan_only:
+        with contextlib.redirect_stdout(sys.stderr):
+            pl = plan_build(p, only=ids or None, force=force, options={"draft": draft})
+        return pl.summary() | {"lines": pl.lines()}
     from .compile.compiler import build_site
 
     def run(job):
         log, progress = logger(job)
-        out = build_site(p, log=log, progress=progress, only=section, force=force, options={"draft": draft})
+        announce(p, only=ids or None, force=force, options={"draft": draft}, log=log)
+        out = build_site(p, log=log, progress=progress, only=ids or None, force=force, options={"draft": draft})
         return {"index": str(out)}
     return jobs.submit("build", p.name, "build", run).public(tail=5)
+
+
+@mcp.tool()
+def storyboard(project: str, level: str = "stills", only: Optional[list[str]] = None, motion: bool = False,
+               timeout_s: int = 900) -> dict:
+    """Storyboard the site before the full render, and review it: returns `sheet` (sheet.jpg, one image with a card
+    per shot: its frames, prompt, motion, caption, length, fidelity, status new/changed/unchanged/locked/rendered and
+    the full render estimate; Read it), `html` (storyboard.html), `site` (the real page with stills standing in for
+    unrendered films), `animatic` (animatic.mp4 at level animatic) and a JSON summary per card.
+    level: sketch (no ComfyUI: blockouts, cached stills, placeholder cards; seconds), stills (the real first frames:
+    keyframes, beat stills, product stills at low samples; ~10-30 s a new shot) or animatic (stills in motion and
+    animatic.mp4). only: shot ids (beats, sections, blocks) to redo; the rest keep their frames. motion=True with
+    animatic: a tiny LTX preview per shot. Frames reuse the full build's caches, so approved frames are the real
+    first frames. Runs as a job; waits up to timeout_s, else returns the job to poll with job_status."""
+    from .storyboard import storyboard as run_sb
+    p = _find(project)
+
+    def run(job):
+        log, progress = logger(job)
+        res = run_sb(p, level=level, only=only, motion=motion, log=log, progress=progress)
+        return {k: v for k, v in res.items() if k != "plan"}
+    job = jobs.submit("storyboard", p.name, f"storyboard {level}", run)
+    t0 = time.time()
+    while time.time() - t0 < timeout_s and job.status not in ("done", "failed"):
+        time.sleep(1.0)
+    if job.status == "done":
+        return job.result
+    return job.public(tail=20)
 
 
 @mcp.tool()

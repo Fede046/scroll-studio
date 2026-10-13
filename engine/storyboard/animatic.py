@@ -47,7 +47,7 @@ def build(project: Project, site, cards: list[Card], out: Path, log: Callable[[s
     for c, a, b in spans:
         t0, t1 = starts[a], starts[b] + pieces[b].seconds
         for u0, u1, title, kicker in c.captions:
-            c0, c1 = t0 + (t1 - t0) * u0, t0 + (t1 - t0) * u1
+            c0, c1 = t0 + (t1 - t0) * u0 + (fade * 0.6 if u0 <= 0 else 0), t0 + (t1 - t0) * u1 - (fade if u1 >= 1 else 0)
             if c1 - c0 < 0.4:
                 continue
             items.append({"kind": "caption", "t0": c0, "t1": c1 - 0.06, "title": rich(title), "kicker": rich(kicker),

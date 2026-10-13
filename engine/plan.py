@@ -386,7 +386,10 @@ def _fill(plan: Plan, sec, beats: Optional[set]) -> None:
     """The dry run stopped inside this section (an output a re-render would make is not there yet): every expected
     stage it did not reach counts as running."""
     seen = {s.name for s in plan.stages if s.section == sec.id}
+    standing = any(r.kind == "stand-in" for r in plan.renders_for(sec.id))
     for name in expected(sec, beats):
+        if name == "beats_restore" and standing:   # skipped while beats stand in (film.beats_film)
+            continue
         if name not in seen:
             plan.stages.append(Stage(sec.id, name, "stale", inferred=True))
 
@@ -400,17 +403,19 @@ def announce(project: Project, only: Optional[Iterable[str]] = None, force: bool
         log(f"plan: could not estimate ({type(e).__name__}: {e})")
         return Plan(project, project.load())
     n, m = len(plan.stale()), len(plan.renders)
+    locked = [f"{s.section}/{s.name}" for s in plan.stages if s.state == "locked"]
     if not n and not m:
         log("plan: nothing to render, every stage is up to date" + (f" ({len(plan.errors)} section(s) not planned)" if plan.errors else ""))
         for line in plan.lines():
             log(line)
+        if locked:
+            log(f"  locked (kept as rendered although their settings changed): {', '.join(locked)}")
         return plan
     heavy = plan.heavy()
     log(f"plan: {n} stage(s)" + (f" and {m} image(s)" if m else "") + f" to render, about {fmt(plan.total())} on this "
         f"machine" + (f"; heavy GPU work: {', '.join(sorted({s.section + '/' + s.name for s in heavy}))}" if heavy else ""))
     for line in plan.lines():
         log(line)
-    locked = [f"{s.section}/{s.name}" for s in plan.stages if s.state == "locked"]
     if locked:
-        log(f"  locked (kept as rendered): {', '.join(locked)}")
+        log(f"  locked (kept as rendered although their settings changed): {', '.join(locked)}")
     return plan

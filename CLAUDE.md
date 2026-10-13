@@ -12,6 +12,8 @@ or a script tied to one image or one shot. If a site needs something the engine 
   sequence, parallax, type, stage (an opening: a faceless figure comes into the light line by line), vector, chart (callouts resolved from the data), map, splat (`backends/splats.py`: .ply /
   gsplat .pt -> SPZ for Spark).
 - `runtime/src/players/<type>.ts`: the browser player for each scene type; `runtime/src/index.ts` is the scroll core.
+- `engine/plan.py`: dry-run build plans and estimates; `engine/storyboard/`: `studio storyboard` (cards per shot from
+  the full build's own stages, stand-in films, sheet, animatic); `engine/fidelity.py`: plan/preview modes.
 - `engine/compile/`: templates + themes -> `dist/`. Content blocks: intro, features, stats, timeline, quote, cta, gallery, hero, product (with an HTML phone or a clip; `pose:` beside/rise/close/lean/pair/turn varies the composition, `behind:` adds a second phone that swaps places with the first, `stats:` big figures; a hero takes a `device:` too; `theme.display_em: bold` sets emphasis as bold italics). `scroll.speed` (read by the runtime as `window.__ssScroll`) paces smooth scrolling and reveals, strip, orbit, faq. `layout: stack` turns every section into a full-screen panel that slides over the last; `surface:` (light, dark, accent) recolours one section with contrast-checked tokens. `pages:` adds plain Markdown pages (privacy policy, support) set in the site's theme at `/<slug>/`, linked from the footer (`page.html.j2`). Any section takes a full-bleed `backdrop:` image (`engine/inputs.py` also renders `gradient:` backdrops locally: stops, glows, stars, grain).
 - Styles (`theme.style`) are experiences, not skins: `engine/styles/<name>/` (style.yaml tokens and fonts, style.css,
   blocks.html.j2 with its own markup per block type, chrome.html.j2 for page furniture) plus
@@ -24,8 +26,9 @@ or a script tied to one image or one shot. If a site needs something the engine 
 - `examples/`: example projects; each must keep building with `studio build examples/<name>`.
 
 ## Workflow for a new site
-Use the `scroll-site` skill (`.claude/skills/scroll-site/SKILL.md`). In short: spec -> `studio build --draft` ->
-`studio snapshot` and look at the images -> fix -> full build -> `studio record`.
+Use the `scroll-site` skill (`.claude/skills/scroll-site/SKILL.md`). In short: spec -> `studio storyboard` and read
+storyboard/sheet.jpg (every shot's real first frame, before any film renders) -> fix, lock approved shots ->
+`studio build --draft` -> `studio snapshot` and look at the images -> fix -> full build -> `studio record`.
 
 ## Licence
 Scroll Studio is AGPL-3.0 with additional terms (NOTICE.md); AGENTS.md says what that means for any agent, including

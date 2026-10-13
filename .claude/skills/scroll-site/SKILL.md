@@ -38,8 +38,20 @@ Mix them: a `film` hero, then `features`/`stats`, then an `artwork` section, the
 - Quote YAML strings that contain `:` or `,` inside `{ … }` flow mappings.
 - No images? Use `image: { generate: "<a photographic prompt>" }`: generated locally (needs ComfyUI running).
 
-## 3. Build, look, fix
-1. `build(project, draft=True)` then `wait_for_job`. Read the log on failure: it names the stage and the cause.
+## 3. Storyboard, then build
+Storyboard before any full render: a film costs an hour or more, a storyboard seconds to minutes, and its frames are
+the real first frames (same stages and caches), so approving them is not wasted work.
+1. `storyboard(project, level="sketch")` for layout and pacing with no GPU, then `storyboard(project)` (stills).
+   Read the returned `sheet` image: does each shot open (and end) on the right frame, does the product sit right in a
+   take, are captions and motion verbs right, is anything a placeholder? The summary lists each card's status and the
+   full render estimate; open `site` to judge the real page.
+2. Fix the spec and storyboard again: only changed shots are redone (`only=[ids]` to limit it). Use
+   `level="animatic"` (and `motion=True` with `only` for one shot) to check pacing and motion.
+3. Lock approved shots (`locked: true` on a beat, take or scene) so later edits never re-render them.
+4. `build(project, plan_only=True)` shows what will render and how long; tell the user before a long render.
+
+## 4. Build, look, fix
+1. `build(project, draft=True)` (or `only=[ids]` for a few shots) then `wait_for_job`. Read the log on failure: it names the stage and the cause.
 2. `snapshot(project)`, then read the sheet image. Check: text legible over the visual, the subject framed
    (not hidden behind the copy), nothing cut off, colours on brand, every stage actually visible.
 3. Fix the spec (or the engine, if it's an engine limitation) and repeat. Finish with a full `build`.
@@ -48,6 +60,6 @@ Mix them: a `film` hero, then `features`/`stats`, then an `artwork` section, the
    `trailer(project, plan_only=True)` and look at frames of the result before handing it over.
 5. Client revisions: `studio copy export <project>` -> send copy.md -> `studio copy import <project> copy.md` -> build.
 
-## 4. Hand over
+## 5. Hand over
 Tell the user where the site is (`dist/index.html`, preview with `studio preview <name>` or in `studio ui`), what
 each section shows, and anything you couldn't do (e.g. ComfyUI not running, so generated images were skipped).
