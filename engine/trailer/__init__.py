@@ -214,9 +214,11 @@ def render_format(shots: list[Shot], cuts, fmt: str, fps: int, sources: dict, tr
                         if need_focus else np.full((n, 2), 0.5))
                 src_iter = fr.frames(s.src, s.t0, n, fps, s.speed, s.hold)
                 gen = (fr.warp(f, W, H, path[i][0], path[i][1], zooms[i]) for i, f in enumerate(src_iter))
-            elif s.kind == "record":
-                gen = (f if f.shape[:2] == (H, W) else fr.warp(f, W, H, 0.5, 0.5, 1.0)
-                       for f in fr.frames(sources[k], 0.0, n, fps))
+            elif s.kind == "record":   # recorded at this size; a slow push keeps a short section alive
+                if s.zoom is None:
+                    zooms = [1.0 + 0.05 * _ease(i / max(n - 1, 1)) for i in range(n)]
+                fx, fy = s.focus or (0.5, 0.45)
+                gen = (fr.warp(f, W, H, fx, fy, zooms[i]) for i, f in enumerate(fr.frames(sources[k], 0.0, n, fps)))
             elif s.kind == "still":
                 still = sources[k]   # laid out by _still: the product large, above the type when there is some
                 fx, fy = s.focus or (0.5, 0.5)
