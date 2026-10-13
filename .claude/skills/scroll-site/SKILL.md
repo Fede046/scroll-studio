@@ -42,7 +42,9 @@ Mix them: a `film` hero, then `features`/`stats`, then an `artwork` section, the
 2. `snapshot(project)`, then read the sheet image. Check: text legible over the visual, the subject framed
    (not hidden behind the copy), nothing cut off, colours on brand, every stage actually visible.
 3. Fix the spec (or the engine, if it's an engine limitation) and repeat. Finish with a full `build`.
-4. `record(project)` for an MP4 scroll-through when the user wants something to share.
+4. `record(project)` for an MP4 scroll-through when the user wants something to share. For a launch film, add
+   `trailer: {}` to the spec and run `trailer(project)` (16:9 + 9:16 in dist/trailer/); check the cut with
+   `trailer(project, plan_only=True)` and look at frames of the result before handing it over.
 5. Client revisions: `studio copy export <project>` -> send copy.md -> `studio copy import <project> copy.md` -> build.
 
 ## 4. Hand over
