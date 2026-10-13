@@ -28,6 +28,71 @@ comfyui:
     size_gb: 1
     licence: LTX-2 Community License
     used_by: [film (upscale)]
+  # Wan 2.2 A14B (`video_model: wan`): a second video model (16 fps, ~1280x720), at about the same VRAM as LTX.
+  # fp8 14B experts (~14 GB each) on a 24 GB RTX 4090: ComfyUI keeps one expert on the GPU and swaps to the other
+  # half-way through sampling (needs ~32 GB of free system RAM to hold the idle one). `wan:` names the key in
+  # engine/backends/comfy.py WAN; override the file name in studio.toml [wan] when yours differs or sits in a
+  # subfolder (doctor and the engine also find a moved file by its base name through ComfyUI's model list).
+  - name: Wan 2.2 I2V A14B high-noise expert (fp8)
+    file: diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors
+    wan: i2v_high
+    source: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/blob/main/split_files/diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors
+    size_gb: 14.3
+    vram_gb: 16
+    licence: Apache-2.0
+    used_by: [film beats, theme.art (video_model wan)]
+  - name: Wan 2.2 I2V A14B low-noise expert (fp8)
+    file: diffusion_models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors
+    wan: i2v_low
+    source: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/blob/main/split_files/diffusion_models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors
+    size_gb: 14.3
+    vram_gb: 16
+    licence: Apache-2.0
+    used_by: [film beats, theme.art (video_model wan)]
+  - name: Wan 2.2 Fun Control A14B high-noise expert (fp8)
+    file: diffusion_models/wan2.2_fun_control_high_noise_14B_fp8_scaled.safetensors
+    wan: control_high
+    source: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/blob/main/split_files/diffusion_models/wan2.2_fun_control_high_noise_14B_fp8_scaled.safetensors
+    size_gb: 14.3
+    vram_gb: 16
+    licence: Apache-2.0
+    used_by: [film takes (video_model wan)]
+  - name: Wan 2.2 Fun Control A14B low-noise expert (fp8)
+    file: diffusion_models/wan2.2_fun_control_low_noise_14B_fp8_scaled.safetensors
+    wan: control_low
+    source: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/blob/main/split_files/diffusion_models/wan2.2_fun_control_low_noise_14B_fp8_scaled.safetensors
+    size_gb: 14.3
+    vram_gb: 16
+    licence: Apache-2.0
+    used_by: [film takes (video_model wan)]
+  - name: UMT5-XXL text encoder (fp8)
+    file: text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors
+    wan: text_encoder
+    source: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/blob/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors
+    size_gb: 6.7
+    licence: Apache-2.0
+    used_by: [video_model wan]
+  - name: Wan 2.1 VAE
+    file: vae/wan_2.1_vae.safetensors
+    wan: vae
+    source: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/blob/main/split_files/vae/wan_2.1_vae.safetensors
+    size_gb: 0.25
+    licence: Apache-2.0
+    used_by: [video_model wan]
+  - name: Wan 2.2 I2V lightx2v 4-step LoRA, high noise
+    file: loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors
+    wan: lora_high
+    source: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/blob/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors
+    size_gb: 1.2
+    licence: Apache-2.0
+    used_by: [video_model wan (wan.quality fast, the default)]
+  - name: Wan 2.2 I2V lightx2v 4-step LoRA, low noise
+    file: loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors
+    wan: lora_low
+    source: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/blob/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors
+    size_gb: 1.2
+    licence: Apache-2.0
+    used_by: [video_model wan (wan.quality fast, the default)]
   - name: Z-Image Turbo (bf16)
     file: diffusion_models/z_image_turbo_bf16.safetensors
     source: https://huggingface.co/Comfy-Org/z_image_turbo

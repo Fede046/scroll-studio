@@ -237,6 +237,42 @@ class WorldObject(Model):
     clear: Optional[tuple[float, float, float]] = Field(None, description="scatter: keep (x, y, radius) empty")
 
 
+# ---------------------------------------------------------------- video model (LTX-2.3 or Wan 2.2)
+
+VideoModel = Literal["ltx", "wan"]
+VIDEO_MODEL_DOC = ("Video model: ltx (LTX-2.3, the default) or wan (Wan 2.2 A14B: renders at ~1280x720 and 16 fps, "
+                   "retimed to 24; clean, physical motion and first/last-frame control, but no finer detail than LTX "
+                   "after restore, and slower). Unset = the site's `video_model`, then studio.toml's, then ltx")
+
+
+class Wan(Model):
+    """Wan 2.2 A14B settings (`video_model: wan`). Two 14B experts sample in turn (high-noise for the first half of
+    the steps, low-noise for the rest). Renders at ~1280x720, 16 fps, up to 81 frames (~5 s) per clip; longer shots
+    chain clips from the previous last frame; frames are retimed to 24 fps and restored/upscaled as usual."""
+    quality: Literal["fast", "full"] = Field("fast", description="fast: the lightx2v 4-step LoRAs, cfg 1 (an 81-frame "
+                                             "720p clip samples in ~2.5 min on an RTX 4090, plus loading the two "
+                                             "experts). full: no LoRAs, 20 steps at cfg 3.5 (~25 min a clip; uses the "
+                                             "negative prompt; in tests no sharper than fast)")
+    steps: Optional[int] = Field(None, ge=2, le=60, description="Total steps (default 4 fast, 20 full); the high-noise "
+                                                                "expert takes the first half")
+    cfg: Optional[float] = Field(None, ge=1, le=10, description="Guidance (default 1 fast, 3.5 full)")
+    shift: Optional[float] = Field(None, ge=1, le=20, description="ModelSamplingSD3 shift (default 5 fast, 8 full)")
+    res: Optional[tuple[int, int]] = Field(None, description="Render size, multiples of 16 (default 1280x720's "
+                                                             "pixel count at the shot's aspect; 720x1280 for portrait)")
+    interpolate: Literal["mci", "blend", "dup"] = Field(
+        "mci", description="16 -> 24 fps: mci (FFmpeg motion-compensated in-betweens), blend (cross-fades) or dup "
+                           "(repeated frames, exact pixels, slight judder)")
+    stretch: float = Field(1.35, ge=1, le=2, description="beats/art: a shot up to this many times one clip's length "
+                                                     "(81 frames, ~5 s) is one clip played slower instead of two "
+                                                     "chained clips (a chained clip restarts the motion)")
+    seed: Optional[int] = Field(None, description="takes: seed for Wan (default: the take's ltx.seed)")
+    guide_blur: Optional[float] = Field(None, ge=0, le=12, description="takes: blur of the depth guide in pixels "
+                                        "(default: ltx.guide_blur). Fun Control follows the guide's shapes closely, so "
+                                        "a blockout box tends to stay a box: blur more (3-6) to let it paint a real "
+                                        "table or rock, less to hold exact edges")
+    negative_prompt: Optional[str] = Field(None, description="Used only when cfg > 1 (quality: full)")
+
+
 class CameraKey(Model):
     t: float = Field(..., description="Seconds")
     at: tuple[float, float, float] = Field(..., description="Camera position")
@@ -305,6 +341,10 @@ class Take(Model):
                                                                       "softness and redraw fine detail, before the "
                                                                       "product is composited (the real product is "
                                                                       "never restored); slow")
+    video_model: Optional[VideoModel] = Field(None, description=VIDEO_MODEL_DOC + ". With wan the world is painted by "
+                                              "Wan 2.2 Fun Control along the same depth guide, from the first "
+                                              "keyframe, in the segments and prompts of `ltx:`")
+    wan: Optional[Wan] = Field(None, description="Wan settings for this take (over the site's `wan:`)")
 
 
 class Beat(Model):
@@ -323,6 +363,7 @@ class Beat(Model):
     motion_seed: Optional[int] = Field(None, description="Seed for the motion only, to re-roll a clip and keep its still")
     trim: float = Field(0.0, ge=0, description="Seconds cut from the start of the clip (an action shot that holds its "
                                                "first frame before moving). Re-uses the render: nothing is re-animated")
+    video_model: Optional[VideoModel] = Field(None, description=VIDEO_MODEL_DOC + ". `strength` applies to ltx only")
 
 
 class FilmScene(SceneBase):
@@ -810,7 +851,7 @@ class Art(Model):
                                                     "dribbling, black background'. Plain backgrounds and strong "
                                                     "silhouettes read best in characters and points")
     file: Optional[str] = Field(None, description="Use this image (project file or URL) instead of a prompt")
-    motion: Optional[str] = Field(None, description="Animate it with LTX-2.3 (needs ComfyUI), e.g. 'dribbles the "
+    motion: Optional[str] = Field(None, description="Animate it with the video model (needs ComfyUI), e.g. 'dribbles the "
                                                     "ball between his legs'. Omit for a still")
     seconds: float = Field(3.0, ge=1, le=8, description="Length of the animated loop")
     size: tuple[int, int] = Field((1024, 768), description="Generated image size (the loop keeps its aspect)")
@@ -819,6 +860,7 @@ class Art(Model):
     width: int = Field(220, ge=40, le=480, description="Sampling width in pixels of the shipped frames: characters "
                                                        "and points are drawn from these")
     label: Optional[str] = Field(None, description="Short name shown with the art (defaults to the prompt)")
+    video_model: Optional[VideoModel] = Field(None, description=VIDEO_MODEL_DOC)
 
 
 class Theme(Model):
@@ -971,6 +1013,9 @@ class Site(Model):
     # launch trailer
     trailer: Optional[Trailer] = Field(None, description="A launch film built from the site's renders by "
                                                          "`studio trailer` (16:9 and 9:16); `{}` derives the cut")
+    video_model: Optional[VideoModel] = Field(None, description="Default video model for film beats, takes and "
+                                              "theme.art: ltx (LTX-2.3) or wan (Wan 2.2). Unset = studio.toml's, then ltx")
+    wan: Wan = Field(default_factory=Wan, description="Wan 2.2 settings used wherever video_model is wan")
 
 
 def is_scene(section) -> bool:

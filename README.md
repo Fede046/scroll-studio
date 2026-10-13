@@ -380,6 +380,47 @@ slow, camera-led motion best; for an action shot that holds its first frame, low
 motion alone with `motion_seed`, and cut the hold with `trim` (seconds, re-uses the render).
 Example: [Feel](examples/feel/site.yaml).
 
+### Two video models: LTX-2.3 and Wan 2.2
+
+Beats, takes and `theme.art` animate with LTX-2.3 by default. `video_model: wan` switches to Wan 2.2 A14B, a second
+local model: a pair of 14B experts (one lays out the motion, the other paints the detail) that renders at its native
+~1280x720 and 16 fps, retimed to 24 fps with FFmpeg's motion-compensated interpolation and restored to 1080p by the
+SeedVR2 stage (`beat_restore`, `take.upscale`). Choose it for the whole site, or per beat, take or art:
+
+```yaml
+video_model: wan            # site default (else studio.toml's video_model, else ltx)
+wan: { quality: fast }      # fast: 4-step lightx2v LoRAs, cfg 1 · full: ~20 steps, cfg 3.5, no LoRAs (slower)
+sections:
+  - id: story
+    type: film
+    beats:
+      - id: door
+        video_model: wan    # per beat; `image` is the first frame and `end_image` the last (first-last-frame)
+        ...
+  - id: take
+    type: film
+    take:
+      video_model: wan      # Wan 2.2 Fun Control paints the world along the Blender depth guide
+      wan: { quality: fast }
+      ltx: { segments: [...] }   # the same segments and prompts drive either model
+```
+
+A Wan clip is at most 81 frames (~5 s). A beat a little longer than that (up to `wan.stretch`, 1.35x) is one clip
+played slower; a longer one chains clips, each starting on the last frame of the one before, with the end image on
+the last. In a take, every segment is cut into clips of at most 81 frames along the depth guide; the first clip starts
+on the keyframe at its start time and each clip takes the keyframe inside its range as a reference still. The product
+pass is unchanged, so the real product stays locked to the same camera. Both models' renders are cached side by side
+(a take's Wan render lives in `.build/<section>/wan/`), so switching back and forth costs nothing, and LTX caches made
+before `video_model` existed stay valid. `studio doctor` lists every Wan file ComfyUI can see; file names that differ
+from the defaults go in `studio.toml` under `[wan]`.
+
+Which to use: on the Feel door beat (start and end image given) the two land the same motion and, after SeedVR2, LTX
+still shows the finer texture (it renders beats at 1920x1088; Wan at 1280x720), so LTX stays the default. Wan earns its
+place in takes, where Fun Control at 1280x720 paints a crisper world than LTX at the example's 1024x576 and follows the
+guide's shapes closely (blur the guide, `wan.guide_blur`, when a blockout box should become something better than a
+box). On an RTX 4090 an 81-frame Wan clip samples in about 2.5 minutes (fast) or 25 (full), plus about 4 minutes to
+load each 14B expert from a hard disk when they aren't already in RAM.
+
 ### Flying through code
 
 A `code` scene follows an AI agent through a codebase in live 3D, with real, readable text. It opens on the agent's

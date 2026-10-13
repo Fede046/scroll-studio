@@ -56,4 +56,8 @@ def settings() -> dict:
         # image -> 3D for product takes (engine/backends/trellis.py); optional
         "trellis_python": get("TRELLIS_PYTHON", "trellis_python", None),
         "trellis_script": get("TRELLIS_SCRIPT", "trellis_script", None),
+        # video model for film beats, takes and theme.art when the spec doesn't choose one: ltx | wan
+        "video_model": get("STUDIO_VIDEO_MODEL", "video_model", "ltx"),
+        # Wan 2.2 file names as ComfyUI lists them, when they differ from engine/backends/comfy.py WAN ([wan] table)
+        "wan": t.get("wan") or {},
     }

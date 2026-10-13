@@ -1,7 +1,20 @@
 # Copy to studio.toml and edit. Environment variables (BLENDER, FFMPEG, COMFY_URL, STUDIO_MODELS, CHROME,
-# STUDIO_PROJECTS) override these.
+# STUDIO_PROJECTS, STUDIO_VIDEO_MODEL) override these.
 # blender = "C:/Program Files/Blender Foundation/Blender 4.3/blender.exe"
 # ffmpeg = "ffmpeg"
 # comfy_url = "http://127.0.0.1:8188"
 # model_dir = "D:/ai"           # Hugging Face cache for depth / segmentation models goes in <model_dir>/hf
 # projects = "projects"
+# video_model = "ltx"          # default video model when a spec doesn't choose one: ltx (LTX-2.3) or wan (Wan 2.2)
+
+# Wan 2.2 file names as ComfyUI lists them, only where yours differ from the defaults (engine/models.yaml).
+# A subfolder is part of the name; a file moved to another subfolder is also found by its base name.
+# [wan]
+# control_high = "wan_h/wan2.2_fun_control_high_noise_14B_fp8_scaled.safetensors"
+# control_low = "wan_h/wan2.2_fun_control_low_noise_14B_fp8_scaled.safetensors"
+# i2v_high = "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors"
+# i2v_low = "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors"
+# text_encoder = "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+# vae = "wan_2.1_vae.safetensors"
+# lora_high = "wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors"
+# lora_low = "wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors"

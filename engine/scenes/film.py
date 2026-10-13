@@ -3,7 +3,8 @@
 Stages (each cached by its own settings):
   blockout   Blender preset or the user's .blend -> beauty frames + log-depth pass
   keyframes  Z-Image Turbo + depth ControlNet -> detailed stills at chosen times
-  generate   LTX-2.3 guided by the depth video + keyframes, in segments -> gen/gen.mp4
+  generate   LTX-2.3 guided by the depth video + keyframes, in segments -> gen/gen.mp4; or, with
+             video_model: wan, Wan 2.2 Fun Control along the same depth video -> wan/gen/gen.mp4
   upscale    optional (shot.upscale.method: ltx | seedvr2)
   restore    take.restore: SeedVR2 over the generated world, before the product composite
   encode     short-GOP H.264 for scrubbing (desktop + mobile), poster and end frames
@@ -96,17 +97,21 @@ def take_shot(sec: FilmScene, ctx: BuildContext) -> dict:
         old["samples"] = old["samples"] if "samples" in layer.model_fields_set else 32
         old["res"] = old["res"] or [1920, 1080]
         src = raw or path
-        lw = {**{k: v for k, v in t.items() if k not in ("ltx", "keyframes", "upscale", "product", "product_file")},
+        lw = {**{k: v for k, v in t.items() if k not in ("ltx", "keyframes", "upscale", "product", "product_file", "restore", "video_model", "wan")},
               "product": old, "product_file": _legacy_path(src)}
         legacy = {"world_key": lw, "model": file_key(src)}
     ctx.work.mkdir(parents=True, exist_ok=True)
     (ctx.work / "take.json").write_text(json.dumps(t, indent=1), encoding="utf-8")
-    world = {k: v for k, v in t.items() if k not in ("ltx", "keyframes", "upscale", "product", "product_file")}
+    world = {k: v for k, v in t.items() if k not in ("ltx", "keyframes", "upscale", "product", "product_file", "restore", "video_model", "wan")}
     if sec.take.product and sec.take.product_in_guide:
         world["product"] = {k: t["product"][k] for k in ("at", "height", "rotation", "spin")}
         world["product_model"] = file_key(Path(t["product_file"]))
     shot = {"fps": t["fps"], "duration": t["duration"], "preview_res": t["preview_res"], "ltx": t["ltx"],
             "blockout": {"world": str(ctx.work / "take.json")}, "world_key": world, "legacy_world_key": legacy}
+    if t.get("video_model"):
+        shot["video_model"] = t["video_model"]
+    if sec.take.wan:   # only what the take sets, so the site's `wan:` fills the rest
+        shot["wan"] = sec.take.wan.model_dump(mode="json", exclude_unset=True)
     if t.get("keyframes"):
         shot["keyframes"] = t["keyframes"]
     if t.get("upscale"):
@@ -146,13 +151,26 @@ def generate(sec: FilmScene, ctx: BuildContext) -> Path:
                   lambda: fb.stage_keyframes(shot, out, _args(ctx)), legacy=legacy and {"b": legacy, "k": shot["keyframes"]})
     gkey = {"b": bkey, "k": shot.get("keyframes"), "ltx": shot["ltx"], "subject": shot.get("subject")}
     glegacy = legacy and {"b": legacy, "k": shot.get("keyframes"), "ltx": shot["ltx"], "subject": shot.get("subject")}
-    ctx.stage("generate", gkey, [gdir / "gen.mp4"], lambda: fb.stage_generate(shot, out, _args(ctx)), legacy=glegacy)
+    from ..animate import video_model, wan_settings
+    model = video_model(shot.get("video_model"), ctx.options.get("site_video_model"))
+    # Wan's renders live under wan/ with their own stage names, so switching models back and forth never
+    # throws away the other model's cached film (and LTX keys are unchanged).
+    sfx, mout = ("", out) if model == "ltx" else ("_wan", str(ctx.work / "wan"))
+    gdir = Path(mout) / "gen"
+    if model == "wan":
+        shot["wan"] = wan_settings(ctx.options.get("site_wan"), shot.get("wan"))
+        gkey = dict(gkey, video_model=model, wan=shot["wan"])
+        ctx.stage("generate_wan", gkey, [gdir / "gen.mp4"],
+                  lambda: fb.stage_generate_wan(shot, out, mout, _args(ctx), ctx.log))
+    else:
+        ctx.stage("generate", gkey, [gdir / "gen.mp4"], lambda: fb.stage_generate(shot, out, _args(ctx)),
+                  legacy=glegacy)
     film = gdir / "gen.mp4"
     up = shot.get("upscale")
     if up and up.get("method") in ("ltx", "seedvr2"):
         dst = gdir / ("gen_sr.mp4" if up["method"] == "seedvr2" else "gen_up.mp4")
-        ctx.stage("upscale", {"g": gkey, "u": up}, [dst], lambda: fb.stage_upscale(shot, out, _args(ctx)),
-                  legacy=glegacy and {"g": glegacy, "u": up})
+        ctx.stage("upscale" + sfx, {"g": gkey, "u": up}, [dst], lambda: fb.stage_upscale(shot, mout, _args(ctx)),
+                  legacy=(glegacy and not sfx) and {"g": glegacy, "u": up})
         film = dst
     if sec.take and sec.take.restore:
         film = restore_take(sec, ctx, shot, film, up)
@@ -185,13 +203,21 @@ def json_product_file(ctx: BuildContext) -> str:
     return _take_json(ctx)["product_file"]
 
 
+def _model_key(path: Path) -> dict:
+    """The product model in a cache key: a normalised GLB is named by the digest of what made it, so its name and size
+    identify it on any machine (no mtime, which would re-render a product pass after a fresh checkout or copy)."""
+    if path.parent.name == "_product":
+        return {"glb": path.name, "size": path.stat().st_size}
+    return file_key(path)
+
+
 def _product_keys(ctx: BuildContext) -> dict:
     """What the product pass depends on: the camera and world timing, the product layer and model, and take.py."""
     from ..product import _sha
     from . import film_build as fb
     t = _take_json(ctx)
     return {"camera": {k: t.get(k) for k in ("camera", "lens", "fps", "duration", "light")},
-            "product": t["product"], "model": file_key(Path(t["product_file"])),
+            "product": t["product"], "model": _model_key(Path(t["product_file"])),
             "script": _sha(Path(fb.SCRIPTS) / "take.py")}
 
 
@@ -249,11 +275,11 @@ def encode(src: Path, ctx: BuildContext, gop: int) -> dict:
 
 
 def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
-    """A story in shots: each beat's still (generated, or a file) animated by LTX-2.3, cached per beat, then joined
-    with crossfades. Steps pinned with state: {beat: <id>} are timed to their beat."""
+    """A story in shots: each beat's still (generated, or a file) animated by the video model (LTX-2.3 or Wan 2.2,
+    `video_model`), cached per beat, then joined with crossfades. Steps pinned with state: {beat: <id>} are timed to their beat."""
     import shutil
     from PIL import Image, ImageOps
-    from ..animate import FPS, animate
+    from ..animate import FPS, animate, video_model, wan_settings
     from ..inputs import resolve_image
     from ..spec import ImageInput
     W, H = sec.beat_res[0] // 32 * 32, sec.beat_res[1] // 32 * 32
@@ -279,7 +305,7 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
             frames = sorted((bdir / "frames").glob("*.png"))
             if not (frames and stamp.exists() and stamp.read_text() == akey):
                 frames = animate(still, b.prompt, b.motion, b.seconds, b.seed if b.motion_seed is None else b.motion_seed,
-                                 bdir, ctx.log, size=(W, H), strength=b.strength, end_image=end)
+                                 bdir, ctx.log, size=(W, H), strength=b.strength, end_image=end, model=model, wan=wan)
                 stamp.write_text(akey)
             frames = frames[round(b.trim * FPS):]
             seq = bdir / "seq"
@@ -295,9 +321,15 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
                 return r
             if isinstance(r, str):
                 return file_key(ctx.project.path(r))
-            return r.model_dump(mode="json")
+            from ..inputs import stable_dump
+            return stable_dump(r)
         key = {"prompt": b.prompt, "motion": b.motion, "seconds": b.seconds, "seed": b.seed, "res": [W, H],
                "image": ref_key(b.image)}
+        model = video_model(b.video_model, ctx.options.get("site_video_model"))
+        wan = wan_settings(ctx.options.get("site_wan")) if model == "wan" else None
+        if model != "ltx":   # only when not the default, so LTX beats rendered before video_model existed stay cached
+            key["video_model"] = model
+            key["wan"] = {k: v for k, v in wan.items() if k != "seed"}
         if b.end_image:
             key["end_image"] = ref_key(b.end_image)
         # only when set, so beats rendered before these existed stay cached

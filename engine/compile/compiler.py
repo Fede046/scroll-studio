@@ -112,6 +112,8 @@ def build_site(project: Project, log: Callable[[str], None] = print,
     dist.mkdir(parents=True, exist_ok=True)
     (dist / "assets").mkdir(exist_ok=True)
 
+    # the site's video model and Wan settings reach every builder (film beats/takes) through the options
+    options = dict(options or {}, site_video_model=site.video_model, site_wan=site.wan.model_dump(mode="json"))
     sections, credits = [], []
     # site.product: its model credit goes in the footer whatever uses it; a concept page says so
     from .. import product as product_mod
@@ -258,7 +260,8 @@ def build_site(project: Project, log: Callable[[str], None] = print,
     art_cfg = None
     if site.theme.art:
         from .. import art as art_mod
-        art_cfg = art_mod.build(project, site.theme.art, dist, log)
+        art_cfg = art_mod.build(project, site.theme.art, dist, log, site_video_model=site.video_model,
+                                site_wan=site.wan.model_dump(mode="json"))
     env.globals["art"] = art_cfg
     css_vars = themes.css_vars(theme, log)
     # launch trailer (`trailer.embed`): a button and a modal player, once `studio trailer` has made the film

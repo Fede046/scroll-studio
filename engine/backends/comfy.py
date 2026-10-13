@@ -32,7 +32,32 @@ LTX = {
     "upscaler": "ltx-2.3-spatial-upscaler-x2-1.1.safetensors",
 }
 
-DISTILLED_SIGMAS = "1.0, 0.99375, 0.9875, 0.98125, 0.975, 0.909375, 0.725, 0.421875, 0.0"
+# Wan 2.2 A14B (the second video model; `video_model: wan`). Two 14B experts: the high-noise one lays out the motion
+# for the first half of the steps, the low-noise one paints the detail for the rest. Names are what ComfyUI lists;
+# override any of them in studio.toml under [wan] (e.g. control_high = "wan_h/wan2.2_fun_control_high_...") and a
+# file moved to another subfolder is still found by its base name (wan_model_names()).
+WAN = {
+    "i2v_high": "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
+    "i2v_low": "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
+    "control_high": "wan2.2_fun_control_high_noise_14B_fp8_scaled.safetensors",
+    "control_low": "wan2.2_fun_control_low_noise_14B_fp8_scaled.safetensors",
+    "text_encoder": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+    "vae": "wan_2.1_vae.safetensors",
+    "lora_high": "wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors",
+    "lora_low": "wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors",
+}
+WAN_FOLDERS = {"i2v_high": "diffusion_models", "i2v_low": "diffusion_models", "control_high": "diffusion_models",
+               "control_low": "diffusion_models", "text_encoder": "text_encoders", "vae": "vae",
+               "lora_high": "loras", "lora_low": "loras"}
+WAN_FPS = 16          # Wan's native frame rate
+WAN_MAX_FRAMES = 81   # one clip (~5 s); longer shots are chained
+# fast: the lightx2v 4-step distillation LoRAs on both experts, cfg 1 (negative prompt unused).
+# full: no LoRAs, real CFG, ~20 steps; about 10x slower, for when the fast path smears fine texture.
+WAN_QUALITY = {"fast": {"steps": 4, "cfg": 1.0, "shift": 5.0, "lora": True},
+               "full": {"steps": 20, "cfg": 3.5, "shift": 8.0, "lora": False}}
+
+
+DISTILLED_SIGMAS ="1.0, 0.99375, 0.9875, 0.98125, 0.975, 0.909375, 0.725, 0.421875, 0.0"
 REFINE_SIGMAS = "0.909375, 0.725, 0.421875, 0.0"
 
 
@@ -261,6 +286,112 @@ def build_i2v_graph(cfg, first_image, frames, width, height, fps, prompt, negati
         g["crop"] = {"class_type": "LTXVCropGuides", "inputs": {
             "positive": ["endguide", 0], "negative": ["endguide", 1], "latent": ["split", 0]}}
         g["decode"]["inputs"]["latents"] = ["crop", 2]
+    return g
+
+
+def listed(folder):
+    """File names ComfyUI can load from one of its model folders (subfolders included), or None if it is not up."""
+    try:
+        return json.loads(_req(f"/models/{folder}"))
+    except Exception:
+        return None
+
+
+def wan_model_names(cfg=None, need=None):
+    """The Wan file names to put in a graph: WAN, then studio.toml [wan], then `cfg`; each checked against what
+    ComfyUI lists, and a file that moved to another subfolder is matched by its base name. Raises SystemExit naming
+    every missing file (with where to get it) when `need` lists keys that ComfyUI can't see."""
+    names = dict(WAN, **{k: v for k, v in (settings().get("wan") or {}).items() if k in WAN}, **{k: v for k, v in (cfg or {}).items() if k in WAN})
+    cache, missing = {}, []
+    for key in need or ():
+        folder = WAN_FOLDERS[key]
+        if folder not in cache:
+            cache[folder] = listed(folder)
+        have = cache[folder]
+        if have is None:
+            continue    # ComfyUI not reachable; the run itself will say so
+        want = names[key]
+        if want in have:
+            continue
+        base = want.replace("\\", "/").rsplit("/", 1)[-1]
+        alt = [h for h in have if h.replace("\\", "/").rsplit("/", 1)[-1] == base]
+        if alt:
+            names[key] = alt[0]
+        else:
+            missing.append(f"{folder}/{want}")
+    if missing:
+        raise SystemExit("video_model wan: ComfyUI can't see " + ", ".join(missing) + ". Download them from "
+                         "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged (see engine/models.yaml), or "
+                         "point studio.toml [wan] at the names ComfyUI lists. `studio doctor` checks them all.")
+    return names
+
+
+def build_wan_graph(cfg, prompt, negative, width, height, frames, seed, prefix, start_image=None, end_image=None,
+                    control_video=None, ref_image=None):
+    """Wan 2.2 A14B video: image-to-video (start image, optional end image) or Fun Control (a control video, e.g. the
+    take's Blender depth guide, with the start image and a reference still).
+
+    Two-stage MoE sampling: KSamplerAdvanced on the high-noise expert for steps [0, split), returning the leftover
+    noise, then the low-noise expert for [split, steps). cfg: quality (fast|full), steps, cfg, shift, split, sampler,
+    scheduler, lora_strength and any WAN file name. `frames` must be 4k+1 (<= 81 for one clip).
+    """
+    q = dict(WAN_QUALITY[cfg.get("quality", "fast")])
+    q.update({k: cfg[k] for k in ("steps", "cfg", "shift") if cfg.get(k) is not None})
+    control = control_video is not None
+    hi_key, lo_key = ("control_high", "control_low") if control else ("i2v_high", "i2v_low")
+    use_lora = q["lora"] and cfg.get("lora", True)
+    names = wan_model_names(cfg, need=[hi_key, lo_key, "text_encoder", "vae"] + (["lora_high", "lora_low"] if use_lora else []))
+    steps = int(q["steps"])
+    split = int(cfg.get("split") or max(1, steps // 2))
+    g = {
+        "unet_hi": {"class_type": "UNETLoader", "inputs": {"unet_name": names[hi_key], "weight_dtype": "default"}},
+        "unet_lo": {"class_type": "UNETLoader", "inputs": {"unet_name": names[lo_key], "weight_dtype": "default"}},
+        "clip": {"class_type": "CLIPLoader", "inputs": {"clip_name": names["text_encoder"], "type": "wan", "device": "default"}},
+        "vae": {"class_type": "VAELoader", "inputs": {"vae_name": names["vae"]}},
+        "pos": {"class_type": "CLIPTextEncode", "inputs": {"text": prompt, "clip": ["clip", 0]}},
+        "neg": {"class_type": "CLIPTextEncode", "inputs": {"text": negative or "", "clip": ["clip", 0]}},
+    }
+    m_hi, m_lo = ["unet_hi", 0], ["unet_lo", 0]
+    if use_lora:
+        s = float(cfg.get("lora_strength", 1.0))
+        g["lora_hi"] = {"class_type": "LoraLoaderModelOnly", "inputs": {"model": m_hi, "lora_name": names["lora_high"], "strength_model": s}}
+        g["lora_lo"] = {"class_type": "LoraLoaderModelOnly", "inputs": {"model": m_lo, "lora_name": names["lora_low"], "strength_model": s}}
+        m_hi, m_lo = ["lora_hi", 0], ["lora_lo", 0]
+    g["shift_hi"] = {"class_type": "ModelSamplingSD3", "inputs": {"model": m_hi, "shift": float(q["shift"])}}
+    g["shift_lo"] = {"class_type": "ModelSamplingSD3", "inputs": {"model": m_lo, "shift": float(q["shift"])}}
+    common = {"positive": ["pos", 0], "negative": ["neg", 0], "vae": ["vae", 0], "width": width, "height": height,
+              "length": frames, "batch_size": 1}
+    if start_image:
+        g["first"] = {"class_type": "LoadImage", "inputs": {"image": start_image}}
+    if control:
+        g["ctl_vid"] = {"class_type": "LoadVideo", "inputs": {"file": control_video}}
+        g["ctl"] = {"class_type": "GetVideoComponents", "inputs": {"video": ["ctl_vid", 0]}}
+        cond = dict(common, control_video=["ctl", 0])
+        if ref_image:
+            g["ref"] = {"class_type": "LoadImage", "inputs": {"image": ref_image}}
+            cond["ref_image"] = ["ref", 0]
+        if start_image:
+            # Wan22FunControlToVideo's execute() takes start_image (the first latent frame is pinned to it) although
+            # its schema doesn't list it; ComfyUI passes linked inputs through, which is what chains the segments.
+            cond["start_image"] = ["first", 0]
+        g["cond"] = {"class_type": "Wan22FunControlToVideo", "inputs": cond}
+    elif end_image:
+        g["last"] = {"class_type": "LoadImage", "inputs": {"image": end_image}}
+        g["cond"] = {"class_type": "WanFirstLastFrameToVideo", "inputs": dict(
+            common, start_image=["first", 0], end_image=["last", 0])}
+    else:
+        g["cond"] = {"class_type": "WanImageToVideo", "inputs": dict(common, **({"start_image": ["first", 0]} if start_image else {}))}
+    ks = {"noise_seed": int(seed), "steps": steps, "cfg": float(q["cfg"]),
+          "sampler_name": cfg.get("sampler", "euler"), "scheduler": cfg.get("scheduler", "simple"),
+          "positive": ["cond", 0], "negative": ["cond", 1]}
+    g["ks_hi"] = {"class_type": "KSamplerAdvanced", "inputs": dict(
+        ks, model=["shift_hi", 0], add_noise="enable", latent_image=["cond", 2],
+        start_at_step=0, end_at_step=split, return_with_leftover_noise="enable")}
+    g["ks_lo"] = {"class_type": "KSamplerAdvanced", "inputs": dict(
+        ks, model=["shift_lo", 0], add_noise="disable", latent_image=["ks_hi", 0],
+        start_at_step=split, end_at_step=10000, return_with_leftover_noise="disable")}
+    g["decode"] = {"class_type": "VAEDecode", "inputs": {"samples": ["ks_lo", 0], "vae": ["vae", 0]}}
+    g["save"] = {"class_type": "SaveImage", "inputs": {"images": ["decode", 0], "filename_prefix": prefix}}
     return g
 
 

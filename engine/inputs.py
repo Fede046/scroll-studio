@@ -59,10 +59,28 @@ def _lfs_check(url: str, out: Path, log=print) -> None:
     tmp.replace(out)
 
 
+# Image-input fields added after earlier builds were keyed: left out of keys while unset, so adding a field never
+# re-renders finished work.
+LATE_FIELDS = ("product", "scene")
+
+
+def stable_dump(model) -> dict:
+    """model_dump for cache keys: late fields that are unset (None) are dropped, at any depth."""
+    def strip(v):
+        if isinstance(v, dict):
+            return {k: strip(x) for k, x in v.items() if not (k in LATE_FIELDS and x is None)}
+        if isinstance(v, list):
+            return [strip(x) for x in v]
+        return v
+    return strip(model.model_dump(mode="json"))
+
+
 def image_key(ref: ImageRef) -> dict:
     if isinstance(ref, str):
         return {"file": ref}
-    return ref.model_dump(mode="json", exclude={"credit"})
+    d = stable_dump(ref)
+    d.pop("credit", None)
+    return d
 
 
 def resolve_image(project: Project, ref: ImageRef, log=print, alpha: bool = False) -> Path:
