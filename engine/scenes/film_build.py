@@ -402,8 +402,8 @@ def stage_generate_wan(shot, out, wout, args, log=print):
     video, so the world follows the exact camera the product is rendered through.
 
     Same segments and prompts as `ltx:`. Wan runs at 16 fps in clips of <= 81 frames: a longer segment is split
-    into even clips. The first clip starts on the keyframe at t=0 (if any); every later clip starts on the previous
-    clip's real last frame, so the joins are seamless. Each clip also gets a reference still (the keyframe inside
+    into even clips. The first clip starts on the keyframe at its start time (if any; also a segment with
+    `continue: false`); every later clip starts on the previous clip's real last frame, so the joins are seamless. Each clip also gets a reference still (the keyframe inside
     its range, else the first keyframe) that steers the look. The joined 16 fps frames are retimed to the take's fps
     (FFmpeg minterpolate by default) so frame i matches the product pass frame i. Writes <wout>/gen/gen.mp4.
     """
@@ -439,7 +439,8 @@ def stage_generate_wan(shot, out, wout, args, log=print):
         a = int(round(seg["range"][0] * wfps))
         n = max(5, (int(round(seg["range"][1] * wfps)) - a) // 4 * 4 + 1)
         for k in wan_split(n, int(wan.get("max_frames", ltx_comfy.WAN_MAX_FRAMES))):
-            clips.append((seg.get("prompt") or ltx.get("prompt", ""), a, k, seg["id"]))
+            fresh = not clips or (a == int(round(seg["range"][0] * wfps)) and not seg.get("continue", True))
+            clips.append((seg.get("prompt") or ltx.get("prompt", ""), a, k, seg["id"], fresh))
             a += k - 1
 
     def still(src, name):
@@ -452,10 +453,11 @@ def stage_generate_wan(shot, out, wout, args, log=print):
     os.makedirs(raw)
     ltx_comfy.free()
     n_out, start = 0, None
-    if keys and keys[0][0] <= 0.05:
-        start = still(keys[0][1], "start")
-    for ci, (prompt, a, k, sid) in enumerate(clips):
+    for ci, (prompt, a, k, sid, fresh) in enumerate(clips):
         t0, t1 = a / wfps, (a + k - 1) / wfps
+        if fresh:   # the take's first clip (or a segment with continue: false) starts on its keyframe, if one is there
+            at = [src for t, src in keys if abs(t - t0) <= 0.5 / wfps]
+            start = still(at[0], f"start{ci}") if at else None
         inside = [src for t, src in keys if t0 <= t <= t1]
         ref_src = inside[0] if inside else (keys[0][1] if keys else None)
         ref = still(ref_src, f"ref{ci}") if ref_src and wan.get("ref", True) else None
@@ -468,7 +470,7 @@ def stage_generate_wan(shot, out, wout, args, log=print):
         ff("-i", os.path.join(bdir, "depth.mp4"), "-vf", ",".join(vf), "-frames:v", str(k),
            "-c:v", "libx264", "-crf", "10", "-pix_fmt", "yuv420p", "-r", str(wfps), guide)
         log(f"  [wan {sid} {ci + 1}/{len(clips)}] {t0:.2f}-{t1:.2f}s, {k} frames at {w}x{h} | start: "
-            f"{'keyframe' if start and ci == 0 else 'previous clip' if start else 'none'} | ref: "
+            f"{'none' if not start else 'keyframe' if fresh else 'previous clip'} | ref: "
             f"{os.path.basename(ref_src) if ref else 'none'}")
         t = time.time()
         graph = ltx_comfy.build_wan_graph(wan, prompt, neg, w, h, k, seed0 + ci, prefix=f"{shot['id']}/wan_{ci:02d}",

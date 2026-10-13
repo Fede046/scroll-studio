@@ -10,6 +10,7 @@ Scroll Studio runs entirely on your machine. What you need depends on which scen
 | `parallax` | + PyTorch (depth estimation). Runs on the CPU; a CUDA GPU is much faster. `generate:` images need ComfyUI. |
 | `sequence` | + Blender 4.2+ (Cycles uses the GPU when there is one, otherwise the CPU). |
 | `film` | + Blender, FFmpeg, ComfyUI with the LTX-2.3 and Z-Image models, a 24 GB GPU (RTX 4090/5090 class). |
+| `film` with `video_model: wan` | + the Wan 2.2 files in `engine/models.yaml` (~67 GB: two i2v experts for beats and art, two Fun Control experts for takes, UMT5, the VAE, two LoRAs) and ~32 GB of free system RAM. Same 24 GB GPU. |
 | `film` with `take.product` | + the product's 3D model (.glb/.gltf/.obj/.fbx/.stl/.ply). `from_photo:` instead needs TRELLIS (below). |
 | `splat` | A scan as a 3DGS `.ply` (any) or a gsplat `.pt` checkpoint (needs PyTorch to read). No GPU at build time. |
 
@@ -59,6 +60,13 @@ in `studio.toml` (copy `studio.example.toml`) or the `BLENDER` environment varia
    On Windows set `PYTHONUTF8=1` first. Close games before rendering; they take VRAM and stall renders.
 
 Scroll Studio talks to ComfyUI at `comfy_url` (default http://127.0.0.1:8188).
+
+**Wan 2.2 (optional second video model, `video_model: wan`).** Download the eight Wan files listed in
+`engine/models.yaml` from https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged into the same folders (Wan needs
+no custom nodes: its nodes ship with ComfyUI). The experts are fp8 14B models of ~14 GB each; on a 24 GB card ComfyUI
+holds one on the GPU and swaps to the other half-way through sampling, so keep ~32 GB of system RAM free. If a file
+sits in a subfolder or under another name, set it in `studio.toml` under `[wan]` (see `studio.example.toml`);
+`studio doctor` asks ComfyUI which files it can load and lists every Wan file as found or missing, with its URL.
 
 ## 5. TRELLIS (optional: a product model from one photo)
 

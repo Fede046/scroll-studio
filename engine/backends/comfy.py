@@ -522,6 +522,15 @@ def run(graph, poll=5, timeout=45 * 60):
             if status.get("completed"):
                 print(f"  done in {int(time.time() - start)}s", flush=True)
                 return hist[pid]["outputs"]["save"]["images"]
+        else:
+            # ComfyUI may be shared: time spent waiting behind someone else's job doesn't count toward the
+            # timeout (and the interrupt below must never cancel their job).
+            try:
+                q = json.loads(_req("/queue"))
+                if any(p[1] == pid for p in q.get("queue_pending", [])):
+                    start = time.time()
+            except Exception:
+                pass
         time.sleep(poll)
     interrupt()  # don't leave a stalled job hogging the GPU
     raise SystemExit(f"Timed out after {timeout // 60} min waiting for ComfyUI prompt {pid} and cancelled it. "

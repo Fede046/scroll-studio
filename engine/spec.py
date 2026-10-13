@@ -162,6 +162,9 @@ class Wan(Model):
     interpolate: Literal["mci", "blend", "dup"] = Field(
         "mci", description="16 -> 24 fps: mci (FFmpeg motion-compensated in-betweens), blend (cross-fades) or dup "
                            "(repeated frames, exact pixels, slight judder)")
+    stretch: float = Field(1.35, ge=1, le=2, description="beats/art: a shot up to this many times one clip's length "
+                                                     "(81 frames, ~5 s) is one clip played slower instead of two "
+                                                     "chained clips (a chained clip restarts the motion)")
     seed: Optional[int] = Field(None, description="takes: seed for Wan (default: the take's ltx.seed)")
     negative_prompt: Optional[str] = Field(None, description="Used only when cfg > 1 (quality: full)")
 

@@ -70,7 +70,7 @@ def wan_split(frames: int, max_frames: int = 81) -> list[int]:
     return [(q + (1 if i < r else 0)) * 4 + 1 for i in range(k)]
 
 
-def retime(src_dir: Path, dst_dir: Path, src_fps: int, dst_fps: int, size: Optional[tuple[int, int]] = None,
+def retime(src_dir: Path, dst_dir: Path, src_fps: float, dst_fps: int, size: Optional[tuple[int, int]] = None,
            mode: str = "mci", log: Callable[[str], None] = print) -> list[Path]:
     """PNG frames at src_fps -> PNG frames at dst_fps (and `size`). mode: mci (FFmpeg minterpolate, motion-compensated:
     in-between frames are synthesised along motion vectors), blend (cross-fades, softer but never tears) or dup
@@ -80,8 +80,8 @@ def retime(src_dir: Path, dst_dir: Path, src_fps: int, dst_fps: int, size: Optio
     if dst_dir.exists():
         shutil.rmtree(dst_dir)
     dst_dir.mkdir(parents=True)
-    vf = []
-    if src_fps != dst_fps:
+    vf = ["tpad=stop_mode=clone:stop=2"]   # minterpolate drops the last in-betweens without a frame to aim at
+    if abs(src_fps - dst_fps) > 1e-3:
         vf.append({"mci": f"minterpolate=fps={dst_fps}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1",
                    "blend": f"minterpolate=fps={dst_fps}:mi_mode=blend",
                    "dup": f"fps={dst_fps}"}[mode])
@@ -89,8 +89,8 @@ def retime(src_dir: Path, dst_dir: Path, src_fps: int, dst_fps: int, size: Optio
         vf.append(f"scale={size[0]}:{size[1]}:flags=lanczos")
     src = sorted(src_dir.glob("*.png"))
     n_out = round((len(src) - 1) * dst_fps / src_fps) + 1   # first and last frame land on source frames
-    ffmpeg("-framerate", str(src_fps), "-start_number", "1", "-i", src_dir / "%04d.png",
-           *(["-vf", ",".join(vf)] if vf else []), "-frames:v", str(n_out), "-start_number", "1", dst_dir / "%04d.png", log=log)
+    ffmpeg("-framerate", f"{src_fps:.4f}".rstrip("0").rstrip("."), "-start_number", "1", "-i", src_dir / "%04d.png",
+           "-vf", ",".join(vf), "-frames:v", str(n_out), "-start_number", "1", dst_dir / "%04d.png", log=log)
     return sorted(dst_dir.glob("*.png"))
 
 
@@ -136,7 +136,13 @@ def _animate_wan(still: Path, prompt: str, motion: str, seconds: float, seed: in
     out_size = size or (src_w, src_h)
     w, h = wan_size(*out_size, wan.get("res"))
     total = wan_frames(seconds, comfy.WAN_FPS)
-    clips = wan_split(total, int(wan.get("max_frames", comfy.WAN_MAX_FRAMES)))
+    max_f = int(wan.get("max_frames", comfy.WAN_MAX_FRAMES))
+    play_fps = comfy.WAN_FPS
+    if max_f < total and seconds <= (max_f - 1) / comfy.WAN_FPS * float(wan.get("stretch", 1.35)):
+        # A little over one clip: one clip played a bit slower beats two clips joined. A chained clip restarts the
+        # motion from a still frame and only the last clip sees the end image (a door opened, shut and re-opened).
+        total, play_fps = max_f, (max_f - 1) / seconds
+    clips = wan_split(total, max_f)
     q = wan.get("quality", "fast")
     log(f"  animating with Wan 2.2 ({q}, {w}x{h}, {total} frames at {comfy.WAN_FPS} fps in {len(clips)} clip(s)): {motion[:80]}")
     text = f"{prompt or 'The subject of the image'}. {motion}. Smooth natural motion."
@@ -172,5 +178,5 @@ def _animate_wan(still: Path, prompt: str, motion: str, seconds: float, seed: in
         shutil.rmtree(cdir, ignore_errors=True)
     comfy.free()
     mode = wan.get("interpolate", "mci")
-    log(f"  retiming {n} frames {comfy.WAN_FPS} -> {FPS} fps ({mode}) at {out_size[0]}x{out_size[1]}")
-    return retime(raw, work / "frames", comfy.WAN_FPS, FPS, tuple(out_size), mode, log)
+    log(f"  retiming {n} frames {play_fps:.2f} -> {FPS} fps ({mode}) at {out_size[0]}x{out_size[1]}")
+    return retime(raw, work / "frames", play_fps, FPS, tuple(out_size), mode, log)
