@@ -6,6 +6,24 @@ commits it spans so you can check out any earlier state (`git checkout <commit>`
 Everything so far is version 1. On 2026-10-12 the releases first published as 2.0.0 and 3.0.0 were renumbered
 1.1.0 and 1.2.0 (tags `v1.1.0` and `v1.2.0`).
 
+## Unreleased
+
+### Added (launch trailers)
+- `trailer:` in the spec and `studio trailer <project>` (MCP tool `trailer`): a launch film cut from the site's own
+  renders in 16:9 and 9:16 (`dist/trailer/trailer-16x9.mp4`, `trailer-9x16.mp4`, posters). Shots come from film takes
+  and beats (by step, beat or time range), scroll recordings of other sections (at phone size for 9:16), type cards
+  and product stills (`site.product`, when the product feature is present). `trailer: {}` derives the cut: hook,
+  story, product reveal, feature callouts (a product block's tags, features or stats) and an end card. Cuts land on a
+  `bpm` grid; `music:` is trimmed, faded and loudness-normalised; captions and the end card use the theme's fonts and
+  colours, animate on the beat and keep to the TikTok/Reels safe areas. Cached per stage in `.build/_trailer`.
+- 9:16 reframing: a take's product is projected through the take's camera (`take.py --pass track`) so the crop
+  follows it, the reveal is cut where it is biggest in frame, and the push-in on it goes as far as the source
+  resolution allows; other footage uses a saliency-guided crop (spectral residual plus faces).
+- `trailer.embed`: a "Watch the launch film" button on the opening section and a modal player (the 9:16 cut on
+  portrait screens).
+- `take.restore`: SeedVR2 over a take's generated world before the product composite, as `beat_restore` does for beats.
+- `studio record` internals take a device pixel ratio, phone emulation and a part of the scroll.
+
 ## 1.3.0 · 2026-10-11 to 2026-10-12
 
 Commits after `83bfbc7` to the `v1.3.0` tag.

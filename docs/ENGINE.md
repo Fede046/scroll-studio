@@ -117,6 +117,12 @@ UI (React) ◄─► engine server (FastAPI + job queue + websocket events) ◄�
   sticky stage + scrolling step cards, the players, shared HUD/caption/progress components, theme tokens,
   asset preloading by priority, and mobile and `prefers-reduced-motion` behaviour.
 - **`doctor`** checks the whole stack: Python, Node, FFmpeg, Blender, CUDA/VRAM, ComfyUI, disk space, models.
+- **Launch trailers** (`engine/trailer/`, `studio trailer`): a second output from the same spec and the same cache.
+  `plan.py` cuts shots from what the builders already rendered (takes, beats, scroll recordings, product stills) onto
+  a beat grid; `frame.py` reframes each for 16:9 and 9:16 (the take's product projected through its camera by
+  `take.py --pass track`, else a saliency crop) and limits push-ins to what the source resolution allows; `type.py`
+  sets captions, callouts and the end card in the theme's fonts with headless Chrome (`type.html`, drawn by
+  `seek(t)`, captured as transparent frames); the result is encoded once per format and the music muxed in.
 
 ### Repository layout
 
