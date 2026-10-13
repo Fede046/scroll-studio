@@ -96,7 +96,7 @@ def retime(src_dir: Path, dst_dir: Path, src_fps: float, dst_fps: int, size: Opt
 def animate(still: Path, prompt: str, motion: str, seconds: float, seed: int, work: Path,
             log: Callable[[str], None] = print, size: Optional[tuple[int, int]] = None,
             negative: str = NEGATIVE, strength: float = 1.0, end_image: Optional[Path] = None,
-            model: str = "ltx", wan: Optional[dict] = None) -> list[Path]:
+            model: str = "ltx", wan: Optional[dict] = None, timeout: int = 45 * 60) -> list[Path]:
     """Frames (PNG paths, in order, 24 fps) of `still` brought to life by `motion`."""
     from .backends import comfy
     name = "Wan 2.2" if model == "wan" else "LTX-2.3"
@@ -114,7 +114,7 @@ def animate(still: Path, prompt: str, motion: str, seconds: float, seed: int, wo
     text = f"{prompt or 'The subject of the image'}. {motion}. Smooth natural motion."
     graph = comfy.build_i2v_graph(comfy.LTX, name, n, w, h, FPS, text, negative, seed, prefix=f"studio/anim_{work.name}",
                                   strength=strength, end_image=end_name)
-    images = comfy.run(graph, poll=3)
+    images = comfy.run(graph, poll=3, timeout=timeout)   # a storyboard preview gives up sooner than a render
     import shutil
     if (work / "frames").exists():
         shutil.rmtree(work / "frames")

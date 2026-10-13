@@ -30,6 +30,7 @@ from .motion import STILL, Move, Piece, from_camera, from_text
 
 PREVIEW_SIZE = (512, 288)      # --motion: the tiny LTX preview per shot
 PREVIEW_SECONDS = 2.0
+PREVIEW_TIMEOUT = 12 * 60     # a preview stuck in a busy ComfyUI is dropped (the shot keeps its still move)
 
 
 @dataclass
@@ -568,7 +569,8 @@ class Maker:
             return clip
         d.mkdir(parents=True, exist_ok=True)
         try:
-            frames = animate(still, prompt, motion, PREVIEW_SECONDS, seed, d, self.log, size=PREVIEW_SIZE, end_image=end)
+            frames = animate(still, prompt, motion, PREVIEW_SECONDS, seed, d, self.log, size=PREVIEW_SIZE, end_image=end,
+                             timeout=PREVIEW_TIMEOUT)
         except (BuildError, SystemExit) as e:
             self.log(f"  {name}: no motion preview ({e})")
             return None
