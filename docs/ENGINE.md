@@ -158,9 +158,12 @@ scroll-studio/
     backends/blender/          headless runner, blockout_lib, rigs/
     backends/models/           registry.yaml, downloader, VRAM checks
     compile/                   site compiler, templates/, themes/
+    plan.py                    dry-run build plans, estimates calibrated from stage stamps
+    storyboard/                cards per shot, stand-in films, sheet.jpg/storyboard.html, animatic
+    fidelity.py                plan and storyboard preview modes, placeholder cards
     jobs/                      stage graph, cache, events
     server/                    FastAPI app (REST + websocket) used by the UI and MCP
-    cli.py                     `studio new | build | preview | export | doctor | models`
+    cli.py                     `studio new | storyboard | build | preview | export | doctor | models`
   runtime/                     TypeScript runtime (Vite) → runtime.js
     core/ players/ components/
   ui/                          React + Vite app: the Studio
