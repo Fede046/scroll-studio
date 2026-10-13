@@ -26,7 +26,7 @@ from ..config import settings
 from ..project import BuildContext, BuildError, Project, ffmpeg, file_key
 from ..spec import Trailer
 from . import frame as fr
-from .plan import Planner, Shot, end_card, product_still
+from .plan import Planner, Shot, end_card, film_source, product_still
 from .type import LAYOUT, render as render_type
 
 HERE = Path(__file__).resolve().parent
@@ -73,7 +73,7 @@ def timeline(shots: list[Shot], cuts: list[tuple[int, int]], fps: int, bpm: floa
                               "kstatic": j > 0, "count": f"{j + 1:02d} / {k:02d}" if k > 1 else "",
                               "fade_out": 0.1, "delay": 0.02})
             texty.append((t0, t1))
-        elif s.caption or s.kicker:
+        elif s.kind != "card" and (s.caption or s.kicker):
             items.append({"kind": "caption", "t0": t0, "t1": t1 - 0.06, "title": s.caption, "kicker": s.kicker,
                           "fade_out": 0.34})
             texty.append((t0, t1))
@@ -187,14 +187,26 @@ def render_format(shots: list[Shot], cuts, fmt: str, fps: int, sources: dict, tr
                             "-pix_fmt", "bgr24", "-s", f"{W}x{H}", "-r", str(fps), "-i", "-", "-c:v", "libx264",
                             "-preset", "slow", "-crf", "14", "-pix_fmt", "yuv420p", str(out)],
                            stdin=subprocess.PIPE, stderr=subprocess.PIPE)
-    shrink = 0.6 if fmt == "9x16" else 1.0       # the 9:16 crop is already tight: push in less
     last = bg.copy()
+    prev_z = None     # (source, end zoom) of the shot before, so a freeze after it carries its push on
     fi = 0
     try:
         for k, (s, (a, b)) in enumerate(zip(shots, cuts)):
             n = b - a
             z0, z1 = s.zoom or (1.0, 1.0)
-            z0, z1 = 1 + (z0 - 1) * shrink, 1 + (z1 - 1) * shrink
+            if s.kind == "film" and s.zoom is None and s.track and tracks.get(s.track):
+                # a take's product: push in until it reads large, as far as the source's resolution allows
+                zmax = fr.max_zoom(s.src, W, H, fmt)
+                times = [s.t0 + (0 if s.hold else i * s.speed / fps) for i in range(n)]
+                zp = fr.product_push(fr.load_track(tracks[s.track]), times, fmt, zmax)
+                if zp is not None:
+                    if s.hold and prev_z and prev_z[0] == s.src:
+                        z0, z1 = prev_z[1], max(prev_z[1], min(zmax, prev_z[1] + (zmax - 1) * 0.2))
+                    elif s.role in ("reveal", "hook"):
+                        z0, z1 = 1 + (zp - 1) * 0.25, 1 + (zp - 1) * 0.85
+                    else:
+                        z0, z1 = 1 + (zp - 1) * 0.6, 1 + (zp - 1) * 0.85
+            prev_z = (s.src, z1) if s.kind == "film" else None
             zooms = [z0 + (z1 - z0) * _ease(i / max(n - 1, 1)) for i in range(n)]
             if s.kind == "film":
                 need_focus = fmt != "16x9" or z0 > 1.001 or z1 > 1.001 or s.focus is not None
@@ -206,9 +218,11 @@ def render_format(shots: list[Shot], cuts, fmt: str, fps: int, sources: dict, tr
                 gen = (f if f.shape[:2] == (H, W) else fr.warp(f, W, H, 0.5, 0.5, 1.0)
                        for f in fr.frames(sources[k], 0.0, n, fps))
             elif s.kind == "still":
-                img = sources[k]
+                still = sources[k]   # laid out by _still: the product large, above the type when there is some
                 fx, fy = s.focus or (0.5, 0.5)
-                gen = (fr.warp(img, W, H, fx, fy, zooms[i]) for i in range(n))
+                if s.zoom is None:   # a slow push and drift, so a still moves like a shot
+                    zooms = [1.0 + 0.08 * _ease(i / max(n - 1, 1)) for i in range(n)]
+                gen = (fr.warp(still, W, H, fx - 0.015 + 0.03 * _ease(i / max(n - 1, 1)), fy, zooms[i]) for i in range(n))
             elif s.kind == "card":
                 gen = (bg for _ in range(n))
             else:   # end card: the last frame, blurred under the theme's background colour
@@ -266,11 +280,23 @@ def finish(video: Path, out: Path, music: Optional[Path], t: Trailer, seconds: f
 
 # ---------------------------------------------------------------- entry point
 
+def take_tracks(project: Project, site, ctx: BuildContext) -> dict[str, Path]:
+    """The product's screen position in each built take, from the take's own camera: where to cut, push and crop."""
+    tracks: dict[str, Path] = {}
+    for s in site.sections:
+        if s.type == "film" and s.take and s.take.product and film_source(project, s) is not None:
+            p = product_track(project, ctx, s.id)
+            if p:
+                tracks[s.id] = p
+    return tracks
+
+
 def plan_only(project: Project, log: Callable[[str], None] = print) -> list[Shot]:
     """The cut, logged, without rendering anything (`studio trailer --plan`)."""
     site = project.load()
     t = site.trailer or Trailer()
-    shots = Planner(project, site, t, log).plan()
+    tracks = take_tracks(project, site, BuildContext(project, "_trailer", log=lambda m: None))
+    shots = Planner(project, site, t, log, tracks={k: fr.load_track(v) for k, v in tracks.items()}).plan()
     _log_cut(shots, cut_frames(shots, t.bpm, t.fps), t, log)
     return shots
 
@@ -299,7 +325,8 @@ def build_trailer(project: Project, formats: Optional[list[str]] = None, force: 
             raise BuildError(f"unknown trailer format {f} (16x9, 9x16)")
     theme = themes.resolve(site.theme)
     ctx = BuildContext(project, "_trailer", log=log, force=force, progress=progress)
-    planner = Planner(project, site, t, log)
+    tracks = take_tracks(project, site, ctx)
+    planner = Planner(project, site, t, log, tracks={k: fr.load_track(v) for k, v in tracks.items()})
     shots = planner.plan()
     fps, beat = t.fps, 60.0 / t.bpm
     cuts = cut_frames(shots, t.bpm, fps)
@@ -313,12 +340,6 @@ def build_trailer(project: Project, formats: Optional[list[str]] = None, force: 
         from ..inputs import resolve_path
         music = resolve_path(project, t.music, log)
 
-    tracks: dict[str, Path] = {}
-    for s in shots:
-        if s.track and s.track not in tracks and ("9x16" in fmts or s.zoom):
-            p = product_track(project, ctx, s.track)
-            if p:
-                tracks[s.track] = p
 
     card = end_card(site, t)
     dist = project.dist / "trailer"
@@ -369,19 +390,40 @@ def _load(v):
 
 
 def _still(project: Project, site, s: Shot, fmt: str, theme: dict, log) -> Path:
-    """A product still from the product feature, flattened onto the theme background."""
+    """A product still from the product feature, laid out for this format: the product (cut out by its alpha, or
+    by what differs from a flat background) scaled to fill most of the frame, raised above the type when the shot
+    has words, on the theme background. Never scaled up more than 1.3x its own pixels."""
+    import numpy as np
     from PIL import Image
     L = LAYOUT[fmt]
-    p = product_still(project, site, s.text, (L["W"], L["H"]), theme["colors"]["bg"], log)
+    W, H = L["W"], L["H"]
+    p = product_still(project, site, s.text, (W, H), None, log)    # None: a transparent PNG when it can
     im = Image.open(p)
+    bgc = theme["colors"]["bg"]
     if im.mode in ("RGBA", "LA", "P"):
         im = im.convert("RGBA")
-        flat = Image.new("RGBA", im.size, theme["colors"]["bg"])
-        flat.alpha_composite(im)
-        im = flat
-        out = project.build / "_trailer" / "stills" / f"{p.stem}-{fmt}.png"
-        out.parent.mkdir(parents=True, exist_ok=True)
-        im.convert("RGB").save(out)
-        return out
-    return p
+        box = im.split()[3].point(lambda v: 255 if v > 8 else 0).getbbox()
+    else:
+        im = im.convert("RGB")
+        a = np.asarray(im).astype(np.int16)
+        edge = np.concatenate([a[0], a[-1], a[:, 0], a[:, -1]])
+        diff = np.abs(a - np.median(edge, axis=0)).sum(axis=2) > 36
+        ys, xs = np.nonzero(diff)
+        box = (xs.min(), ys.min(), xs.max() + 1, ys.max() + 1) if len(xs) > 20 else None
+        im = im.convert("RGBA")
+    words = bool(s.caption or s.callouts)
+    share, cy = (0.44, 0.33) if words else (0.78, 0.5)
+    canvas = Image.new("RGBA", (W, H), bgc)
+    if box:
+        prod = im.crop(box)
+        k = min(share * H / prod.height, 0.86 * W / prod.width, 1.3 * max(W / im.width, H / im.height, 1.0))
+        prod = prod.resize((max(1, round(prod.width * k)), max(1, round(prod.height * k))), Image.LANCZOS)
+        canvas.alpha_composite(prod, ((W - prod.width) // 2, max(0, min(H - prod.height, round(cy * H - prod.height / 2)))))
+    else:
+        canvas.alpha_composite(im.resize((W, H), Image.LANCZOS))
+    out = project.build / "_trailer" / "stills" / f"{p.stem}-{fmt}-{'t' if words else 'f'}.png"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    canvas.convert("RGB").save(out)
+    s.focus = s.focus or (0.5, cy)
+    return out
 

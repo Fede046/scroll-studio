@@ -192,6 +192,39 @@ def focus_path(src: Path, t0: float, n: int, fps: int, speed: float, hold: bool,
     return smooth(out, fps * 0.35)
 
 
+# How far a crop may be scaled up before it reads soft: a 9:16 phone frame is seen small, so it tolerates more.
+MAX_UPSCALE = {"16x9": 1.3, "9x16": 2.0}
+MAX_PUSH = 1.3
+TARGET = {"16x9": 0.36, "9x16": 0.32}     # the product's share of the frame height a push aims for
+
+
+def max_zoom(src: Path, W: int, H: int, fmt: str) -> float:
+    """The deepest push-in the source's resolution allows without going soft (never past MAX_PUSH)."""
+    sw, sh = _size(src)
+    cw0, _ = cover(sw, sh, W, H)
+    return max(1.0, min(MAX_PUSH, MAX_UPSCALE[fmt] * cw0 / W))
+
+
+def product_sizes(track: dict, times) -> np.ndarray:
+    fr, tf = track["frames"], track["fps"]
+    out = []
+    for t in times:
+        e = fr[min(len(fr) - 1, max(0, int(round(t * tf))))]
+        ok = e and -0.05 < e["c"][0] < 1.05 and -0.05 < e["c"][1] < 1.05
+        out.append(max(0.0, e["box"][3] - e["box"][1]) if ok else 0.0)
+    return np.array(out)
+
+
+def product_push(track: dict, times, fmt: str, zmax: float) -> Optional[float]:
+    """The zoom that makes a take's product read large (TARGET of the frame height), within what the source allows;
+    None when the product is not the subject of these frames (mostly off screen, or a speck)."""
+    h = product_sizes(track, times)
+    vis = h[h > 0]
+    if len(vis) < 0.6 * len(h) or float(np.median(vis)) < 0.035 or zmax <= 1.001:
+        return None
+    return float(np.clip(TARGET[fmt] / float(np.median(vis)), 1.0, zmax))
+
+
 def load_track(path: Optional[Path]) -> Optional[dict]:
     if path and path.exists():
         return json.loads(path.read_text())

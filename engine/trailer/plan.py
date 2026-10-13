@@ -191,8 +191,12 @@ def end_card(site: Site, t: Trailer) -> dict:
 # ---------------------------------------------------------------- the cut
 
 class Planner:
-    def __init__(self, project: Project, site: Site, t: Trailer, log: Callable[[str], None] = print):
+    def __init__(self, project: Project, site: Site, t: Trailer, log: Callable[[str], None] = print,
+                 tracks: Optional[dict] = None):
+        """tracks: film section id -> the take's product track (take.py --pass track), so shots of the product can be
+        cut where it is biggest in frame."""
         self.project, self.site, self.t, self.log = project, site, t, log
+        self.tracks = tracks or {}
         self.beat = 60.0 / t.bpm
         self.films: dict[str, Film] = {}
         for s in site.sections:
@@ -204,6 +208,33 @@ class Planner:
                     self.films[s.id] = f
 
     # -- film windows
+    def product_size(self, f: Film, t: float) -> float:
+        """The product's height as a fraction of the frame at second t of a take (0 when off screen)."""
+        tr = self.tracks.get(f.sec.id)
+        if not tr:
+            return 0.0
+        fr = tr["frames"]
+        e = fr[min(len(fr) - 1, max(0, int(round(t * tr["fps"]))))]
+        if not e or not (-0.05 < e["c"][0] < 1.05 and -0.05 < e["c"][1] < 1.05):
+            return 0.0
+        return max(0.0, e["box"][3] - e["box"][1])
+
+    def _biggest(self, f: Film, a: float, L: float) -> Optional[float]:
+        """Start of the L-second window, from `a - L` on, where the product is biggest in frame on average (the
+        take's closest approach), or None without a track."""
+        if f.sec.id not in self.tracks or f.dur <= L:
+            return None
+        step = 2.0 / f.fps
+        best, best_t = -1.0, None
+        t0 = max(0.0, a - L)
+        while t0 <= f.dur - L + 1e-6:
+            k = 12
+            score = sum(self.product_size(f, t0 + L * j / (k - 1)) for j in range(k)) / k
+            if score > best + 1e-4:
+                best, best_t = score, t0
+            t0 += step
+        return best_t
+
     def _window(self, f: Film, a: float, b: float, beats: int, speed: float, after: float = 0.0,
                 align: str = "start") -> float:
         """First second of a `beats`-long window under [a, b], not overlapping the previous shot of the same film
@@ -234,7 +265,9 @@ class Planner:
         cap = title if caption is None else caption
         n = beats or read_beats(cap, self.beat, 8 if role in ("hook", "reveal") else 4)
         t0 = self._window(f, a, b, n, speed, after, align="end" if role == "reveal" and f.has_product else "start")
-        zoom = (1.0, 1.2) if role == "reveal" and f.has_product else None   # push in on the real product
+        if role == "reveal" and f.has_product:   # show the real product where it is biggest in frame
+            t0 = self._biggest(f, a, n * self.beat * speed) or t0
+        zoom = None    # takes with a product push in on it automatically (see frame.product_zoom)
         return Shot("film", n, role, label=f"{f.sec.id}" + (f" step {step}" if step is not None else ""), src=f.src,
                     t0=t0, speed=speed, caption=rich(cap), kicker=plain(kick if kicker is None else kicker),
                     zoom=zoom, section=f.sec.id, track=f.sec.id if f.has_product else None)
@@ -300,9 +333,8 @@ class Planner:
         if last is None:
             return Shot("card", n, "features", label="callouts", callouts=lines, kicker=kicker)
         t_end = last.t0 + last.beats * self.beat * last.speed - 1.0 / 24
-        z = last.zoom[1] if last.zoom else 1.0
         return Shot("film", n, "features", label="callouts over the reveal", src=last.src, t0=max(0.0, t_end),
-                    hold=True, callouts=lines, kicker=kicker, zoom=(z, z + 0.12), section=last.section,
+                    hold=True, callouts=lines, kicker=kicker, zoom=last.zoom, section=last.section,
                     track=last.track)
 
     def _recorded_cut(self) -> list[Shot]:
@@ -319,8 +351,7 @@ class Planner:
                 continue
             role = "hook" if not out else "middle"
             n = read_beats(title, self.beat, 8 if role == "hook" else 6)
-            out.append(Shot("record", n, role, label=f"record {s.id}", section=s.id, caption=rich(title),
-                            kicker=plain(kicker), span=(0.0, 0.6)))
+            out.append(Shot("record", n, role, label=f"record {s.id}", section=s.id, span=(0.0, 0.6)))
             if len(out) == 4:
                 break
         if not out:
@@ -386,10 +417,10 @@ class Planner:
                 ends[f.sec.id] = shot.t0 + shot.beats * beat * shot.speed
                 out.append(shot)
             else:
-                title, kicker = section_headline(sec)
-                cap = title if s.caption is None else s.caption
+                # a recorded section shows its own copy: no caption over it unless one is given
+                cap = s.caption or ""
                 out.append(Shot("record", s.beats or read_beats(cap, beat, 6), label=f"record {sec.id}", section=sec.id,
-                                caption=rich(cap), kicker=plain(kicker if s.kicker is None else s.kicker),
+                                caption=rich(cap), kicker=plain(s.kicker or ""),
                                 span=tuple(s.range) if s.range else (0.0, 0.6), callouts=s.callouts, speed=s.speed))
         if not out:
             raise BuildError("trailer: no usable shots")

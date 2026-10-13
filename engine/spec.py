@@ -182,8 +182,15 @@ class Take(Model):
     preview_res: tuple[int, int] = Field((1280, 720), description="Blockout render size; same aspect as product.res")
     depth_far: float = Field(400.0, description="Depth guide far plane")
     keyframes: Optional[dict[str, Any]] = Field(None, description="Z-Image stills pinned at times, as in shot.keyframes")
-    ltx: dict[str, Any] = Field(..., description="LTX-2.3 settings, as in shot.ltx: res, segments [{id, range, prompt}], seed, guide_strength ...")
+    ltx: dict[str, Any] = Field(..., description="LTX-2.3 settings, as in shot.ltx: res, segments [{id, range, prompt}], "
+                                                 "seed, guide_strength ... Render at res [1920, 1088] (multiples of "
+                                                 "32) for a detailed world; [1024, 576] is a quick draft")
     upscale: Optional[dict[str, Any]] = Field(None, description="Optional upscale stage, as in shot.upscale")
+    restore: Optional[int] = Field(None, ge=360, le=2160, description="Run SeedVR2 over the generated world at this "
+                                                                      "height (e.g. 1080) to clean the video model's "
+                                                                      "softness and redraw fine detail, before the "
+                                                                      "product is composited (the real product is "
+                                                                      "never restored); slow")
 
 
 class Beat(Model):
