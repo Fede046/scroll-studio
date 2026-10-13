@@ -377,18 +377,30 @@ if total > limit:
         weight[o.data.name] = weight.get(o.data.name, 0) + tris(o)
     per_mesh = {o.data.name: tris(o) for o in meshes}
     light_cap = 4000
+    # big parts (housings, lids, plates) are what a viewer sees: they keep at least half their triangles
+    lo_all, hi_all = world_bounds(meshes)
+    span = (hi_all - lo_all).length
+    big = set()
+    for o in meshes:
+        w_ = [o.matrix_world @ Vector(c) for c in o.bound_box]
+        diag = (Vector((max(q.x for q in w_), max(q.y for q in w_), max(q.z for q in w_))) -
+                Vector((min(q.x for q in w_), min(q.y for q in w_), min(q.z for q in w_)))).length
+        if diag > 0.3 * span:
+            big.add(o.data.name)
     light = sum(w for n, w in weight.items() if per_mesh[n] <= light_cap)
-    heavy = total - light
-    ratio = max((limit - light) / max(heavy, 1), 0.02) if limit > light else max(limit / total, 0.02)
+    bigw = sum(w for n, w in weight.items() if per_mesh[n] > light_cap and n in big)
+    small = total - light - bigw
+    ratio = max((limit - light - 0.5 * bigw) / max(small, 1), 0.02) if limit > light + 0.5 * bigw else 0.02
+    big_ratio = max(ratio, 0.5)
     done = set()
     for o in meshes:
-        if o.data.name in done or (limit > light and per_mesh[o.data.name] <= light_cap):
+        if o.data.name in done or per_mesh[o.data.name] <= light_cap:
             continue
         done.add(o.data.name)
         mod = o.modifiers.new("Decimate", "DECIMATE")
-        mod.ratio = ratio
+        mod.ratio = min(1.0, big_ratio if o.data.name in big else ratio)
         mod.use_collapse_triangulate = True
-    print(f"DECIMATE {total} triangles -> about {limit} (heavy meshes at ratio {ratio:.3f})", flush=True)
+    print(f"DECIMATE {total} triangles -> about {limit} (small heavy meshes at {ratio:.3f}, large parts at {big_ratio:.2f})", flush=True)
     bpy.context.view_layer.update()
     deps = bpy.context.evaluated_depsgraph_get()
     for name in done:
@@ -431,18 +443,28 @@ if len(parts) > 1:
     anchor = max(parts, key=vol)
 
 
+# layers: parts sorted by height (heights within 3% of the product's height share a layer). Exploding spreads the
+# layers apart in their own order, so nothing passes through anything: keycaps rise above the plate, the base
+# drops below it, and each layer also opens outwards a little from the centre.
+_heights = {}
+if len(parts) > 1:
+    hz = max(hi.z - lo.z, 1e-6)
+    zs = sorted({round(((bounds_of(o)[0].z + bounds_of(o)[1].z) / 2 - lo.z) / hz / 0.03) for o in parts})
+    rank = {z: i / max(len(zs) - 1, 1) for i, z in enumerate(zs)}
+    for o in parts:
+        _heights[o.name] = rank[round(((bounds_of(o)[0].z + bounds_of(o)[1].z) / 2 - lo.z) / hz / 0.03)]
+
+
 def explode_offset(o):
     if o is anchor or len(parts) < 2:
         return Vector((0, 0, 0))
     l, h = bounds_of(o)
-    d = ((l + h) / 2 - C) / R
-    if d.length < 0.06:
-        d = Vector((0, 0, 1))
-    # out along the line from the centre; parts near the middle move less than the outer ones, and everything
-    # rises a little so stacked parts separate
-    out = d.normalized() * (0.32 + 0.45 * min(d.length, 1.0))
-    out.z += 0.12
-    return out * R
+    c = (l + h) / 2
+    out = Vector(((c.x - C.x) * 0.35, (c.y - C.y) * 0.35, 0.0))
+    out.z = (_heights[o.name] - _heights[anchor.name]) * 1.1 * R
+    if out.length < 0.02 * R:          # a part at the anchor's height and centre: lift it clear
+        out.z = 0.25 * R
+    return out
 
 
 def hexcol(mat):

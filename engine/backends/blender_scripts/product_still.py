@@ -262,6 +262,8 @@ def extent():
 # the shortest distance at which the silhouette fits inside `fill` of the frame (binary search on distance)
 if len(pts) > 4000:
     pts = pts[::len(pts) // 4000]
+if len(focus) > 1:      # thinning must never lose a part's extremes: add every part's own bounds
+    pts += [o.matrix_world @ Vector(c) for o in focus for c in o.bound_box]
 near, far = (exit_distance() if V.get("part") else 0.05), 60.0
 for _ in range(36):
     mid = (near + far) / 2

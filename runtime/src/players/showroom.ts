@@ -110,7 +110,8 @@ const factory: PlayerFactory = async (cfg, ctx) => {
     // the bounding sphere fills ~90% of the shorter side: the silhouette lands near two thirds of the frame
     const vfov = THREE.MathUtils.degToRad(camera.fov);
     const fov = Math.min(vfov, 2 * Math.atan(Math.tan(vfov / 2) * camera.aspect));
-    fitDist = R / Math.sin(fov / 2) / 0.9;
+    // cards share the screen with copy: the model gets the free part of it
+    fitDist = R / Math.sin(fov / 2) / (ctx.data.layout === "cards" && !isMobile() ? 0.78 : 0.9);
     if (isMobile()) fitDist *= 1.05;
     last = "";
   }
@@ -129,7 +130,7 @@ const factory: PlayerFactory = async (cfg, ctx) => {
     dir.set(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
     const target = C.clone();
     target.y += ex * R * 0.12;                 // parts rise as they explode; keep them centred
-    const dist = fitDist * (1 + ex * 0.25) / Math.max(cur.zoom, 0.05);
+    const dist = fitDist * (1 + ex * 0.55) / Math.max(cur.zoom, 0.05);
     camera.position.copy(target).addScaledVector(dir, dist);
     camera.up.copy(up);
     camera.lookAt(target);
