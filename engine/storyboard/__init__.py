@@ -71,7 +71,8 @@ def storyboard(project: Project, level: str = "stills", only: Optional[Iterable[
         else:
             c.status = "unchanged"
         c.redrawn = old.get(c.id, {}).get("frame_keys") != record.frame_keys(c)
-        log(f"  {c.id}: {c.status}, {c.level}" + (f", frames redrawn in {c.seconds_taken:.1f}s" if c.redrawn else
+        made = "made" if c.id not in old else "redrawn"
+        log(f"  {c.id}: {c.status}, {c.level}" + (f", frames {made} in {c.seconds_taken:.1f}s" if c.redrawn else
                                                   ", frames unchanged") + (f" ({c.note})" if c.note else ""))
     progress(0.6, "page")
     site_index = None

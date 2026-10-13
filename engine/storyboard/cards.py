@@ -156,8 +156,16 @@ class Maker:
         except WouldRender:
             pass
         lvl = "sketch" if cache_only or self.level == "sketch" else "stills"
-        with previewing(lvl):
-            p = resolve_image(self.project, ref, self.log, alpha=alpha)
+        try:
+            with previewing(lvl):
+                p = resolve_image(self.project, ref, self.log, alpha=alpha)
+        except (BuildError, SystemExit, OSError) as e:   # ComfyUI down or failing: a card now, the still next run
+            if lvl == "sketch":
+                raise
+            self.log(f"  could not render a still ({str(e).splitlines()[0][:120]}); a placeholder stands in")
+            lvl = "sketch"
+            with previewing(lvl):
+                p = resolve_image(self.project, ref, self.log, alpha=alpha)
         return p, ("placeholder" if "placeholder" in p.name else lvl)
 
     def would(self, refs: list, alpha: bool = True) -> tuple[float, list[str]]:
@@ -197,12 +205,18 @@ class Maker:
         for sec in self.site.sections:
             t0 = time.time()
             made: list[Card] = []
-            if is_scene(sec):
-                fn = getattr(self, f"scene_{sec.type}", None)
-                if fn is not None:
-                    made = fn(sec)
-            if not is_scene(sec) or sec.type in ("type", "stage", "chart", "code", "map", "scene3d", "splat"):
-                made += self.block(sec)
+            try:
+                if is_scene(sec):
+                    fn = getattr(self, f"scene_{sec.type}", None)
+                    if fn is not None:
+                        made = fn(sec)
+                if not is_scene(sec) or sec.type in ("type", "stage", "chart", "code", "map", "scene3d", "splat"):
+                    made += self.block(sec)
+            except Exception as e:   # one broken shot never stops the storyboard: it shows as a card with the error
+                sid = getattr(sec, "id", None) or sec.type
+                msg = f"{type(e).__name__}: {e}"
+                self.log(f"  {sid}: failed, {msg.splitlines()[0][:200]}")
+                made = [Card(sid, sid, sec.type, sid, note=f"failed: {msg}"[:400])]
             dt = (time.time() - t0) / max(1, len(made))
             for c in made:
                 c.seconds_taken = c.seconds_taken or dt
@@ -303,8 +317,15 @@ class Maker:
                 bdir = ctx.work / "blockout"
                 world_ok = ctx.status("blockout", bkey, [bdir / "depth.mp4", bdir / "first.png"], legacy) != "stale"
             else:
-                shot, bkey, legacy = film.world(sec, ctx)       # the full build's own blockout + keyframes stages
-                world_ok = True
+                try:
+                    shot, bkey, legacy = film.world(sec, ctx)   # the full build's own blockout + keyframes stages
+                    world_ok = True
+                except (BuildError, SystemExit, RuntimeError, OSError) as e:   # e.g. ComfyUI down: sketch instead
+                    self.log(f"  {sec.id}: keyframes not painted ({str(e).splitlines()[0][:120]}); sketching instead")
+                    sketch = True
+                    shot, bkey, legacy = film.blockout_key(sec, ctx)
+                    bdir = ctx.work / "blockout"
+                    world_ok = ctx.status("blockout", bkey, [bdir / "depth.mp4", bdir / "first.png"], legacy) != "stale"
             kpaths = {}
             if kf:
                 outs = [ctx.work / "keyframes" / f"{k['name']}.png" for k in kf]
