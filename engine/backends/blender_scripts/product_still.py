@@ -137,6 +137,7 @@ try:   # Khronos PBR Neutral keeps product colours true (AgX washes saturated pl
     scene.view_settings.view_transform = "Khronos PBR Neutral"
 except TypeError:
     scene.view_settings.view_transform = "AgX"
+scene.view_settings.exposure = float(V.get("exposure", 0) or 0)
 scene.render.image_settings.file_format = "PNG"
 scene.render.image_settings.color_mode = "RGBA"
 
@@ -193,7 +194,7 @@ c = (hi + lo) / 2
 if ENV:
     # the backdrop's brightest region becomes a sun, so the shadow falls the way the scene's light does
     sd = bpy.data.lights.new("Sun", "SUN")
-    sd.energy = 1.5 + 0.5 * float(ENV.get("sun_strength", 2.0))
+    sd.energy = 0.6 + 0.45 * float(ENV.get("sun_strength", 2.0))   # overcast (low contrast): a soft, weak sun
     sd.angle = math.radians(6)
     sun = bpy.data.objects.new("Sun", sd)
     scene.collection.objects.link(sun)

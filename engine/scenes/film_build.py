@@ -315,7 +315,7 @@ def _srgb_to_linear(x):
     return np.where(x <= 0.04045, x / 12.92, ((x + 0.055) / 1.055) ** 2.4)
 
 
-def env_from_frame(lin, M, lens, sensor, aspect, W=1024, H=512):
+def env_from_frame(lin, M, lens, sensor, aspect, W=1024, H=512, lift=3.0):
     """An equirect environment (Blender's layout, world axes, float linear RGB) from one frame seen by a camera.
 
     lin: the frame as linear float RGB (h, w, 3); M: the camera's 4x4 matrix_world; lens/sensor in mm (sensor fit
@@ -356,8 +356,8 @@ def env_from_frame(lin, M, lens, sensor, aspect, W=1024, H=512):
     env = np.where(inside[..., None], a, b * (1 - wout) + fall * wout)
     env = cv2.GaussianBlur(env.astype(np.float32), (0, 0), 3)
     lum = env @ np.array([0.2126, 0.7152, 0.0722], np.float32)
-    lift = 1 + 3.0 * np.clip((lum - 0.55) / 0.45, 0, 1) ** 2
-    return (env * lift[..., None]).astype(np.float32)
+    gain = 1 + lift * np.clip((lum - 0.55) / 0.45, 0, 1) ** 2
+    return (env * gain[..., None]).astype(np.float32)
 
 
 def env_sun(env):

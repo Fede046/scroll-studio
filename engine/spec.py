@@ -122,6 +122,7 @@ class ProductShot(Model):
     hdri: str = Field("studio", description="Blender studio light: studio, city, courtyard, forest, interior, night, sunrise, sunset")
     samples: int = Field(128, ge=4, le=4096, description="Cycles samples (denoised)")
     shadow: bool = Field(True, description="A soft contact shadow under the product")
+    exposure: float = Field(0.0, ge=-4, le=4, description="Exposure in stops (-0.7 tames a pale metal lid in a bright scene)")
     fstop: Optional[float] = Field(None, gt=0, description="Depth of field, focused on the product (or `part`); "
                                                           "detail views default to f/8, a macro look")
     scene: Optional[str] = Field(None, description="Render the product into a generated scene instead of the studio: "

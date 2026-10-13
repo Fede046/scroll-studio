@@ -225,6 +225,8 @@ def product_still(project: Project, product: Optional[Product] = None, view: str
     for k in ("yaw", "pitch", "zoom", "explode", "lens", "part", "fstop"):
         if shot.get(k) is not None:
             cam[k] = shot[k]
+    if shot.get("exposure"):
+        cam["exposure"] = float(shot["exposure"])
     if view == "detail" and not cam.get("part"):
         raise BuildError("the detail view needs `part`: a glob on a part name (studio product <project> --parts)")
     if cam.get("explode"):
@@ -312,7 +314,8 @@ def take_track(project: Project, section_id: str, log=print) -> Path:
 
 # ---------------------------------------------------------------- the product in a generated scene
 
-SCENE_VERSION = 2
+SCENE_VERSION = 3
+FRAMING_VERSION = 1     # bump when product_still.py frames differently (the painted backdrop follows the framing)
 HARMONISE = ("Blend the product naturally into the scene's lighting: match the light direction, colour temperature, "
              "reflections and soft contact shadow of the room. Keep the product's shape, proportions, edges, details, "
              "text and colours exactly as they are. Do not move, resize or redesign the product.")
@@ -388,6 +391,8 @@ def scene_still(project: Project, product: Optional[Product], view: str, size: t
     for k in ("yaw", "pitch", "explode", "lens", "part", "fstop"):
         if shot.get(k) is not None:
             cam_v[k] = shot[k]
+    if shot.get("exposure"):
+        cam_v["exposure"] = float(shot["exposure"])
     cam_v["zoom"] = float(shot.get("zoom") or 1.0) * 0.82      # leave room around it: it stands in a place
     samples, shadow = int(shot.get("samples") or 128), True
     key = {"v": SCENE_VERSION, "glb": glb.name, "cam": cam_v, "size": [w, h], "scene": scene, "seed": seed,
@@ -400,17 +405,22 @@ def scene_still(project: Project, product: Optional[Product], view: str, size: t
         raise BuildError(f"`scene:` paints the product's surroundings with Z-Image, but ComfyUI is not running at "
                          f"{comfy.COMFY}. Start it (docs/INSTALL.md), or drop `scene:` for a studio still.")
     d.mkdir(parents=True, exist_ok=True)
+    # the framing and the painted backdrop are kept apart from the lighting, so re-lighting never repaints the scene
+    frame_v = {k: v for k, v in cam_v.items() if k != "exposure"}
+    bkey = {"v": FRAMING_VERSION, "glb": glb.name, "cam": frame_v, "size": [w, h], "scene": scene, "seed": seed}
+    b = _cache(project) / "scenes" / ("bg_" + _digest(bkey))
+    b.mkdir(parents=True, exist_ok=True)
     # 1. the camera and a quick studio pass (framing, matte)
-    cam_json, studio, mask = d / "camera.json", d / "studio.png", d / "mask.png"
+    cam_json, studio, mask = b / "camera.json", b / "studio.png", b / "mask.png"
     if not (cam_json.exists() and mask.exists()):
         _blender("product_still.py", ["--glb", glb, "--out", studio, "--size", f"{w}x{h}", "--view", json.dumps(cam_v),
                                       "--samples", 16, "--shadow", 1, "--camera", cam_json, "--mask", mask],
                  log, "framing the product")
     cam = json.loads(cam_json.read_text(encoding="utf-8"))
     # 2. the scene, painted to that camera
-    bg = d / "scene.png"
+    bg = b / "scene.png"
     if not bg.exists():
-        depth = d / "depth.png"
+        depth = b / "depth.png"
         cv2.imwrite(str(depth), _floor_depth(cam))
         prompt = (f"{scene}. The surface in the middle of the foreground is clear and empty, no objects on it. "
                   f"Photograph, natural light, realistic materials, shallow depth of field.")
@@ -418,7 +428,7 @@ def scene_still(project: Project, product: Optional[Product], view: str, size: t
         kcfg = dict(comfy.ZIMAGE, control_strength=0.55)
         images = comfy.run(comfy.build_keyframe_graph(kcfg, prompt, comfy.upload(str(depth)), w, h, seed,
                                                       prefix=f"studio/scene_{d.name}"), poll=2)
-        tmp = comfy.fetch(images, str(d / "_z"))
+        tmp = comfy.fetch(images, str(b / "_z"))
         Path(tmp, "0001.png").replace(bg)
     bg_rgb = cv2.cvtColor(cv2.imread(str(bg)), cv2.COLOR_BGR2RGB)
     bg_rgb = cv2.resize(bg_rgb, (w, h), interpolation=cv2.INTER_AREA)
@@ -428,7 +438,9 @@ def scene_still(project: Project, product: Optional[Product], view: str, size: t
     if not env_json.exists():
         small = cv2.resize(bg_rgb, (480, round(480 * h / w)), interpolation=cv2.INTER_AREA).astype(np.float32) / 255
         lin = fb._srgb_to_linear(small).astype(np.float32)
-        env = fb.env_from_frame(lin, cam["matrix"], cam["lens"], cam["sensor"], w / h)
+        # no highlight lift here: a sun lamp from the brightest region carries the key light, and a lifted bright
+        # window would blow out anything that reflects it (an aluminium lid facing the sky)
+        env = fb.env_from_frame(lin, cam["matrix"], cam["lens"], cam["sensor"], w / h, lift=0.0)
         sun, strength = fb.env_sun(env)
         ys, xs = np.nonzero(m_alpha > 0.5)
         if len(ys):

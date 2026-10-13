@@ -341,6 +341,7 @@ def product(name: str, parts: bool = typer.Option(False, "--parts", help="List t
             background: str = typer.Option("transparent", help="transparent, theme or a hex colour"),
             scene: Optional[str] = typer.Option(None, help="Render the still into a generated scene (prompt; needs ComfyUI)"),
             out: Optional[Path] = typer.Option(None, help="Copy the still here"),
+            exposure: float = typer.Option(0.0, help="Exposure in stops"),
             all_parts: bool = typer.Option(False, "--all", help="With --parts: every part, not grouped by name")):
     """The site's product: normalise its model (cached), list its parts, render stills."""
     import re as _re
@@ -379,10 +380,10 @@ def product(name: str, parts: bool = typer.Option(False, "--parts", help="List t
         w, h = (int(v) for v in size.lower().split("x"))
         if scene:
             from .spec import ImageInput, ProductShot
-            path = prod.image_still(project, ImageInput(product=ProductShot(view=still, part=part, scene=scene,
+            path = prod.image_still(project, ImageInput(product=ProductShot(view=still, part=part, scene=scene, exposure=exposure,
                                     background=background), size=(w, h)), typer.echo, alpha=background == "transparent")
         else:
-            path = prod.product_still(project, None, still, (w, h), background, typer.echo, part=part)
+            path = prod.product_still(project, None, still, (w, h), background, typer.echo, part=part, exposure=exposure)
         if out:
             out.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy(path, out)
