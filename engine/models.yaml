@@ -28,7 +28,7 @@ comfyui:
     size_gb: 1
     licence: LTX-2 Community License
     used_by: [film (upscale)]
-  # Wan 2.2 A14B (`video_model: wan`): a second video model, crisper than LTX at about the same VRAM.
+  # Wan 2.2 A14B (`video_model: wan`): a second video model (16 fps, ~1280x720), at about the same VRAM as LTX.
   # fp8 14B experts (~14 GB each) on a 24 GB RTX 4090: ComfyUI keeps one expert on the GPU and swaps to the other
   # half-way through sampling (needs ~32 GB of free system RAM to hold the idle one). `wan:` names the key in
   # engine/backends/comfy.py WAN; override the file name in studio.toml [wan] when yours differs or sits in a

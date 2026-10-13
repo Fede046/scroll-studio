@@ -1,7 +1,6 @@
 """Animate a still with a local video model (ComfyUI): the shared step behind theme.art and film beats.
 
-Two models: LTX-2.3 (`video_model: ltx`, the default) and Wan 2.2 A14B (`video_model: wan`), which keeps more fine
-detail at the cost of a slower render. Wan renders at its native ~1280x720 and 16 fps in clips of up to 81 frames
+Two models: LTX-2.3 (`video_model: ltx`, the default) and Wan 2.2 A14B (`video_model: wan`). Wan renders at its native ~1280x720 and 16 fps in clips of up to 81 frames
 (chained from each clip's last frame for longer shots); the frames are then retimed to the engine's 24 fps with
 FFmpeg's motion-compensated interpolation and scaled to the requested size.
 """

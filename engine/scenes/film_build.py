@@ -421,7 +421,7 @@ def stage_generate_wan(shot, out, wout, args, log=print):
     os.makedirs(gdir, exist_ok=True)
     seed0 = wan.get("seed", ltx.get("seed", 42))
     neg = wan.get("negative_prompt") or ltx.get("negative_prompt", "")
-    blur = ltx.get("guide_blur", 0)
+    blur = wan["guide_blur"] if wan.get("guide_blur") is not None else ltx.get("guide_blur", 0)
     keys = []
     for spec in shot.get("keyframes", {}).get("frames", []):
         t = shot["duration"] if spec["t"] == "end" else float(spec["t"])

@@ -12,7 +12,8 @@ Everything so far is version 1. On 2026-10-12 the releases first published as 2.
 - Wan 2.2 A14B as a second local video model beside LTX-2.3: `video_model: ltx | wan` on the site (default for
   every beat, take and `theme.art`), on a beat, a take or `theme.art`, or in studio.toml (`video_model = "wan"`); LTX
   stays the default. `wan:` settings (site-wide, or per take): `quality: fast` (the lightx2v 4-step LoRAs, cfg 1) or
-  `full` (~20 steps, cfg 3.5, no LoRAs), `steps`, `cfg`, `shift`, `res`, `interpolate` (mci, blend, dup), `stretch`.
+  `full` (~20 steps, cfg 3.5, no LoRAs), `steps`, `cfg`, `shift`, `res`, `interpolate` (mci, blend, dup), `stretch`, `guide_blur` (takes).
+  LTX stays the default: in a side-by-side test Wan was not sharper after restore (see README).
   Two-stage MoE sampling (high-noise expert for the first half of the steps, low-noise for the rest) at ~1280x720,
   16 fps, retimed to 24 fps with FFmpeg's motion-compensated interpolation (RIFE isn't installed, so not used).
 - Beats with Wan: `image` is the first frame and `end_image` the last (WanFirstLastFrameToVideo). A clip is at most 81

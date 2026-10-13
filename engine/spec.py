@@ -141,18 +141,19 @@ class WorldObject(Model):
 # ---------------------------------------------------------------- video model (LTX-2.3 or Wan 2.2)
 
 VideoModel = Literal["ltx", "wan"]
-VIDEO_MODEL_DOC = ("Video model: ltx (LTX-2.3, the default: fast, softer) or wan (Wan 2.2 A14B: crisper detail and "
-                   "steadier texture, slower; 16 fps native, retimed to 24). Unset = the site's `video_model`, then "
-                   "studio.toml's, then ltx")
+VIDEO_MODEL_DOC = ("Video model: ltx (LTX-2.3, the default) or wan (Wan 2.2 A14B: renders at ~1280x720 and 16 fps, "
+                   "retimed to 24; clean, physical motion and first/last-frame control, but no finer detail than LTX "
+                   "after restore, and slower). Unset = the site's `video_model`, then studio.toml's, then ltx")
 
 
 class Wan(Model):
     """Wan 2.2 A14B settings (`video_model: wan`). Two 14B experts sample in turn (high-noise for the first half of
     the steps, low-noise for the rest). Renders at ~1280x720, 16 fps, up to 81 frames (~5 s) per clip; longer shots
     chain clips from the previous last frame; frames are retimed to 24 fps and restored/upscaled as usual."""
-    quality: Literal["fast", "full"] = Field("fast", description="fast: the lightx2v 4-step LoRAs, cfg 1 (about a "
-                                             "minute a second of video on an RTX 4090). full: no LoRAs, ~20 steps at "
-                                             "cfg 3.5 (several times slower; uses the negative prompt)")
+    quality: Literal["fast", "full"] = Field("fast", description="fast: the lightx2v 4-step LoRAs, cfg 1 (an 81-frame "
+                                             "720p clip samples in ~2.5 min on an RTX 4090, plus loading the two "
+                                             "experts). full: no LoRAs, 20 steps at cfg 3.5 (~25 min a clip; uses the "
+                                             "negative prompt; in tests no sharper than fast)")
     steps: Optional[int] = Field(None, ge=2, le=60, description="Total steps (default 4 fast, 20 full); the high-noise "
                                                                 "expert takes the first half")
     cfg: Optional[float] = Field(None, ge=1, le=10, description="Guidance (default 1 fast, 3.5 full)")
@@ -166,6 +167,10 @@ class Wan(Model):
                                                      "(81 frames, ~5 s) is one clip played slower instead of two "
                                                      "chained clips (a chained clip restarts the motion)")
     seed: Optional[int] = Field(None, description="takes: seed for Wan (default: the take's ltx.seed)")
+    guide_blur: Optional[float] = Field(None, ge=0, le=12, description="takes: blur of the depth guide in pixels "
+                                        "(default: ltx.guide_blur). Fun Control follows the guide's shapes closely, so "
+                                        "a blockout box tends to stay a box: blur more (3-6) to let it paint a real "
+                                        "table or rock, less to hold exact edges")
     negative_prompt: Optional[str] = Field(None, description="Used only when cfg > 1 (quality: full)")
 
 

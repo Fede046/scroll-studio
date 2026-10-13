@@ -364,6 +364,13 @@ pass is unchanged, so the real product stays locked to the same camera. Both mod
 before `video_model` existed stay valid. `studio doctor` lists every Wan file ComfyUI can see; file names that differ
 from the defaults go in `studio.toml` under `[wan]`.
 
+Which to use: on the Feel door beat (start and end image given) the two land the same motion and, after SeedVR2, LTX
+still shows the finer texture (it renders beats at 1920x1088; Wan at 1280x720), so LTX stays the default. Wan earns its
+place in takes, where Fun Control at 1280x720 paints a crisper world than LTX at the example's 1024x576 and follows the
+guide's shapes closely (blur the guide, `wan.guide_blur`, when a blockout box should become something better than a
+box). On an RTX 4090 an 81-frame Wan clip samples in about 2.5 minutes (fast) or 25 (full), plus about 4 minutes to
+load each 14B expert from a hard disk when they aren't already in RAM.
+
 ### Flying through code
 
 A `code` scene follows an AI agent through a codebase in live 3D, with real, readable text. It opens on the agent's
