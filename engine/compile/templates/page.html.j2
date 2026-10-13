@@ -63,6 +63,7 @@
 <footer class="ss-footer"><div class="ss-wrap ss-footer__in">
   <span>{{ (site.footer.left or ("© " ~ site.name)) | rich }}</span>
   <span>{% for l in page_links %}<a href="{{ l.href }}">{{ l.label }}</a> · {% endfor %}{{ (site.footer.right or "") | rich }}</span>
-</div></footer>
+{% if concept %}  <p class="ss-footer__concept">{{ concept }}{% if product.url %} The real {{ product.name }}: <a href="{{ product.url }}" rel="noopener">{{ product.url.split("//")[-1].split("/")[0] }}</a>.{% endif %}</p>
+{% endif %}</div></footer>
 </body>
 </html>

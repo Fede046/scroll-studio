@@ -79,6 +79,9 @@ for o in parts:
     c = sum((o.matrix_world @ Vector(v) for v in o.bound_box), Vector()) / 8
     lift = 0.22 + 0.3 * ((sum(map(ord, o.name)) * 2654435761) % 1000) / 1000   # staggered, deterministic
     dirs[o.name] = Vector((c.x * 0.35, c.y * 0.35, lift)) if o.name != anchor else Vector((0, 0, 0))
+    if o.get("ss_explode") is not None:   # a site.product GLB carries its own offsets (metres, glTF axes)
+        e = o["ss_explode"]
+        dirs[o.name] = Vector((e[0], -e[2], e[1])) / radius
 
 floor_z = min((o.matrix_world @ Vector(v)).z for o in meshes for v in o.bound_box)
 

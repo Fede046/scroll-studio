@@ -190,6 +190,9 @@ blockquote { hanging-punctuation: first last; }
 .ss-tile__text p { color: var(--ink-2); font-size: 15px; line-height: 1.55; }
 .ss-footer { border-top: 1px solid var(--line); }
 .ss-footer__in { padding: 36px var(--gutter); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 16px; font-size: 13px; color: var(--ink-3); font-family: var(--font-mono); }
+/* site.product with concept: true. Plain sentence case in the body face, on its own line under the footer row */
+.ss-footer__concept { flex-basis: 100%; margin: 4px 0 0; font: 400 13px/1.5 var(--font-body); letter-spacing: 0; text-transform: none; color: var(--ink-2); }
+.ss-footer__concept a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 
 /* opacity and offset are set every frame from scroll position (runtime); no timed transition to fall behind */
 .js .ss-reveal { opacity: 0; transform: translateY(22px); }

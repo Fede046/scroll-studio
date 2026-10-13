@@ -41,11 +41,12 @@ def image_key(ref: ImageRef) -> dict:
     return ref.model_dump(mode="json", exclude={"credit"})
 
 
-def resolve_image(project: Project, ref: ImageRef, log=print) -> Path:
+def resolve_image(project: Project, ref: ImageRef, log=print, alpha: bool = False) -> Path:
+    """alpha: the caller can show a transparent image (hero/product blocks), so a product still may stay RGBA."""
     if isinstance(ref, str):
         ref = ImageInput(file=ref)
     if ref.crop:
-        src = resolve_image(project, ref.model_copy(update={"crop": None}), log)
+        src = resolve_image(project, ref.model_copy(update={"crop": None}), log, alpha)
         digest = hashlib.sha1(json.dumps([str(src), src.stat().st_size, list(ref.crop)]).encode()).hexdigest()[:12]
         out = project.build / "_generated" / f"crop_{digest}.png"
         if not out.exists():
@@ -55,6 +56,9 @@ def resolve_image(project: Project, ref: ImageRef, log=print) -> Path:
             out.parent.mkdir(parents=True, exist_ok=True)
             im.crop((round(x0 * im.width), round(y0 * im.height), round(x1 * im.width), round(y1 * im.height))).save(out)
         return out
+    if ref.product is not None:
+        from .product import image_still
+        return image_still(project, ref, log, alpha)
     if ref.file:
         return resolve_path(project, ref.file, log)
     if ref.edit:
@@ -68,7 +72,7 @@ def resolve_image(project: Project, ref: ImageRef, log=print) -> Path:
             render_gradient(ref.gradient, (w, h), ref.seed).save(out)
         return out
     if not ref.generate:
-        raise BuildError("an image input needs `file`, `generate` or `gradient`")
+        raise BuildError("an image input needs `file`, `generate`, `gradient` or `product`")
     w, h = (int(v) // 16 * 16 for v in ref.size)
     digest = hashlib.sha1(json.dumps([ref.generate, w, h, ref.seed]).encode()).hexdigest()[:12]
     out = project.build / "_generated" / f"{digest}.png"

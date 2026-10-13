@@ -177,7 +177,8 @@
 <footer class="ss-footer"><div class="ss-wrap ss-footer__in">
   <span>{{ (site.footer.left or ("© " ~ site.name)) | rich }}</span>
   <span>{% for l in page_links %}<a href="{{ l.href }}">{{ l.label }}</a> · {% endfor %}{% for l in site.footer.links %}<a href="{{ l.href }}">{{ l.label }}</a> · {% endfor %}{{ (site.footer.right or "") | rich }}{% for c in credits %}{% if loop.first and site.footer.right %} · {% endif %}{{ c }}{% if not loop.last %} · {% endif %}{% endfor %}</span>
-</div></footer>
+{% if concept %}  <p class="ss-footer__concept">{{ concept }}{% if product.url %} The real {{ product.name }}: <a href="{{ product.url }}" rel="noopener">{{ product.url.split("//")[-1].split("/")[0] }}</a>.{% endif %}</p>
+{% endif %}</div></footer>
 
 <script>window.__ssScroll = { speed: {{ site.scroll.speed }} };</script>
 {% if art %}<script type="application/json" id="ss-art">{{ art | tojson }}</script>

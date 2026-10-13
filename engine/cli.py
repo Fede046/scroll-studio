@@ -7,6 +7,7 @@
   studio ui                                         the Studio app (http://localhost:5180)
   studio doctor                                     check Python, Node, FFmpeg, Blender, GPU, ComfyUI, models
   studio schema                                     JSON Schema of site.yaml
+  studio product my-site [--parts] [--still three-quarter]   the site's product: parts, stills
 """
 from __future__ import annotations
 
@@ -328,6 +329,65 @@ def combine(videos: list[Path], out: Path = typer.Option(..., help="MP4 to write
     ffmpeg(*inputs, "-filter_complex", ";".join(chains), "-map", last, "-c:v", "libx264", "-crf", "18", "-preset", "slow",
            "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(out))
     typer.echo(f"-> {out} ({sum(durs) - fade * (len(videos) - 1):.1f}s)")
+
+
+# ---------------------------------------------------------------- product (site.product)
+
+@app.command()
+def product(name: str, parts: bool = typer.Option(False, "--parts", help="List the model's parts and materials (names to target in product.parts)"),
+            still: Optional[str] = typer.Option(None, help="Render a still: front, three-quarter, side, top, back, hero-low, exploded, detail"),
+            part: Optional[str] = typer.Option(None, help="detail (or any view): glob on the part to frame"),
+            size: str = typer.Option("1600x1200", help="Still size WxH"),
+            background: str = typer.Option("transparent", help="transparent, theme or a hex colour"),
+            scene: Optional[str] = typer.Option(None, help="Render the still into a generated scene (prompt; needs ComfyUI)"),
+            out: Optional[Path] = typer.Option(None, help="Copy the still here"),
+            all_parts: bool = typer.Option(False, "--all", help="With --parts: every part, not grouped by name")):
+    """The site's product: normalise its model (cached), list its parts, render stills."""
+    import re as _re
+    from . import product as prod
+    from .project import Project
+    project = Project(resolve(name))
+    info = prod.product_info(project, log=typer.echo)
+    sx, sy, sz = info["size"]
+    typer.echo(f"{project.load().product.name}: {sx * 1000:.1f} x {sy * 1000:.1f} x {sz * 1000:.1f} mm (w x d x h), "
+               f"{info['triangles']:,} triangles{' (decimated from ' + format(info['source_triangles'], ',') + ')' if info['decimated'] else ''}, "
+               f"{len(info['parts'])} parts, units {info['units']}, up {info['up']}")
+    typer.echo(f"  GLB: {prod.normalised_glb(project)}")
+    if parts:
+        groups: dict = {}
+        for p in info["parts"]:
+            key = p["name"] if all_parts else _re.sub(r"(\.\d{3}|:\d+)+$", "", p["name"])
+            g = groups.setdefault(key, {"n": 0, "tris": 0, "mats": [], "size": p["size"], "path": p["path"]})
+            g["n"] += 1
+            g["tris"] += p["triangles"]
+            for m in p["materials"]:
+                if m not in g["mats"]:
+                    g["mats"].append(m)
+        typer.echo("")
+        typer.echo(f"  {'part':<38} {'count':>5} {'triangles':>10}  {'size mm':<20} materials")
+        for k, g in sorted(groups.items(), key=lambda kv: -max(kv[1]["size"])):
+            dims = "x".join(f"{v * 1000:.0f}" for v in g["size"])
+            mats = ", ".join(f"{m['name']} {m['color'] or ''}".strip() for m in g["mats"][:4]) + (" ..." if len(g["mats"]) > 4 else "")
+            typer.echo(f"  {k[:38]:<38} {g['n']:>5} {g['tris']:>10,}  {dims:<20} {mats}")
+        parents = sorted({p["path"].rsplit("/", 1)[0] for p in info["parts"] if "/" in p["path"]})
+        if parents:
+            typer.echo("")
+            typer.echo(f"  assemblies (a match on one covers its parts): {', '.join(parents[:25])}{' ...' if len(parents) > 25 else ''}")
+        for r in info.get("rules", []):
+            typer.echo(f"  rule match={r['match']!r}{' material=' + repr(r['material']) if r['material'] else ''}: {r['hits']} mesh(es)")
+    if still:
+        w, h = (int(v) for v in size.lower().split("x"))
+        if scene:
+            from .spec import ImageInput, ProductShot
+            path = prod.image_still(project, ImageInput(product=ProductShot(view=still, part=part, scene=scene,
+                                    background=background), size=(w, h)), typer.echo, alpha=background == "transparent")
+        else:
+            path = prod.product_still(project, None, still, (w, h), background, typer.echo, part=part)
+        if out:
+            out.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(path, out)
+            path = out
+        typer.echo(f"still -> {path}")
 
 
 @app.command()

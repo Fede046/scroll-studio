@@ -113,6 +113,10 @@ def build_site(project: Project, log: Callable[[str], None] = print,
     (dist / "assets").mkdir(exist_ok=True)
 
     sections, credits = [], []
+    # site.product: its model credit goes in the footer whatever uses it; a concept page says so
+    from .. import product as product_mod
+    credits += product_mod.credits(site.product)
+    concept = product_mod.concept_line(site.product)
     scenes = [s for s in site.sections if is_scene(s)]
     for i, sec in enumerate(site.sections):
         entry = {"s": sec, "scene": is_scene(sec), "config": None,
@@ -164,17 +168,22 @@ def build_site(project: Project, log: Callable[[str], None] = print,
     def block_image(ref, width: int, knockout: bool = False) -> Optional[str]:
         if ref is None:
             return None
-        src = resolve_image(project, ref, log)
+        src = resolve_image(project, ref, log, alpha=True)
         st = src.stat()
         digest = hashlib.sha1(json.dumps([str(src), st.st_size, int(st.st_mtime), width, knockout, 1]).encode()).hexdigest()[:12]
         out = media / f"{digest}.webp"
         if not out.exists():
             from PIL import Image
             media.mkdir(parents=True, exist_ok=True)
-            im = Image.open(src).convert("RGB")
+            im = Image.open(src)
+            # a transparent image (a product still, a cut-out PNG) keeps its alpha, so it floats on the panel
+            alpha = im.mode in ("RGBA", "LA", "PA") or (im.mode == "P" and "transparency" in im.info)
+            im = im.convert("RGBA" if alpha else "RGB")
+            if alpha and im.getchannel("A").getextrema()[0] == 255:
+                im, alpha = im.convert("RGB"), False
             if im.width > width:
                 im = im.resize((width, round(im.height * width / im.width)), Image.LANCZOS)
-            if knockout:
+            if knockout and not alpha:
                 im = _knockout(im)
             im.save(out, "WEBP", quality=86, method=6)
         if image_credit(ref):
@@ -257,6 +266,7 @@ def build_site(project: Project, log: Callable[[str], None] = print,
     html = env.get_template("site.html.j2").render(
         site=site, sections=sections, theme=theme, css_vars=css_vars, logo=logo,
         font_css=font_css, font_links=[] if font_css else links, nav_links=nav, page_links=page_links, credits=credits,
+        concept=concept, product=site.product,
         configs={e["s"].id: e["config"] for e in sections if e["scene"]},
         style_css=themes.style_css(theme["style"]) if theme["style"] else "",
         style_blocks=bool(sdir and (sdir / "blocks.html.j2").exists()),
@@ -283,6 +293,7 @@ def build_site(project: Project, log: Callable[[str], None] = print,
                                      extension_configs={"toc": {"permalink": False}})
             page_html = env.get_template("page.html.j2").render(
                 site=site, page=p, icon=favicon(site, theme), body=Markup(body), theme=theme, css_vars=css_vars, base=base,
+                concept=concept, product=site.product,
                 logo=rebase(logo) if logo and not logo.startswith("M") else logo,
                 font_css=rebase(font_css) if font_css else None, font_links=[] if font_css else links,
                 nav_links=[{"label": l["label"], "href": rebase(l["href"])} for l in nav],

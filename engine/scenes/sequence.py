@@ -22,7 +22,11 @@ def _hex(h: str) -> tuple[int, int, int]:
 
 def build(sec: SequenceScene, ctx: BuildContext, theme: dict) -> dict:
     from ..inputs import resolve_path
-    model = resolve_path(ctx.project, sec.model, ctx.log)
+    if sec.model in (None, "product"):     # the site's product: its normalised GLB (materials, axes, explode offsets)
+        from ..product import normalised_glb
+        model = normalised_glb(ctx.project, log=ctx.log)
+    else:
+        model = resolve_path(ctx.project, sec.model, ctx.log)
     raw = ctx.work / "render"
     frames = [raw / "frames" / f"{i:04d}.png" for i in range(1, sec.frames + 1)]
     draft = bool(ctx.options.get("draft"))
