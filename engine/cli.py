@@ -1,7 +1,8 @@
 """`studio` command line.
 
   studio new my-site [--example lodestar-orbital]   create projects/my-site (from an example or a starter)
-  studio build my-site [--section hero] [--force] [--draft]
+  studio build my-site [--only hero,door] [--force] [--draft] [--yes] [--plan]
+  studio storyboard my-site [--level sketch|stills|animatic] [--only id,id] [--motion] [--open]
   studio preview my-site [--port 5173]
   studio record my-site [--section hero] [--seconds 12] [--gif]
   studio trailer my-site [--format 9x16] [--plan]      launch trailer from the site's renders -> dist/trailer/
@@ -68,14 +69,59 @@ def new(name: str, example: Optional[str] = typer.Option(None, help="Copy an exa
 
 
 @app.command()
-def build(name: str, section: Optional[str] = typer.Option(None, help="Rebuild one scene only"),
-          force: bool = typer.Option(False, help="Ignore the cache"),
-          draft: bool = typer.Option(False, help="Fast low-quality renders where supported")):
-    """Build a project into dist/."""
+def build(name: str, only: Optional[str] = typer.Option(None, help="Render only these sections and beats (ids, comma "
+                                                                   "separated); the rest keep their cache or show "
+                                                                   "their storyboard stand-in"),
+          section: Optional[str] = typer.Option(None, help="Rebuild one scene only (same as --only <id>)"),
+          force: bool = typer.Option(False, help="Ignore the cache (locked scenes and beats are still kept)"),
+          draft: bool = typer.Option(False, help="Fast low-quality renders where supported"),
+          yes: bool = typer.Option(False, "--yes", "-y", help="Don't ask, even over studio.toml's confirm_over"),
+          plan: bool = typer.Option(False, "--plan", help="Print what would render and the estimate, then stop")):
+    """Build a project into dist/. Prints what will render and about how long it takes here before starting."""
+    import sys
     from .compile.compiler import build_site
+    from .plan import announce, fmt
     from .project import Project
-    out = build_site(Project(resolve(name)), only=section, force=force, options={"draft": draft})
+    project = Project(resolve(name))
+    ids = ",".join(x for x in (only, section) if x) or None
+    est = announce(project, only=ids.split(",") if ids else None, force=force, options={"draft": draft}, log=typer.echo)
+    if plan:
+        return
+    limit = settings().get("confirm_over")
+    if limit and est.total() > limit * 60 and not yes:
+        if sys.stdin.isatty():
+            if not typer.confirm(f"about {fmt(est.total())} of rendering (over confirm_over = {limit:g} min). Start?"):
+                raise typer.Exit(1)
+        else:
+            typer.echo(f"stopping: about {fmt(est.total())} of rendering is over confirm_over = {limit:g} min; "
+                       f"run with --yes for unattended builds")
+            raise typer.Exit(2)
+    out = build_site(project, only=ids, force=force, options={"draft": draft})
     typer.echo(f"built {out}")
+
+
+@app.command()
+def storyboard(name: str, level: str = typer.Option("stills", help="sketch (no ComfyUI: blockouts, cached stills, "
+                                                                   "cards), stills (the real first frames) or animatic "
+                                                                   "(stills in motion + animatic.mp4)"),
+               only: Optional[str] = typer.Option(None, help="Redo only these shots (beat, section or block ids); "
+                                                             "the rest keep their last storyboard frames"),
+               motion: bool = typer.Option(False, "--motion", help="animatic: a tiny LTX-2.3 preview per shot "
+                                                                    "(512x288, 2 s) to check motion"),
+               open_: bool = typer.Option(False, "--open", help="Open storyboard.html when done")):
+    """Storyboard the site before the full render: <project>/storyboard/ (the page with stills standing in for films,
+    storyboard.html + sheet.jpg with a card per shot and the render estimate, animatic.mp4)."""
+    from .project import Project
+    from .storyboard import storyboard as run
+    res = run(Project(resolve(name)), level=level, only=only.split(",") if only else None, motion=motion,
+              log=typer.echo)
+    typer.echo(f"sheet: {res['sheet']}")
+    typer.echo(f"page: {res['site']}")
+    if res["animatic"]:
+        typer.echo(f"animatic: {res['animatic']}")
+    if open_:
+        import webbrowser
+        webbrowser.open(Path(res["html"]).as_uri())
 
 
 @app.command()

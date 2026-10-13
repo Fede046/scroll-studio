@@ -29,12 +29,10 @@ def _animate(still: Path, art: Art, work: Path, log: Callable[[str], None], mode
                    model=model, wan=wan)
 
 
-def build(project: Project, art: Art, dist: Path, log: Callable[[str], None] = print,
-          site_video_model: str | None = None, site_wan: dict | None = None) -> dict:
-    from PIL import Image, ImageOps
+def _paths(project: Project, art: Art, log: Callable[[str], None], site_video_model: str | None,
+           site_wan: dict | None):
+    """(digest, work dir, clip dir, model, wan settings) of a theme.art."""
     from .animate import video_model, wan_settings
-    if not art.prompt and not art.file:
-        raise BuildError("theme.art needs a `prompt` (generated locally) or a `file`")
     model = video_model(art.video_model, site_video_model) if art.motion else "ltx"
     wan = wan_settings(site_wan) if model == "wan" else None
     dump = art.model_dump(mode="json")
@@ -51,9 +49,26 @@ def build(project: Project, art: Art, dist: Path, log: Callable[[str], None] = p
     vkey = json.dumps([art.prompt, art.file, art.motion, art.seconds, list(art.size), art.seed]
                       + ([model, wan] if model != "ltx" else []), sort_keys=True)
     vwork = project.build / "_art" / ("v_" + hashlib.sha1(vkey.encode()).hexdigest()[:12])
+    return digest, work, vwork, model, wan
+
+
+def cached(project: Project, art: Art, site_video_model: str | None = None, site_wan: dict | None = None) -> bool:
+    """True when the art's sprite sheet is built (a build would only copy it)."""
+    _, work, _, _, _ = _paths(project, art, lambda m: None, site_video_model, site_wan)
+    return (work / "sheet.png").exists() and (work / "meta.json").exists()
+
+
+def build(project: Project, art: Art, dist: Path, log: Callable[[str], None] = print,
+          site_video_model: str | None = None, site_wan: dict | None = None) -> dict:
+    from PIL import Image, ImageOps
+    if not art.prompt and not art.file:
+        raise BuildError("theme.art needs a `prompt` (generated locally) or a `file`")
+    digest, work, vwork, model, wan = _paths(project, art, log, site_video_model, site_wan)
     sheet = work / "sheet.png"
     meta_file = work / "meta.json"
     if not (sheet.exists() and meta_file.exists()):
+        from .fidelity import would_render
+        would_render("art", (art.prompt or art.file or "")[:60])
         work.mkdir(parents=True, exist_ok=True)
         still = src if art.file else resolve_image(project, ImageInput(generate=art.prompt, size=art.size, seed=art.seed), log)
         if art.motion:

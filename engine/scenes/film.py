@@ -74,7 +74,7 @@ def take_shot(sec: FilmScene, ctx: BuildContext) -> dict:
     the depth guide, and never by an absolute path, so a moved project or a new product keeps its generated world.
     `legacy_world_key` is the key of the older formula, so stamps written by it still count."""
     import json
-    t = sec.take.model_dump(mode="json")
+    t = sec.take.model_dump(mode="json", exclude={"locked"})   # locking never changes what is rendered
     legacy = None
     if sec.take.product:
         path, raw, p = take_product(sec, ctx)
@@ -119,36 +119,47 @@ def take_shot(sec: FilmScene, ctx: BuildContext) -> dict:
     return shot
 
 
-def generate(sec: FilmScene, ctx: BuildContext) -> Path:
+def world(sec: FilmScene, ctx: BuildContext, keyframes_too: bool = True) -> tuple[dict, dict, Optional[dict]]:
+    """The world stages of a take or shot, as the full build runs them: `blockout` (Blender: the grey world, the
+    camera and its depth guide) and `keyframes` (Z-Image stills on that depth). Returns (shot, blockout key, legacy
+    key). The storyboard calls this too, so an approved keyframe is the one the film is generated from."""
     from . import film_build as fb
+    shot, bkey, legacy = blockout_key(sec, ctx)
+    bdir = ctx.work / "blockout"
+    ctx.stage("blockout", bkey, [bdir / "depth.mp4", bdir / "first.png"], lambda: fb.stage_blockout(shot, str(ctx.work)),
+              legacy=legacy)
+    if keyframes_too and shot.get("keyframes", {}).get("frames"):
+        keyframes(shot, bkey, legacy, ctx)
+    return shot, bkey, legacy
+
+
+def blockout_key(sec: FilmScene, ctx: BuildContext) -> tuple[dict, dict, Optional[dict]]:
+    """(shot, blockout key, legacy key) without running anything (the storyboard's sketch reads the cache with it)."""
     shot = dict(take_shot(sec, ctx) if sec.take else sec.shot, id=sec.id)
     for k in ("fps", "duration", "preview_res", "ltx"):
         if k not in shot:
             raise BuildError(f"film section '{sec.id}': shot.{k} is required to generate a film (or set `video:`)")
-    out = str(ctx.work)
     bl = dict(shot.get("blockout", {}))
     if bl.get("file"):
         bl["file"] = str(ctx.project.path(bl["file"]))
         shot["blockout"] = bl
-    bdir, gdir = ctx.work / "blockout", ctx.work / "gen"
     legacy = None
     if sec.take:
         bkey = {"take": shot["world_key"], "fps": shot["fps"], "duration": shot["duration"], "res": shot["preview_res"]}
         lw = shot.get("legacy_world_key")
-        if lw:
-            legacy = {"blockout": {"world_key": lw["world_key"]}, "fps": shot["fps"], "duration": shot["duration"],
-                      "res": shot["preview_res"], "file": None, "model": lw["model"]}
-        else:
-            legacy = {"blockout": {"world_key": shot["world_key"]}, "fps": shot["fps"], "duration": shot["duration"],
-                      "res": shot["preview_res"], "file": None, "model": None}
+        legacy = {"blockout": {"world_key": (lw or {}).get("world_key", shot["world_key"])}, "fps": shot["fps"],
+                  "duration": shot["duration"], "res": shot["preview_res"], "file": None,
+                  "model": lw["model"] if lw else None}
     else:
         bkey = {"blockout": {k: v for k, v in bl.items() if k != "world"}, "fps": shot["fps"], "duration": shot["duration"],
                 "res": shot["preview_res"], "file": file_key(Path(bl["file"])) if bl.get("file") else None, "model": None}
-    ctx.stage("blockout", bkey, [bdir / "depth.mp4", bdir / "first.png"], lambda: fb.stage_blockout(shot, out), legacy=legacy)
-    if shot.get("keyframes", {}).get("frames"):
-        names = [f["name"] for f in shot["keyframes"]["frames"]]
-        ctx.stage("keyframes", {"b": bkey, "k": shot["keyframes"]}, [ctx.work / "keyframes" / f"{n}.png" for n in names],
-                  lambda: fb.stage_keyframes(shot, out, _args(ctx)), legacy=legacy and {"b": legacy, "k": shot["keyframes"]})
+    return shot, bkey, legacy
+
+
+def generate(sec: FilmScene, ctx: BuildContext) -> Path:
+    from . import film_build as fb
+    shot, bkey, legacy = world(sec, ctx)
+    out = str(ctx.work)
     gkey = {"b": bkey, "k": shot.get("keyframes"), "ltx": shot["ltx"], "subject": shot.get("subject")}
     glegacy = legacy and {"b": legacy, "k": shot.get("keyframes"), "ltx": shot["ltx"], "subject": shot.get("subject")}
     from ..animate import video_model, wan_settings
@@ -177,6 +188,45 @@ def generate(sec: FilmScene, ctx: BuildContext) -> Path:
     if sec.take and sec.take.product:
         film = product_layer(sec, ctx, shot, film)
     return film
+
+
+def keyframe_digests(shot: dict, bkey: dict, variants: int = 1) -> dict[str, str]:
+    """One digest per keyframe: the world it is painted over, the shared settings (model, res, seed...) and its own
+    entry. The stage key covers every keyframe; these let a re-run redo only the keyframes that changed."""
+    import hashlib
+    import json
+    common = {k: v for k, v in shot["keyframes"].items() if k != "frames"}
+    return {f["name"]: hashlib.sha1(json.dumps({"b": bkey, "c": common, "f": f, "v": variants}, sort_keys=True,
+                                               default=str).encode()).hexdigest()[:16]
+            for f in shot["keyframes"]["frames"]}
+
+
+def keyframes(shot: dict, bkey: dict, legacy: Optional[dict], ctx: BuildContext) -> list[Path]:
+    """Stage `keyframes`: Z-Image stills locked to the blockout's depth. When it re-runs, keyframes whose own digest
+    (keyframe_digests) is unchanged and whose PNG exists are kept, so editing one keyframe's prompt repaints only it."""
+    import json
+    from . import film_build as fb
+    kdir = ctx.work / "keyframes"
+    names = [f["name"] for f in shot["keyframes"]["frames"]]
+    outs = [kdir / f"{n}.png" for n in names]
+    args = _args(ctx)
+    digests = keyframe_digests(shot, bkey, args.variants)
+    record = kdir / "_frames.json"
+
+    def run():
+        old = json.loads(record.read_text()) if record.exists() and not ctx.force else {}
+        keep = {n for n in names if old.get(n) == digests[n] and (kdir / f"{n}.png").exists()}
+        if keep:
+            ctx.log(f"  keyframes: kept {', '.join(sorted(keep))} (unchanged)")
+        a = _args(ctx, skip=keep)
+        fb.stage_keyframes(shot, str(ctx.work), a)
+        record.write_text(json.dumps(digests, indent=1))
+    key, lkey = {"b": bkey, "k": shot["keyframes"]}, legacy and {"b": legacy, "k": shot["keyframes"]}
+    state = ctx.status("keyframes", key, outs, lkey)
+    ctx.stage("keyframes", key, outs, run, legacy=lkey)
+    if state in ("fresh", "migrated") and not record.exists() and ctx.options.get("plan") is None:
+        record.write_text(json.dumps(digests, indent=1))   # a cache from before per-keyframe digests: adopt it
+    return outs
 
 
 def restore_take(sec: FilmScene, ctx: BuildContext, shot: dict, film: Path, up: Optional[dict]) -> Path:
@@ -283,7 +333,8 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
     from ..inputs import resolve_image
     from ..spec import ImageInput
     W, H = sec.beat_res[0] // 32 * 32, sec.beat_res[1] // 32 * 32
-    clips = []
+    clips, standing = [], []
+    only = ctx.options.get("only_beats")      # build --only: the beats to render (None: all)
     for b in sec.beats:
         bdir = ctx.work / "beats" / b.id
         clip = bdir / "clip.mp4"
@@ -340,7 +391,17 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
         if b.trim:
             key["trim"] = b.trim
         ctx.log(f"  beat {b.id}")
-        ctx.stage(f"beat_{b.id}", key, [clip], run)
+        lock = b.locked or ctx.locked
+        if only is not None and b.id not in only and ctx.status(f"beat_{b.id}", key, [clip], locked=lock) == "stale":
+            # not selected and not rendered yet: its storyboard still stands in (never stamped as the beat)
+            from ..fidelity import would_render
+            would_render("stand-in", f"beat {b.id} (its storyboard still, until it is rendered)")
+            from ..storyboard.standin import beat_clip
+            ctx.log(f"  beat_{b.id}: not in --only and not rendered: its storyboard still stands in")
+            clips.append(beat_clip(ctx.project, sec, b, bdir / "standin.mp4", (W, H), ctx.log))
+            standing.append(b.id)
+            continue
+        ctx.stage(f"beat_{b.id}", key, [clip], run, locked=lock)
         clips.append(clip)
 
     # join: each clip crossfades into the next
@@ -364,7 +425,9 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
         ffmpeg(*args, "-filter_complex", ";".join(graph), "-map", last, "-c:v", "libx264", "-crf", "14", "-preset", "slow",
                "-pix_fmt", "yuv420p", "-r", str(FPS), out, log=ctx.log)
     ctx.stage("beats_join", {"clips": [file_key(c) for c in clips], "fade": fade}, [out], join)
-    if sec.beat_restore:
+    if sec.beat_restore and standing:
+        ctx.log(f"  beats_restore: skipped while {', '.join(standing)} stand in; a full build restores the film")
+    elif sec.beat_restore:
         from . import film_build as fb
         shot = {"id": sec.id, "fps": FPS, "duration": float(probe(out)["duration"]), "ltx": {},
                 "upscale": {"method": "seedvr2", "resolution": int(sec.beat_restore)}}
@@ -373,7 +436,12 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
                   lambda: fb.stage_upscale(shot, str(ctx.work), _restore_args(ctx, out)))
         out = restored
 
-    # beat spans over the film, for steps pinned with state: {beat: id}
+    pin_steps(sec, durs, fade)
+    return out
+
+
+def pin_steps(sec: FilmScene, durs: list[float], fade: float) -> None:
+    """Time steps pinned with state: {beat: id} to their beat's span over the joined film (sets step.at)."""
     total = sum(durs) - fade * (len(durs) - 1)
     spans, t = {}, 0.0
     for b, d in zip(sec.beats, durs):
@@ -391,7 +459,6 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
             a, b2 = a + (b2 - a) * float(part[0]), a + (b2 - a) * float(part[1])
         pad = (b2 - a) * 0.1
         st.at = (round(a + pad, 4), round(b2 - pad * 0.6, 4))
-    return out
 
 
 def build(sec: FilmScene, ctx: BuildContext, theme: dict) -> dict:

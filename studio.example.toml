@@ -1,11 +1,13 @@
 # Copy to studio.toml and edit. Environment variables (BLENDER, FFMPEG, COMFY_URL, STUDIO_MODELS, CHROME,
-# STUDIO_PROJECTS, STUDIO_VIDEO_MODEL) override these.
+# STUDIO_PROJECTS, STUDIO_VIDEO_MODEL, STUDIO_CONFIRM_OVER) override these.
 # blender = "C:/Program Files/Blender Foundation/Blender 4.3/blender.exe"
 # ffmpeg = "ffmpeg"
 # comfy_url = "http://127.0.0.1:8188"
 # model_dir = "D:/ai"           # Hugging Face cache for depth / segmentation models goes in <model_dir>/hf
 # projects = "projects"
 # video_model = "ltx"          # default video model when a spec doesn't choose one: ltx (LTX-2.3) or wan (Wan 2.2)
+# confirm_over = 30            # minutes: `studio build` asks before a render estimated longer than this (unset: it
+#                              # only prints the plan); `--yes` skips the question, and with no terminal it stops instead
 
 # Wan 2.2 file names as ComfyUI lists them, only where yours differ from the defaults (engine/models.yaml).
 # A subfolder is part of the name; a file moved to another subfolder is also found by its base name.

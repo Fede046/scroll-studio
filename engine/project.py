@@ -82,7 +82,8 @@ class BuildContext:
     log: Log = print
     progress: Progress = lambda f, msg="": None
     force: bool = False
-    options: dict = field(default_factory=dict)      # CLI/UI knobs: draft quality, only=stage, ...
+    options: dict = field(default_factory=dict)      # CLI/UI knobs: draft quality, only=stage, plan=Plan, ...
+    locked: bool = False                              # the section (or its take) is locked: keep what is rendered
 
     @property
     def work(self) -> Path:
@@ -100,22 +101,53 @@ class BuildContext:
     def url(self, path: Path) -> str:
         return f"assets/{self.section_id}/{path.relative_to(self.web).as_posix()}"
 
-    def stage(self, name: str, key: Any, outputs: list[Path], fn: Callable[[], Any], legacy: Any = None) -> bool:
+    def status(self, name: str, key: Any, outputs: list[Path], legacy: Any = None, locked: Optional[bool] = None) -> str:
+        """What stage() would do: 'fresh' (stamp matches), 'migrated' (stamp of the legacy key), 'locked' (outputs
+        kept although the key changed) or 'stale' (it would run). Nothing is written."""
+        locked = self.locked if locked is None else locked
+        have = all(p.exists() for p in outputs)
+        stamp = self.work / "stamps" / f"{name}.json"
+        old = json.loads(stamp.read_text()) if stamp.exists() else None
+        if not self.force and old and have:
+            if old.get("key") == _hash(key):
+                plan = self.options.get("plan")
+                return "stale" if plan is not None and plan.depends_on_dirty(key) else "fresh"
+            if legacy is not None and old.get("key") == _hash(legacy):
+                return "migrated"
+        if locked and have:
+            return "locked"
+        return "stale"
+
+    def stage(self, name: str, key: Any, outputs: list[Path], fn: Callable[[], Any], legacy: Any = None,
+              locked: Optional[bool] = None) -> bool:
         """Run fn unless the stamp matches key and every output exists. Returns True if it ran.
 
         legacy: the key this stage had under an older formula. A stamp written with it still counts (and is
-        rewritten with the new key), so changing how a key is computed never re-renders finished work."""
+        rewritten with the new key), so changing how a key is computed never re-renders finished work.
+        locked: keep existing outputs even when the key changed (default: the context's `locked`, set from the
+        section's or take's `locked: true`). With options["plan"] (engine/plan.py) nothing runs: a stage that would
+        run is recorded instead."""
         stamp = self.work / "stamps" / f"{name}.json"
         digest = _hash(key)
-        if not self.force and stamp.exists() and all(p.exists() for p in outputs):
-            old = json.loads(stamp.read_text())
-            if old.get("key") == digest:
-                self.log(f"  {name}: up to date")
-                return False
-            if legacy is not None and old.get("key") == _hash(legacy):
-                stamp.write_text(json.dumps({**old, "key": digest}))
-                self.log(f"  {name}: up to date (cache key migrated)")
-                return False
+        plan = self.options.get("plan")
+        state = self.status(name, key, outputs, legacy, locked)
+        prior = json.loads(stamp.read_text()) if stamp.exists() else {}
+        if plan is not None:
+            plan.record(self.section_id, name, state, prior.get("seconds"), outputs)
+        if state == "fresh":
+            self.log(f"  {name}: up to date")
+            return False
+        if state == "migrated":
+            if plan is None:
+                stamp.write_text(json.dumps({**prior, "key": digest}))
+            self.log(f"  {name}: up to date (cache key migrated)")
+            return False
+        if state == "locked":
+            self.log(f"  {name}: locked, kept the existing render (its settings changed; set locked: false to redo it)")
+            return False
+        if plan is not None:
+            self.log(f"  {name}: would run")
+            return True
         self.log(f"  {name}: running")
         t0 = time.time()
         fn()

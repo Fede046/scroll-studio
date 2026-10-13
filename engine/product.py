@@ -43,6 +43,7 @@ from typing import Optional
 
 from .config import ROOT, settings
 from .project import BuildError, Project
+from .fidelity import placeholder, preview, would_render
 from .spec import ImageInput, Product, ProductShot
 
 VERSION = 1           # bump when the normalisation changes, so every cached GLB is rebuilt
@@ -124,6 +125,7 @@ def _source(project: Project, product: Product, log=print) -> tuple[Path, str, O
             key["tess"] = [lin, ang]
             out = cache / f"step_{_digest(key)}.glb"
             if not out.exists():
+                would_render("product model", f"convert {src.name}")
                 log(f"  converting STEP with OpenCascade ({product.tessellation}: {lin} mm, {ang} rad): {src.name}")
                 _child(["step", src, out, lin, ang], out)
             if product.units != "auto":
@@ -133,6 +135,7 @@ def _source(project: Project, product: Product, log=print) -> tuple[Path, str, O
             out = cache / f"3mf_{_digest(key)}.glb"
             meta = cache / f"3mf_{_digest(key)}.json"
             if not (out.exists() and meta.exists()):
+                would_render("product model", f"convert {src.name}")
                 log(f"  converting 3MF: {src.name}")
                 info = _child(["3mf", src, out], out)
                 meta.write_text(json.dumps(info))
@@ -143,6 +146,8 @@ def _source(project: Project, product: Product, log=print) -> tuple[Path, str, O
         from .backends.trellis import image_to_mesh
         photo = resolve_path(project, product.from_photo, log)
         key = {"photo": _sha(photo)}
+        if not (_cache(project) / f"trellis_{_digest(key)}").exists():
+            would_render("product model", f"TRELLIS.2 from {photo.name}")
         mesh = image_to_mesh(photo, _cache(project) / f"trellis_{_digest(key)}", log)
         return mesh, "ply", None, key
     raise BuildError("product needs `model` (a 3D file or URL) or `from_photo`")
@@ -177,6 +182,7 @@ def _prepare(project: Project, product: Product, log=print) -> tuple[Path, Path]
     glb, report = cache / f"{digest}.glb", cache / f"{digest}.json"
     if glb.exists() and report.exists():
         return glb, report
+    would_render("product model", f"normalise {product.name}")
     log(f"  normalising product model ({fmt}) -> {glb.name}")
     optfile = cache / f"{digest}.opts.json"
     optfile.write_text(json.dumps(opts, indent=1), encoding="utf-8")
@@ -235,12 +241,17 @@ def product_still(project: Project, product: Optional[Product] = None, view: str
             raise BuildError(f"the exploded view needs a model with several parts; {product.name}'s model has {n}")
     samples, hdri, shadow = int(shot.get("samples") or 128), shot.get("hdri") or "studio", shot.get("shadow", True)
     w, h = int(size[0]), int(size[1])
+    pv = preview()
+    if pv is not None:   # a storyboard: few samples (and small at sketch); keyed by both, so never taken for a final
+        samples = min(samples, pv.samples)
+        w, h = max(64, round(w * pv.scale)), max(64, round(h * pv.scale))
     key = {"v": STILL_VERSION, "script": _sha(SCRIPTS / "product_still.py"), "glb": glb.name, "cam": cam, "size": [w, h], "samples": samples, "hdri": hdri, "shadow": bool(shadow)}
     stills = _cache(project) / "stills"
     stills.mkdir(exist_ok=True)
     digest = _digest(key)
     png = stills / f"{digest}.png"
     if not png.exists():
+        would_render("product still", f"{product.name} {view} {w}x{h}")
         log(f"  product still: {view} {w}x{h}, {samples} samples")
         tmp = stills / f"{digest}.tmp.png"
         _blender("product_still.py", ["--glb", glb, "--out", tmp, "--size", f"{w}x{h}", "--view", json.dumps(cam),
@@ -395,12 +406,28 @@ def scene_still(project: Project, product: Optional[Product], view: str, size: t
         cam_v["exposure"] = float(shot["exposure"])
     cam_v["zoom"] = float(shot.get("zoom") or 1.0) * 0.82      # leave room around it: it stands in a place
     samples, shadow = int(shot.get("samples") or 128), True
+    pv = preview()
+    if pv is not None:   # a storyboard: few samples and no harmonising pass (the painted scene is shared with finals)
+        samples, harmonise = min(samples, pv.samples), 0.0
     key = {"v": SCENE_VERSION, "glb": glb.name, "cam": cam_v, "size": [w, h], "scene": scene, "seed": seed,
            "harmonise": harmonise, "samples": samples, "still": _sha(SCRIPTS / "product_still.py")}
     d = _cache(project) / "scenes" / _digest(key)
     final = d / "final.png"
     if final.exists():
         return final
+    would_render("scene still", f"{product.name} {view} in '{scene[:60]}'")
+    if pv is not None and not pv.comfy:
+        # a sketch: the studio still on a card naming the scene, until the scene is painted
+        from PIL import Image
+        card = Image.open(placeholder(project.build / "_storyboard" / "placeholders", f"Scene: {scene}", (w, h)))
+        prod = Image.open(product_still(project, product, view if view in VIEWS else "three-quarter", (w, h),
+                                        "transparent", log, **{k: v for k, v in shot.items() if k in
+                                                               ("yaw", "pitch", "zoom", "explode", "lens", "part")}))
+        card = card.convert("RGBA")
+        card.alpha_composite(prod.convert("RGBA").resize(card.size))
+        out = project.build / "_storyboard" / "placeholders" / f"scene_{d.name}_{pv.samples}.png"
+        card.convert("RGB").save(out)
+        return out
     if not comfy.alive():
         raise BuildError(f"`scene:` paints the product's surroundings with Z-Image, but ComfyUI is not running at "
                          f"{comfy.COMFY}. Start it (docs/INSTALL.md), or drop `scene:` for a studio still.")

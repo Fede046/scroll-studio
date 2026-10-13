@@ -91,17 +91,28 @@ def nav_links(site: Site) -> list[dict]:
 
 def build_site(project: Project, log: Callable[[str], None] = print,
                progress: Callable[[float, str], None] = lambda f, m="": None,
-               only: Optional[str] = None, force: bool = False, options: Optional[dict] = None,
+               only=None, force: bool = False, options: Optional[dict] = None,
                style: Optional[str] = None, out: Optional[Path] = None, runtime_href: Optional[str] = None,
-               looks: Optional[dict] = None, link_base: str = "") -> Path:
-    """style: build in this look instead of the spec's; out: write the site here instead of dist/;
+               looks: Optional[dict] = None, link_base: str = "", standin: Optional[Callable] = None,
+               badge: Optional[str] = None) -> Path:
+    """only: a section id, or ids of sections and beats (a list or "a,b"): only those are rendered (a beat alone
+    renders just that beat of its film); other scenes keep their last build, and a scene never built shows its
+    storyboard stand-in (engine/storyboard/standin.py, from cached frames; nothing is rendered for it).
+    standin: fn(section) -> (config, web dir, section to render) or None, the storyboard's stand-in for a scene;
+    badge: a small corner label marking the page (the storyboard's).
+    style: build in this look instead of the spec's; out: write the site here instead of dist/;
     runtime_href: link a runtime published elsewhere (e.g. ../../runtime/) instead of copying it in;
     looks: {"current", "items": [{name, label, href}], "home"} adds the look switcher bar.
     link_base: prefix for the page's own relative links when it is built below the site root (e.g. "../../"
     for dist/looks/<style>/), so a button to "looks/" or "privacy/" still lands on the site's page."""
+    from ..fidelity import preview
+    from ..plan import section_locked, selection
     from ..scenes import builder_for
 
     site = project.load()
+    if isinstance(only, str):
+        only = [x for x in only.split(",") if x.strip()]
+    selected, beat_sel = selection(site, only)
     if style is not None:
         site = site.model_copy(update={"theme": site.theme.model_copy(update={"style": style or None})})
     if not runtime_ready():
@@ -124,16 +135,38 @@ def build_site(project: Project, log: Callable[[str], None] = print,
         entry = {"s": sec, "scene": is_scene(sec), "config": None,
                  "sdata": sec.model_dump(mode="json", include={"hud", "steps", "layout", "length"}) if is_scene(sec) else None}
         if entry["scene"]:
-            if only and sec.id != only:
+            stand = standin(sec) if standin is not None else None
+            if stand is None and selected is not None and sec.id not in selected                     and not (project.build / sec.id / "config.json").exists():
+                from ..storyboard.standin import cache_only
+                log(f"[{sec.id}] never built: its storyboard stand-in is shown (build it with --only {sec.id})")
+                stand = cache_only(project, sec, theme, log)
+                if stand is None:
+                    raise BuildError(f"section {sec.id} has never been built and has no storyboard frames; build it "
+                                     f"(--only {sec.id}) or run `studio storyboard` first")
+            if stand is not None:
+                cfg, web_src, shown = stand
+                entry.update(s=shown, config=cfg,
+                             sdata=shown.model_dump(mode="json", include={"hud", "steps", "layout", "length"}))
+                dst = dist / "assets" / sec.id
+                if dst.exists():
+                    shutil.rmtree(dst)
+                shutil.copytree(web_src, dst)
+                credits += cfg.get("credits", [])
+                sections.append(entry)
+                continue
+            if selected is not None and sec.id not in selected:
                 prev = project.build / sec.id / "config.json"
-                if not prev.exists():
-                    raise BuildError(f"section {sec.id} has never been built; build it first")
                 entry["config"] = json.loads(prev.read_text())
             else:
                 k = scenes.index(sec)
                 log(f"[{sec.id}] {sec.type}")
-                ctx = BuildContext(project, sec.id, log=log, force=force, options=options or {},
+                opts = dict(options or {})
+                if beat_sel.get(sec.id) is not None:
+                    opts["only_beats"] = beat_sel[sec.id]
+                ctx = BuildContext(project, sec.id, log=log, force=force, options=opts, locked=section_locked(sec),
                                    progress=lambda f, m="", k=k: progress((k + f) / max(len(scenes), 1), m))
+                if ctx.locked:
+                    log(f"  locked: existing renders are kept")
                 cfg = builder_for(sec.type)(sec, ctx, theme)
                 (ctx.work / "config.json").write_text(json.dumps(cfg))
                 entry["config"] = cfg
@@ -260,8 +293,15 @@ def build_site(project: Project, log: Callable[[str], None] = print,
     art_cfg = None
     if site.theme.art:
         from .. import art as art_mod
-        art_cfg = art_mod.build(project, site.theme.art, dist, log, site_video_model=site.video_model,
-                                site_wan=site.wan.model_dump(mode="json"))
+        art, pv = site.theme.art, preview()
+        if pv is not None and art.motion:   # a storyboard: the art as a still (its own cache entry)
+            art = art.model_copy(update={"motion": None})
+        if pv is not None and not pv.comfy and not art_mod.cached(project, art, site.video_model,
+                                                                  site.wan.model_dump(mode="json")):
+            log("  note: theme.art is not generated yet; left out of the sketch")
+        else:
+            art_cfg = art_mod.build(project, art, dist, log, site_video_model=site.video_model,
+                                    site_wan=site.wan.model_dump(mode="json"))
     env.globals["art"] = art_cfg
     css_vars = themes.css_vars(theme, log)
     # launch trailer (`trailer.embed`): a button and a modal player, once `studio trailer` has made the film
@@ -289,6 +329,12 @@ def build_site(project: Project, log: Callable[[str], None] = print,
         style_scenes=bool(sdir and (sdir / "scenes.html.j2").exists()),
         runtime=runtime_href or "runtime/", looks=looks, icon=favicon(site, theme), trailer=trailer,
     )
+    if badge:   # the storyboard marks its pages: never mistaken for the finished site
+        mark = (f'<div class="ss-storyboard-badge" style="position:fixed;left:14px;bottom:14px;z-index:2147483000;'
+                f'font:600 12px/1 system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#111;'
+                f'background:#ffd25e;padding:7px 11px;border-radius:99px;box-shadow:0 2px 12px rgba(0,0,0,.35);'
+                f'pointer-events:none">{Markup.escape(badge)}</div>')
+        html = html.replace("</body>", mark + "\n</body>", 1).replace("<head>", '<head>\n<meta name="robots" content="noindex">', 1)
     if link_base:
         html = re.sub(r'(<a\s[^>]*?href=")(?!#|[a-z][a-z0-9+.-]*:|/|\.\./)([^"]*")', lambda m: m.group(1) + link_base + m.group(2), html)
     (dist / "index.html").write_text(html, encoding="utf-8")

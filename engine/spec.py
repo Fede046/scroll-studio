@@ -213,6 +213,10 @@ class SceneBase(Model):
     backdrop: Optional[ImageRef] = Field(
         None, description="Full-bleed image behind the whole section: a file, URL, generate: or gradient:. In the stack "
                           "layout it is the panel's own backdrop. Pair with `surface` for legible text.")
+    locked: bool = Field(False, description="Keep this scene's renders as they are: `studio build` and `studio "
+                                            "storyboard` never re-render it, even when its settings change (a log line "
+                                            "says so). A locked scene that was never rendered is rendered once. Unlock "
+                                            "(or delete the render) to redo it")
 
 
 # ---------------------------------------------------------------- scene types
@@ -345,6 +349,8 @@ class Take(Model):
                                               "Wan 2.2 Fun Control along the same depth guide, from the first "
                                               "keyframe, in the segments and prompts of `ltx:`")
     wan: Optional[Wan] = Field(None, description="Wan settings for this take (over the site's `wan:`)")
+    locked: bool = Field(False, description="Keep the take's renders (world, product pass, composite) as they are, even "
+                                            "when its settings change: build and storyboard log it and move on")
 
 
 class Beat(Model):
@@ -364,6 +370,8 @@ class Beat(Model):
     trim: float = Field(0.0, ge=0, description="Seconds cut from the start of the clip (an action shot that holds its "
                                                "first frame before moving). Re-uses the render: nothing is re-animated")
     video_model: Optional[VideoModel] = Field(None, description=VIDEO_MODEL_DOC + ". `strength` applies to ltx only")
+    locked: bool = Field(False, description="Keep this beat's clip (and its storyboard still) as rendered, even when "
+                                            "its prompt or motion changes; the rest of the film still builds around it")
 
 
 class FilmScene(SceneBase):

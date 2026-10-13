@@ -88,6 +88,8 @@ def stage_keyframes(shot, out, args):
         name = spec["name"]
         if args.only and name != args.only:
             continue
+        if name in (getattr(args, "skip", None) or ()):
+            continue
         idx = keyframe_index(spec["t"], shot["fps"])
         depth_src = depth_frames[idx if idx < 0 else min(idx, len(depth_frames) - 1)]
         depth = os.path.join(kdir, f"depth_{name}_{w}x{h}.png")

@@ -18,6 +18,8 @@ def resolve_path(project: Project, ref: str, log=print) -> Path:
         name = hashlib.sha1(ref.encode()).hexdigest()[:12] + "_" + ref.split("?")[0].rsplit("/", 1)[-1][-60:]
         out = project.build / "_downloads" / name
         if not out.exists():
+            from .fidelity import would_render
+            would_render("download", ref)
             out.parent.mkdir(parents=True, exist_ok=True)
             log(f"  downloading {ref}")
             ua = {"User-Agent": "ScrollStudio/0.1 (+https://github.com/Okohedeki/scroll-studio)"}
@@ -120,6 +122,11 @@ def resolve_image(project: Project, ref: ImageRef, log=print, alpha: bool = Fals
     out = project.build / "_generated" / f"{digest}.png"
     if out.exists():
         return out
+    from .fidelity import placeholder, preview, would_render
+    would_render("image", ref.generate)
+    pv = preview()
+    if pv is not None and not pv.comfy:   # a sketch storyboard: a card for the shot to come, outside the cache
+        return placeholder(project.build / "_storyboard" / "placeholders", ref.generate, (w, h))
     from .backends import comfy
     if not comfy.alive():
         raise BuildError("this image is generated locally, but ComfyUI is not running at "
@@ -144,6 +151,13 @@ def _edit(project: Project, ref: ImageInput, log=print) -> Path:
     out = project.build / "_generated" / f"edit_{digest}.png"
     if out.exists():
         return out
+    from .fidelity import placeholder, preview, would_render
+    would_render("edit", e.instruction)
+    pv = preview()
+    if pv is not None and not pv.comfy:
+        from PIL import Image
+        return placeholder(project.build / "_storyboard" / "placeholders", f"Edit: {e.instruction}",
+                           Image.open(srcs[0]).size)
     if not comfy.alive():
         raise BuildError(f"this image is edited locally with Qwen-Image-Edit, but ComfyUI is not running at {comfy.COMFY}.")
     log(f"  editing image (Qwen-Image-Edit, seed {e.seed}): {e.instruction[:80]}")

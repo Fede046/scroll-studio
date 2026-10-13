@@ -1,6 +1,9 @@
 # Per-project build cache, built sites, review output (regenerate with `studio build/snapshot/record`)
 .build/
 dist/
+# storyboards (`studio storyboard`): regenerate any time; the engine package is not one
+storyboard/
+!engine/storyboard/
 snapshots/
 recordings/
 # User projects live outside git by default (see studio.toml `projects`)

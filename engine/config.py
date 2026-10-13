@@ -60,4 +60,7 @@ def settings() -> dict:
         "video_model": get("STUDIO_VIDEO_MODEL", "video_model", "ltx"),
         # Wan 2.2 file names as ComfyUI lists them, when they differ from engine/backends/comfy.py WAN ([wan] table)
         "wan": t.get("wan") or {},
+        # `studio build` asks before starting when its estimate is over this many minutes (unset: just print it);
+        # --yes skips the question, and without a terminal the build stops instead of waiting
+        "confirm_over": float(get("STUDIO_CONFIRM_OVER", "confirm_over", 0) or 0) or None,
     }
