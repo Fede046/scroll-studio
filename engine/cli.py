@@ -4,6 +4,7 @@
   studio build my-site [--section hero] [--force] [--draft]
   studio preview my-site [--port 5173]
   studio record my-site [--section hero] [--seconds 12] [--gif]
+  studio trailer my-site [--format 9x16] [--plan]      launch trailer from the site's renders -> dist/trailer/
   studio ui                                         the Studio app (http://localhost:5180)
   studio doctor                                     check Python, Node, FFmpeg, Blender, GPU, ComfyUI, models
   studio schema                                     JSON Schema of site.yaml
@@ -328,6 +329,22 @@ def combine(videos: list[Path], out: Path = typer.Option(..., help="MP4 to write
     ffmpeg(*inputs, "-filter_complex", ";".join(chains), "-map", last, "-c:v", "libx264", "-crf", "18", "-preset", "slow",
            "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(out))
     typer.echo(f"-> {out} ({sum(durs) - fade * (len(videos) - 1):.1f}s)")
+
+
+@app.command()
+def trailer(name: str, format: Optional[str] = typer.Option(None, help="16x9 or 9x16 (default: trailer.formats)"),
+            force: bool = typer.Option(False, help="Ignore the cache"),
+            plan: bool = typer.Option(False, help="Print the cut and stop")):
+    """Cut a launch trailer from the site's own renders: dist/trailer/trailer-16x9.mp4 and trailer-9x16.mp4."""
+    from .project import Project
+    from .trailer import build_trailer, plan_only
+    project = Project(resolve(name))
+    if plan:
+        plan_only(project)
+        return
+    res = build_trailer(project, formats=[format] if format else None, force=force)
+    for fmt, v in res["videos"].items():
+        typer.echo(f"{fmt}: {v}")
 
 
 @app.command()

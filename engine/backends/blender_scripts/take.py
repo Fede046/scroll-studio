@@ -2,6 +2,7 @@
 
   blender -b --factory-startup -P take.py -- --take take.json --pass world   --out DIR --res 1280x720
   blender -b --factory-startup -P take.py -- --take take.json --pass product --out DIR --res 1920x1080 --samples 64
+  blender -b --factory-startup -P take.py -- --take take.json --pass track   --out DIR --res 1920x1080
 
 take.json is the spec's `take` mapping (see engine/spec.py Take) plus "product_file", the resolved model path.
 
@@ -9,6 +10,8 @@ world:    Workbench beauty frames + the depth guide for the video model (depth/#
           mesh is in this pass too, so the guide tells the model something solid stands there.
 product:  Cycles, transparent film: only the product, lit by a studio HDRI and a sun along the take's light
           direction, with its shadow caught on an invisible ground at its base. frames/####.png, RGBA.
+track:    no rendering: the product's screen position per frame (track.json: centre of its body and its screen box,
+          0-1 image coordinates, y down), for reframing the take (the launch trailer's 9:16 crop follows it).
 
 Both passes build the camera from the same keys with the same fps, so frame i of one pass is frame i of the other.
 """
@@ -28,7 +31,7 @@ from blockout_lib import blob, box, camera_rig, cone, cylinder, plane, render, r
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 ap = argparse.ArgumentParser()
 ap.add_argument("--take", required=True)
-ap.add_argument("--pass", dest="which", choices=["world", "product"], required=True)
+ap.add_argument("--pass", dest="which", choices=["world", "product", "track"], required=True)
 ap.add_argument("--out", required=True)
 ap.add_argument("--res", default="1280x720")
 ap.add_argument("--samples", type=int, default=64)
@@ -172,6 +175,40 @@ if a.which == "world":
     cam, target = camera_rig(keys, lens=T.get("lens", 32))
     render(a, cam, target, depth_far=float(T.get("depth_far", 400)))
     print(f"WORLD {a.frames} frames -> {a.out}", flush=True)
+    raise SystemExit(0)
+
+if a.which == "track":
+    if not P:
+        raise SystemExit("this take has no product")
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    scene = bpy.context.scene
+    scene.render.fps = a.fps
+    scene.frame_start, scene.frame_end = 1, a.frames
+    scene.render.resolution_x, scene.render.resolution_y = a.width, a.height
+    scene.render.resolution_percentage = 100
+    _, meshes = place_product(P)
+    keys = [(k["t"], tuple(k["at"]), tuple(k["look"])) for k in T["camera"]]
+    cam, _target = camera_rig(keys, lens=T.get("lens", 32))
+    from bpy_extras.object_utils import world_to_camera_view
+    track = []
+    for fi in range(1, a.frames + 1):
+        scene.frame_set(fi)
+        deps = bpy.context.evaluated_depsgraph_get()
+        pts = [o.evaluated_get(deps).matrix_world @ Vector(c) for o in meshes for c in o.evaluated_get(deps).bound_box]
+        view = [world_to_camera_view(scene, cam, q) for q in pts]
+        front = [v for v in view if v.z > 0]
+        if not front:
+            track.append(None)
+            continue
+        xs, ys = [v.x for v in front], [v.y for v in front]
+        cx, cy = (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
+        track.append({"c": [round(cx, 5), round(1 - cy, 5)],
+                      "box": [round(min(xs), 5), round(1 - max(ys), 5), round(max(xs), 5), round(1 - min(ys), 5)],
+                      "dist": round(sum(v.z for v in front) / len(front), 4)})
+    os.makedirs(a.out, exist_ok=True)
+    with open(os.path.join(a.out, "track.json"), "w") as f:
+        json.dump({"fps": a.fps, "res": [a.width, a.height], "frames": track}, f)
+    print(f"TRACK {a.frames} frames -> {a.out}", flush=True)
     raise SystemExit(0)
 
 # product pass

@@ -722,6 +722,72 @@ class Page(Model):
     nav: bool = Field(False, description="Also link it from the nav, after the section links")
 
 
+# ---------------------------------------------------------------- launch trailer (`studio trailer`, engine/trailer/)
+
+class TrailerShot(Model):
+    """One shot of the launch trailer, cut from something the site already rendered. Give one source: `section`
+    (with `step` or `range`), `beat`, `product` or `card`."""
+    section: Optional[str] = Field(None, description="id of a section. A film plays its own footage (take, beats or "
+                                                      "video); any other section is recorded scrolling through the "
+                                                      "built site (at phone size for 9:16)")
+    step: Optional[int] = Field(None, description="film: the footage under this step (its index in the section's "
+                                                  "steps), captioned with its headline")
+    beat: Optional[str] = Field(None, description="id of a beat of a beats film (the section is found for you)")
+    range: Optional[tuple[float, float]] = Field(None, description="Part of the source: seconds of a film, or 0-1 "
+                                                                   "scroll progress of a recorded section")
+    product: Optional[str] = Field(None, description="A still of `site.product` from this view (front, three-quarter, "
+                                                     "side, top, back, hero-low, exploded) with a slow push-in. Needs "
+                                                     "the product feature; skipped with a note when it is missing")
+    card: Optional[str] = Field(None, description="A type card on the theme background with this headline "
+                                                  "(<em>…</em> marks accent words)")
+    caption: Optional[str] = Field(None, description="Headline over the shot (<em>…</em> marks accent words). "
+                                                     "Default: the matching step or section headline; '' for none")
+    kicker: Optional[str] = Field(None, description="Small label above the caption")
+    callouts: list[str] = Field(default_factory=list, description="Short feature lines ('24 h cold') set big, one "
+                                                                  "after another on the beat, over this shot")
+    beats: Optional[int] = Field(None, ge=1, le=64, description="Length on the trailer's beat grid (default: long "
+                                                                "enough to read the caption, at least a bar)")
+    speed: float = Field(1.0, ge=0.25, le=4.0, description="Playback speed of the footage")
+    hold: bool = Field(False, description="Freeze the first frame of `range` instead of playing it")
+    zoom: Optional[tuple[float, float]] = Field(None, description="Push-in: scale at the start and the end of the "
+                                                                  "shot (1 = the whole frame). Default: a slow push on "
+                                                                  "the product reveal and on stills")
+    focus: Optional[tuple[float, float]] = Field(None, description="Point (0-1 x, y of the source) that the 9:16 crop "
+                                                                   "and the push-in keep in frame. Default: the "
+                                                                   "product in a take, else the most salient area")
+
+
+class Trailer(Model):
+    """A launch film cut by the engine from the site's own renders (`studio trailer`): dist/trailer/trailer-16x9.mp4,
+    trailer-9x16.mp4 (reframed, never letterboxed) and their posters. Cuts land on a beat grid; captions and the end
+    card are set in the theme's fonts and colours. `trailer: {}` derives the cut: a hook shot, the middle of the
+    story, the product reveal, 2-4 feature callouts and an end card."""
+    shots: list[TrailerShot] = Field(default_factory=list, description="The cut, in order. Empty: derived from the site")
+    formats: list[Literal["16x9", "9x16"]] = Field(default_factory=lambda: ["16x9", "9x16"],
+                                                   description="16x9: 1920x1080; 9x16: 1080x1920 for TikTok/Reels/Shorts")
+    seconds: float = Field(24.0, ge=8, le=90, description="Target length of a derived cut (15-30 s suits social)")
+    bpm: float = Field(100.0, ge=40, le=220, description="Tempo of the beat grid the cuts land on")
+    music: Optional[str] = Field(None, description="A local audio file (project path); none is generated. Without "
+                                                   "it the trailer is silent and the captions carry it")
+    music_start: float = Field(0.0, ge=0, description="Seconds into the music where the first cut lands (a downbeat)")
+    loudness: float = Field(-14.0, ge=-30, le=-8, description="Music loudness target, integrated LUFS")
+    fps: Literal[24, 30] = 24
+    captions: bool = Field(True, description="Set captions over the shots")
+    title: Optional[str] = Field(None, description="End card name (default: the site name)")
+    tagline: Optional[str] = Field(None, description="End card line (default: the site description)")
+    cta: Optional[str] = Field(None, description="End card call to action (default: the nav button's label)")
+    url: Optional[str] = Field(None, description="End card address, e.g. stillwater.example (default: the nav "
+                                                 "button's link when it is a full URL)")
+    disclaimer: Optional[str] = Field(None, description="Small print on the end card (default: the product's concept "
+                                                        "line, 'Concept page. Not affiliated with <maker>.')")
+    end_beats: int = Field(8, ge=2, le=32, description="Length of the end card on the beat grid")
+    end_background: Literal["blur", "theme"] = Field("blur", description="blur: the last shot, blurred under the "
+                                                                         "theme colour; theme: the plain background")
+    embed: bool = Field(False, description="Add a 'Watch the launch film' button to the first section that opens the "
+                                           "trailer in a modal (built by `studio trailer`, picked up by the next build)")
+    embed_label: str = Field("Watch the launch film", description="Label of the embed button")
+
+
 class Site(Model):
     name: str
     description: str = ""
@@ -736,6 +802,9 @@ class Site(Model):
     sections: list[Section]
     footer: Footer = Field(default_factory=Footer)
     pages: list[Page] = Field(default_factory=list, description="Plain Markdown pages beside the site (privacy, support)")
+    # launch trailer
+    trailer: Optional[Trailer] = Field(None, description="A launch film built from the site's renders by "
+                                                         "`studio trailer` (16:9 and 9:16); `{}` derives the cut")
 
 
 def is_scene(section) -> bool:
