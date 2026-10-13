@@ -44,9 +44,37 @@ def checks() -> list[dict]:
             "film, generated images (`generate:`)")
     except Exception as e:
         add("ComfyUI", False, str(e), "film, generated images")
+    res.extend(wan_checks())
     add("Chrome", shutil.which("chrome") or Path(r"C:\Program Files\Google\Chrome\Application\chrome.exe").exists() or s["chrome"],
         "found", "recordings")
     return res
+
+
+def wan_checks() -> list[dict]:
+    """Every Wan 2.2 file (engine/models.yaml entries with `wan:`), looked up in ComfyUI's own model lists, so a
+    file in a subfolder, on another drive behind a junction, or renamed in studio.toml [wan] is found where ComfyUI
+    loads it from. Without ComfyUI running, the check can't see them and says so."""
+    import yaml
+    from .backends import comfy
+    entries = [m for m in yaml.safe_load((Path(__file__).parent / "models.yaml").read_text(encoding="utf-8"))["comfyui"]
+               if m.get("wan")]
+    names = comfy.wan_model_names()
+    lists, out = {}, []
+    for m in entries:
+        key = m["wan"]
+        folder = comfy.WAN_FOLDERS[key]
+        if folder not in lists:
+            lists[folder] = comfy.listed(folder)
+        have, want = lists[folder], names[key]
+        base = want.replace("\\", "/").rsplit("/", 1)[-1]
+        if have is None:
+            ok, detail = False, f"{want}: ComfyUI not running, can't check"
+        else:
+            hit = want if want in have else next((h for h in have if h.replace("\\", "/").rsplit("/", 1)[-1] == base), None)
+            ok = hit is not None
+            detail = f"{folder}/{hit}" if ok else f"missing {folder}/{want} ({m['size_gb']} GB): {m['source']}"
+        out.append({"name": m["name"], "ok": ok, "detail": detail, "needed_by": ", ".join(m.get("used_by", []))})
+    return out
 
 
 def report() -> None:

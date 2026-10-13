@@ -395,3 +395,94 @@ def stage_upscale(shot, out, args):
        "-pix_fmt", "yuv420p", "-movflags", "+faststart", dst)
     w, h = Image.open(os.path.join(final, "00001.png")).size
     print(f"  {os.path.basename(dst)}: {len(os.listdir(final))} frames at {w}x{h}")
+
+
+def stage_generate_wan(shot, out, wout, args, log=print):
+    """A take's world painted by Wan 2.2 Fun Control (`video_model: wan`): the Blender depth guide is the control
+    video, so the world follows the exact camera the product is rendered through.
+
+    Same segments and prompts as `ltx:`. Wan runs at 16 fps in clips of <= 81 frames: a longer segment is split
+    into even clips. The first clip starts on the keyframe at t=0 (if any); every later clip starts on the previous
+    clip's real last frame, so the joins are seamless. Each clip also gets a reference still (the keyframe inside
+    its range, else the first keyframe) that steers the look. The joined 16 fps frames are retimed to the take's fps
+    (FFmpeg minterpolate by default) so frame i matches the product pass frame i. Writes <wout>/gen/gen.mp4.
+    """
+    import time
+    from pathlib import Path
+    from ..animate import retime, wan_size, wan_split
+    wan = dict(shot.get("wan") or {})
+    ltx = shot["ltx"]
+    fps, wfps = shot["fps"], ltx_comfy.WAN_FPS
+    pw, ph = shot["preview_res"]
+    w, h = wan_size(pw, ph, wan.get("res"))
+    bdir = os.path.join(out, "blockout")
+    kdir = os.path.join(out, "keyframes")
+    gdir = os.path.join(wout, "gen")
+    os.makedirs(gdir, exist_ok=True)
+    seed0 = wan.get("seed", ltx.get("seed", 42))
+    neg = wan.get("negative_prompt") or ltx.get("negative_prompt", "")
+    blur = ltx.get("guide_blur", 0)
+    keys = []
+    for spec in shot.get("keyframes", {}).get("frames", []):
+        t = shot["duration"] if spec["t"] == "end" else float(spec["t"])
+        src = os.path.join(kdir, f"{spec['name']}.png")
+        if os.path.exists(src):
+            keys.append((t, src))
+    keys.sort()
+
+    # clips: (prompt, first 16 fps frame, frame count), segment by segment
+    clips = []
+    segments = ltx.get("segments") or [{"id": "main", "range": [0, shot["duration"]], "prompt": ltx.get("prompt", "")}]
+    if args.seconds:
+        segments = [dict(segments[0], range=[segments[0]["range"][0], segments[0]["range"][0] + args.seconds])]
+    for seg in segments:
+        a = int(round(seg["range"][0] * wfps))
+        n = max(5, (int(round(seg["range"][1] * wfps)) - a) // 4 * 4 + 1)
+        for k in wan_split(n, int(wan.get("max_frames", ltx_comfy.WAN_MAX_FRAMES))):
+            clips.append((seg.get("prompt") or ltx.get("prompt", ""), a, k, seg["id"]))
+            a += k - 1
+
+    def still(src, name):
+        dst = os.path.join(gdir, f"{name}_{w}x{h}.png")
+        ff("-i", src, "-vf", f"scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h}", dst)
+        return ltx_comfy.upload(dst)
+
+    raw = os.path.join(gdir, "frames16")
+    shutil.rmtree(raw, ignore_errors=True)
+    os.makedirs(raw)
+    ltx_comfy.free()
+    n_out, start = 0, None
+    if keys and keys[0][0] <= 0.05:
+        start = still(keys[0][1], "start")
+    for ci, (prompt, a, k, sid) in enumerate(clips):
+        t0, t1 = a / wfps, (a + k - 1) / wfps
+        inside = [src for t, src in keys if t0 <= t <= t1]
+        ref_src = inside[0] if inside else (keys[0][1] if keys else None)
+        ref = still(ref_src, f"ref{ci}") if ref_src and wan.get("ref", True) else None
+        guide = os.path.join(gdir, f"guide{ci}_{w}x{h}_{a}_{k}_b{blur}.mp4")
+        vf = [f"fps={wfps}", f"trim=start_frame={a}", "setpts=PTS-STARTPTS",
+              f"scale={w}:{h}:force_original_aspect_ratio=increase:flags=lanczos", f"crop={w}:{h}"]
+        if blur:
+            vf.append(f"gblur=sigma={blur}")
+        vf += ["tpad=stop_mode=clone:stop=32"]
+        ff("-i", os.path.join(bdir, "depth.mp4"), "-vf", ",".join(vf), "-frames:v", str(k),
+           "-c:v", "libx264", "-crf", "10", "-pix_fmt", "yuv420p", "-r", str(wfps), guide)
+        log(f"  [wan {sid} {ci + 1}/{len(clips)}] {t0:.2f}-{t1:.2f}s, {k} frames at {w}x{h} | start: "
+            f"{'keyframe' if start and ci == 0 else 'previous clip' if start else 'none'} | ref: "
+            f"{os.path.basename(ref_src) if ref else 'none'}")
+        t = time.time()
+        graph = ltx_comfy.build_wan_graph(wan, prompt, neg, w, h, k, seed0 + ci, prefix=f"{shot['id']}/wan_{ci:02d}",
+                                          start_image=start, control_video=ltx_comfy.upload(guide), ref_image=ref)
+        cdir = ltx_comfy.fetch(ltx_comfy.run(graph), os.path.join(gdir, f"_c{ci:02d}"))
+        pngs = sorted(glob.glob(os.path.join(cdir, "*.png")))
+        for p in pngs[1 if ci else 0:]:
+            n_out += 1
+            shutil.move(p, os.path.join(raw, f"{n_out:04d}.png"))
+        shutil.rmtree(cdir, ignore_errors=True)
+        log(f"  clip {ci + 1}: {k} frames in {time.time() - t:.0f}s")
+        start = still(os.path.join(raw, f"{n_out:04d}.png"), f"chain{ci}")
+    ltx_comfy.free()
+    frames = retime(Path(raw), Path(gdir) / "frames24", wfps, fps, None, wan.get("interpolate", "mci"), log)
+    ff("-framerate", str(fps), "-i", os.path.join(gdir, "frames24", "%04d.png"), "-c:v", "libx264", "-crf", "14",
+       "-pix_fmt", "yuv420p", "-movflags", "+faststart", os.path.join(gdir, "gen.mp4" if not args.seconds else "gen_test.mp4"))
+    log(f"  gen.mp4 (wan): {n_out} frames at {wfps} fps -> {len(frames)} at {fps} fps")

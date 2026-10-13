@@ -1,8 +1,8 @@
 """theme.art: artwork a style renders in its own medium (ascii-art prints it in characters, particles forms it in points).
 
-The image is generated locally from a prompt (Z-Image) or taken from a file; with `motion:` LTX-2.3 animates it into a
-short loop. The page gets one grayscale sprite sheet (frames stacked top to bottom, auto-contrasted) plus the facts the
-runtime needs; the runtime turns those frames into characters or points at whatever size the screen has.
+The image is generated locally from a prompt (Z-Image) or taken from a file; with `motion:` the video model (LTX-2.3 or Wan
+2.2, `video_model`) animates it into a short loop. The page gets one grayscale sprite sheet (frames stacked top to
+bottom, auto-contrasted) plus the facts the runtime needs; the runtime turns those frames into characters or points at whatever size the screen has.
 
 Cached under .build/_art/<digest>/; only the sheet is copied into the site.
 """
@@ -18,27 +18,38 @@ from .inputs import resolve_image, resolve_path
 from .project import BuildError, Project
 from .spec import Art, ImageInput
 
-def _animate(still: Path, art: Art, work: Path, log: Callable[[str], None]) -> list[Path]:
+def _animate(still: Path, art: Art, work: Path, log: Callable[[str], None], model: str = "ltx",
+             wan: dict | None = None) -> list[Path]:
     from .animate import animate
     from .backends import comfy
     if not comfy.alive():
-        raise BuildError("theme.art has `motion:`, which is animated locally with LTX-2.3, but ComfyUI is not running. "
-                         "Start it (docs/INSTALL.md) or remove `motion:` for a still.")
-    return animate(still, art.prompt or "", f"{art.motion}, the camera stays still", art.seconds, art.seed, work, log)
+        raise BuildError("theme.art has `motion:`, which is animated locally with a video model in ComfyUI, but ComfyUI "
+                         "is not running. Start it (docs/INSTALL.md) or remove `motion:` for a still.")
+    return animate(still, art.prompt or "", f"{art.motion}, the camera stays still", art.seconds, art.seed, work, log,
+                   model=model, wan=wan)
 
 
-def build(project: Project, art: Art, dist: Path, log: Callable[[str], None] = print) -> dict:
+def build(project: Project, art: Art, dist: Path, log: Callable[[str], None] = print,
+          site_video_model: str | None = None, site_wan: dict | None = None) -> dict:
     from PIL import Image, ImageOps
+    from .animate import video_model, wan_settings
     if not art.prompt and not art.file:
         raise BuildError("theme.art needs a `prompt` (generated locally) or a `file`")
-    key = json.dumps(art.model_dump(mode="json"), sort_keys=True)
+    model = video_model(art.video_model, site_video_model) if art.motion else "ltx"
+    wan = wan_settings(site_wan) if model == "wan" else None
+    dump = art.model_dump(mode="json")
+    dump.pop("video_model", None)   # keyed below only when it is not ltx, so art built before it existed stays cached
+    if model != "ltx":
+        dump["video"] = [model, wan]
+    key = json.dumps(dump, sort_keys=True)
     if art.file:
         src = resolve_path(project, art.file, log)
         key += f"{src.stat().st_size}:{int(src.stat().st_mtime)}"
     digest = hashlib.sha1((key + ":7").encode()).hexdigest()[:12]
     work = project.build / "_art" / digest
     # the generated clip depends only on what was asked for, not on how it is shipped (frames, width)
-    vkey = json.dumps([art.prompt, art.file, art.motion, art.seconds, list(art.size), art.seed], sort_keys=True)
+    vkey = json.dumps([art.prompt, art.file, art.motion, art.seconds, list(art.size), art.seed]
+                      + ([model, wan] if model != "ltx" else []), sort_keys=True)
     vwork = project.build / "_art" / ("v_" + hashlib.sha1(vkey.encode()).hexdigest()[:12])
     sheet = work / "sheet.png"
     meta_file = work / "meta.json"
@@ -49,7 +60,7 @@ def build(project: Project, art: Art, dist: Path, log: Callable[[str], None] = p
             paths = sorted((vwork / "frames").glob("*.png"))
             if not paths:
                 vwork.mkdir(parents=True, exist_ok=True)
-                paths = _animate(Path(still), art, vwork, log)
+                paths = _animate(Path(still), art, vwork, log, model, wan)
             paths = _loop_span(paths)
         else:
             paths = [Path(still)]
