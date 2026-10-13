@@ -100,13 +100,21 @@ class BuildContext:
     def url(self, path: Path) -> str:
         return f"assets/{self.section_id}/{path.relative_to(self.web).as_posix()}"
 
-    def stage(self, name: str, key: Any, outputs: list[Path], fn: Callable[[], Any]) -> bool:
-        """Run fn unless the stamp matches key and every output exists. Returns True if it ran."""
+    def stage(self, name: str, key: Any, outputs: list[Path], fn: Callable[[], Any], legacy: Any = None) -> bool:
+        """Run fn unless the stamp matches key and every output exists. Returns True if it ran.
+
+        legacy: the key this stage had under an older formula. A stamp written with it still counts (and is
+        rewritten with the new key), so changing how a key is computed never re-renders finished work."""
         stamp = self.work / "stamps" / f"{name}.json"
         digest = _hash(key)
         if not self.force and stamp.exists() and all(p.exists() for p in outputs):
-            if json.loads(stamp.read_text()).get("key") == digest:
+            old = json.loads(stamp.read_text())
+            if old.get("key") == digest:
                 self.log(f"  {name}: up to date")
+                return False
+            if legacy is not None and old.get("key") == _hash(legacy):
+                stamp.write_text(json.dumps({**old, "key": digest}))
+                self.log(f"  {name}: up to date (cache key migrated)")
                 return False
         self.log(f"  {name}: running")
         t0 = time.time()

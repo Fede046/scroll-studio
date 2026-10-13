@@ -6,6 +6,38 @@ commits it spans so you can check out any earlier state (`git checkout <commit>`
 Everything so far is version 1. On 2026-10-12 the releases first published as 2.0.0 and 3.0.0 were renumbered
 1.1.0 and 1.2.0 (tags `v1.1.0` and `v1.2.0`).
 
+## Unreleased (product integration)
+
+### Added
+- `site.product`: the product declared once (name, maker, url, model, licence, credit, `concept`). Models in GLB/glTF,
+  OBJ, FBX, STL, PLY, **STEP/STP** (converted locally with OpenCascade through `cascadio`, parts kept as separate meshes
+  with their names) and **3MF** (trimesh), from a file or URL. `up`, `units` and `rotation` fix any file; `parts` sets
+  materials by part/assembly/mesh glob, material name, a `region` of the bounds and a `facing` (so a one-piece body
+  can have a screen window); `exclude` drops alternate variants; `tessellation` and `max_triangles` keep huge CAD
+  files in check (only heavy meshes are thinned). Cached as one normalised GLB in `.build/_product/`
+  (`engine/product.py`, `backends/blender_scripts/product_prep.py`, `backends/cad.py`).
+- Product stills anywhere an image is accepted: `image: {product: <view>}` with views front, three-quarter, side, top,
+  back, hero-low, exploded and detail (`part:`, a macro view with shallow depth of field). Framed on the real
+  silhouette (about two thirds of the frame), Khronos PBR Neutral colour, soft contact shadow, transparent where the
+  page shows it. `scene:` renders the product into a perspective-matched Z-Image backdrop, lit by it, harmonised by a
+  light Qwen-Image-Edit pass and checked against the product's own edges.
+- `showroom` scene: the product live in the page (three.js, the normalised GLB, environment light, soft shadow);
+  scroll keys turn, explode and zoom it; a Cycles poster until it loads.
+- `studio product <project> [--parts] [--still <view>]` and MCP tools `product_parts`, `product_still`.
+- Footer: the product's credit and licence, and "Concept page. Not affiliated with <maker>." for `concept: true`.
+- Takes: plate-matched light by default (environments made from the generated frames, the ground's colour under the
+  shadow, sun from `take.light`), depth of field at the camera's look-at, motion blur, and a composite graded to the
+  plate (black level, white balance, saturation, softness, grain, light wrap). `product: {}` uses the site's product;
+  product passes default to 64 samples at the final film size. `track` stage writes `product/track.json`, the
+  product's screen position per frame (for vertical reframing).
+
+### Changed
+- Take stage keys are portable: the generated world (blockout, keyframes, LTX) no longer depends on the product (unless
+  it is in the depth guide) or on absolute paths, so moving a project or changing the product never re-renders the
+  world. Stamps written by the old keys are recognised and migrated.
+- Block images keep their transparency (WebP with alpha) instead of being flattened.
+- `sequence` scenes take `model: product` (or no model) and the product's own explode offsets.
+
 ## 1.3.0 · 2026-10-11 to 2026-10-12
 
 Commits after `83bfbc7` to the `v1.3.0` tag.

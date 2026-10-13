@@ -1,7 +1,8 @@
 """A take: the world blockout and the product pass, rendered through one and the same camera.
 
   blender -b --factory-startup -P take.py -- --take take.json --pass world   --out DIR --res 1280x720
-  blender -b --factory-startup -P take.py -- --take take.json --pass product --out DIR --res 1920x1080 --samples 64
+  blender -b --factory-startup -P take.py -- --take take.json --pass product --out DIR --res 1920x1080 --samples 64 [--env env.json]
+  blender -b --factory-startup -P take.py -- --take take.json --pass track   --out DIR --res 1920x1080
 
 take.json is the spec's `take` mapping (see engine/spec.py Take) plus "product_file", the resolved model path.
 
@@ -9,6 +10,10 @@ world:    Workbench beauty frames + the depth guide for the video model (depth/#
           mesh is in this pass too, so the guide tells the model something solid stands there.
 product:  Cycles, transparent film: only the product, lit by a studio HDRI and a sun along the take's light
           direction, with its shadow caught on an invisible ground at its base. frames/####.png, RGBA.
+          With --env (engine/scenes/film_build.py stage_plate_env) the light is the plate itself: environments
+          built from the generated frames, blended over time, and the ground the shadow falls on takes the plate's
+          colour. Depth of field focuses where the camera looks; motion blur follows the camera.
+track:    no render: per frame, the camera and the product's place on screen -> track.json (normalised 0-1, y down).
 
 Both passes build the camera from the same keys with the same fps, so frame i of one pass is frame i of the other.
 """
@@ -28,7 +33,8 @@ from blockout_lib import blob, box, camera_rig, cone, cylinder, plane, render, r
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 ap = argparse.ArgumentParser()
 ap.add_argument("--take", required=True)
-ap.add_argument("--pass", dest="which", choices=["world", "product"], required=True)
+ap.add_argument("--pass", dest="which", choices=["world", "product", "track"], required=True)
+ap.add_argument("--env", default=None, help="product: env.json of plate environments (else the studio light `hdri`)")
 ap.add_argument("--out", required=True)
 ap.add_argument("--res", default="1280x720")
 ap.add_argument("--samples", type=int, default=64)
@@ -134,7 +140,7 @@ def place_product(p):
     pts = [o.matrix_world @ Vector(c) for o in meshes for c in o.bound_box]
     lo = Vector((min(q.x for q in pts), min(q.y for q in pts), min(q.z for q in pts)))
     hi = Vector((max(q.x for q in pts), max(q.y for q in pts), max(q.z for q in pts)))
-    scale = p["height"] / max(hi.z - lo.z, 1e-6)
+    scale = float(p.get("height") or 1.0) / max(hi.z - lo.z, 1e-6)
     root = bpy.data.objects.new("Product", None)
     bpy.context.scene.collection.objects.link(root)
     for o in new:
@@ -208,12 +214,52 @@ scene.render.image_settings.color_mode = "RGBA"
 
 root, meshes = place_product(P)
 
+if a.which == "track":
+    from bpy_extras.object_utils import world_to_camera_view
+    keys = [(k["t"], tuple(k["at"]), tuple(k["look"])) for k in T["camera"]]
+    cam, target = camera_rig(keys, lens=T.get("lens", 32))
+    out = []
+    for fi in range(1, a.frames + 1):
+        scene.frame_set(fi)
+        deps = bpy.context.evaluated_depsgraph_get()
+        pts = []
+        for o in meshes:
+            ev = o.evaluated_get(deps)
+            pts += [ev.matrix_world @ Vector(c) for c in ev.bound_box]
+        proj = [world_to_camera_view(scene, cam, q) for q in pts]
+        front = [q for q in proj if q.z > 0]
+        base = world_to_camera_view(scene, cam, Vector(P["at"]))
+        lo_ = Vector((min(q.x for q in pts), min(q.y for q in pts), min(q.z for q in pts)))
+        hi_ = Vector((max(q.x for q in pts), max(q.y for q in pts), max(q.z for q in pts)))
+        centre = world_to_camera_view(scene, cam, (lo_ + hi_) / 2)
+        rec = {"f": fi, "t": round((fi - 1) / a.fps, 4), "visible": False,
+               "camera": [list(r) for r in cam.matrix_world],
+               "distance": round((cam.matrix_world.translation - (lo_ + hi_) / 2).length, 4)}
+        if front and centre.z > 0:
+            x0, x1 = min(q.x for q in front), max(q.x for q in front)
+            y0, y1 = 1 - max(q.y for q in front), 1 - min(q.y for q in front)
+            rec.update({"visible": x1 > 0 and x0 < 1 and y1 > 0 and y0 < 1,
+                        "centre": [round(centre.x, 5), round(1 - centre.y, 5)],
+                        "base": [round(base.x, 5), round(1 - base.y, 5)],
+                        "box": [round(v, 5) for v in (x0, y0, x1, y1)]})
+        out.append(rec)
+    os.makedirs(a.out, exist_ok=True)
+    with open(os.path.join(a.out, "track.json"), "w", encoding="utf-8") as f:
+        json.dump({"fps": a.fps, "size": [a.width, a.height], "lens": cam.data.lens, "sensor": cam.data.sensor_width,
+                   "sensor_fit": cam.data.sensor_fit, "frames": out}, f)
+    print(f"TRACK {len(out)} frames -> {a.out}", flush=True)
+    raise SystemExit(0)
+
 world = bpy.data.worlds.new("World")
 scene.world = world
 world.use_nodes = True
 nt = world.node_tree
+ENV = None
+if a.env:
+    with open(a.env, encoding="utf-8") as f:
+        ENV = json.load(f)
 env = nt.nodes.new("ShaderNodeTexEnvironment")
-hdri = next((q for q in (os.path.join(bpy.utils.resource_path(k), "datafiles", "studiolights", "world", f"{P.get('hdri', 'sunrise')}.exr")
+hdri = next((q for q in (os.path.join(bpy.utils.resource_path(k), "datafiles", "studiolights", "world", f"{P.get('hdri') or 'sunrise'}.exr")
                         for k in ("LOCAL", "SYSTEM", "USER")) if os.path.exists(q)), None)
 if hdri is None:
     raise SystemExit(f"studio light '{P.get('hdri')}' not found in Blender's datafiles")
@@ -254,6 +300,35 @@ nt.links.new(mix.outputs["Color"], cam_mix.inputs["Color1"])
 nt.links.new(env.outputs["Color"], cam_mix.inputs["Color2"])
 nt.links.new(cam_mix.outputs["Color"], nt.nodes["Background"].inputs["Color"])
 nt.nodes["Background"].inputs["Strength"].default_value = 1.0
+if ENV:
+    # plate-matched light: one environment per key time (built from the generated frame at that moment, in world
+    # axes), cross-faded over the take, lighting and reflecting on the product for every ray type
+    for n in list(nt.nodes):
+        if n.type not in ("BACKGROUND", "OUTPUT_WORLD"):
+            nt.nodes.remove(n)
+    coord = nt.nodes.new("ShaderNodeTexCoord")
+    last = None
+    keys_env = ENV["keys"]
+    for i, k in enumerate(keys_env):
+        tex = nt.nodes.new("ShaderNodeTexEnvironment")
+        tex.image = bpy.data.images.load(k["file"])
+        tex.interpolation = "Cubic"
+        nt.links.new(coord.outputs["Generated"], tex.inputs["Vector"])
+        if last is None:
+            last = tex.outputs["Color"]
+            continue
+        mixn = nt.nodes.new("ShaderNodeMixRGB")
+        nt.links.new(last, mixn.inputs["Color1"])
+        nt.links.new(tex.outputs["Color"], mixn.inputs["Color2"])
+        f0 = 1 + round(keys_env[i - 1]["t"] * a.fps)
+        f1 = 1 + round(k["t"] * a.fps)
+        mixn.inputs["Fac"].default_value = 0.0
+        mixn.inputs["Fac"].keyframe_insert("default_value", frame=f0)
+        mixn.inputs["Fac"].default_value = 1.0
+        mixn.inputs["Fac"].keyframe_insert("default_value", frame=f1)
+        last = mixn.outputs["Color"]
+    nt.links.new(last, nt.nodes["Background"].inputs["Color"])
+    nt.nodes["Background"].inputs["Strength"].default_value = float(ENV.get("strength", 1.0))
 if P.get("sun_strength", 3.0) > 0:
     sun_data = bpy.data.lights.new("Sun", "SUN")
     sun_data.energy = float(P["sun_strength"])
@@ -270,9 +345,24 @@ if P.get("shadow", True):
     bpy.ops.mesh.primitive_plane_add(size=SHADOW, location=(P["at"][0], P["at"][1], P["at"][2]))
     floor = bpy.context.active_object
     floor.is_shadow_catcher = True
+    if ENV and ENV.get("ground"):
+        # the surface it stands on takes the plate's colour, so bounce light and occlusion match the ground
+        gm = bpy.data.materials.new("Ground")
+        gm.use_nodes = True
+        b = next(n for n in gm.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
+        b.inputs["Base Color"].default_value = (*ENV["ground"], 1.0)
+        b.inputs["Roughness"].default_value = 0.8
+        floor.data.materials.append(gm)
 
 keys = [(k["t"], tuple(k["at"]), tuple(k["look"])) for k in T["camera"]]
 cam, target = camera_rig(keys, lens=T.get("lens", 32))
+if P.get("fstop"):            # focus where the camera looks, as the generated world does
+    cam.data.dof.use_dof = True
+    cam.data.dof.focus_object = target
+    cam.data.dof.aperture_fstop = float(P["fstop"])
+if float(P.get("motion_blur", 0) or 0) > 0:
+    scene.render.use_motion_blur = True
+    scene.render.motion_blur_shutter = float(P["motion_blur"])
 
 from bpy_extras.object_utils import world_to_camera_view  # noqa: E402
 

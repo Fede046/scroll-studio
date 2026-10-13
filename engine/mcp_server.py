@@ -237,6 +237,39 @@ def brand_from_logo(project: str, logo: str, mode: str = "light", dry_run: bool 
     return apply_brand(_find(project), logo, mode=mode, dry_run=dry_run)
 
 
+# ---------------------------------------------------------------- product (site.product)
+
+@mcp.tool()
+def product_parts(project: str) -> dict:
+    """The site's product model, normalised (cached): size (m), triangles, units, and every part with its
+    materials and size, so product.parts rules can target names (match/material globs, region, facing)."""
+    from . import product as prod
+    p = _find(project)
+    with contextlib.redirect_stdout(sys.stderr):
+        info = prod.product_info(p, log=lambda m: None)
+        info["glb"] = str(prod.normalised_glb(p, log=lambda m: None))
+    return info
+
+
+@mcp.tool()
+def product_still(project: str, view: str = "three-quarter", width: int = 1600, height: int = 1200,
+                  background: str = "transparent", part: Optional[str] = None, scene: Optional[str] = None) -> dict:
+    """Render a still of the site's product (Cycles, studio light; cached) and return its path to look at.
+    view: front, three-quarter, side, top, back, hero-low, exploded, detail (with part = a name glob).
+    background: transparent, theme or a hex colour. scene: a prompt to render it into a generated scene
+    (needs ComfyUI)."""
+    from . import product as prod
+    from .spec import ImageInput, ProductShot
+    p = _find(project)
+    with contextlib.redirect_stdout(sys.stderr):
+        if scene:
+            path = prod.image_still(p, ImageInput(product=ProductShot(view=view, part=part, scene=scene, background=background),
+                                                  size=(width, height)), lambda m: None, alpha=background == "transparent")
+        else:
+            path = prod.product_still(p, None, view, (width, height), background, lambda m: None, part=part)
+    return {"image": str(path)}
+
+
 @mcp.tool()
 def doctor() -> list[dict]:
     """Which tools are installed (Blender, FFmpeg, GPU, ComfyUI...) and which scene types need them."""

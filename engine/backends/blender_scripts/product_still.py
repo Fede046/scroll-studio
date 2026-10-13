@@ -6,6 +6,11 @@
 
 Output: an RGBA PNG (transparent film, with a soft contact shadow caught on an invisible floor). The camera is
 fitted to the product's (exploded) bounds and shifted so the product sits centred in the frame.
+
+  --camera cam.json   also write the camera (matrix, lens, sensor, shift, floor) for a perspective-matched backdrop
+  --env env.json      light it with an environment built from a backdrop ({"file", "ground", "sun", "sun_strength"})
+                      instead of the studio
+  --mask mask.png     also write the product's own alpha (no shadow), for compositing checks
 """
 import argparse
 import fnmatch
@@ -27,6 +32,9 @@ ap.add_argument("--view", default="{}")
 ap.add_argument("--samples", type=int, default=96)
 ap.add_argument("--hdri", default="studio")
 ap.add_argument("--shadow", type=int, default=1)
+ap.add_argument("--camera", default=None)
+ap.add_argument("--env", default=None)
+ap.add_argument("--mask", default=None)
 a = ap.parse_args(argv)
 W, H = (int(v) for v in a.size.split("x"))
 V = json.loads(a.view)
@@ -142,6 +150,11 @@ hdri = next((p for p in (os.path.join(bpy.utils.resource_path(k), "datafiles", "
 if hdri is None:
     raise SystemExit(f"studio light '{a.hdri}' not found in Blender's datafiles")
 env.image = bpy.data.images.load(hdri)
+ENV = None
+if a.env:
+    with open(a.env, encoding="utf-8") as f:
+        ENV = json.load(f)
+    env.image = bpy.data.images.load(ENV["file"])
 # reflections see the studio HDRI; diffuse light from the world is an even grey, so the only shadows are the soft
 # ones from the area lights (an HDRI's own sun throws long streaks across the shadow catcher)
 path = nt.nodes.new("ShaderNodeLightPath")
@@ -151,6 +164,9 @@ nt.links.new(path.outputs["Is Glossy Ray"], mix.inputs["Fac"])
 nt.links.new(env.outputs["Color"], mix.inputs["Color2"])
 nt.links.new(mix.outputs["Color"], nt.nodes["Background"].inputs["Color"])
 nt.nodes["Background"].inputs["Strength"].default_value = 1.0
+if ENV:      # the backdrop's own light, for every ray type
+    nt.links.new(env.outputs["Color"], nt.nodes["Background"].inputs["Color"])
+    nt.nodes["Background"].inputs["Strength"].default_value = float(ENV.get("strength", 1.0))
 
 if V.get("aim") and V.get("part"):   # detail: look at the part from the side it faces out of
     d = (fhi + flo) / 2 - (hi + lo) / 2
@@ -174,13 +190,32 @@ def area(name, loc, energy, size, shadow=True):
 
 
 c = (hi + lo) / 2
-area("Key", c + fwd * 2.2 - right * 2.0 + Vector((0, 0, 3.6)), 240, 3.0)
-area("Fill", c + fwd * 3.0 + right * 2.8 + Vector((0, 0, 0.8)), 70, 3.0, shadow=False)
-area("Rim", c - fwd * 2.8 + right * 1.6 + Vector((0, 0, 2.2)), 170, 2.0, shadow=False)
+if ENV:
+    # the backdrop's brightest region becomes a sun, so the shadow falls the way the scene's light does
+    sd = bpy.data.lights.new("Sun", "SUN")
+    sd.energy = 1.5 + 0.5 * float(ENV.get("sun_strength", 2.0))
+    sd.angle = math.radians(6)
+    sun = bpy.data.objects.new("Sun", sd)
+    scene.collection.objects.link(sun)
+    sun.rotation_euler = (-Vector(ENV.get("sun", (0.3, -0.4, 0.8))).normalized()).to_track_quat("-Z", "Y").to_euler()
+    area("Rim", c - fwd * 2.8 + right * 1.6 + Vector((0, 0, 2.2)), 60, 2.0, shadow=False)
+else:
+    area("Key", c + fwd * 2.2 - right * 2.0 + Vector((0, 0, 3.6)), 240, 3.0)
+    area("Fill", c + fwd * 3.0 + right * 2.8 + Vector((0, 0, 0.8)), 70, 3.0, shadow=False)
+    area("Rim", c - fwd * 2.8 + right * 1.6 + Vector((0, 0, 2.2)), 170, 2.0, shadow=False)
 
+catcher = None
 if a.shadow:
     bpy.ops.mesh.primitive_plane_add(size=60, location=(0, 0, floor_z))
-    bpy.context.active_object.is_shadow_catcher = True
+    catcher = bpy.context.active_object
+    catcher.is_shadow_catcher = True
+    if ENV and ENV.get("ground"):
+        gm = bpy.data.materials.new("Ground")
+        gm.use_nodes = True
+        gb = next(n for n in gm.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
+        gb.inputs["Base Color"].default_value = (*ENV["ground"], 1.0)
+        gb.inputs["Roughness"].default_value = 0.8
+        catcher.data.materials.append(gm)
 
 cam_data = bpy.data.cameras.new("Cam")
 cam_data.lens = float(V.get("lens") or 50)
@@ -248,6 +283,19 @@ if fstop:
     cam_data.dof.use_dof = True
     cam_data.dof.focus_distance = (target - cam.location).length
     cam_data.dof.aperture_fstop = float(fstop) * radius   # the scene is scaled to unit radius: keep the real-size blur
+if a.camera:
+    m = cam.matrix_world
+    with open(a.camera, "w", encoding="utf-8") as f:
+        json.dump({"matrix": [list(r) for r in m], "lens": cam_data.lens, "sensor": cam_data.sensor_width,
+                   "shift": [cam_data.shift_x, cam_data.shift_y], "size": [W, H], "floor": floor_z,
+                   "radius": radius, "target": list(target)}, f)
 scene.render.filepath = os.path.abspath(a.out)
 bpy.ops.render.render(write_still=True)
+if a.mask:     # the product's own alpha: no shadow catcher, a few samples
+    if catcher is not None:
+        catcher.hide_render = True
+    scene.cycles.samples = 4
+    scene.cycles.use_denoising = False
+    scene.render.filepath = os.path.abspath(a.mask)
+    bpy.ops.render.render(write_still=True)
 print(f"STILL {a.out}", flush=True)

@@ -36,7 +36,9 @@ def checks() -> list[dict]:
         add("PyTorch + CUDA", gpu, detail, "parallax (depth), film")
     except Exception:
         add("PyTorch + CUDA", False, "torch not installed", "parallax (depth), film")
-    for mod, need in (("transformers", "parallax (depth)"), ("cv2", "artwork"), ("websocket", "recordings"), ("playwright", "recordings, URL capture")):
+    for mod, need in (("transformers", "parallax (depth)"), ("cv2", "artwork"), ("websocket", "recordings"), ("playwright", "recordings, URL capture"),
+                      ("cascadio", "product models in STEP/STP (OpenCascade)"), ("trimesh", "product models in 3MF"),
+                      ("lxml", "product models in 3MF")):
         add(mod, importlib.util.find_spec(mod), "installed" if importlib.util.find_spec(mod) else None, need)
     try:
         from .backends import comfy

@@ -38,6 +38,7 @@ SCENE_INFO = {
     "artwork": "Any image drawn and painted in stages: guides, contour lines, graphite, underpainting, colour.",
     "scene3d": "Live 3D zoom journey through levels: cells → DNA, galaxy → planet, networks, lattices, your glTF.",
     "sequence": "A 3D model rendered by Blender into frames: turntable, explode and reassemble.",
+    "showroom": "The site's product live in the page (three.js): scroll turns, explodes and zooms the real model.",
     "parallax": "Photos turned into 2.5D camera moves with estimated depth, one per step.",
     "type": "Kinetic typography: reveal, stack, swap or scale.",
 }

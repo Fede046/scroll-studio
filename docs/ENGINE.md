@@ -43,6 +43,13 @@ Each scene type is one engine module: a schema, a builder (inputs → assets), a
 | 9 | `chart` | Data story: charts that build, highlight and re-shape | CSV/JSON + narrative | Clean, aggregate, pre-compute states | `chart` (D3) |
 | 10 | `map` | Geographic journey: fly between places, draw routes | places/GeoJSON | Fetch/clip tiles to PMTiles (offline), route geometry | `map` (MapLibre GL) |
 | 11 | `type` | Kinetic typography: headlines that assemble, swap, scale with scroll | text only | none | `type` (GSAP) |
+| 12 | `showroom` | The site's product, live: scroll turns, explodes and zooms the real model | `site.product` (any model format) or a model file | `engine/product.py` normalised GLB (thinned for the web), Cycles poster | `showroom` (three.js, environment light, shadow) |
+
+**The product, declared once.** `site.product` names the model once; `engine/product.py` converts it (STEP via
+OpenCascade, 3MF via trimesh), normalises it in Blender (axes, units, base at the origin, part materials, explode
+offsets as node extras) into one cached GLB, and renders stills (`image: {product: <view>}`, optionally into a
+generated `scene:`). Takes (`product: {}`), sequences (`model: product`) and showroom scenes all use that GLB; takes
+light it from the plate (environments built from the generated frames) and grade it to the plate.
 
 Mapping the current demos: Lodestar Orbital and Meridian = `film`; Atelier Sfumato = `artwork`;
 Cellwright Bio = `scene3d` with generator presets (cells, chromatin, helix, molecule).
@@ -180,7 +187,8 @@ A local web app (`studio ui` → http://localhost:5180):
 `torch` (CUDA build), `numpy`, `opencv-python`, `scikit-image`, `scipy`, `pillow`, `pillow-avif-plugin`,
 `imageio`, `av` (PyAV), `pydantic`, `pyyaml`, `jinja2`, `fastapi`, `uvicorn`, `websockets`, `httpx`,
 `huggingface_hub`, `transformers`, `accelerate`, `safetensors`, `onnxruntime-gpu`, `rembg`, `vtracer`,
-`trimesh`, `pygltflib`, `playwright`, `pandas`, `soundfile`, `rich`, `typer`, `mcp`, `pytest`.
+`trimesh`, `pygltflib`, `cascadio` (STEP via OpenCascade), `lxml` (3MF), `playwright`, `pandas`, `soundfile`, `rich`,
+`typer`, `mcp`, `pytest`.
 Optional extras: `[splat]` gsplat, nerfstudio; `[audio]` audiocraft or transformers MusicGen.
 
 ### Node (`package.json`)

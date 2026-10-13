@@ -274,12 +274,57 @@ A style is a folder (`engine/styles/<name>/`: tokens, stylesheet, its own block 
 runtime module (`runtime/src/styles/<name>.ts`) with its scroll controller; the contract is in
 [engine/styles/README.md](engine/styles/README.md) and the research behind each one in [docs/styles](docs/styles/).
 
+## Your product, declared once
+
+Declare the product a site is about once, at the top of `site.yaml`, and every part of the site uses the real thing:
+
+```yaml
+product:
+  name: Flipper Zero
+  maker: Flipper Devices
+  url: https://flipperzero.one
+  model: https://example.com/flipper-zero-body-3d.stp   # GLB/glTF, OBJ, FBX, STL, PLY, STEP/STP or 3MF; file or URL
+  licence: GPL-3.0
+  concept: true                  # footer: "Concept page. Not affiliated with Flipper Devices."
+  rotation: [0, 90, 0]           # up / units / rotation fix any file's axes and scale
+  parts:                         # materials by part name (globs), material name, or a region of a one-piece body
+    - { match: "*", color: "#e9e7e0", roughness: 0.55 }
+    - { match: "*", region: [0.235, 0, 0.28, 0.62, 0.35, 0.85], facing: front, color: "#111214", roughness: 0.05 }
+sections:
+  - type: hero
+    title: A pocket multi-tool for hardware.
+    image: { product: three-quarter, size: [1920, 1080] }          # a Cycles still, cached
+  - type: product
+    title: Every port where you need it.
+    image: { product: { view: detail, part: "*usb*" } }            # a macro view of one part
+  - type: product
+    title: On your desk.
+    image: { product: hero-low, scene: "a walnut desk by a window, morning light" }
+  - id: live
+    type: showroom                 # the real model live in the page: scroll turns, explodes and zooms it
+```
+
+The engine converts the model (STEP through OpenCascade, keeping every part and its name; 3MF through trimesh),
+fixes its axes and units, centres it on its base, applies the part materials, decimates only an absurdly heavy file
+and caches one GLB. `studio product <project> --parts` lists the part, assembly and material names to target;
+`studio product <project> --still exploded` renders a still. Views: `front`, `three-quarter`, `side`, `top`, `back`,
+`hero-low`, `exploded` (when the model has parts) and `detail` (with `part:`). A still is transparent where the page
+can show it (hero and product blocks) and on the theme background elsewhere; `scene:` paints a place around it with
+Z-Image to the still's own camera, lights the product with that place, and blends it in with a light Qwen-Image-Edit
+pass (checked: if the edit changed the product, the rendered product is put back through its matte).
+
+A take's `product: {}` and a sequence's `model: product` use the same model, materials and credit; the credit and
+licence go in the footer automatically.
+
 ## One Take, places and data
 
 A `film` scene with a `take:` is one continuous shot. `objects` are rough shapes (`box`, `cylinder`, `cone`, `blob`,
 `plane`, `scatter` for forests or towns), `camera` is a list of `{t, at, look}` keys, and `product` is your 3D model
-(`model: inputs/bottle.glb`, or `from_photo:` with TRELLIS configured) standing at a point in that world. The world is
-generated; the product is rendered, lit by the take's sun, with its shadow on the surface it stands on:
+(`model: inputs/bottle.glb`, `from_photo:` with TRELLIS configured, or `product: {}` for the site's product) standing
+at a point in that world. The world is generated; the product is rendered through the same camera and lit by the plate
+itself (environments built from the generated frames, the sun along the take's light, its shadow and occlusion on a
+ground of the plate's colour), with depth of field and motion blur, then graded to the plate (black level, white
+balance, saturation, softness, grain, a light wrap). `hdri:` picks a studio light instead:
 
 ```yaml
   - id: take

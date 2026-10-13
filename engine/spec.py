@@ -256,12 +256,24 @@ class ProductLayer(Model):
                                                       "real height in metres, else 1)")
     rotation: tuple[float, float, float] = Field((0, 0, 0), description="Euler degrees")
     spin: float = Field(0.0, description="Extra yaw, in degrees, turned evenly over the whole take")
-    hdri: str = Field("sunrise", description="Blender studio light for the product: studio, forest, city, courtyard, night, interior, sunrise, sunset")
+    hdri: Optional[str] = Field(None, description="Light for the product. Default: the plate itself (an environment "
+                                                  "built from the generated frames around each moment, so the product "
+                                                  "takes the scene's light and reflections). Or a Blender studio light: "
+                                                  "studio, forest, city, courtyard, night, interior, sunrise, sunset")
     sun_strength: float = Field(3.0, description="A sun lamp along the take's light direction; 0 to turn it off")
-    samples: int = Field(32, description="Cycles samples per frame (denoised)")
+    samples: int = Field(64, description="Cycles samples per frame (denoised)")
     shadow: bool = Field(True, description="Cast the product's shadow onto the generated ground")
     shadow_size: Optional[float] = Field(None, description="Side of the square the shadow falls on, in metres (the table or floor patch); default 3x the height")
-    res: tuple[int, int] = Field((1920, 1080), description="Render size of the product pass (also the final film size)")
+    res: Optional[tuple[int, int]] = Field(None, description="Render size of the product pass, which is also the final "
+                                                             "film size (default 1920x1080; 2560x1440 when the take "
+                                                             "is upscaled)")
+    fstop: Optional[float] = Field(2.8, description="Depth of field: focused where the camera looks, at this f-stop "
+                                                    "(real scale); none for everything sharp")
+    motion_blur: float = Field(0.5, ge=0, le=1, description="Shutter as a fraction of a frame (0: off)")
+    grade: bool = Field(True, description="Match the product pass to the plate: black level, white balance, saturation, "
+                                          "softness, and a light wrap at the edges")
+    grain: Optional[float] = Field(None, ge=0, description="Film grain on the product (0-255 sigma); default: measured "
+                                                          "from the plate")
 
 
 class Take(Model):

@@ -33,7 +33,7 @@ function at(keys: Key[], t: number): Record<string, number> {
 }
 
 const LIGHTING: Record<string, { env: number; key: number; rim: number }> = {
-  studio: { env: 1.0, key: 2.2, rim: 0.8 },
+  studio: { env: 1.35, key: 2.8, rim: 1.0 },
   soft: { env: 1.25, key: 0.9, rim: 0.3 },
   contrast: { env: 0.45, key: 3.4, rim: 2.2 },
 };
@@ -99,7 +99,7 @@ const factory: PlayerFactory = async (cfg, ctx) => {
 
   const camera = new THREE.PerspectiveCamera(30, 1, R * 0.02, R * 60);
   const side = ctx.section.className.includes("ss-side-left") ? -1 : 1;
-  let fitDist = 1;
+  let fitDist = 1, last = "";
   function resize() {
     const w = canvas.clientWidth || 1, h = canvas.clientHeight || 1;
     renderer.setSize(w, h, false);
@@ -117,7 +117,6 @@ const factory: PlayerFactory = async (cfg, ctx) => {
   resize();
 
   const cur = at(cfg.keys || [], 0);
-  let last = "";
   const dir = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
   function frame(t: number, mx: number, my: number) {
     const yaw = THREE.MathUtils.degToRad(cur.yaw + mx * 8 + (cfg.spin || 0) * t);

@@ -23,6 +23,9 @@ it then means `site.product` of the project.
         field (yaw, pitch, zoom, explode, lens, hdri, samples, shadow).
     credits(product) -> list[str]        footer credit line(s) for the model
     concept_line(product) -> str | None  "Concept page. Not affiliated with <maker>." when product.concept
+    scene_still(project, product, view, size, scene, log=print, harmonise=0.3, seed=7, **shot) -> Path
+        The product rendered into a generated scene (a prompt): perspective-matched Z-Image backdrop, lit by it,
+        composited, harmonised by Qwen-Image-Edit and checked (needs ComfyUI). `image: {product: v, scene: "..."}`.
     take_track(project, section_id, log=print) -> Path
         `.build/<section>/product/track.json` for a film section with a take product: per frame, where the product
         is on screen (normalised 0-1, y down): {"fps", "size", "frames": [{"f", "visible", "centre", "base",
@@ -259,6 +262,11 @@ def product_still(project: Project, product: Optional[Product] = None, view: str
 def image_still(project: Project, ref: ImageInput, log=print, alpha: bool = False) -> Path:
     """`image: {product: <view or shot>}`: transparent where the caller can show it (alpha), else the theme bg."""
     shot = ref.product if isinstance(ref.product, ProductShot) else ProductShot(view=ref.product)
+    scene = shot.scene or ref.scene
+    if scene:
+        opts = shot.model_dump(exclude={"view", "background", "scene", "harmonise", "seed"})
+        return scene_still(project, None, shot.view, tuple(ref.size), scene, log, shot.harmonise,
+                           shot.seed if "seed" in shot.model_fields_set else ref.seed, **opts)
     bg = shot.background
     if bg == "auto":
         bg = "transparent" if alpha else "theme"
@@ -300,3 +308,173 @@ def take_track(project: Project, section_id: str, log=print) -> Path:
     ctx = BuildContext(project, section_id, log=log)
     film.take_shot(sec, ctx)
     return film.track(sec, ctx)
+
+
+# ---------------------------------------------------------------- the product in a generated scene
+
+SCENE_VERSION = 1
+HARMONISE = ("Blend the product naturally into the scene's lighting: match the light direction, colour temperature, "
+             "reflections and soft contact shadow of the room. Keep the product's shape, proportions, edges, details, "
+             "text and colours exactly as they are. Do not move, resize or redesign the product.")
+
+
+def _floor_depth(cam: dict):
+    """A depth guide of the floor the product stands on, as seen by the still's camera (white near, black sky)."""
+    import numpy as np
+    W, H = cam["size"]
+    s = cam["sensor"] / cam["lens"]
+    sx, sy = cam["shift"]
+    px = (np.arange(W) + 0.5) / W - 0.5
+    py = 0.5 - (np.arange(H) + 0.5) / H
+    PX, PY = np.meshgrid(px, py)
+    if W >= H:
+        dx, dy = (PX - sx) * s, (PY * H / W - sy) * s
+    else:
+        dx, dy = (PX * W / H - sx) * s, (PY - sy) * s
+    M = np.array(cam["matrix"], dtype=np.float64)
+    R, o = M[:3, :3], M[:3, 3]
+    wx = R[0, 0] * dx + R[0, 1] * dy - R[0, 2]
+    wy = R[1, 0] * dx + R[1, 1] * dy - R[1, 2]
+    wz = R[2, 0] * dx + R[2, 1] * dy - R[2, 2]
+    norm = np.sqrt(wx ** 2 + wy ** 2 + wz ** 2)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        t = (cam["floor"] - o[2]) / wz
+    hit = (wz < -1e-6) & (t > 0)
+    dist = np.where(hit, t * norm, np.inf)
+    near = float(np.min(dist[hit])) if hit.any() else 1.0
+    inv = np.where(hit, near / dist, 0.0)
+    img = (np.clip(inv, 0, 1) ** 0.8 * 255).astype(np.uint8)
+    return np.dstack([img] * 3)
+
+
+def _edges_kept(a, b, mask) -> dict:
+    """How much of the product survived an edit: edge F1 (2 px tolerance) and colour drift (Lab) inside its mask."""
+    import cv2
+    import numpy as np
+    m = mask > 0.5
+    if m.sum() < 50:
+        return {"f1": 1.0, "delta_e": 0.0}
+    region = cv2.dilate(m.astype(np.uint8), np.ones((7, 7), np.uint8)) > 0
+    ea = cv2.Canny(cv2.cvtColor(a, cv2.COLOR_RGB2GRAY), 60, 160) > 0
+    eb = cv2.Canny(cv2.cvtColor(b, cv2.COLOR_RGB2GRAY), 60, 160) > 0
+    ea, eb = ea & region, eb & region
+    k = np.ones((5, 5), np.uint8)
+    da, db = cv2.dilate(ea.astype(np.uint8), k) > 0, cv2.dilate(eb.astype(np.uint8), k) > 0
+    recall = (ea & db).sum() / max(ea.sum(), 1)
+    precision = (eb & da).sum() / max(eb.sum(), 1)
+    f1 = 2 * recall * precision / max(recall + precision, 1e-6)
+    inner = cv2.erode(m.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
+    la = cv2.cvtColor(a, cv2.COLOR_RGB2LAB).astype(np.float32)
+    lb = cv2.cvtColor(b, cv2.COLOR_RGB2LAB).astype(np.float32)
+    de = float(np.mean(np.linalg.norm((la - lb)[inner], axis=1))) if inner.any() else 0.0
+    return {"f1": round(float(f1), 3), "delta_e": round(de, 2)}
+
+
+def scene_still(project: Project, product: Optional[Product], view: str, size: tuple[int, int], scene: str,
+                log=print, harmonise: float = 0.3, seed: int = 7, **shot) -> Path:
+    """The product rendered into a generated scene: Z-Image paints the scene to the still's camera (a depth guide of
+    the floor, so horizon and perspective match), the product is re-lit by an environment made from that scene
+    (its brightest region as the sun, its ground under the shadow), composited with PlateMatch, then a light
+    Qwen-Image-Edit pass blends it in. If that pass changed the product (edge F1 < 0.7 or colour drift > 9), the
+    Cycles product is put back over the blended scene through its own matte."""
+    import cv2
+    import numpy as np
+    from .backends import comfy
+    from .scenes import film_build as fb
+    product = get(project, product)
+    glb, report = _prepare(project, product, log)
+    w, h = (int(size[0]) // 16 * 16, int(size[1]) // 16 * 16)
+    cam_v = dict(VIEWS.get(view, VIEWS["three-quarter"]))
+    for k in ("yaw", "pitch", "explode", "lens", "part", "fstop"):
+        if shot.get(k) is not None:
+            cam_v[k] = shot[k]
+    cam_v["zoom"] = float(shot.get("zoom") or 1.0) * 0.82      # leave room around it: it stands in a place
+    samples, shadow = int(shot.get("samples") or 128), True
+    key = {"v": SCENE_VERSION, "glb": glb.name, "cam": cam_v, "size": [w, h], "scene": scene, "seed": seed,
+           "harmonise": harmonise, "samples": samples, "still": _sha(SCRIPTS / "product_still.py")}
+    d = _cache(project) / "scenes" / _digest(key)
+    final = d / "final.png"
+    if final.exists():
+        return final
+    if not comfy.alive():
+        raise BuildError(f"`scene:` paints the product's surroundings with Z-Image, but ComfyUI is not running at "
+                         f"{comfy.COMFY}. Start it (docs/INSTALL.md), or drop `scene:` for a studio still.")
+    d.mkdir(parents=True, exist_ok=True)
+    # 1. the camera and a quick studio pass (framing, matte)
+    cam_json, studio, mask = d / "camera.json", d / "studio.png", d / "mask.png"
+    if not (cam_json.exists() and mask.exists()):
+        _blender("product_still.py", ["--glb", glb, "--out", studio, "--size", f"{w}x{h}", "--view", json.dumps(cam_v),
+                                      "--samples", 16, "--shadow", 1, "--camera", cam_json, "--mask", mask],
+                 log, "framing the product")
+    cam = json.loads(cam_json.read_text(encoding="utf-8"))
+    # 2. the scene, painted to that camera
+    bg = d / "scene.png"
+    if not bg.exists():
+        depth = d / "depth.png"
+        cv2.imwrite(str(depth), _floor_depth(cam))
+        prompt = (f"{scene}. The surface in the foreground is empty, with nothing standing on it. Photograph, natural "
+                  f"light, realistic materials, shallow depth of field.")
+        log(f"  scene: Z-Image to the product's camera: {scene[:70]}")
+        kcfg = dict(comfy.ZIMAGE, control_strength=0.55)
+        images = comfy.run(comfy.build_keyframe_graph(kcfg, prompt, comfy.upload(str(depth)), w, h, seed,
+                                                      prefix=f"studio/scene_{d.name}"), poll=2)
+        tmp = comfy.fetch(images, str(d / "_z"))
+        Path(tmp, "0001.png").replace(bg)
+    bg_rgb = cv2.cvtColor(cv2.imread(str(bg)), cv2.COLOR_BGR2RGB)
+    bg_rgb = cv2.resize(bg_rgb, (w, h), interpolation=cv2.INTER_AREA)
+    m_alpha = cv2.imread(str(mask), cv2.IMREAD_UNCHANGED)[..., 3].astype(np.float32) / 255
+    # 3. light from the scene itself
+    env_json = d / "env.json"
+    if not env_json.exists():
+        small = cv2.resize(bg_rgb, (480, round(480 * h / w)), interpolation=cv2.INTER_AREA).astype(np.float32) / 255
+        lin = fb._srgb_to_linear(small).astype(np.float32)
+        env = fb.env_from_frame(lin, cam["matrix"], cam["lens"], cam["sensor"], w / h)
+        sun, strength = fb.env_sun(env)
+        ys, xs = np.nonzero(m_alpha > 0.5)
+        if len(ys):
+            y0, x0, x1 = min(h - 2, int(ys.max() + h * 0.02)), int(xs.min()), int(xs.max())
+            patch = bg_rgb[y0:min(h, y0 + max(4, h // 40)), x0:x1].reshape(-1, 3).astype(np.float32) / 255
+            ground = fb._srgb_to_linear(patch.mean(0)).tolist() if len(patch) else [0.2, 0.2, 0.2]
+        else:
+            ground = [0.2, 0.2, 0.2]
+        cv2.imwrite(str(d / "env.hdr"), env[..., ::-1])
+        env_json.write_text(json.dumps({"file": str(d / "env.hdr"), "ground": ground, "sun": sun,
+                                        "sun_strength": strength, "strength": 1.0}), encoding="utf-8")
+    lit = d / "lit.png"
+    if not lit.exists():
+        log(f"  scene: the product lit by the scene ({samples} samples)")
+        _blender("product_still.py", ["--glb", glb, "--out", lit, "--size", f"{w}x{h}", "--view", json.dumps(cam_v),
+                                      "--samples", samples, "--shadow", int(shadow), "--env", env_json],
+                 log, "lighting the product in the scene")
+    # 4. composite, graded to the scene
+    rgba = fb.read_rgba(lit, (w, h))
+    plate = bg_rgb.astype(np.float32) / 255
+    comp = fb.PlateMatch(True, None, 0.0).apply(plate, rgba) if rgba is not None else plate
+    comp8 = (np.clip(comp, 0, 1) * 255 + 0.5).astype(np.uint8)
+    cv2.imwrite(str(d / "composite.png"), cv2.cvtColor(comp8, cv2.COLOR_RGB2BGR))
+    out8, info = comp8, {"harmonise": harmonise}
+    # 5. a light harmonising edit, checked against the product's own edges
+    if harmonise > 0:
+        log(f"  scene: Qwen-Image-Edit harmonising pass (strength {harmonise})")
+        g = comfy.build_qwen_edit_graph([comfy.upload(str(d / "composite.png"))], HARMONISE, seed, 30,
+                                        prefix=f"studio/harm_{d.name}", megapixels=round(w * h / 1e6, 2))
+        g["ks"]["inputs"]["denoise"] = float(harmonise)
+        images = comfy.run(g, poll=2)
+        tmp = comfy.fetch(images, str(d / "_q"))
+        ed = cv2.cvtColor(cv2.imread(str(Path(tmp, "0001.png"))), cv2.COLOR_BGR2RGB)
+        ed = cv2.resize(ed, (w, h), interpolation=cv2.INTER_LANCZOS4)
+        cv2.imwrite(str(d / "harmonised.png"), cv2.cvtColor(ed, cv2.COLOR_RGB2BGR))
+        score = _edges_kept(comp8, ed, m_alpha)
+        info.update(score)
+        if score["f1"] < 0.7 or score["delta_e"] > 9:
+            # the edit redrew the product: keep its light and shadow around it, put the real product back
+            matte = cv2.GaussianBlur(m_alpha, (0, 0), 0.8)[..., None]
+            out8 = (ed.astype(np.float32) * (1 - matte) + comp8.astype(np.float32) * matte + 0.5).astype(np.uint8)
+            info["product"] = "re-composited (the edit changed it)"
+        else:
+            out8 = ed
+            info["product"] = "kept by the edit"
+        log(f"  scene: edge F1 {score['f1']}, colour drift {score['delta_e']}: product {info['product']}")
+    (d / "check.json").write_text(json.dumps(info, indent=1), encoding="utf-8")
+    cv2.imwrite(str(final), cv2.cvtColor(out8, cv2.COLOR_RGB2BGR))
+    return final

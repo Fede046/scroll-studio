@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Optional
 
 from ..project import BuildContext, BuildError, ffmpeg, file_key, probe
 from ..spec import FilmScene
@@ -31,29 +32,80 @@ def _restore_args(ctx: BuildContext, source: Path):
     return a
 
 
-def take_shot(sec: FilmScene, ctx: BuildContext) -> dict:
-    """Turn a spec `take` into the `shot` mapping the film stages run on, writing take.json for Blender."""
-    import json
+def _legacy_path(path: Path) -> str:
+    """How take.json named the product file before keys were made portable (absolute path); tests patch this."""
+    return str(path)
+
+
+def take_product(sec: FilmScene, ctx: BuildContext) -> tuple[Path, Optional[Path], dict]:
+    """The take product's model file (site.product's normalised GLB when the layer names no model), the raw source
+    file (for keys written before site.product existed), and the layer as take.py reads it (height and res resolved)."""
     from ..inputs import resolve_path
+    layer = sec.take.product
+    p = layer.model_dump(mode="json")
+    site_product = ctx.project.load().product
+    raw = None
+    if layer.model:
+        path = raw = resolve_path(ctx.project, layer.model, ctx.log)
+    elif layer.from_photo:
+        from ..backends.trellis import image_to_mesh
+        photo = resolve_path(ctx.project, layer.from_photo, ctx.log)
+        path = image_to_mesh(photo, ctx.work / "trellis", ctx.log)
+    elif site_product is not None:
+        from ..product import normalised_glb
+        path = normalised_glb(ctx.project, log=ctx.log)
+        if site_product.model:
+            raw = resolve_path(ctx.project, site_product.model, ctx.log)
+    else:
+        raise BuildError(f"film section '{sec.id}': take.product needs `model` or `from_photo`, or a site `product:`")
+    from ..product import take_height
+    p["height"] = take_height(ctx.project, layer)
+    if not p.get("res"):
+        p["res"] = [2560, 1440] if sec.take.upscale else [1920, 1080]
+    return path, raw, p
+
+
+def take_shot(sec: FilmScene, ctx: BuildContext) -> dict:
+    """Turn a spec `take` into the `shot` mapping the film stages run on, writing take.json for Blender.
+
+    Keys are portable: the world (blockout, keyframes, LTX) is keyed without the product unless the product is in
+    the depth guide, and never by an absolute path, so a moved project or a new product keeps its generated world.
+    `legacy_world_key` is the key of the older formula, so stamps written by it still count."""
+    import json
     t = sec.take.model_dump(mode="json")
-    p = t.get("product")
-    if p:
-        if p.get("model"):
-            t["product_file"] = str(resolve_path(ctx.project, p["model"], ctx.log))
-        elif p.get("from_photo"):
-            from ..backends.trellis import image_to_mesh
-            photo = resolve_path(ctx.project, p["from_photo"], ctx.log)
-            t["product_file"] = str(image_to_mesh(photo, ctx.work / "trellis", ctx.log))
-        else:
-            raise BuildError(f"film section '{sec.id}': take.product needs `model` or `from_photo`")
+    legacy = None
+    if sec.take.product:
+        path, raw, p = take_product(sec, ctx)
+        t["product"] = p
+        t["product_file"] = str(path)
         pw, ph = p["res"]
         bw, bh = t["preview_res"]
         if abs(pw / ph - bw / bh) > 0.01:
             raise BuildError(f"take.product.res {pw}x{ph} and take.preview_res {bw}x{bh} must have the same aspect ratio")
+        layer = sec.take.product
+        old = {k: v for k, v in layer.model_dump(mode="json").items()
+               if k in ("model", "from_photo", "credit", "at", "height", "rotation", "spin", "hdri", "sun_strength",
+                        "samples", "shadow", "shadow_size", "res")}
+        site_product = ctx.project.load().product
+        if not old["model"] and not old["from_photo"] and site_product is not None:
+            old["model"] = site_product.model
+            old["credit"] = old["credit"] or site_product.credit
+        old["height"] = old["height"] if old["height"] is not None else 1.0
+        old["hdri"] = old["hdri"] or "sunrise"
+        old["samples"] = old["samples"] if "samples" in layer.model_fields_set else 32
+        old["res"] = old["res"] or [1920, 1080]
+        src = raw or path
+        lw = {**{k: v for k, v in t.items() if k not in ("ltx", "keyframes", "upscale", "product", "product_file")},
+              "product": old, "product_file": _legacy_path(src)}
+        legacy = {"world_key": lw, "model": file_key(src)}
     ctx.work.mkdir(parents=True, exist_ok=True)
     (ctx.work / "take.json").write_text(json.dumps(t, indent=1), encoding="utf-8")
+    world = {k: v for k, v in t.items() if k not in ("ltx", "keyframes", "upscale", "product", "product_file")}
+    if sec.take.product and sec.take.product_in_guide:
+        world["product"] = {k: t["product"][k] for k in ("at", "height", "rotation", "spin")}
+        world["product_model"] = file_key(Path(t["product_file"]))
     shot = {"fps": t["fps"], "duration": t["duration"], "preview_res": t["preview_res"], "ltx": t["ltx"],
-            "blockout": {"world": str(ctx.work / "take.json"), "world_key": {k: v for k, v in t.items() if k not in ("ltx", "keyframes", "upscale")}}}
+            "blockout": {"world": str(ctx.work / "take.json")}, "world_key": world, "legacy_world_key": legacy}
     if t.get("keyframes"):
         shot["keyframes"] = t["keyframes"]
     if t.get("upscale"):
@@ -73,39 +125,90 @@ def generate(sec: FilmScene, ctx: BuildContext) -> Path:
         bl["file"] = str(ctx.project.path(bl["file"]))
         shot["blockout"] = bl
     bdir, gdir = ctx.work / "blockout", ctx.work / "gen"
-    bkey = {"blockout": {k: v for k, v in bl.items() if k != "world"}, "fps": shot["fps"], "duration": shot["duration"],
-            "res": shot["preview_res"], "file": file_key(Path(bl["file"])) if bl.get("file") else None,
-            "model": file_key(Path(json_product_file(ctx))) if bl.get("world") and sec.take.product else None}
-    ctx.stage("blockout", bkey, [bdir / "depth.mp4", bdir / "first.png"], lambda: fb.stage_blockout(shot, out))
+    legacy = None
+    if sec.take:
+        bkey = {"take": shot["world_key"], "fps": shot["fps"], "duration": shot["duration"], "res": shot["preview_res"]}
+        lw = shot.get("legacy_world_key")
+        if lw:
+            legacy = {"blockout": {"world_key": lw["world_key"]}, "fps": shot["fps"], "duration": shot["duration"],
+                      "res": shot["preview_res"], "file": None, "model": lw["model"]}
+        else:
+            legacy = {"blockout": {"world_key": shot["world_key"]}, "fps": shot["fps"], "duration": shot["duration"],
+                      "res": shot["preview_res"], "file": None, "model": None}
+    else:
+        bkey = {"blockout": {k: v for k, v in bl.items() if k != "world"}, "fps": shot["fps"], "duration": shot["duration"],
+                "res": shot["preview_res"], "file": file_key(Path(bl["file"])) if bl.get("file") else None, "model": None}
+    ctx.stage("blockout", bkey, [bdir / "depth.mp4", bdir / "first.png"], lambda: fb.stage_blockout(shot, out), legacy=legacy)
     if shot.get("keyframes", {}).get("frames"):
         names = [f["name"] for f in shot["keyframes"]["frames"]]
         ctx.stage("keyframes", {"b": bkey, "k": shot["keyframes"]}, [ctx.work / "keyframes" / f"{n}.png" for n in names],
-                  lambda: fb.stage_keyframes(shot, out, _args(ctx)))
+                  lambda: fb.stage_keyframes(shot, out, _args(ctx)), legacy=legacy and {"b": legacy, "k": shot["keyframes"]})
     gkey = {"b": bkey, "k": shot.get("keyframes"), "ltx": shot["ltx"], "subject": shot.get("subject")}
-    ctx.stage("generate", gkey, [gdir / "gen.mp4"], lambda: fb.stage_generate(shot, out, _args(ctx)))
+    glegacy = legacy and {"b": legacy, "k": shot.get("keyframes"), "ltx": shot["ltx"], "subject": shot.get("subject")}
+    ctx.stage("generate", gkey, [gdir / "gen.mp4"], lambda: fb.stage_generate(shot, out, _args(ctx)), legacy=glegacy)
     film = gdir / "gen.mp4"
     up = shot.get("upscale")
     if up and up.get("method") in ("ltx", "seedvr2"):
         dst = gdir / ("gen_sr.mp4" if up["method"] == "seedvr2" else "gen_up.mp4")
-        ctx.stage("upscale", {"g": gkey, "u": up}, [dst], lambda: fb.stage_upscale(shot, out, _args(ctx)))
+        ctx.stage("upscale", {"g": gkey, "u": up}, [dst], lambda: fb.stage_upscale(shot, out, _args(ctx)),
+                  legacy=glegacy and {"g": glegacy, "u": up})
         film = dst
     if sec.take and sec.take.product:
-        # The real product, rendered through the identical camera, over the generated world.
-        p = sec.take.product
-        pdir = ctx.work / "product"
-        n = int(round(shot["fps"] * shot["duration"]))
-        # world_key carries the camera, duration, fps and product placement; the model file adds its content
-        pkey = {"world": shot["blockout"]["world_key"], "model": file_key(Path(json_product_file(ctx)))}
-        ctx.stage("product", pkey, [pdir / "frames" / f"{n:04d}.png"], lambda: fb.stage_product(shot, out, p.res, p.samples, ctx))
-        comp = gdir / "take.mp4"
-        ctx.stage("composite", {"film": file_key(film), "p": pkey}, [comp], lambda: fb.stage_composite(film, pdir, comp, shot["fps"], p.res))
-        film = comp
+        film = product_layer(sec, ctx, shot, film)
     return film
 
 
-def json_product_file(ctx: BuildContext) -> str:
+def _take_json(ctx: BuildContext) -> dict:
     import json
-    return json.loads((ctx.work / "take.json").read_text(encoding="utf-8"))["product_file"]
+    return json.loads((ctx.work / "take.json").read_text(encoding="utf-8"))
+
+
+def json_product_file(ctx: BuildContext) -> str:
+    return _take_json(ctx)["product_file"]
+
+
+def _product_keys(ctx: BuildContext) -> dict:
+    """What the product pass depends on: the camera and world timing, the product layer and model, and take.py."""
+    from ..product import _sha
+    from . import film_build as fb
+    t = _take_json(ctx)
+    return {"camera": {k: t.get(k) for k in ("camera", "lens", "fps", "duration", "light")},
+            "product": t["product"], "model": file_key(Path(t["product_file"])),
+            "script": _sha(Path(fb.SCRIPTS) / "take.py")}
+
+
+def track(sec: FilmScene, ctx: BuildContext) -> Path:
+    """product/track.json: per frame, the camera and where the product is on screen (stage `track`, seconds)."""
+    from . import film_build as fb
+    out = ctx.work / "product" / "track.json"
+    ctx.stage("track", {"p": _product_keys(ctx)}, [out],
+              lambda: fb.stage_track(str(ctx.work), _take_json(ctx)["product"]["res"]))
+    return out
+
+
+def product_layer(sec: FilmScene, ctx: BuildContext, shot: dict, film: Path) -> Path:
+    """The real product, rendered through the identical camera, lit by the plate and graded to it, over the world."""
+    from . import film_build as fb
+    p = _take_json(ctx)["product"]
+    pdir = ctx.work / "product"
+    n = int(round(shot["fps"] * shot["duration"]))
+    base = _product_keys(ctx)
+    trk = track(sec, ctx)
+    env = None
+    if not p.get("hdri"):        # plate-matched light: environments built from the generated frames themselves
+        env = pdir / "env" / "env.json"
+        ctx.stage("plate_env", {"p": base, "film": file_key(film), "v": fb.PLATE_ENV_VERSION}, [env],
+                  lambda: fb.stage_plate_env(film, trk, env, shot["fps"], ctx.log))
+    pkey = {"p": base, "env": file_key(env) if env else None}
+    ctx.stage("product", pkey, [pdir / "frames" / f"{n:04d}.png"],
+              lambda: fb.stage_product(shot, str(ctx.work), p["res"], p["samples"], ctx, env=env))
+    comp = ctx.work / "gen" / "take.mp4"
+    ckey = {"film": file_key(film), "p": pkey, "grade": p.get("grade", True), "grain": p.get("grain"),
+            "v": fb.COMPOSITE_VERSION}
+    ctx.stage("composite", ckey, [comp], lambda: fb.stage_composite(film, pdir, comp, shot["fps"], p["res"],
+                                                                     grade=p.get("grade", True), grain=p.get("grain"),
+                                                                     track=trk, log=ctx.log))
+    return comp
 
 
 def encode(src: Path, ctx: BuildContext, gop: int) -> dict:
@@ -245,4 +348,7 @@ def build(sec: FilmScene, ctx: BuildContext, theme: dict) -> dict:
     src = ctx.project.path(sec.video) if sec.video else beats_film(sec, ctx) if sec.beats else generate(sec, ctx)
     if not src.exists():
         raise BuildError(f"film source not found: {src}")
-    return encode(src, ctx, sec.gop)
+    cfg = encode(src, ctx, sec.gop)
+    if sec.take and sec.take.product and sec.take.product.credit:   # site.product's own credit is added site-wide
+        cfg["credits"] = [sec.take.product.credit]
+    return cfg
