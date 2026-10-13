@@ -4,10 +4,10 @@ import type { Info } from "../App";
 import { Fields, Fieldset, type Ctx } from "./SchemaForm";
 
 const DEFS: Record<string, string> = {
-  film: "FilmScene", artwork: "ArtworkScene", scene3d: "Scene3DScene", sequence: "SequenceScene", parallax: "ParallaxScene", type: "TypeScene",
+  film: "FilmScene", artwork: "ArtworkScene", scene3d: "Scene3DScene", sequence: "SequenceScene", parallax: "ParallaxScene", type: "TypeScene", showroom: "ShowroomScene",
   intro: "IntroBlock", features: "FeaturesBlock", stats: "StatsBlock", timeline: "TimelineBlock", quote: "QuoteBlock", cta: "CtaBlock", gallery: "GalleryBlock",
 };
-const SCENES = ["film", "artwork", "scene3d", "sequence", "parallax", "type"];
+const SCENES = ["film", "artwork", "scene3d", "sequence", "showroom", "parallax", "type"];
 
 function starter(type: string, n: number): any {
   const id = `${type}-${n}`;
@@ -18,6 +18,7 @@ function starter(type: string, n: number): any {
     case "scene3d": return { id, type, levels: [{ preset: "galaxy" }, { preset: "star-system" }, { preset: "planet" }],
       hud: { kind: "scale", scales: ["100,000 ly", "40 AU", "12,700 km"] }, steps: [{ intro: true, title: "Fall <em>inward.</em>" }, { title: "The galaxy" }, { title: "One star" }, { title: "Home" }] };
     case "sequence": return { id, type, model: "inputs/model.glb", steps: [{ intro: true, title: "Meet the <em>product.</em>" }, { title: "Every part" }, { title: "Back together" }] };
+    case "showroom": return { id, type, model: "product", steps: [{ intro: true, title: "The real <em>thing.</em>" }, { title: "Every part" }, { title: "Back together" }] };
     case "parallax": return { id, type, steps: [{ intro: true, title: "A place worth <em>the trip.</em>" },
       { title: "Morning", image: { generate: "A sunlit terrace above the sea at morning, photoreal" } }, { title: "Evening", image: { generate: "The same terrace at dusk with lanterns, photoreal" } }] };
     case "type": return { id, type, mode: "reveal", text: "Say the one thing that <em>matters</em>, and let the page take its time." };
