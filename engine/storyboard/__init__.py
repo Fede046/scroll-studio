@@ -95,6 +95,11 @@ def storyboard(project: Project, level: str = "stills", only: Optional[Iterable[
         progress(0.75, "animatic")
         anim = animatic.build(project, site, cards, out / "animatic.mp4", log, progress)
     progress(0.9, "sheet")
+    from .edit import approvals
+    appr = approvals.summary(project)       # None until the project has used approvals in the edit workspace
+    if appr:
+        for c in cards:
+            c.approval = appr["status"].get(c.id, "no")
     files = sheet.thumbs(cards, out)
     shots = [c for c in cards]
     changed = [c.id for c in cards if c.status in ("new", "changed")]
@@ -104,9 +109,12 @@ def storyboard(project: Project, level: str = "stills", only: Optional[Iterable[
     head = {"title": f"Storyboard: {site.name} ({level})",
             "line": f"{len(shots)} shots · {len(changed)} new or changed · "
                     f"{sum(c.status == 'rendered' for c in cards)} rendered · {sum(c.locked for c in cards)} locked · "
-                    f"full render on this machine ~{fmt(total)}" + (f" (heavy: {', '.join(heavy)})" if heavy else ""),
+                    + (f"{appr['approved']} of {appr['total']} approved · " if appr else "")
+                    + f"full render on this machine ~{fmt(total)}" + (f" (heavy: {', '.join(heavy)})" if heavy else ""),
             "line2": f"made in {time.time() - t0:.0f}s · {time.strftime('%Y-%m-%d %H:%M')} · frames: FINAL rendered, "
                      f"STILLS real first frames, SKETCH blockout/low samples, PLACEHOLDER not generated yet"
+                     + (f" · not approved: {', '.join(appr['pending'][:10])}" + (" ..." if len(appr['pending']) > 10 else "")
+                        if appr and appr["pending"] else "")
                      + (f" · joins/restores/encodes ~{fmt(finishing)}" if finishing else "")}
     links = {"page": "site/index.html" if site_index else "", "animatic": "animatic.mp4" if anim else "",
              "sheet": "sheet.jpg"}

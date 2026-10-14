@@ -65,6 +65,7 @@ class Card:
     seconds_taken: float = 0.0
     redrawn: bool = False
     captions: list = field(default_factory=list)   # (from, to) as 0-1 of the shot, title (HTML), kicker: the animatic's type
+    approval: str = ""           # approved | changed | no | "" (the project has not used approvals: `studio storyboard --edit`)
 
     @property
     def level(self) -> str:
@@ -79,7 +80,7 @@ class Card:
                 "scroll": round(self.scroll, 2), "level": self.level, "status": self.status, "locked": self.locked,
                 "estimate_seconds": round(self.estimate), "stages": self.stages, "fingerprint": self.fingerprint,
                 "preview": str(self.preview) if self.preview else None, "note": self.note,
-                "redrawn": self.redrawn, "seconds_taken": round(self.seconds_taken, 1)}
+                "redrawn": self.redrawn, "seconds_taken": round(self.seconds_taken, 1), "approval": self.approval}
 
 
 def _digest(obj) -> str:

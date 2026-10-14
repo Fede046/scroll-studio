@@ -46,8 +46,16 @@ the real first frames (same stages and caches), so approving them is not wasted 
    full render estimate; open `site` to judge the real page.
 2. Fix the spec and storyboard again: only changed shots are redone (`only=[ids]` to limit it). Use
    `level="animatic"` (and `motion=True` with `only` for one shot) to check pacing and motion.
-3. Lock approved shots (`locked: true` on a beat, take or scene) so later edits never re-render them.
-4. `build(project, plan_only=True)` shows what will render and how long; tell the user before a long render.
+3. Edit shots and images in the loop, not by re-writing the spec: `storyboard_shots(project)` lists every shot's
+   fields, images (each a chain of steps, with seeds) and variants. `set_shot_field(project, shot, field, value)` changes
+   text, seed, seconds... in place (comments kept, validated). `regenerate_shot_image(project, shot, slot)` renders
+   just that image (a new seed; `mode="rerun"` after a text edit; `step=1` for the base of an edit chain) and returns
+   its path: read it, then keep it or `pick_shot_variant` an earlier one. The user can do the same in the browser with
+   `studio storyboard <project> --edit`. `approve_shot` marks a shot approved (the sheet and `build(plan_only)` list
+   the rest). It renders stills only: it never starts a film.
+4. Lock approved shots (`locked: true` on a beat, take or scene, or `set_shot_field(..., "locked", true)`) so later
+   edits never re-render them.
+5. `build(project, plan_only=True)` shows what will render and how long; tell the user before a long render.
 
 ## 4. Build, look, fix
 1. `build(project, draft=True)` (or `only=[ids]` for a few shots) then `wait_for_job`. Read the log on failure: it names the stage and the cause.

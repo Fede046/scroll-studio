@@ -11,7 +11,7 @@ import shutil
 import sys
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import yaml
 from mcp.server.fastmcp import FastMCP
@@ -181,6 +181,96 @@ def storyboard(project: str, level: str = "stills", only: Optional[list[str]] = 
     if job.status == "done":
         return job.result
     return job.public(tail=20)
+
+
+_WORKSPACES: dict = {}
+
+
+def _workspace(project: str):
+    from .storyboard.edit.workspace import Workspace
+    p = _find(project)
+    key = str(p.root)
+    if key not in _WORKSPACES:
+        _WORKSPACES[key] = Workspace(p, jobs)
+    return _WORKSPACES[key]
+
+
+@mcp.tool()
+def storyboard_shots(project: str, shot: Optional[str] = None) -> dict:
+    """The storyboard as an editing workspace sees it (the same one `studio storyboard <project> --edit` opens): every
+    shot with its editable fields (name, current value, type), its images (slots, each a chain of steps: generate,
+    edit..., with seeds) and the variants kept for each image, plus the steps shared between shots. Use the field names
+    with set_shot_field and the shot/slot names with regenerate_shot_image. shot: only that shot."""
+    ws = _workspace(project)
+    with contextlib.redirect_stdout(sys.stderr):
+        st = ws.state()
+    out = []
+    for s in st["shots"]:
+        if shot and s["id"] != shot:
+            continue
+        out.append({"id": s["id"], "kind": s["kind"], "title": s["title"], "locked": s["locked"], "approval": s["approval"],
+                    "fields": {f["name"]: {"value": f["value"], "type": f["type"]} for f in s["fields"]},
+                    "images": [{"slot": sl["name"], "label": sl["label"], "state": sl["nodes"][0]["image"]["state"],
+                                "image": (str(_find(project).root / sl["nodes"][0]["image"]["p"]) if sl["nodes"][0]["image"].get("p") else None),
+                                "variants": [{"n": v["n"], "seed": v["seed"], "current": v["current"]} for v in sl["nodes"][0]["variants"]],
+                                "steps": [{"kind": n["kind"], "shared": n["shared"], "summary": n["summary"][:120],
+                                           "fields": {f["name"]: f["value"] for f in n["fields"]}} for n in sl["nodes"]]}
+                               for sl in s["slots"]]})
+    return {"rev": st["rev"], "approved": st["approved"], "total": st["total"], "shots": out,
+            "shared": [{"key": n["key"], "kind": n["kind"], "used_by": n["used_by"], "summary": n["summary"][:120],
+                        "fields": {f["name"]: f["value"] for f in n["fields"]}} for n in st["shared"]]}
+
+
+@mcp.tool()
+def set_shot_field(project: str, shot: str, field: str, value: Any) -> dict:
+    """Set one field of a storyboard shot in site.yaml (comments and layout kept, validated first, the previous text is
+    kept in storyboard/history/). field: a name from storyboard_shots, e.g. caption, prompt, motion, seconds, seed,
+    trim, strength, motion_seed, duration, still.instruction, still.seed, key.<name>.prompt, locked (true/false).
+    Changing text does not render anything: follow with regenerate_shot_image (mode rerun) to redraw the image."""
+    from .storyboard.edit import specdoc
+    try:
+        res = _workspace(project).set_fields(shot, {field: value}, label=f"mcp {shot}.{field}")
+    except specdoc.SpecError as e:
+        return {"ok": False, "errors": e.errors}
+    return res
+
+
+@mcp.tool()
+def regenerate_shot_image(project: str, shot: str, slot: Optional[str] = None, mode: str = "regenerate",
+                          step: int = 0, seed: Optional[int] = None, timeout_s: int = 1500) -> dict:
+    """Render one image of a storyboard shot again and return the new image's path (Read it). Only that image's stage
+    runs (a beat's start or end image, an edit, a take keyframe, a product still), through the build's own code and
+    cache, as one background job; videos are never rendered. mode: regenerate (a new seed; written into site.yaml) or
+    rerun (the same seed, after set_shot_field changed its text). slot: the image's name from storyboard_shots (default:
+    the shot's first, e.g. still, end, key.<name>, image). step: 0 = the image's own step, 1 = the step under it (the
+    base image of an edit chain; its shots then need a rerun). Every render is kept as a variant; pick_shot_variant
+    goes back to one. Returns image (path), seed, variant, shot, slot."""
+    ws = _workspace(project)
+    key = ws.resolve_key(shot, slot, step)
+    job = ws.start(key, mode, seed)
+    t0 = time.time()
+    while time.time() - t0 < timeout_s and job.status not in ("done", "failed"):
+        time.sleep(1.0)
+    if job.status == "done":
+        return {k: v for k, v in (job.result or {}).items() if k != "key"} | {"job": job.id}
+    if job.status == "failed":
+        raise ValueError(job.error or "the render failed")
+    return job.public(tail=10) | {"note": "still rendering: poll with job_status"}
+
+
+@mcp.tool()
+def pick_shot_variant(project: str, shot: str, variant: int, slot: Optional[str] = None, step: int = 0) -> dict:
+    """Make a kept variant of a shot's image the one in use: its seed (and text) are written into site.yaml, and the
+    build's cache holds it, so the full build reproduces that image."""
+    ws = _workspace(project)
+    return ws.pick(ws.resolve_key(shot, slot, step), variant)
+
+
+@mcp.tool()
+def approve_shot(project: str, shot: str, approved: bool = True) -> dict:
+    """Mark a storyboard shot approved (kept in storyboard/state.json, not in the spec). The sheet and `build --plan`
+    list shots that are not approved; editing a shot makes its approval read 'changed'."""
+    return {"shot": shot, "approval": _workspace(project).approve(shot, approved)}
 
 
 @mcp.tool()

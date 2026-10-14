@@ -411,7 +411,7 @@ function buildShared(n) {
   const cid = "shared:" + n.key;
   const fake = { id: cid, locked: ST.shots.some(s => n.used_by.includes(s.id) && s.locked), slots: [] };
   const card = el("article", { class: "card shared", id: "c-" + cssId(cid) });
-  card.append(el("div", { class: "hd" }, el("h3", {}, n.label + ": " + (n.kind === "generate" ? "base image" : n.kind)),
+  card.append(el("div", { class: "hd" }, el("h3", {}, n.kind === "generate" ? "Base image" : n.kind === "edit" ? "Edit: " + (n.summary.length > 56 ? n.summary.slice(0, 54) + "..." : n.summary) : n.label),
     el("span", { class: "spacer" }), el("span", { class: "used" }, "used by", ...n.used_by.map(x => el("code", {}, x)))));
   const wrap = el("div", { class: "slots" });
   const left = el("div", { class: "slot" });
@@ -523,7 +523,6 @@ async function refresh(own = false) {
   }
   // shared panel
   $("#shared-wrap").hidden = !ST.shared.length;
-  const keepCards = new Set(ST.shots.map(s => "shared:" || s.id));
   const ids = [...ST.shared.map(n => "shared:" + n.key), ...ST.shots.map(s => s.id)];
   document.querySelectorAll(".card").forEach(c => { if (!ids.some(i => "c-" + cssId(i) === c.id)) c.remove(); });
   if ($("#cards .sub")) $("#cards .sub").remove();
@@ -549,7 +548,7 @@ async function poll() {
       $("#p-comfy .dot").classList.toggle("on", d.comfy);
       $("#b-undo").disabled = !d.undo;
       const finished = before.filter(k => !(k in d.jobs));
-      if (finished.length || (ST && d.rev !== REV)) await refresh(false);
+      if (finished.length || (ST && d.rev !== REV)) await refresh(!!d.own);
       else paintJobs();
       for (const cid of [...pendingRender]) { const a = document.activeElement; const c = document.getElementById("c-" + cssId(cid)); if (!c || !a || !c.contains(a)) { pendingRender.delete(cid); renderCard(cid, true); } }
     }

@@ -9,6 +9,23 @@ Everything so far is version 1. On 2026-10-12 the releases first published as 2.
 ## Unreleased
 
 ### Added
+- The storyboard is editable: `studio storyboard <project> --edit [--port N]` (also `/sb/<project>` in `studio ui`) serves
+  one card per shot with every field editable in place (caption, prompt, motion, seconds, seed, trim, strength, motion
+  seed, a take's keyframe prompts and motion segments, an edit's instruction, a product still's scene and view). Saves
+  go into `site.yaml` as a text splice, so comments, alignment, quoting and line endings are untouched (ruamel's
+  round trip, with the file's own indentation, for what a splice cannot do), after validating against the spec (an
+  invalid value is shown on the card, nothing is written); the last 30 previous texts are kept in
+  `storyboard/history/` with an Undo. Per image: Regenerate (a new seed), Re-run (same seed after editing text) and
+  Revert render only that image's stage through the full build's code and cache digests (beat still, end image, edit,
+  take keyframe, product still; never video, restore or product passes) as a background job with progress on the card.
+  Every render is kept as a variant (`storyboard/variants/`); clicking one writes its seed (and text) back into the spec
+  and restores it to the build's cache. Edit chains show each shot's own step with the shared base steps listed once at
+  the top (an edit there reaches every shot using it). Lock (`locked: true`), Approve (`storyboard/state.json`, shown
+  on the sheet and by `build --plan`), one job per image, and a page that notices `site.yaml` changing on disk.
+  MCP: `storyboard_shots`, `set_shot_field`, `regenerate_shot_image`, `pick_shot_variant`, `approve_shot`.
+- A take's keyframe may set its own `seed` (default: the keyframes' shared seed, so nothing existing re-renders).
+- `inputs.generated_path` / `inputs.edit_path` (the cache digests of generated and edited images, unchanged) and
+  `BuildContext.adopt` (record that outputs on disk are what a stage key makes).
 - Storyboard first: `studio storyboard <project> [--level sketch|stills|animatic] [--only ids] [--motion] [--open]`
   and the MCP tool `storyboard`. A card per shot (beat, take, film, product still, block image) with its opening and
   end frames, prompt, motion, caption, length, fidelity, status (new / changed since the last storyboard / unchanged /

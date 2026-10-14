@@ -105,7 +105,8 @@ class Workspace:
     def poll(self) -> dict:
         """Cheap: what changed since the page last looked (the spec's revision, running jobs, ComfyUI)."""
         jobs = {k: self.job_json(k) for k in list(self.active)}
-        return {"rev": specdoc.current_rev(self.project), "jobs": jobs, "comfy": self.comfy_alive(),
+        rev = specdoc.current_rev(self.project)
+        return {"rev": rev, "own": rev in specdoc.WRITTEN, "jobs": jobs, "comfy": self.comfy_alive(),
                 "last": {k: v for k, v in self.last.items() if k not in self.active},
                 "undo": bool(specdoc.can_undo(self.project))}
 

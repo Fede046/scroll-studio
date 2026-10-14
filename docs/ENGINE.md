@@ -138,6 +138,22 @@ UI (React) ◄─► engine server (FastAPI + job queue + websocket events) ◄�
   by scroll, Ken Burns moves from the motion text or the take's camera at `animatic`), draws the sheet (`sheet.py`)
   and cuts `animatic.mp4` with the trailer's type layer. `locked: true` (beats, takes, scenes) makes a stage keep
   existing outputs whatever its key; the `keyframes` stage repaints only keyframes whose own digest changed.
+- **The storyboard editor.** `engine/storyboard/edit/` is `studio storyboard --edit`, `/sb/<project>` in the Studio server
+  and the MCP tools `storyboard_shots`, `set_shot_field`, `regenerate_shot_image`, `pick_shot_variant`, `approve_shot`.
+  The spec stays the single source of truth: `shots.py` reads site.yaml into shots, image slots and their chains of
+  generators (`generate`, `edit` over another image, product still, gradient, file, take keyframe), each field carrying
+  the YAML path it is written to; identical steps in several chains are shared and written in every place.
+  `specdoc.py` writes edits as text splices located with ruamel's composer (comments, alignment, quoting, CRLF kept;
+  anchors and aliases followed), falling back to ruamel's round trip with the file's indentation and wrap width; the
+  result must load back as the old data plus the edit and validate against `Site`, else nothing is written, and each
+  write keeps the old text in `storyboard/history/`. `render.py` renders one image: `inputs.resolve_image` on the
+  image input (so the file lands under the digest the build looks up: `inputs.generated_path` / `edit_path`) or the
+  take's `keyframes` stage (a keyframe may set its own `seed`); never a video, restore or product-pass stage.
+  `variants.py` keeps every render with the recipe that drew it (which is current is derived from the cache entry
+  the spec describes, never stored), and picking one writes the recipe back and restores the cache entry (a
+  keyframe's file and `_frames.json` digest, then `BuildContext.adopt`). `workspace.py` runs image jobs on the server's
+  `JobQueue` (one per image: a lock file in the variants folder) and shares ComfyUI with other sessions without ever
+  stopping or interrupting it. Approvals live in `storyboard/state.json`, outside the spec.
 - **Launch trailers** (`engine/trailer/`, `studio trailer`): a second output from the same spec and the same cache.
   `plan.py` cuts shots from what the builders already rendered (takes, beats, scroll recordings, product stills) onto
   a beat grid; `frame.py` reframes each for 16:9 and 9:16 (the take's product projected through its camera by
@@ -159,6 +175,8 @@ scroll-studio/
     compile/                   site compiler, templates/, themes/
     plan.py                    dry-run build plans, estimates calibrated from stage stamps
     storyboard/                cards per shot, stand-in films, sheet.jpg/storyboard.html, animatic
+    storyboard/edit/           the edit workspace: specdoc (site.yaml edits), shots (fields and image chains), variants,
+                               render (one image's stage), approvals, workspace + api (server, page.html)
     fidelity.py                plan and storyboard preview modes, placeholder cards
     jobs/                      stage graph, cache, events
     server/                    FastAPI app (REST + websocket) used by the UI and MCP

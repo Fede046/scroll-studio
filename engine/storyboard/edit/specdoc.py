@@ -63,6 +63,7 @@ class _Splice(Exception):
 
 
 _LOCKS: dict[str, threading.RLock] = {}
+WRITTEN: list[str] = []          # revisions written by this process (the page tells its own saves from outside changes)
 
 
 def lock(project: Project) -> threading.RLock:
@@ -500,6 +501,8 @@ def save(project: Project, ops: list[Op], expect: Optional[dict] = None, label: 
             return {"changed": False, "rev": rev_of(text), "history": None}
         hist = _remember(project, text, new, label)
         _write(project, new)
+        WRITTEN.append(rev_of(new))
+        del WRITTEN[:-50]
         return {"changed": True, "rev": rev_of(new), "history": hist}
 
 
@@ -524,6 +527,7 @@ def undo(project: Project) -> dict:
             raise BuildError("nothing to undo (site.yaml has changed since the last save made here)")
         old = (history_dir(project) / last["file"]).read_bytes().decode("utf-8")
         _write(project, old)
+        WRITTEN.append(rev_of(old))
         (history_dir(project) / last["file"]).unlink(missing_ok=True)
         (history_dir(project) / "last.json").unlink(missing_ok=True)
         return {"rev": rev_of(old), "label": last.get("label", "")}

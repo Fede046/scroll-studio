@@ -221,6 +221,7 @@ studio storyboard my-site --level animatic   # the stills in motion, timed cuts 
 studio storyboard my-site --level animatic --motion --only door   # plus a tiny LTX preview of one shot's motion
 studio build my-site --plan                  # what a build would render, and about how long it takes here
 studio build my-site --only door,enter       # render just those beats (or sections); the rest keep their cache
+studio storyboard my-site --edit             # edit every shot in the browser, regenerate one image at a time
 ```
 
 It writes `<project>/storyboard/` (not committed, like `dist/`):
@@ -250,7 +251,41 @@ beats:
 ```
 
 `locked: true` works on a beat, a take and any scene section; the build logs `locked, kept the existing render` for
-each stage it keeps (a locked shot that was never rendered is rendered once). `studio build` prints its plan and
+each stage it keeps (a locked shot that was never rendered is rendered once).
+
+### Edit it, one image at a time
+
+`studio storyboard my-site --edit [--port 8971]` opens the storyboard as an editing workspace (a local server; the same
+page is `/sb/<project>` in `studio ui`). One card per shot, with every field editable in place and a button per image:
+
+- **Edit any field.** Caption, prompt, motion, seconds, seed, trim, strength, a take's keyframe prompts and motion
+  segments, an edit's instruction, a product still's scene and view. Save writes the change into `site.yaml` *in
+  place*: only the edited text changes, so comments, column alignment, quoting and line endings stay as you wrote them
+  (a change a text splice cannot make, such as switching a source, falls back to ruamel's round-trip dump with the
+  file's own indentation). The spec is validated first: an invalid value is shown on the card and nothing is written.
+  The previous text of every save is kept in `<project>/storyboard/history/` (the last 30; **Undo last save**
+  restores it).
+- **Regenerate, Re-run, Revert, per image.** *Regenerate* renders one more variant of just that image with a new seed;
+  *Re-run* renders it with the same seed after you edited its text; *Revert* goes back to the image that was in use
+  before. Only that image's stage runs (a beat's start or end image, an edit, a take keyframe, a product still), through
+  the code and cache digests the full build uses, as a background job with its progress on the card. Videos, restores and
+  product passes are never started from here. Locked shots refuse, and one job runs per image at a time; jobs share
+  ComfyUI with whatever else is queued on it.
+- **Variants.** Every render is kept under `<project>/storyboard/variants/<shot>/<image>/` and shown as a strip of
+  thumbnails on the card. Click one to make it current: its seed (and text) are written into `site.yaml`, and it is put
+  back in the build's cache if that was cleaned, so `studio build` reproduces exactly that image.
+- **Shared steps.** A chain of edits (a generated base image, a relight edit, a crop edit per shot) is shown the readable
+  way: each card holds only what is its own, with the full chain behind an expander, and the steps several shots share
+  are listed once at the top, where one edit reaches every shot that uses them ("Re-run its shots" redraws them).
+- **Lock and Approve.** *Lock* sets `locked: true` in the spec. *Approve* is storyboard-only state in
+  `<project>/storyboard/state.json`: a badge on the card, listed as "not approved" on the sheet and by
+  `studio build --plan`, and read as "changed since approval" once the shot is edited again.
+- **Safe beside other editors.** If `site.yaml` changes on disk while the page is open (you, an agent, git), the page
+  notices, reloads the values and says which; a save whose fields changed under it is refused instead of overwriting.
+
+Agents drive the same loop through the MCP tools `storyboard_shots`, `set_shot_field`, `regenerate_shot_image` (returns
+the new image's path), `pick_shot_variant` and `approve_shot`. *Update sheet* in the page (or `studio storyboard
+my-site`) rebuilds `sheet.jpg`, the stand-in page and the animatic from the edited spec; the frames come from the caches. `studio build` prints its plan and
 estimate before any heavy GPU work; with `confirm_over = 30` in studio.toml it asks first when a build would run
 longer than that many minutes (`--yes` skips the question; without a terminal it stops instead of waiting).
 

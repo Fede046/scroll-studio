@@ -404,6 +404,8 @@ def announce(project: Project, only: Optional[Iterable[str]] = None, force: bool
         return Plan(project, project.load())
     n, m = len(plan.stale()), len(plan.renders)
     locked = [f"{s.section}/{s.name}" for s in plan.stages if s.state == "locked"]
+    from .storyboard.edit import approvals
+    approvals.mention(project, log)      # shots the storyboard has not approved (only once approvals are in use)
     if not n and not m:
         log("plan: nothing to render, every stage is up to date" + (f" ({len(plan.errors)} section(s) not planned)" if plan.errors else ""))
         for line in plan.lines():
