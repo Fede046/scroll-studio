@@ -51,7 +51,9 @@ in `studio.toml` (copy `studio.example.toml`) or the `BLENDER` environment varia
 ## 4. ComfyUI (film, generated images)
 
 1. Install [ComfyUI](https://github.com/comfyanonymous/ComfyUI) and these custom nodes: ComfyUI-LTXVideo,
-   ComfyUI-KJNodes, ComfyUI-VideoHelperSuite.
+   ComfyUI-KJNodes, ComfyUI-VideoHelperSuite, ComfyUI-SeedVR2_VideoUpscaler (`beat_restore`, `take.restore`, and the
+   upscale of a frozen moment, `freeze.upscale`; it downloads its ~8 GB of weights into `models/SEEDVR2` on first use,
+   and without them a frozen moment falls back to a local Lanczos upscale).
 2. Download the models listed in `engine/models.yaml` into ComfyUI's model folders (or point
    `extra_model_paths.yaml` at another drive).
 3. Start it and leave it running:
