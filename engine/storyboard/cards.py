@@ -113,8 +113,12 @@ def describe(ref) -> str:
         return ref
     if ref.generate:
         return ref.generate
-    if ref.edit:
-        return f"edit of [{describe(ref.edit.source)}]: {ref.edit.instruction}"
+    if ref.edit:                      # this shot's own step first; the chain's base after it, short
+        base, src = "", ref.edit.source
+        while not isinstance(src, str) and src.edit and not src.generate and not src.file and src.product is None:
+            src = src.edit.source
+        base = describe(src)
+        return f"edit: {ref.edit.instruction}" + (f"  (from: {base[:70]}{'...' if len(base) > 70 else ''})" if base else "")
     if ref.product is not None:
         view = ref.product if isinstance(ref.product, str) else ref.product.view
         scene = ref.scene or (getattr(ref.product, "scene", None) if not isinstance(ref.product, str) else None)
