@@ -518,11 +518,17 @@ def _queue_state(pid):
 
 
 def run(graph, poll=5, timeout=45 * 60):
-    """Queue a graph and block until it finishes; returns the list of saved image records.
+    """Queue a graph and block until it finishes; returns the list of saved image records (node `save`).
 
     ComfyUI may be shared with other jobs: time spent waiting in its queue does not count towards `timeout`
     (which limits our own execution), and a timed-out job is interrupted only while it is the one running, or
     taken out of the queue while it is still waiting."""
+    return run_outputs(graph, poll, timeout)["save"]["images"]
+
+
+def run_outputs(graph, poll=5, timeout=45 * 60):
+    """`run`, returning every output node's record ({node id: {"images": [...], "text": [...]}}); for graphs whose
+    answer is not an image (a text node, a mask batch saved as images under another node id)."""
     body = json.dumps({"prompt": graph, "client_id": uuid.uuid4().hex}).encode()
     try:
         res = json.loads(_req("/prompt", body, {"Content-Type": "application/json"}))
@@ -540,7 +546,7 @@ def run(graph, poll=5, timeout=45 * 60):
                 raise SystemExit(f"ComfyUI error: {json.dumps(msgs, indent=1)[:3000]}")
             if status.get("completed"):
                 print(f"  done in {int(time.time() - start)}s", flush=True)
-                return hist[pid]["outputs"]["save"]["images"]
+                return hist[pid]["outputs"]
         if run_start is None:
             state, ahead = _queue_state(pid)
             if state == "running" or (state is None and pid not in hist):
