@@ -401,3 +401,13 @@ def test_http_save_validation_conflict_and_lock(project):
     assert c.get(f"/api/sb/{name}/state").json()["name"] == "Edited outside"
     # undo only while the file is as the last save left it
     assert c.post(f"/api/sb/{name}/undo").status_code == 400
+
+
+def test_keyframe_identity_ignores_an_explicit_default_seed():
+    from engine.storyboard.edit.images import keyframe_ident
+    frames = [{"name": "room", "t": 0, "prompt": "p"}]
+    a = {"keyframes": {"seed": 5, "frames": frames}}
+    b = {"keyframes": {"seed": 5, "frames": [{"name": "room", "t": 0, "prompt": "p", "seed": 5}]}}
+    c = {"keyframes": {"seed": 5, "frames": [{"name": "room", "t": 0, "prompt": "p", "seed": 6}]}}
+    bk = {"w": 1}
+    assert keyframe_ident(a, bk, "room") == keyframe_ident(b, bk, "room") != keyframe_ident(c, bk, "room")

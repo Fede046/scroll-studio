@@ -32,8 +32,18 @@ def rel(project: Project, p: Path) -> str:
         return str(p)
 
 
+def keyframe_ident(shot: dict, bkey: dict, name: str) -> str:
+    """Identifies a keyframe's image for the variant store: the world it is painted over and its *effective* recipe, so
+    a seed written explicitly (equal to the shared default) is still the same image."""
+    kf = shot["keyframes"]
+    fr = next(f for f in kf["frames"] if f["name"] == name)
+    eff = dict(fr, seed=fr.get("seed", kf.get("seed", 7)), control_strength=fr.get("control_strength", kf.get("control_strength", 0.8)))
+    common = {k: v for k, v in kf.items() if k not in ("frames", "seed", "control_strength")}
+    return hashlib.sha1(json.dumps({"b": bkey, "c": common, "f": eff}, sort_keys=True, default=str).encode()).hexdigest()[:16]
+
+
 def keyframe_info(project: Project, site, node: Node) -> tuple[Optional[str], Path, bool]:
-    """(digest of the keyframe's recipe now, its file, whether the stage has painted exactly that). The digest is
+    """(identity of the keyframe's recipe now, its file, whether the stage has painted exactly that). The identity is
     None when the world it is painted over cannot be keyed without rendering something."""
     from ...scenes import film
     sec = site.sections[node.extra["section_index"]]
@@ -46,12 +56,13 @@ def keyframe_info(project: Project, site, node: Node) -> tuple[Optional[str], Pa
     except (WouldRender, BuildError, KeyError, OSError):
         return None, png, False
     digest = film.keyframe_digests(shot, bkey, 1).get(name)
+    ident = keyframe_ident(shot, bkey, name) if digest else None
     rec = ctx.work / "keyframes" / "_frames.json"
     try:
         recorded = json.loads(rec.read_text()) if rec.exists() else {}
     except ValueError:
         recorded = {}
-    return digest, png, bool(digest and png.exists() and recorded.get(name) == digest)
+    return ident, png, bool(digest and png.exists() and recorded.get(name) == digest)
 
 
 def probe(project: Project, site, node: Node) -> Probe:

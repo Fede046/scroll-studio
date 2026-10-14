@@ -157,7 +157,7 @@ def _keyframe(project: Project, board: Board, node: Node, recipe: dict, recipe0:
         ctx = BuildContext(project, sec.id, log=log, options={"site_video_model": site.video_model})
         progress(0.05, "keyframes stage")
         shot, bkey, _legacy = film.world(sec, ctx)
-        digest = film.keyframe_digests(shot, bkey, 1)[node.extra["frame"]]
+        ident = images.keyframe_ident(shot, bkey, node.extra["frame"])
     except Exception:
         if seed_changed:                                         # put the seed back: nothing came of it
             try:
@@ -168,7 +168,7 @@ def _keyframe(project: Project, board: Board, node: Node, recipe: dict, recipe0:
                 pass
         raise
     png = ctx.work / "keyframes" / f"{node.extra['frame']}.png"
-    return png, f"kf:{digest}"
+    return png, f"kf:{ident}"
 
 
 # ---------------------------------------------------------------- choosing a variant
