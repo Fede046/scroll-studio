@@ -85,6 +85,21 @@ def image_key(ref: ImageRef) -> dict:
     return d
 
 
+def generated_path(project: Project, ref: ImageInput) -> Path:
+    """Where a `generate:` image is cached: .build/_generated/<digest of prompt, size and seed>.png."""
+    w, h = (int(v) // 16 * 16 for v in ref.size)
+    digest = hashlib.sha1(json.dumps([ref.generate, w, h, ref.seed]).encode()).hexdigest()[:12]
+    return project.build / "_generated" / f"{digest}.png"
+
+
+def edit_path(project: Project, ref: ImageInput, srcs: list[Path]) -> Path:
+    """Where an `edit:` image is cached, given its resolved source images (the edit's source, then its refs)."""
+    from .project import file_key
+    e = ref.edit
+    digest = hashlib.sha1(json.dumps([[file_key(s) for s in srcs], e.instruction, e.seed, e.steps, 2]).encode()).hexdigest()[:12]
+    return project.build / "_generated" / f"edit_{digest}.png"
+
+
 def resolve_image(project: Project, ref: ImageRef, log=print, alpha: bool = False) -> Path:
     """alpha: the caller can show a transparent image (hero/product blocks), so a product still may stay RGBA."""
     if isinstance(ref, str):
@@ -118,8 +133,8 @@ def resolve_image(project: Project, ref: ImageRef, log=print, alpha: bool = Fals
     if not ref.generate:
         raise BuildError("an image input needs `file`, `generate`, `gradient` or `product`")
     w, h = (int(v) // 16 * 16 for v in ref.size)
-    digest = hashlib.sha1(json.dumps([ref.generate, w, h, ref.seed]).encode()).hexdigest()[:12]
-    out = project.build / "_generated" / f"{digest}.png"
+    out = generated_path(project, ref)
+    digest = out.stem
     if out.exists():
         return out
     from .fidelity import placeholder, preview, would_render
@@ -147,8 +162,8 @@ def _edit(project: Project, ref: ImageInput, log=print) -> Path:
     from .project import file_key
     e = ref.edit
     srcs = [resolve_image(project, r, log) for r in [e.source, *e.refs[:2]]]
-    digest = hashlib.sha1(json.dumps([[file_key(s) for s in srcs], e.instruction, e.seed, e.steps, 2]).encode()).hexdigest()[:12]
-    out = project.build / "_generated" / f"edit_{digest}.png"
+    out = edit_path(project, ref, srcs)
+    digest = out.stem[len("edit_"):]
     if out.exists():
         return out
     from .fidelity import placeholder, preview, would_render

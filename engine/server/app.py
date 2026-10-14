@@ -308,6 +308,12 @@ def job(jid: str):
     return jobs.jobs[jid].public()
 
 
+# ---------------------------------------------------------------- storyboard editor
+
+from ..storyboard.edit.api import make_router as _sb_router   # noqa: E402  /sb/<project> and /api/sb/<project>/...
+app.include_router(_sb_router(find, jobs))
+
+
 # ---------------------------------------------------------------- UI
 
 if UI_DIST.exists():

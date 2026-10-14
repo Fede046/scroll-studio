@@ -98,7 +98,7 @@ def stage_keyframes(shot, out, args):
         depth_name = ltx_comfy.upload(depth)
         spec_cfg = dict(kcfg, control_strength=spec.get("control_strength", kcfg.get("control_strength", 0.8)))
         for i in range(args.variants):
-            seed = kcfg.get("seed", 7) + i
+            seed = spec.get("seed", kcfg.get("seed", 7)) + i   # a keyframe may pin its own seed
             graph = ltx_comfy.build_keyframe_graph(spec_cfg, spec["prompt"], depth_name, w, h, seed,
                                                    prefix=f"{shot['id']}/key_{name}")
             if args.dry_run:

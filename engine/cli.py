@@ -3,6 +3,7 @@
   studio new my-site [--example lodestar-orbital]   create projects/my-site (from an example or a starter)
   studio build my-site [--only hero,door] [--force] [--draft] [--yes] [--plan]
   studio storyboard my-site [--level sketch|stills|animatic] [--only id,id] [--motion] [--open]
+  studio storyboard my-site --edit [--port 8971]    edit every shot in the browser: captions, prompts, seeds, regenerate one image
   studio preview my-site [--port 5173]
   studio record my-site [--section hero] [--seconds 12] [--gif]
   studio trailer my-site [--format 9x16] [--plan]      launch trailer from the site's renders -> dist/trailer/
@@ -108,10 +109,21 @@ def storyboard(name: str, level: str = typer.Option("stills", help="sketch (no C
                                                              "the rest keep their last storyboard frames"),
                motion: bool = typer.Option(False, "--motion", help="animatic: a tiny LTX-2.3 preview per shot "
                                                                     "(512x288, 2 s) to check motion"),
-               open_: bool = typer.Option(False, "--open", help="Open storyboard.html when done")):
+               open_: bool = typer.Option(False, "--open", help="Open storyboard.html when done"),
+               edit: bool = typer.Option(False, "--edit", help="Serve the storyboard as an editing workspace instead: "
+                                                               "change any shot's text, seed, motion or length (written into "
+                                                               "site.yaml), regenerate one image at a time, keep every "
+                                                               "variant, lock and approve shots"),
+               port: Optional[int] = typer.Option(None, help="--edit: port (default: the first free one of 8971-8979)"),
+               browser: bool = typer.Option(True, "--browser/--no-browser", help="--edit: open the browser")):
     """Storyboard the site before the full render: <project>/storyboard/ (the page with stills standing in for films,
-    storyboard.html + sheet.jpg with a card per shot and the render estimate, animatic.mp4)."""
+    storyboard.html + sheet.jpg with a card per shot and the render estimate, animatic.mp4). With --edit: the same
+    shots as an editing workspace on a local server."""
     from .project import Project
+    if edit:
+        from .storyboard.edit.api import serve
+        serve(Project(resolve(name)), port=port, open_browser=browser, log=typer.echo)
+        return
     from .storyboard import storyboard as run
     res = run(Project(resolve(name)), level=level, only=only.split(",") if only else None, motion=motion,
               log=typer.echo)

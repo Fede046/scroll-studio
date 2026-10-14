@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Storyboard editor</title>
+<style>
+:root { color-scheme: dark; --bg:#111214; --panel:#1b1c20; --panel2:#222328; --ink:#eceef2; --dim:#9aa0aa; --line:#2c2e34;
+  --accent:#ffb27a; --ok:#2fb67c; --warn:#ff8a3d; --bad:#ff5d5d; --blue:#3d8bfd; --violet:#a479f0; }
+* { box-sizing:border-box; margin:0; }
+body { background:var(--bg); color:var(--ink); font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; padding:0 0 60px; }
+button { font:inherit; color:inherit; cursor:pointer; }
+button:disabled { cursor:not-allowed; opacity:.45; }
+a { color:var(--accent); }
+header.top { position:sticky; top:0; z-index:20; background:rgba(17,18,20,.94); backdrop-filter:blur(8px); border-bottom:1px solid var(--line);
+  padding:12px clamp(16px,3vw,40px); display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px; }
+header.top h1 { font-size:18px; letter-spacing:-.01em; margin-right:6px; }
+header.top h1 small { color:var(--dim); font-weight:400; font-size:13px; margin-left:8px; }
+.pill { display:inline-flex; align-items:center; gap:6px; border-radius:99px; padding:1px 10px; font-size:12.5px; background:var(--panel2); color:var(--dim); border:1px solid var(--line); white-space:nowrap; }
+.pill.ok { color:#0b0b0c; background:var(--ok); border-color:var(--ok); }
+.pill.warn { color:#0b0b0c; background:var(--warn); border-color:var(--warn); }
+.pill.bad { color:#0b0b0c; background:var(--bad); border-color:var(--bad); }
+.pill.violet { color:#0b0b0c; background:var(--violet); border-color:var(--violet); }
+.pill.blue { color:#0b0b0c; background:var(--blue); border-color:var(--blue); }
+.dot { width:8px; height:8px; border-radius:50%; background:var(--bad); display:inline-block; } .dot.on { background:var(--ok); }
+.spacer { flex:1; }
+.btn { background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:4px 12px; font-size:13px; }
+.btn:hover:not(:disabled) { border-color:#4a4d55; background:#2a2c33; }
+.btn.primary { background:var(--accent); color:#1a1209; border-color:var(--accent); font-weight:600; }
+.btn.primary:hover:not(:disabled) { background:#ffc298; }
+.btn.small { padding:2px 9px; font-size:12.5px; }
+.btn.on { background:var(--ok); color:#0b0b0c; border-color:var(--ok); }
+.btn.lock.on { background:var(--violet); border-color:var(--violet); }
+#notice { margin:12px clamp(16px,3vw,40px) 0; display:flex; flex-direction:column; gap:8px; }
+.note { background:#2a2417; border:1px solid #6b4f12; color:#ffd89b; border-radius:10px; padding:8px 14px; display:flex; gap:12px; align-items:center; }
+.note.err { background:#2b1717; border-color:#7a2a2a; color:#ffb4b4; }
+.note.info { background:#17222b; border-color:#2a4a66; color:#b9dcff; }
+.note button { margin-left:auto; background:none; border:0; color:inherit; opacity:.7; font-size:16px; }
+main { padding:18px clamp(16px,3vw,40px) 0; }
+h2.sec { font-size:13px; letter-spacing:.08em; text-transform:uppercase; color:var(--dim); margin:22px 0 4px; font-weight:600; }
+p.sub { color:var(--dim); font-size:13px; margin-bottom:10px; max-width:80ch; }
+.grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(620px,100%),1fr)); gap:18px; align-items:start; }
+.card { background:var(--panel); border:2px solid var(--line); border-radius:14px; padding:12px 14px 14px; position:relative; }
+.card.is-dirty { border-color:var(--accent); }
+.card.is-approved { border-color:#235c46; }
+.card.is-locked { border-color:#5a4488; }
+.card .hd { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+.card .hd h3 { font-size:17px; margin-right:2px; }
+.card .hd .spacer { flex:1; }
+.slots { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:14px; }
+.slot { min-width:0; }
+.slotlab { display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--dim); margin-bottom:4px; }
+.slotlab b { color:var(--ink); font-weight:600; }
+.imgbox { position:relative; aspect-ratio:16/9; background:#000; border-radius:9px; overflow:hidden; border:1px solid var(--line); }
+.imgbox img { width:100%; height:100%; object-fit:contain; display:block; cursor:zoom-in; }
+.imgbox.stale img { opacity:.45; filter:saturate(.6); }
+.imgbox .empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center; color:var(--dim); padding:14px; font-size:13px; background:repeating-linear-gradient(135deg,#15161a,#15161a 12px,#181a1e 12px,#181a1e 24px); }
+.imgbox .chip { position:absolute; left:8px; top:8px; font-size:11.5px; border-radius:6px; padding:0 7px; color:#0b0b0c; background:var(--ok); text-transform:uppercase; letter-spacing:.03em; }
+.imgbox .chip.stale { background:var(--warn); } .imgbox .chip.missing { background:#7c818c; } .imgbox .chip.file { background:var(--blue); } .imgbox .chip.error { background:var(--bad); }
+.job { position:absolute; inset:auto 0 0 0; background:rgba(10,10,12,.86); padding:8px 10px 9px; font-size:12.5px; }
+.job .bar { height:5px; border-radius:3px; background:#333; overflow:hidden; margin-top:5px; }
+.job .bar i { display:block; height:100%; background:var(--accent); transition:width .4s; }
+.job.failed { color:#ffb4b4; background:rgba(40,12,12,.92); }
+.job.done { color:#b7f0d4; }
+.job .x { float:right; background:none; border:0; opacity:.7; }
+.strip { display:flex; gap:6px; margin-top:6px; overflow-x:auto; padding-bottom:3px; min-height:12px; }
+.vt { flex:0 0 auto; width:84px; padding:0; border:2px solid var(--line); border-radius:7px; background:#000; overflow:hidden; position:relative; }
+.vt img { width:100%; aspect-ratio:16/9; object-fit:cover; display:block; }
+.vt span { position:absolute; left:0; right:0; bottom:0; font-size:10.5px; background:rgba(0,0,0,.72); text-align:center; line-height:1.5; }
+.vt.current { border-color:var(--accent); }
+.vt:hover:not(.current) { border-color:#6b6f7a; }
+.acts { display:flex; gap:6px; margin-top:7px; flex-wrap:wrap; }
+.recipe { margin-top:8px; display:flex; flex-direction:column; gap:7px; }
+.recipe .nlab { font-size:11.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--dim); display:flex; gap:8px; align-items:center; }
+.fld { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.fld > label { font-size:12px; color:var(--dim); display:flex; gap:8px; }
+.fld > label em { font-style:normal; color:#6f7480; }
+.fld input, .fld textarea, .fld select { width:100%; background:#141519; color:var(--ink); border:1px solid var(--line); border-radius:7px; padding:5px 8px; font:inherit; }
+.fld textarea { resize:vertical; line-height:1.45; min-height:34px; overflow:hidden; }
+.fld input:focus, .fld textarea:focus, .fld select:focus { outline:none; border-color:var(--accent); }
+.fld.dirty input, .fld.dirty textarea, .fld.dirty select { border-color:var(--accent); background:#1a1712; }
+.fld.bad input, .fld.bad textarea { border-color:var(--bad); }
+.fld .ferr { color:#ff9a9a; font-size:12.5px; }
+.fld input:disabled, .fld textarea:disabled { opacity:.6; }
+.nums { display:flex; gap:10px; flex-wrap:wrap; }
+.nums .fld { width:92px; }
+.fields { margin-top:12px; display:flex; flex-direction:column; gap:8px; }
+.bar2 { display:flex; align-items:center; gap:8px; margin-top:12px; padding-top:10px; border-top:1px solid var(--line); }
+.bar2 .msg { color:var(--accent); font-size:13px; }
+.errs { margin-top:8px; display:flex; flex-direction:column; gap:3px; color:#ff9a9a; font-size:13px; }
+details.chain { margin-top:8px; font-size:13px; }
+details.chain summary { cursor:pointer; color:var(--dim); }
+.chainrow { display:flex; gap:10px; align-items:center; padding:5px 0; border-bottom:1px dashed var(--line); }
+.chainrow img { width:72px; aspect-ratio:16/9; object-fit:cover; border-radius:5px; background:#000; flex:0 0 auto; }
+.chainrow .t { min-width:0; } .chainrow .t b { font-weight:600; } .chainrow .t div { color:var(--dim); overflow-wrap:anywhere; }
+.shared { border-color:#33384a; background:#191b22; }
+.shared .slots { grid-template-columns:minmax(250px,320px) 1fr; }
+.used { display:flex; gap:6px; flex-wrap:wrap; font-size:12px; color:var(--dim); align-items:center; }
+.used code { background:var(--panel2); padding:0 6px; border-radius:5px; }
+.hint { color:var(--dim); font-size:12.5px; }
+#lightbox { position:fixed; inset:0; background:rgba(0,0,0,.92); z-index:50; display:none; align-items:center; justify-content:center; cursor:zoom-out; }
+#lightbox.on { display:flex; } #lightbox img { max-width:96vw; max-height:94vh; }
+.kfgrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:14px; }
+.foot { color:var(--dim); font-size:12.5px; margin:34px clamp(16px,3vw,40px) 0; }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Storyboard <small id="proj"></small></h1>
+  <span class="pill" id="p-appr">...</span>
+  <span class="pill" id="p-comfy"><i class="dot"></i> ComfyUI</span>
+  <span class="spacer"></span>
+  <button class="btn" id="b-undo" disabled title="Put back site.yaml as it was before the last save made here">Undo last save</button>
+  <a class="btn" id="b-sheet-open" target="_blank" hidden>Sheet</a>
+  <a class="btn" id="b-page-open" target="_blank" hidden>Stand-in page</a>
+  <button class="btn" id="b-sheet" title="Run the storyboard (stills) again so the sheet and the stand-in page show these edits">Update sheet</button>
+</header>
+<div id="notice"></div>
+<main>
+  <div id="shared-wrap" hidden>
+    <h2 class="sec">Shared steps</h2>
+    <p class="sub">These steps draw more than one shot: a base image, a relight, a style edit. Each shot below shows only what is its own. Editing a shared step changes every shot that uses it; its shots then need a Re-run.</p>
+    <div class="grid" id="shared"></div>
+  </div>
+  <h2 class="sec">Shots</h2>
+  <div class="grid" id="cards"><p class="sub">Loading...</p></div>
+</main>
+<p class="foot">Edits are written into site.yaml (comments and layout kept; the previous text is kept in storyboard/history/). Regenerate renders one more variant of just that image; click a variant to make it the one the build uses.</p>
+<div id="lightbox"><img alt=""></div>
+<script>
+const NAME = "__NAME__";
+const API = "/api/sb/" + encodeURIComponent(NAME);
+const $ = (s, r = document) => r.querySelector(s);
+const el = (tag, attrs, ...kids) => {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v === null || v === undefined || v === false) continue;
+    if (k === "class") e.className = v; else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+    else if (k === "html") e.innerHTML = v; else if (v === true) e.setAttribute(k, ""); else e.setAttribute(k, v);
+  }
+  for (const c of kids.flat()) if (c !== null && c !== undefined && c !== false) e.append(c.nodeType ? c : document.createTextNode(String(c)));
+  return e;
+};
+
+let ST = null;               // last state from the server
+let REV = null;              // site.yaml revision this page last saw
+const dirty = {};            // card id -> {path: {value, old}}
+const errors = {};           // card id -> [{loc, msg}]
+const jobs = {};             // image key -> job (from poll)
+const lastRes = {};          // image key -> {status, message, error}
+const pendingRender = new Set();
+const sigs = {};
+
+async function api(path, opts = {}) {
+  const r = await fetch(API + path, opts.body !== undefined ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(opts.body) } : { method: opts.method || "GET" });
+  let data = null; try { data = await r.json(); } catch (e) {}
+  return { ok: r.ok, status: r.status, data };
+}
+const imgUrl = (i, w = 640) => i && i.p ? `${API}/img?p=${encodeURIComponent(i.p)}&v=${i.v}${w ? "&w=" + w : ""}` : "";
+
+function notice(text, cls = "") {
+  const n = el("div", { class: "note " + cls }, el("span", {}, text), el("button", { title: "dismiss", onclick: () => n.remove() }, "x"));
+  $("#notice").prepend(n);
+  if (cls !== "err") setTimeout(() => n.remove(), 12000);
+}
+
+// ------------------------------------------------------------------ fields
+function allFields(shot) {
+  const out = [...shot.fields];
+  for (const sl of shot.slots) for (const n of sl.nodes) if (!n.shared || n === sl.nodes[0]) out.push(...n.fields);
+  return out;
+}
+const shown = (f) => f.value === null || f.value === undefined ? "" : f.value;
+
+function fieldEl(cid, f) {
+  const d = (dirty[cid] || {})[f.paths[0]];
+  const val = d ? d.value : shown(f);
+  let input;
+  if (f.type === "area") {
+    input = el("textarea", { rows: 1, spellcheck: "true" }); input.value = val;
+  } else if (f.type === "select") {
+    input = el("select", {}, ...(f.options || []).map(o => el("option", { value: o }, o))); input.value = val;
+  } else if (f.type === "int" || f.type === "float") {
+    input = el("input", { type: "number", step: f.type === "int" ? "1" : "any" }); input.value = val;
+  } else { input = el("input", { type: "text", spellcheck: "true" }); input.value = val; }
+  if (f.readonly) input.disabled = true;
+  const wrap = el("div", { class: "fld" + (d ? " dirty" : ""), "data-path": f.paths[0] },
+    el("label", {}, f.label, f.paths.length > 1 ? el("em", {}, `(written in ${f.paths.length} places)`) : null),
+    input);
+  const err = (errors[cid] || []).find(e => e.field === f.paths[0]);
+  if (err) { wrap.classList.add("bad"); wrap.append(el("div", { class: "ferr" }, err.msg)); }
+  if (f.hint) input.title = f.hint;
+  const grow = () => { if (f.type === "area") { input.style.height = "auto"; input.style.height = Math.max(34, input.scrollHeight + 2) + "px"; } };
+  input.addEventListener("input", () => {
+    grow();
+    const same = String(input.value) === String(shown(f));
+    dirty[cid] = dirty[cid] || {};
+    if (same) delete dirty[cid][f.paths[0]]; else dirty[cid][f.paths[0]] = { value: input.value, old: f.raw === undefined ? null : f.raw };
+    wrap.classList.toggle("dirty", !same);
+    syncBar(cid);
+  });
+  input.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter" && (ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); save(cid); }
+    if (ev.key === "s" && (ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); save(cid); }
+  });
+  queueMicrotask(grow); setTimeout(grow, 30);
+  return wrap;
+}
+
+function syncBar(cid) {
+  const card = document.getElementById("c-" + cssId(cid)); if (!card) return;
+  const n = Object.keys(dirty[cid] || {}).length;
+  card.classList.toggle("is-dirty", n > 0);
+  const bar = $(".bar2", card); if (!bar) return;
+  $(".save", bar).disabled = n === 0; $(".discard", bar).disabled = n === 0;
+  $(".msg", bar).textContent = n ? `${n} unsaved change${n > 1 ? "s" : ""}` : "";
+}
+const cssId = (s) => s.replace(/[^A-Za-z0-9_-]/g, "_");
+
+// ------------------------------------------------------------------ saving
+function matchErrors(cid, shot, errs) {
+  const fields = shot ? allFields(shot) : [];
+  const out = [];
+  for (const e of errs) {
+    const parts = String(e.loc).split(".");
+    let hit = null;
+    for (const f of fields) for (const p of f.paths) {
+      const fp = p.split(".");
+      if (fp[fp.length - 1] !== parts[parts.length - 1]) continue;
+      let i = 0; for (const x of parts) if (x === fp[i]) i++;
+      if (i === fp.length) hit = f.paths[0];
+    }
+    out.push({ loc: e.loc, msg: e.msg, field: hit });
+  }
+  return out;
+}
+function findShot(cid) {
+  if (!ST) return null;
+  if (cid.startsWith("shared:")) { const n = ST.shared.find(x => "shared:" + x.key === cid); return n ? { id: cid, fields: n.fields, slots: [] } : null; }
+  return ST.shots.find(s => s.id === cid);
+}
+async function save(cid) {
+  const d = dirty[cid]; if (!d || !Object.keys(d).length) return true;
+  const edits = Object.entries(d).map(([path, v]) => ({ path, value: v.value, old: v.old }));
+  const r = await api("/save", { body: { edits, rev: REV } });
+  if (r.ok) {
+    delete dirty[cid]; delete errors[cid]; REV = r.data.rev;
+    await refresh(true);
+    return true;
+  }
+  if (r.status === 422) {
+    errors[cid] = matchErrors(cid, findShot(cid), r.data.errors || []);
+    renderCard(cid, true);
+    notice("Not saved: site.yaml would be invalid. Nothing was written.", "err");
+    return false;
+  }
+  if (r.status === 409) {
+    const gone = r.data.conflict || [];
+    for (const p of gone) delete (dirty[cid] || {})[p];
+    notice((r.data.error || "site.yaml changed on disk") + ": " + gone.slice(0, 3).join(", ") + ". Your edit to " + (gone.length > 1 ? "them" : "it") + " was dropped; review the new value and edit again.", "");
+    await refresh(true);
+    return false;
+  }
+  notice((r.data && r.data.error) || "Save failed", "err");
+  return false;
+}
+function discard(cid) { delete dirty[cid]; delete errors[cid]; renderCard(cid, true); }
+
+// ------------------------------------------------------------------ images
+async function runImage(cid, key, mode) {
+  if (!(await save(cid))) return;
+  const r = await api("/image", { body: { key, mode } });
+  if (!r.ok) { notice((r.data && r.data.error) || "Could not start", "err"); return; }
+  delete lastRes[key]; jobs[key] = r.data.job; paintJobs(); schedulePoll(400);
+}
+async function pickVariant(key, n) {
+  const r = await api("/pick", { body: { key, n } });
+  if (!r.ok) notice((r.data && r.data.error) || "Could not use that variant", "err");
+  else if (r.data.note) notice(r.data.note, "");
+  await refresh(true);
+}
+async function revertImage(key) {
+  const r = await api("/revert", { body: { key } });
+  if (!r.ok) notice((r.data && r.data.error) || "Nothing to revert to", "err");
+  await refresh(true);
+}
+async function toggleLock(shot) {
+  if ((dirty[shot.id] && Object.keys(dirty[shot.id]).length) && !(await save(shot.id))) return;
+  const r = await api("/lock", { body: { shot: shot.id, locked: !shot.locked } });
+  if (!r.ok) notice((r.data && r.data.error) || "Could not change the lock", "err");
+  else REV = r.data.rev;
+  await refresh(true);
+}
+async function toggleApprove(shot) {
+  const r = await api("/approve", { body: { shot: shot.id, approved: shot.approval !== "approved" } });
+  if (!r.ok) notice((r.data && r.data.error) || "Could not approve", "err");
+  await refresh(true);
+}
+
+function nodeImage(n, label) {
+  const i = n.image || {};
+  const box = el("div", { class: "imgbox " + (i.state === "stale" ? "stale" : ""), "data-key": n.key });
+  if (i.p) box.append(el("img", { src: imgUrl(i, 640), alt: "", loading: "lazy", onclick: () => lightbox(imgUrl(i, 0)) }));
+  else box.append(el("div", { class: "empty" }, i.error ? i.error : (n.kind === "file" ? "file not found" : "not rendered yet. Re-run draws it with the settings below.")));
+  const chip = { current: "rendered", stale: "out of date", missing: "not rendered", file: "file", error: "problem" }[i.state] || i.state;
+  box.append(el("span", { class: "chip " + (i.state || "") }, chip));
+  box.append(el("div", { class: "jobbox" }));
+  return box;
+}
+
+function strip(n) {
+  const s = el("div", { class: "strip" });
+  for (const v of n.variants) {
+    s.append(el("button", { class: "vt" + (v.current ? " current" : ""), title: `variant ${v.n}: seed ${v.seed ?? "-"}, ${v.origin}, ${v.time}` + (v.current ? " (in use)" : "\nclick to use it: its seed (and text) are written into site.yaml"),
+      onclick: () => !v.current && pickVariant(n.key, v.n) }, el("img", { src: imgUrl(v, 200), alt: "", loading: "lazy" }), el("span", {}, v.seed != null ? "seed " + v.seed : "v" + v.n)));
+  }
+  return s;
+}
+
+function actions(cid, shot, n) {
+  if (!n.render) return null;
+  const locked = shot.locked, busy = !!jobs[n.key];
+  const why = locked ? "unlock the shot to render" : busy ? "already rendering" : "";
+  return el("div", { class: "acts", "data-key": n.key },
+    el("button", { class: "btn small primary", disabled: locked || busy || !n.regen, title: n.regen ? (why || "render this image again with a new seed, as a new variant") : "no seed to change here: edit the text and use Re-run", onclick: () => runImage(cid, n.key, "regenerate") }, "Regenerate"),
+    el("button", { class: "btn small", disabled: locked || busy, title: why || "render with the same seed after editing the text (does nothing if it is already rendered)", onclick: () => runImage(cid, n.key, "rerun") }, "Re-run"),
+    el("button", { class: "btn small", disabled: locked || busy || !n.can_revert, title: n.can_revert ? "go back to the image that was in use before the latest one" : "no earlier image", onclick: () => revertImage(n.key) }, "Revert"));
+}
+
+function usedBy(n, selfId) {
+  if (!n.shared) return null;
+  const others = (n.used_by || []).filter(x => x !== selfId);
+  return el("span", { class: "used" }, "shared with", ...others.map(x => el("code", {}, x)));
+}
+
+function recipe(cid, shot, sl) {
+  const out = el("div", { class: "recipe" });
+  const top = sl.nodes[0];
+  sl.nodes.forEach((n, idx) => {
+    const own = !n.shared || idx === 0;
+    if (!own || !n.fields.length) return;
+    out.append(el("div", { class: "nlab" }, sl.nodes.length > 1 ? (idx === 0 ? "this shot: " : "") + n.label : n.label, usedBy(n, shot.id)));
+    const nums = el("div", { class: "nums" });
+    for (const f of n.fields) {
+      const fe = fieldEl(cid, f);
+      if (f.type === "int" || f.type === "float") nums.append(fe); else out.append(fe);
+    }
+    if (nums.children.length) out.append(nums);
+  });
+  if (sl.nodes.length > 1) {
+    const chain = el("details", { class: "chain" }, el("summary", {}, `Full chain (${sl.nodes.length} steps, base first)`));
+    [...sl.nodes].reverse().forEach(n => {
+      const i = n.image || {};
+      chain.append(el("div", { class: "chainrow" }, i.p ? el("img", { src: imgUrl(i, 200), alt: "" }) : el("div", {}),
+        el("div", { class: "t" }, el("b", {}, n.label), n.shared ? el("span", { class: "pill violet", style: "margin-left:6px" }, "shared") : null,
+          el("div", {}, n.summary || "")),
+        n.regen ? el("span", { class: "hint" }, "seed " + ((n.fields.find(f => f.name.endsWith(".seed")) || {}).value ?? "-")) : null));
+    });
+    out.append(chain);
+  }
+  return out;
+}
+
+function slotEl(cid, shot, sl) {
+  const top = sl.nodes[0];
+  const wrap = el("div", { class: "slot", "data-slot": sl.id });
+  wrap.append(el("div", { class: "slotlab" }, el("b", {}, sl.label), top.kind !== "file" ? el("span", {}, top.label) : null));
+  wrap.append(nodeImage(top, sl.label));
+  if (top.render) { wrap.append(strip(top)); wrap.append(actions(cid, shot, top)); }
+  wrap.append(recipe(cid, shot, sl));
+  return wrap;
+}
+
+// ------------------------------------------------------------------ cards
+function approvalPill(shot) {
+  if (shot.approval === "approved") return el("span", { class: "pill ok" }, "approved");
+  if (shot.approval === "changed") return el("span", { class: "pill warn", title: "edited since it was approved" }, "changed since approval");
+  return null;
+}
+
+function buildCard(shot) {
+  const cid = shot.id;
+  const card = el("article", { class: "card" + (shot.approval === "approved" ? " is-approved" : "") + (shot.locked ? " is-locked" : ""), id: "c-" + cssId(cid) });
+  const hd = el("div", { class: "hd" }, el("h3", {}, shot.title), el("span", { class: "pill" }, shot.kind + (shot.seconds ? ` · ${(+shot.seconds).toFixed(1).replace(/\.0$/, "")} s` : "")),
+    shot.locked ? el("span", { class: "pill violet" }, "locked") : null, approvalPill(shot), el("span", { class: "spacer" }),
+    shot.can_lock ? el("button", { class: "btn small lock" + (shot.locked ? " on" : ""), title: shot.locked ? "locked: build and storyboard keep what is rendered. Click to unlock" : "lock: keep this shot's renders as they are (locked: true in the spec)", onclick: () => toggleLock(shot) }, shot.locked ? "Locked" : "Lock") : null,
+    el("button", { class: "btn small" + (shot.approval === "approved" ? " on" : ""), title: "mark this shot as approved on the storyboard (not saved in the spec)", onclick: () => toggleApprove(shot) }, shot.approval === "approved" ? "Approved" : "Approve"));
+  card.append(hd);
+  if (shot.note) card.append(el("p", { class: "hint" }, shot.note));
+  if (shot.slots.length) {
+    const kind = shot.slots.length > 2 ? "kfgrid" : "slots";
+    card.append(el("div", { class: kind }, ...shot.slots.map(sl => slotEl(cid, shot, sl))));
+  }
+  const fields = el("div", { class: "fields" });
+  const nums = el("div", { class: "nums" });
+  for (const f of shot.fields) {
+    const fe = fieldEl(cid, f);
+    if (f.type === "int" || f.type === "float") nums.append(fe); else fields.append(fe);
+  }
+  if (nums.children.length) fields.append(nums);
+  if (fields.children.length) card.append(fields);
+  const errs = (errors[cid] || []).filter(e => !e.field);
+  if (errs.length) card.append(el("div", { class: "errs" }, ...errs.map(e => el("div", {}, e.loc + ": " + e.msg))));
+  card.append(el("div", { class: "bar2" }, el("button", { class: "btn small primary save", onclick: () => save(cid) }, "Save"),
+    el("button", { class: "btn small discard", onclick: () => discard(cid) }, "Discard"), el("span", { class: "msg" }, "")));
+  return card;
+}
+
+function buildShared(n) {
+  const cid = "shared:" + n.key;
+  const fake = { id: cid, locked: ST.shots.some(s => n.used_by.includes(s.id) && s.locked), slots: [] };
+  const card = el("article", { class: "card shared", id: "c-" + cssId(cid) });
+  card.append(el("div", { class: "hd" }, el("h3", {}, n.label + ": " + (n.kind === "generate" ? "base image" : n.kind)),
+    el("span", { class: "spacer" }), el("span", { class: "used" }, "used by", ...n.used_by.map(x => el("code", {}, x)))));
+  const wrap = el("div", { class: "slots" });
+  const left = el("div", { class: "slot" });
+  left.append(nodeImage(n, n.label)); left.append(strip(n)); left.append(actions(cid, fake, n));
+  left.append(el("div", { class: "acts" }, el("button", { class: "btn small", title: "Re-run every shot that is drawn from this step, so they follow it", onclick: () => rerunDependents(n) }, "Re-run its shots")));
+  const right = el("div", { class: "recipe" });
+  const nums = el("div", { class: "nums" });
+  for (const f of n.fields) { const fe = fieldEl(cid, f); if (f.type === "int" || f.type === "float") nums.append(fe); else right.append(fe); }
+  if (nums.children.length) right.append(nums);
+  wrap.append(left, right); card.append(wrap);
+  const errs = (errors[cid] || []).filter(e => !e.field);
+  if (errs.length) card.append(el("div", { class: "errs" }, ...errs.map(e => el("div", {}, e.loc + ": " + e.msg))));
+  card.append(el("div", { class: "bar2" }, el("button", { class: "btn small primary save", onclick: () => save(cid) }, "Save"),
+    el("button", { class: "btn small discard", onclick: () => discard(cid) }, "Discard"), el("span", { class: "msg" }, "")));
+  return card;
+}
+async function rerunDependents(n) {
+  let started = 0;
+  for (const s of ST.shots) {
+    if (!n.used_by.includes(s.id) || s.locked) continue;
+    for (const sl of s.slots) {
+      if (!sl.nodes.some(x => x.key === n.key)) continue;
+      const top = sl.nodes[0];
+      if (jobs[top.key]) continue;
+      const r = await api("/image", { body: { key: top.key, mode: "rerun" } });
+      if (r.ok) { jobs[top.key] = r.data.job; started++; }
+    }
+  }
+  notice(started ? `Re-running ${started} shot${started > 1 ? "s" : ""} from this step.` : "Nothing to re-run (locked, running, or already up to date).", "info");
+  paintJobs(); schedulePoll(400);
+}
+
+function cardSig(x) { return JSON.stringify(x, (k, v) => (k === "job" ? undefined : v)); }
+
+function renderCard(cid, force = false) {
+  const isShared = cid.startsWith("shared:");
+  const data = isShared ? ST.shared.find(n => "shared:" + n.key === cid) : ST.shots.find(s => s.id === cid);
+  const old = document.getElementById("c-" + cssId(cid));
+  if (!data) { if (old) old.remove(); return; }
+  const active = document.activeElement;
+  if (!force && old && active && old.contains(active) && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)) { pendingRender.add(cid); return; }
+  const fresh = isShared ? buildShared(data) : buildCard(data);
+  if (old) old.replaceWith(fresh); else (isShared ? $("#shared") : $("#cards")).append(fresh);
+  syncBar(cid);
+}
+
+function paintJobs() {
+  document.querySelectorAll(".jobbox").forEach(b => {
+    const key = b.closest(".imgbox").dataset.key;
+    const j = jobs[key], last = lastRes[key];
+    b.innerHTML = "";
+    if (j) {
+      const pct = Math.round((j.progress || 0) * 100);
+      const queued = j.status === "queued";
+      b.append(el("div", { class: "job" }, el("div", {}, (queued ? "queued behind another job" : (j.message || "rendering")) + (j.elapsed ? ` · ${Math.round(j.elapsed)} s` : "")),
+        el("div", { class: "bar" }, el("i", { style: `width:${queued ? 3 : Math.max(4, pct)}%` }))));
+    } else if (last) {
+      b.append(el("div", { class: "job " + last.status }, el("button", { class: "x", onclick: () => { delete lastRes[key]; paintJobs(); } }, "x"),
+        last.status === "failed" ? "Failed: " + (last.error || "") : (last.message || "done") + (last.note ? " · " + last.note : "")));
+    }
+  });
+  document.querySelectorAll(".acts[data-key]").forEach(a => {
+    const busy = !!jobs[a.dataset.key];
+    a.querySelectorAll("button").forEach((b, i) => { if (busy) b.disabled = true; });
+  });
+}
+
+// ------------------------------------------------------------------ whole page
+function header() {
+  $("#proj").textContent = ST.name;
+  document.title = "Storyboard: " + ST.name;
+  const p = $("#p-appr"); p.textContent = `${ST.approved} of ${ST.total} approved`; p.className = "pill" + (ST.approved === ST.total && ST.total ? " ok" : "");
+  $("#p-comfy .dot").classList.toggle("on", ST.comfy);
+  $("#p-comfy").title = ST.comfy ? "ComfyUI is running; image jobs share it with whatever else is queued there" : "ComfyUI is not reachable: generated images cannot be rendered";
+  $("#b-undo").disabled = !ST.undo;
+  const s = $("#b-sheet-open"), pg = $("#b-page-open");
+  s.hidden = !ST.has_sheet; s.href = `/sb/${encodeURIComponent(NAME)}/files/storyboard.html`;
+  pg.hidden = !ST.has_page; pg.href = `/sb/${encodeURIComponent(NAME)}/files/site/index.html`;
+}
+
+function describeChanges(oldS, newS) {
+  const names = [];
+  const flat = (st) => { const m = {}; for (const s of st.shots) for (const f of allFields(s)) for (const p of f.paths) m[p] = [s.id, f.label, f.raw]; for (const n of st.shared) for (const f of n.fields) for (const p of f.paths) m[p] = ["shared", f.label, f.raw]; return m; };
+  const a = flat(oldS), b = flat(newS);
+  for (const p of Object.keys(b)) if (!(p in a) || JSON.stringify(a[p][2]) !== JSON.stringify(b[p][2])) names.push(b[p][0] + " " + b[p][1]);
+  return [...new Set(names)];
+}
+
+async function refresh(own = false) {
+  const r = await api("/state");
+  if (!r.ok) { notice((r.data && (r.data.errors ? r.data.errors.map(e => e.loc + ": " + e.msg).join("; ") : r.data.error)) || "Could not read the spec", "err"); return; }
+  const prev = ST; ST = r.data; REV = ST.rev;
+  header();
+  // fields edited here but changed on disk meanwhile: take the disk's value, tell the user
+  const reloaded = [];
+  if (prev) {
+    const oldRaw = {}; for (const s of prev.shots) for (const f of allFields(s)) oldRaw[f.paths[0]] = f.raw;
+    for (const n of prev.shared) for (const f of n.fields) oldRaw[f.paths[0]] = f.raw;
+    const newF = {}; for (const s of ST.shots) for (const f of allFields(s)) newF[f.paths[0]] = f;
+    for (const n of ST.shared) for (const f of n.fields) newF[f.paths[0]] = f;
+    for (const [cid, d] of Object.entries(dirty)) for (const p of Object.keys(d)) {
+      if (newF[p] && JSON.stringify(newF[p].raw) !== JSON.stringify(oldRaw[p])) { delete d[p]; reloaded.push(newF[p].label); }
+      else if (!newF[p]) delete d[p];
+    }
+    if (!own) {
+      const names = describeChanges(prev, ST);
+      if (names.length) notice(`site.yaml changed on disk since this page loaded. Reloaded: ${names.slice(0, 6).join(", ")}${names.length > 6 ? ", ..." : ""}.` + (reloaded.length ? ` Your unsaved edit to ${reloaded.join(", ")} was replaced by the new value.` : ""), "");
+    }
+  }
+  // shared panel
+  $("#shared-wrap").hidden = !ST.shared.length;
+  const keepCards = new Set(ST.shots.map(s => "shared:" || s.id));
+  const ids = [...ST.shared.map(n => "shared:" + n.key), ...ST.shots.map(s => s.id)];
+  document.querySelectorAll(".card").forEach(c => { if (!ids.some(i => "c-" + cssId(i) === c.id)) c.remove(); });
+  if ($("#cards .sub")) $("#cards .sub").remove();
+  for (const n of ST.shared) { const cid = "shared:" + n.key; const sg = cardSig(n); if (sigs[cid] !== sg || !document.getElementById("c-" + cssId(cid))) { sigs[cid] = sg; renderCard(cid); } }
+  for (const s of ST.shots) { const sg = cardSig(s) + JSON.stringify(errors[s.id] || []); if (sigs[s.id] !== sg || !document.getElementById("c-" + cssId(s.id))) { sigs[s.id] = sg; renderCard(s.id); } }
+  // keep DOM order = spec order
+  const order = (box, list) => list.forEach(id => { const e = document.getElementById("c-" + cssId(id)); if (e && e.parentNode === box) box.append(e); });
+  order($("#shared"), ST.shared.map(n => "shared:" + n.key)); order($("#cards"), ST.shots.map(s => s.id));
+  paintJobs();
+}
+
+let pollTimer = null;
+function schedulePoll(ms) { clearTimeout(pollTimer); pollTimer = setTimeout(poll, ms); }
+async function poll() {
+  try {
+    const r = await api("/poll");
+    if (r.ok) {
+      const d = r.data, before = Object.keys(jobs);
+      for (const k of before) if (!(k in d.jobs)) delete jobs[k];
+      for (const [k, j] of Object.entries(d.jobs)) jobs[k] = j;
+      for (const [k, v] of Object.entries(d.last || {})) if (!jobs[k] && !(k in lastRes)) lastRes[k] = v;
+      if (d.last && d.last.__sheet__ && !lastRes.__sheet__ && before.includes("__sheet__")) { notice(d.last.__sheet__.message || d.last.__sheet__.error || "sheet done", d.last.__sheet__.status === "failed" ? "err" : "info"); }
+      $("#p-comfy .dot").classList.toggle("on", d.comfy);
+      $("#b-undo").disabled = !d.undo;
+      const finished = before.filter(k => !(k in d.jobs));
+      if (finished.length || (ST && d.rev !== REV)) await refresh(false);
+      else paintJobs();
+      for (const cid of [...pendingRender]) { const a = document.activeElement; const c = document.getElementById("c-" + cssId(cid)); if (!c || !a || !c.contains(a)) { pendingRender.delete(cid); renderCard(cid, true); } }
+    }
+  } catch (e) { /* server restarting */ }
+  schedulePoll(Object.keys(jobs).length ? 900 : 2000);
+}
+
+function lightbox(src) { const lb = $("#lightbox"); $("img", lb).src = src; lb.classList.add("on"); }
+$("#lightbox").addEventListener("click", () => $("#lightbox").classList.remove("on"));
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("#lightbox").classList.remove("on"); });
+$("#b-undo").addEventListener("click", async () => {
+  const r = await api("/undo", { body: {} });
+  if (!r.ok) notice((r.data && r.data.error) || "Nothing to undo", "err"); else notice("Put back site.yaml as it was before the last save.", "info");
+  await refresh(true);
+});
+$("#b-sheet").addEventListener("click", async () => {
+  const r = await api("/sheet", { body: {} });
+  if (!r.ok) { notice((r.data && r.data.error) || "Could not start", "err"); return; }
+  jobs.__sheet__ = r.data.job; notice("Updating the sheet and the stand-in page (stills, from the caches)...", "info"); schedulePoll(500);
+});
+document.addEventListener("focusout", () => setTimeout(() => {
+  for (const cid of [...pendingRender]) { const c = document.getElementById("c-" + cssId(cid)); const a = document.activeElement; if (!c || !a || !c.contains(a)) { pendingRender.delete(cid); renderCard(cid, true); } }
+}, 60));
+window.addEventListener("beforeunload", (e) => { if (Object.values(dirty).some(d => Object.keys(d).length)) { e.preventDefault(); e.returnValue = ""; } });
+
+refresh(true).then(() => schedulePoll(1500));
+</script>
+</body>
+</html>

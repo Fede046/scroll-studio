@@ -118,6 +118,14 @@ class BuildContext:
             return "locked"
         return "stale"
 
+    def adopt(self, name: str, key: Any) -> None:
+        """Record that the outputs on disk are what `key` makes, without running the stage (the storyboard's edit
+        workspace puts a chosen variant in place, so the build keeps it)."""
+        stamp = self.work / "stamps" / f"{name}.json"
+        prior = json.loads(stamp.read_text()) if stamp.exists() else {}
+        stamp.parent.mkdir(exist_ok=True)
+        stamp.write_text(json.dumps({**prior, "key": _hash(key)}))
+
     def stage(self, name: str, key: Any, outputs: list[Path], fn: Callable[[], Any], legacy: Any = None,
               locked: Optional[bool] = None) -> bool:
         """Run fn unless the stamp matches key and every output exists. Returns True if it ran.
