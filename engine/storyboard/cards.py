@@ -272,6 +272,11 @@ class Maker:
             spans = span_captions(sec.steps, s0, s1)
             caption = " / ".join([plain(st.title) for st in sec.steps if (st.state or {}).get("beat") == b.id] +
                                  [plain(t) for _, _, t, _ in spans])
+            if b.freeze is not None:      # a frozen moment: its source frame and camera path (cards_freeze below)
+                c = self.freeze_card(sec, b, caption, spans, sec.length * (b.seconds - b.trim) / total, cards)
+                c.seconds_taken = time.time() - t0
+                cards.append(c)
+                continue
             ref = b.image if b.image else ImageInput(generate=b.prompt, size=(W, H), seed=b.seed)
             fp = _digest({"prompt": b.prompt, "motion": b.motion, "seconds": b.seconds, "seed": b.seed, "trim": b.trim,
                           "strength": b.strength, "res": [W, H], "image": image_key(b.image) if b.image else None,
@@ -309,6 +314,77 @@ class Maker:
             c.seconds_taken = time.time() - t0
             cards.append(c)
         return cards
+
+    # ------------------------------------------------------------ film: frozen moment
+    def freeze_card(self, sec: FilmScene, b, caption: str, spans: list, scroll: float, earlier: list[Card]) -> Card:
+        """A frozen-moment beat: the frame it freezes and the camera's boxes. Rendered: frames of the clip at each key.
+        Not rendered: flat crops of the source at each key (the boxes the camera will visit), from the full build's own
+        image when it is cached, else the storyboard still; the clip itself is a flat preview of the camera path."""
+        from PIL import Image
+        from .. import freeze_beats as fbm
+        from ..freeze import CameraPath
+        f = b.freeze
+        W, H = fbm.beat_size(sec)
+        secs = b.seconds - b.trim
+        path = CameraPath(f.camera, f.ease)
+        src_text = f"the last frame of beat '{f.from_}'" if f.from_ else describe(f.image)
+        fp = _digest({"freeze": f.model_dump(mode="json", by_alias=True, exclude={"image"}), "seconds": b.seconds,
+                      "trim": b.trim, "res": [W, H], "image": image_key(f.image) if f.image is not None else None})
+        boxes = "; ".join(f"{k.t:g}: {', '.join(f'{v:g}' for v in k.box)}" + (f" (hold {k.hold:g})" if k.hold else "")
+                          for k in f.camera) or "the whole frame"
+        c = Card(b.id, sec.id, "freeze", f"{sec.id} / {b.id}", prompt=f"frozen moment: {src_text}"
+                 + (f", upscaled x{f.upscale:g}" if f.upscale > 1 else ""),
+                 motion=f"camera {boxes}; parallax {f.parallax:g}, {f.ease}", caption=caption, seconds=secs, scroll=scroll,
+                 locked=b.locked or sec.locked, fingerprint=fp, captions=sorted(step_captions(sec.steps, b.id) + spans))
+        name = f"beat_{b.id}"
+        state = self.plan.stage_state(sec.id, name)
+        clip = self.project.build / sec.id / "beats" / b.id / "clip.mp4"
+        c.rendered = state in ("fresh", "migrated", "locked") and clip.exists()
+        st = [s for s in self.plan.stale(sec.id) if s.name == name]
+        c.stages, c.estimate = [s.name for s in st], sum(s.estimate for s in st)
+        times = sorted({0.0, 1.0} | {k.t for k in f.camera} | {min(1.0, k.t + k.hold) for k in f.camera if k.hold})
+        total = secs + b.trim
+        if c.rendered:
+            c.frames = [Frame(self.grab(clip, max(0.0, min(t * total - b.trim, secs - 0.05)) if t < 1 else -1, f"{b.id}_{t:.2f}"),
+                              f"t={t:g} (rendered)", "final", t * secs) for t in times]
+            c.pieces = [Piece(secs, video=clip, label=b.id)]
+            return c
+        # the frame being frozen: an earlier card's last frame, a cached render of the source, or the storyboard still
+        src, level = None, "stills"
+        if f.from_:
+            prior = next((x for x in earlier if x.id == f.from_ and x.frames), None)
+            if prior is not None:
+                src, level = prior.frames[-1].path, prior.frames[-1].level
+            else:
+                try:
+                    src = fbm.standin_image(self.project, sec, b, self.quiet, "last")
+                    level = "sketch"
+                except (BuildError, OSError):
+                    pass
+        else:
+            src, level = self.image(f.image, cache_only=not self.selected(b.id, sec.id))
+        if src is None:
+            c.frames = []
+            c.note = "the frame to freeze is not available yet"
+            return c
+        out = self.cache / "freeze"
+        out.mkdir(parents=True, exist_ok=True)
+        im = fbm._fit(Image.open(src), (W, H))
+        c.frames = []
+        for t in times:
+            p = out / f"{b.id}_{_digest([file_key(src), t, [k.box for k in f.camera], f.ease, W, H])}.jpg"
+            if not p.exists():
+                fbm.crop_view(im, path.at(t), (640, round(640 * H / W))).save(p, quality=88)
+            c.frames.append(Frame(p, f"t={t:g}", level, t * secs))
+        try:      # the clip as a flat camera move over the frame (no depth, no parallax), kept in the storyboard folder
+            pv = out / f"{b.id}_{_digest([file_key(src), [k.box for k in f.camera], f.ease, secs, b.trim])}.mp4"
+            if not pv.exists():
+                fbm.flat_clip(src, b, pv, (640, round(640 * H / W) // 2 * 2))
+            c.pieces = [Piece(secs, video=pv, label=b.id)]
+        except Exception as e:    # no torch/ffmpeg here: the animatic then holds the first frame
+            self.log(f"  {b.id}: no flat preview ({str(e).splitlines()[0][:100]})")
+            c.pieces = [Piece(secs, c.frames[0].path, None, from_text(""), label=b.id)]
+        return c
 
     # ------------------------------------------------------------ film: take / shot
     def film_take(self, sec: FilmScene) -> Card:

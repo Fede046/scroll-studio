@@ -28,7 +28,7 @@ import yaml
 from ...inputs import image_key
 from ...plan import image_refs, section_locked
 from ...project import Project
-from ...spec import FilmScene, ImageInput, Site, is_scene
+from ...spec import FilmScene, FreezeEase, ImageInput, Site, is_scene
 from . import specdoc
 from .specdoc import MISSING, dotted
 
@@ -461,6 +461,9 @@ def _film(b: _B, sec: FilmScene, i: int, sp: tuple) -> list[Shot]:
         out = []
         for j, bt in enumerate(sec.beats):
             bp = sp + ("beats", j)
+            if bt.freeze is not None:         # a frozen moment: its source frame and its camera, no prompt or motion
+                out.append(_freeze_shot(b, sec, i, bt, bp, sp))
+                continue
             virtual = bt.image is None
             s = Shot(bt.id, sec.id, "beat", f"{sec.id} / {bt.id}", i, seconds=bt.seconds - bt.trim,
                      lock_paths=[bp + ("locked",), sp + ("locked",)], locked=bt.locked or sec.locked)
@@ -490,6 +493,39 @@ def _film(b: _B, sec: FilmScene, i: int, sp: tuple) -> list[Shot]:
             out.append(s)
         return out
     return [_take(b, sec, i, sp)]
+
+
+def _freeze_shot(b: _B, sec: FilmScene, i: int, bt, bp: tuple, sp: tuple) -> Shot:
+    """A frozen-moment beat (freeze:) on the board: its length, upscale, parallax and camera keys (each box number is its
+    own field), and, when it freezes an image input rather than another beat's last frame, that image's chain."""
+    f = bt.freeze
+    fp = bp + ("freeze",)
+    s = Shot(bt.id, sec.id, "beat", f"{sec.id} / {bt.id}", i, seconds=bt.seconds - bt.trim,
+             lock_paths=[bp + ("locked",), sp + ("locked",)], locked=bt.locked or sec.locked)
+    s.fields += _captions(b, sec.steps, sp, only_beat=bt.id)
+    s.note = "frozen moment: " + (f"the last frame of beat '{f.from_}'" if f.from_ else "an image") +         ", moved through in 2.5D (rendered offline in seconds)"
+    s.fields.append(b.fld("seconds", "seconds", FLOAT, bp + ("seconds",), bt.seconds, hint="1 to 60"))
+    s.fields.append(b.fld("trim", "trim", FLOAT, bp + ("trim",), bt.trim, hint="seconds cut from the clip's start"))
+    s.fields.append(b.fld("upscale", "upscale", FLOAT, fp + ("upscale",), f.upscale, hint="1 to 4 times before the camera moves in"))
+    s.fields.append(b.fld("parallax", "parallax", FLOAT, fp + ("parallax",), f.parallax, hint="0 flat, 0.3-0.8 subtle, 2 strong"))
+    s.fields.append(b.fld("grain", "grain", FLOAT, fp + ("grain",), f.grain, hint="film grain, 0.01-0.03 is faint"))
+    s.fields.append(b.fld("ease", "ease", SELECT, fp + ("ease",), f.ease, options=list(get_args(FreezeEase)),
+                          hint="flow keeps moving through keys; the others rest at each"))
+    if f.from_:
+        s.fields.append(b.fld("pick", "frame", SELECT, fp + ("pick",), f.pick, options=["sharpest", "last"],
+                              hint="the sharpest of the last frames, or the very last"))
+    for k, key in enumerate(f.camera):
+        kp = fp + ("camera", k)
+        s.fields.append(b.fld(f"cam{k}.t", f"camera {k + 1}: at", FLOAT, kp + ("t",), key.t, hint="0-1 of the beat"))
+        s.fields.append(b.fld(f"cam{k}.hold", f"camera {k + 1}: hold", FLOAT, kp + ("hold",), key.hold, hint="0-1 of the beat"))
+        for n, name in enumerate(("x0", "y0", "x1", "y1")):
+            s.fields.append(b.fld(f"cam{k}.{name}", f"camera {k + 1}: {name}", FLOAT, kp + ("box", n), key.box[n],
+                                  hint="framing box, 0-1 of the frozen frame"))
+    if f.image is not None:
+        start = Slot(f"{bt.id}/still", "still", "frozen image", s.id)
+        start.nodes = chain(b, f.image, fp + ("image",), False, "still")
+        s.slots.append(start)
+    return s
 
 
 def _take(b: _B, sec: FilmScene, i: int, sp: tuple) -> Shot:

@@ -131,7 +131,9 @@ def beat_candidates(project, sec, b, at, window: int, log) -> list[np.ndarray]:
     clip = beat_clip_path(project, sec, b)
     bdir = beat_dir(project, sec, b)
     if b.freeze is not None:
-        render_beat(project, sec, b, log)           # digest-cached: instant when it is up to date
+        from .fidelity import preview
+        if preview() is None:                       # a storyboard preview reads the clip as it is, never renders
+            render_beat(project, sec, b, log)       # digest-cached: instant when it is up to date
         if at in ("first", "last") and window == 1 and (bdir / f"{at}.png").exists():
             return [read_rgb(bdir / f"{at}.png")]
     elif not clip.exists():
@@ -303,8 +305,8 @@ def _source_frame(project, sec, b, log) -> Path:
         window = f.pick_window if f.pick == "sharpest" else 1
         cands = beat_candidates(project, ssec, sb, "last", window, log)
         i = fz.sharpest([_fit_np(c, size) for c in cands], views) if len(cands) > 1 else len(cands) - 1
-        key = {"from": sb.id, "clip": fkey(beat_clip_path(project, ssec, sb)), "pick": f.pick, "window": window,
-               "views": [(round(v.cx, 4), round(v.cy, 4), round(v.w, 4)) for v in views], "size": size}
+        # keyed by the frame chosen, not by the camera: moving a box that picks the same frame keeps the upscale and depth
+        key = {"from": sb.id, "clip": fkey(beat_clip_path(project, ssec, sb)), "n": len(cands), "i": i, "size": size}
 
         def make(tmp):
             Image.fromarray(cands[i]).convert("RGB").save(tmp)
