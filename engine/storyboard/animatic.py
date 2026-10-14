@@ -65,6 +65,11 @@ def build(project: Project, site, cards: list[Card], out: Path, log: Callable[[s
             c0, c1 = t0 + (t1 - t0) * u0 + (fade * 0.6 if u0 <= 0 else 0), t0 + (t1 - t0) * u1 - (fade if u1 >= 1 else 0)
             if c1 - c0 < 0.4:
                 continue
+            prev = items[-1] if items and items[-1]["kind"] == "caption" else None
+            if prev and prev["title"] == rich(title) and c0 - prev["t1"] < 1.2:
+                prev["t1"] = c1 - 0.06       # one caption held across shots: it stays up through the cut
+                texty[-1][1] = c1
+                continue
             items.append({"kind": "caption", "t0": c0, "t1": c1 - 0.06, "title": rich(title), "kicker": rich(kicker),
                           "fade_out": 0.3})
             texty.append([c0, c1])

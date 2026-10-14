@@ -105,6 +105,20 @@ def step_captions(steps, beat: Optional[str] = None) -> list:
     return out
 
 
+def span_captions(steps, s0: float, s1: float) -> list:
+    """Captions over one beat from the section's own steps that are not pinned to a beat: a step laid over the film by
+    `at` (0-1 of the section; or an even share when it has neither `at` nor a beat), clipped to the beat's span
+    [s0, s1] of the section and given as (from, to, title, kicker) in 0-1 of the beat."""
+    free = [st for st in steps if st.title and not (st.state or {}).get("beat")]
+    out, n = [], len(free)
+    for i, st in enumerate(free):
+        a, b = (float(st.at[0]), float(st.at[1])) if st.at else (i / n, (i + 1) / n)
+        lo, hi = max(a, s0), min(b, s1)
+        if hi - lo > 1e-6 and s1 > s0:
+            out.append(((lo - s0) / (s1 - s0), (hi - s0) / (s1 - s0), st.title, st.kicker or ""))
+    return out
+
+
 def describe(ref) -> str:
     """A short text for an image input: its prompt, its edit, its product view, or its file."""
     if ref is None:
@@ -250,9 +264,14 @@ class Maker:
         W, H = sec.beat_res[0] // 32 * 32, sec.beat_res[1] // 32 * 32
         total = sum(b.seconds - b.trim for b in sec.beats) or 1.0
         cards = []
+        done = 0.0
         for b in sec.beats:
             t0 = time.time()
-            caption = " / ".join(plain(st.title) for st in sec.steps if (st.state or {}).get("beat") == b.id)
+            s0, s1 = done / total, (done + b.seconds - b.trim) / total
+            done += b.seconds - b.trim
+            spans = span_captions(sec.steps, s0, s1)
+            caption = " / ".join([plain(st.title) for st in sec.steps if (st.state or {}).get("beat") == b.id] +
+                                 [plain(t) for _, _, t, _ in spans])
             ref = b.image if b.image else ImageInput(generate=b.prompt, size=(W, H), seed=b.seed)
             fp = _digest({"prompt": b.prompt, "motion": b.motion, "seconds": b.seconds, "seed": b.seed, "trim": b.trim,
                           "strength": b.strength, "res": [W, H], "image": image_key(b.image) if b.image else None,
@@ -261,7 +280,7 @@ class Maker:
             c = Card(b.id, sec.id, "beat", f"{sec.id} / {b.id}", prompt=describe(ref) if b.image else b.prompt,
                      motion=b.motion, caption=caption, seconds=b.seconds - b.trim,
                      scroll=sec.length * (b.seconds - b.trim) / total, locked=b.locked or sec.locked, fingerprint=fp,
-                     captions=step_captions(sec.steps, b.id))
+                     captions=sorted(step_captions(sec.steps, b.id) + spans))
             name = f"beat_{b.id}"
             state = self.plan.stage_state(sec.id, name)
             clip = self.project.build / sec.id / "beats" / b.id / "clip.mp4"
