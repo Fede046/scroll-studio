@@ -23,6 +23,17 @@ Use the MCP tools (`scroll-studio` server) when available, otherwise the `studio
 
 Mix them: a `film` hero, then `features`/`stats`, then an `artwork` section, then a `cta`.
 
+**Time stops: freeze, don't generate.** A video model cannot hold a crowd still while the camera moves, and an image
+editor redraws the faces every time. For "time stops, the camera visits close-ups of the same people", make that beat a
+frozen moment in a `film` with `beats:`: `freeze: { from: <beat id> | image: <any image input>, upscale: 2, camera: [{ t,
+box: [x0, y0, x1, y1] (0-1 of the frozen frame), hold? }...], parallax: 0.6, ease: inOutSine | flow, grain: 0.012 }`. It
+is rendered offline in seconds (one upscaled frame + a depth parallax camera), so the faces never change, and it joins the
+film like any beat. `from` takes the sharpest of that beat's last frames (`pick: sharpest`; `pick: last` for the very
+last). The next generated beat starts where it ends with `image: { beat_frame: { beat: <freeze id>, at: last } }`. In the
+storyboard, a `freeze` card shows flat crops at each camera box (the framing to approve before anything renders). Keep
+`parallax` 0.3-0.8 (above 1 stretches behind edges) and boxes near the aspect of `beat_res`. Look at the close-ups after
+the SeedVR2 upscale: it redraws detail, and a hand or a logo may come out different from the source.
+
 ## 2. Write the spec
 - Start from the closest example: `list_projects`, then `create_project(name, example=...)`, then edit with `get_spec`/`set_spec`.
 - `spec_schema('<type>')` gives every field with descriptions. Pick a theme preset that fits the domain

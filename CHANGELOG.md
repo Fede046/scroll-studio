@@ -9,6 +9,19 @@ Everything so far is version 1. On 2026-10-12 the releases first published as 2.
 ## Unreleased
 
 ### Added
+- Frozen moments: a beat with `freeze:` is rendered offline instead of generated. It takes one frame (`from: <beat>`, the
+  sharpest of that beat's last frames by default, or any `image:`), upscales it (`upscale: 2`; SeedVR2 image restoration
+  through ComfyUI, or a local Lanczos + sharpen when its weights are not installed), estimates its depth (Depth Anything
+  V2, snapped to the picture's edges) and flies a 2.5D camera through it along `camera:` keys (framing boxes in 0-1 of the
+  frame, with `hold`, eased paths with no jerk at keys, `ease: flow` to keep moving through them) with a depth parallax
+  that keeps the subject plane still (`parallax`, `dolly`), optional motion blur and film grain. The render (a ray marched
+  through the depth map per pixel, in torch) takes seconds; the frame, upscale and depth are cached apart from the camera.
+  The clip is the beat's `clip.mp4`, so it joins the film like a generated beat (`trim`, crossfade, `beat_restore`,
+  `locked`, `--only`); the storyboard shows the camera's boxes as flat crops of the source and a flat preview move, the
+  editor has fields for it and for each box number, and `build --plan` prices it apart from a generated beat.
+- `image: { beat_frame: { beat, at: first | last | <seconds>, pick } }`: any image input can be a frame of a beat, so a
+  generated beat starts exactly where a frozen moment (or another beat) ends. Beats that use it re-render when that beat's
+  clip does; under `build --only` a beat that is not rendered stands in with its storyboard still.
 - The storyboard is editable: `studio storyboard <project> --edit [--port N]` (also `/sb/<project>` in `studio ui`) serves
   one card per shot with every field editable in place (caption, prompt, motion, seconds, seed, trim, strength, motion
   seed, a take's keyframe prompts and motion segments, an edit's instruction, a product still's scene and view). Saves

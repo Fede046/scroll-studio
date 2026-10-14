@@ -124,6 +124,22 @@ UI (React) ◄─► engine server (FastAPI + job queue + websocket events) ◄�
   sticky stage + scrolling step cards, the players, shared HUD/caption/progress components, theme tokens,
   asset preloading by priority, and mobile and `prefers-reduced-motion` behaviour.
 - **`doctor`** checks the whole stack: Python, Node, FFmpeg, Blender, CUDA/VRAM, ComfyUI, disk space, models.
+- **Frozen moments** (`engine/freeze.py`, `engine/freeze_beats.py`, `engine/backends/upscale.py`). A `film` beat with
+  `freeze:` is not generated: the beat stage renders one frame offline. Steps, each cached by its own digest in the
+  beat's folder: the source frame (a beat's sharpest-of-last-N frame, or an image input, fitted to `beat_res`), the
+  upscale (SeedVR2 on one image through ComfyUI, or Lanczos + unsharp), the depth (Depth Anything V2 through
+  `backends/depth.py`, then a guided filter that snaps it to the picture and a near-edge dilation, as `parallax.py` does),
+  and the render. The render is an inverse parallax warp in torch: per pixel a ray is marched through the depth map from
+  near to far (the nearest surface that lands there wins, so disocclusions show the background that was there instead of
+  a smear), the colour is sampled bicubic from a mip chain of the upscaled frame, the camera path is `CameraPath` (boxes
+  with hold, per-leg eases or one C1 curve for `flow`) and `Timeline` adds the sway, the dolly and the focus plane that
+  keeps the subject still, with the sway scaled to the room the view has. Blender was not used: a mesh displacement opens
+  the same holes behind foreground edges at seconds a frame, and the warp needs no session and is deterministic. The
+  stage key holds the source clip's `file_key` (so a re-rendered `walk` re-freezes) and only freeze beats have the new key
+  shape. `image: {beat_frame: ...}` resolves through `resolve_image` to a frame written to `.build/_generated/bf_*.png`
+  (a frozen beat is rendered first when it is not; its first and last frames are kept lossless); beats that use it carry
+  the source clip in their key. Storyboard: a `freeze` card of flat crops at the camera's boxes and a flat preview clip;
+  editor: `_freeze_shot` (fields per box number); plan: `film:freeze` / `film:freeze_up` units.
 - **Plans and storyboards.** `engine/plan.py` runs every builder in a dry run (`engine/fidelity.py` `planning()`):
   `BuildContext.stage` reports instead of running, a stage that would run marks its outputs dirty so stages keyed on
   them count too, and code that renders outside a stage (image inputs, product stills, model conversion) raises

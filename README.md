@@ -75,6 +75,9 @@ tiktoken (`cl100k_base`) on the files in this repo; other tokenizers differ by r
   scene to scene. ([try them on Halcyon](https://okohedeki.github.io/scroll-studio-showcase/halcyon/looks/))
 - **Story films told in shots** (`film` with `beats:`): every sentence its own generated shot, with end frames, local
   image edits and SeedVR2 clean-up. ([Feel](examples/feel/site.yaml), the showcase's front door)
+- **Frozen moments** (`freeze:` on a beat): when time stops, stop generating. One frame, upscaled, with a 2.5D depth
+  camera moving through it, rendered offline in seconds, so a crowd stands still while the camera visits a couple's
+  hands and feet and every face stays the same face. `image: { beat_frame: ... }` chains the next shot onto its last frame.
 - **Fly through a codebase** (`code` scene): live 3D, real text, diffs applied as you scroll.
 
 ### New in 1.2
@@ -481,6 +484,73 @@ cached on its own, so changing one shot re-renders only that shot. Steps pin the
 slow, camera-led motion best; for an action shot that holds its first frame, lower `strength` (0.7-0.85), re-roll the
 motion alone with `motion_seed`, and cut the hold with `trim` (seconds, re-uses the render).
 Example: [Feel](examples/feel/site.yaml).
+
+### A frozen moment
+
+When time stops, stop generating. A video model cannot hold a crowd still while the camera moves (the people melt and
+drift), and redrawing close-ups with an image editor gives every close-up different faces. A beat with `freeze:` is
+not generated at all: it takes one frame, upscales it, estimates its depth (Depth Anything V2) and flies a 2.5D camera
+through it, offline, in seconds. Every pixel of the clip is a pixel of that one frame, so a woman's face is the same
+face in the wide shot and in the close-up of her hand. The clip joins the film like any generated beat: same stage,
+cache, `trim`, crossfade, `beat_restore`, `locked`, `build --only`, storyboard card and editor fields.
+
+```yaml
+    beats:
+      - id: walk
+        seconds: 5
+        prompt: A crowd walks toward the camera across a plaza, a woman and a man side by side in the centre
+        motion: the crowd walks steadily toward the camera, the camera tracks backward in front of them
+        image: inputs/crowd.png
+      - id: freeze
+        seconds: 12
+        freeze:
+          from: walk              # the last frame of a beat (its sharpest of the last 6), or `image:` (any image input)
+          upscale: 2              # SeedVR2 image restoration through ComfyUI, so crops stay sharp
+          camera:                 # keyframes over the beat (0-1): a framing box [x0, y0, x1, y1] in the frozen frame
+            - { t: 0,    box: [0, 0, 1, 1] }
+            - { t: 0.3,  box: [0.25, 0.2, 0.75, 0.68] }
+            - { t: 0.55, box: [0.26, 0.42, 0.58, 0.753], hold: 0.1 }      # rest on the hands for 10% of the beat
+            - { t: 0.8,  box: [0.34, 0.732, 0.6, 1.0] }
+            - { t: 1,    box: [0.25, 0.2, 0.75, 0.68] }
+          parallax: 0.6           # the 2.5D depth effect (0 = flat Ken Burns); the subject plane stays put
+          ease: inOutSine         # or flow: keep moving through keys instead of resting at each
+          grain: 0.012            # a faint film grain so it matches the generated shots
+      - id: walkon                # starts exactly where the frozen moment ends
+        prompt: They walk on, the camera pulls back
+        motion: time starts again, the two of them walk toward the camera, the camera pulls back
+        image: { beat_frame: { beat: freeze, at: last } }
+```
+
+- **The frame.** `from: <beat id>` freezes that beat's last frame after its `trim`. A moving shot's very last frame is
+  often motion-blurred, bad for close-ups, so `pick: sharpest` (the default) takes the sharpest of the last
+  `pick_window` frames (6), measured inside the boxes the camera will look at; `pick: last` takes the very last.
+  `image:` freezes any image input instead (a file, `generate:`, `edit:`, a crop, a `beat_frame`).
+- **The camera.** Boxes are in 0-1 of the frozen frame; the aspect comes from `beat_res`, so a box of another shape is
+  widened (never cropped) and everything inside it stays in frame. The camera arrives at each box at its `t`, rests for
+  its `hold`, and travels to the next one along an eased path with no jerk at the keys (`ease`: inOutSine, inOutQuad,
+  inOutCubic, inOutQuart, linear, or `flow`, one smooth curve that keeps its speed through keys and rests only at holds
+  and at both ends). A full-frame box at `t: 0` makes the first frame the frozen frame itself, so the cut from the
+  shot it froze is invisible.
+- **The depth effect.** The camera sways a little and pushes near things in as it closes up (`parallax`, `dolly`),
+  against a focus plane that follows the middle of the view, so the subject holds still while the crowd around them
+  shifts. The sway fades out where the view is too near the frame's edge to move. `parallax` 0.3-0.8 is clean; above 1
+  you see stretching behind foreground edges (it is one photograph: nothing behind a person was ever drawn).
+- **Sharp crops.** `upscale: 2` (1-4) enlarges the frame before the camera crops into it. `upscale_method: auto` uses
+  SeedVR2 (the 7B sharp model, through ComfyUI, about two minutes for a 1920x1088 frame at 2x) when ComfyUI lists its
+  weights, else a local Lanczos + sharpen that is honest but soft; `seedvr2` and `lanczos` force one. SeedVR2 redraws
+  fine detail (wool, stitching, fingernails), so look at the close-ups.
+- **Cheap to iterate.** The frame, the upscale and the depth are cached apart from the camera: changing a box, the
+  parallax or the ease re-renders in seconds (about 20 s for 12 s of film at 1920x1088 on an RTX 4090) and never
+  repeats the upscale. `blur` (0-1, the shutter) adds motion blur by averaging sub-frames.
+- **Chaining.** `image: { beat_frame: { beat: <id>, at: first | last | <seconds>, pick: last | sharpest } }` is the
+  frame of any beat, so a generated beat can start exactly where a frozen moment (or another generated beat) ends. A
+  beat that uses it re-renders when that beat's clip does. Under `build --only`, a beat that is not rendered stands in
+  with its storyboard still instead of failing.
+
+The render is an inverse parallax warp in torch (a ray marched through the depth map per pixel, so the nearest surface
+wins at an edge), on the GPU when there is one and the CPU otherwise; it needs no Blender session. The storyboard shows
+the camera's boxes as flat crops of the source before anything renders, and `build --plan` prices a frozen beat apart
+from a generated one.
 
 ### Two video models: LTX-2.3 and Wan 2.2
 
