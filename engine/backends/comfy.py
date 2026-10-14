@@ -470,15 +470,18 @@ def build_upscale_graph(cfg, video, frames, fps, prompt, prefix):
     }
 
 
-def build_seedvr2_graph(ucfg, video, prefix):
+def build_seedvr2_graph(ucfg, video, prefix, image=None):
     """SeedVR2 video restoration + upscale (one diffusion step, temporally consistent).
 
     Removes the render's noise and compression mush and redraws fine detail at the target short side
     (2160 = 4K UHD). Weights are block-swapped to CPU and the VAE is tiled so 4K fits in ~19 GB.
+    With `image` (an uploaded image's name) it restores that one image instead (a frozen moment's frame).
     """
+    src = ({"vid": {"class_type": "LoadImage", "inputs": {"image": image}}} if image else
+           {"vid": {"class_type": "LoadVideo", "inputs": {"file": video}},
+            "comp": {"class_type": "GetVideoComponents", "inputs": {"video": ["vid", 0]}}})
     return {
-        "vid": {"class_type": "LoadVideo", "inputs": {"file": video}},
-        "comp": {"class_type": "GetVideoComponents", "inputs": {"video": ["vid", 0]}},
+        **src,
         "dit": {"class_type": "SeedVR2LoadDiTModel", "inputs": {
             "model": ucfg.get("model", "seedvr2_ema_7b_sharp_fp8_e4m3fn.safetensors"), "device": "cuda:0",
             "blocks_to_swap": ucfg.get("blocks_to_swap", 32), "swap_io_components": False,
@@ -489,7 +492,7 @@ def build_seedvr2_graph(ucfg, video, prefix):
             "decode_tiled": True, "decode_tile_size": ucfg.get("decode_tile", 768), "decode_tile_overlap": 128,
             "tile_debug": "false", "offload_device": "cpu", "cache_model": False}},
         "up": {"class_type": "SeedVR2VideoUpscaler", "inputs": {
-            "image": ["comp", 0], "dit": ["dit", 0], "vae": ["vae", 0], "seed": ucfg.get("seed", 42),
+            "image": ["vid", 0] if image else ["comp", 0], "dit": ["dit", 0], "vae": ["vae", 0], "seed": ucfg.get("seed", 42),
             "resolution": ucfg.get("resolution", 2160), "max_resolution": 0,
             "batch_size": ucfg.get("batch_size", 9), "uniform_batch_size": True,
             "color_correction": ucfg.get("color_correction", "lab"), "temporal_overlap": ucfg.get("temporal_overlap", 3),

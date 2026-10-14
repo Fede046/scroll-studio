@@ -34,16 +34,18 @@ DEFAULTS = {
     "film:composite": 1.3,      # per frame
     "film:encode": 1.2,         # per second of film
     "film:beat": 100.0,         # per second of a beat (still + edit + animation)
+    "film:freeze": 1.5,         # per second of a frozen moment (depth + camera render, no upscale)
+    "film:freeze_up": 10.0,     # per second of a frozen moment that upscales its frame (SeedVR2: ~2 min, then seconds)
     "film:join": 0.5,           # per second of film
     "sequence:render": 0.13,    # per frame at 96 samples, 1920x1080
     "sequence:encode": 1.0,     # per frame
 }
 FLAT = 10.0                     # any other stage, per run
-IMAGES = {"image": 15.0, "edit": 60.0, "product still": 25.0, "scene still": 150.0, "product model": 60.0,
+IMAGES = {"beat frame": 3.0, "image": 15.0, "edit": 60.0, "product still": 25.0, "scene still": 150.0, "product model": 60.0,
           "download": 5.0, "art": 240.0, "stand-in": 5.0}
 # what counts as heavy GPU work (a video model, SeedVR2, a Cycles pass over every frame): the build lists these first
 HEAVY = ("film:generate", "film:generate_wan", "film:restore", "film:product", "film:beat", "film:keyframes",
-         "sequence:render")
+         "film:freeze_up", "sequence:render")
 
 
 @dataclass
@@ -163,6 +165,8 @@ def units(sec, name: str) -> tuple[str, float]:
         frames = dur * fps
         if name.startswith("beat_") and name != "beats_join":
             b = next((b for b in sec.beats if f"beat_{b.id}" == name), None)
+            if b is not None and b.freeze is not None:     # a frozen moment: offline, seconds (minutes with an upscale)
+                return ("film:freeze_up" if b.freeze.upscale > 1 else "film:freeze"), float(b.seconds)
             return "film:beat", float(b.seconds if b else 4.0)
         if name == "blockout":
             return "film:blockout", frames

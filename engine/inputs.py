@@ -63,7 +63,7 @@ def _lfs_check(url: str, out: Path, log=print) -> None:
 
 # Image-input fields added after earlier builds were keyed: left out of keys while unset, so adding a field never
 # re-renders finished work.
-LATE_FIELDS = ("product", "scene")
+LATE_FIELDS = ("product", "scene", "beat_frame")
 
 
 def stable_dump(model) -> dict:
@@ -115,6 +115,9 @@ def resolve_image(project: Project, ref: ImageRef, log=print, alpha: bool = Fals
             out.parent.mkdir(parents=True, exist_ok=True)
             im.crop((round(x0 * im.width), round(y0 * im.height), round(x1 * im.width), round(y1 * im.height))).save(out)
         return out
+    if ref.beat_frame is not None:        # a frame of a beat of a film (a frozen moment's last frame, say)
+        from .freeze_beats import beat_frame_image
+        return beat_frame_image(project, ref.beat_frame, log)
     if ref.product is not None:
         from .product import image_still
         return image_still(project, ref, log, alpha)

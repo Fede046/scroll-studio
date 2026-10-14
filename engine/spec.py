@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class Model(BaseModel):
@@ -135,6 +135,21 @@ class ProductShot(Model):
     seed: int = Field(7, description="scene: seed for the generated scene")
 
 
+# ---- freeze (frozen-moment beats): a frame of a beat as an image input ----
+class BeatFrame(Model):
+    """A frame of a beat of a film: the first or last frame of what that beat renders (after its trim), or the frame
+    at a time. Chain beats with it: a beat whose `image` is the last frame of the frozen moment before it starts exactly
+    where that moment ends. The beat must come first in the film (or be rendered); `build --only` renders a frozen
+    moment on the way, a generated beat that is not rendered yet stands in with its start image."""
+    beat: str = Field(..., description="The id of the beat")
+    at: Union[Literal["first", "last"], float] = Field("last", description="`first`, `last`, or seconds into the "
+                                                                          "beat's clip (after its trim)")
+    pick: Literal["last", "sharpest"] = Field("last", description="With at: last, `sharpest` takes the sharpest of the "
+                                                                  "last few frames instead of the very last one")
+    section: Optional[str] = Field(None, description="The film section holding the beat (found by the beat id when "
+                                                     "omitted)")
+
+
 class ImageInput(Model):
     """An image the engine uses as input: a file in the project's inputs/, one generated locally, a gradient, or a
     still of the site's product."""
@@ -151,6 +166,9 @@ class ImageInput(Model):
     seed: int = 7
     crop: Optional[tuple[float, float, float, float]] = Field(None, description="Crop [x0, y0, x1, y1] in 0-1 image coordinates")
     edit: Optional["ImageEdit"] = Field(None, description="Make this image by editing another one locally (Qwen-Image-Edit)")
+    beat_frame: Optional[BeatFrame] = Field(None, description="A frame of a beat of a film (its first or last frame, "
+                                                              "or the frame at a time): chain one beat onto the "
+                                                              "end of another")
     credit: Optional[str] = Field(None, description="Attribution shown in the footer")
 
 
@@ -360,12 +378,71 @@ class Take(Model):
                                             "when its settings change: build and storyboard log it and move on")
 
 
+# ---- freeze (frozen-moment beats) ----
+FreezeEase = Literal["linear", "inOutSine", "inOutQuad", "inOutCubic", "inOutQuart", "flow"]
+
+
+class FreezeKey(Model):
+    """One stop of a frozen moment's camera: the framing box the camera has reached at time `t` of the beat."""
+    t: float = Field(..., ge=0, le=1, description="When the camera reaches the box, 0-1 of the beat")
+    box: tuple[float, float, float, float] = Field(
+        ..., description="Framing box [x0, y0, x1, y1] in 0-1 of the frozen frame. The aspect comes from beat_res: a "
+                         "box of another shape is widened (never cropped) to it, so everything in the box stays in frame")
+    hold: float = Field(0.0, ge=0, le=1, description="The camera rests on the box for this much of the beat after "
+                                                     "reaching it (the frozen moment still breathes with the parallax)")
+
+
+class Freeze(Model):
+    """A frozen moment: the beat is not generated but rendered from one frame, offline, in seconds. The frame is
+    upscaled, given a depth map (Depth Anything V2) and the camera moves through it as a 2.5D parallax move along
+    `camera` keys, so a crowd can stand still while the camera visits a couple's hands and feet, and the faces stay
+    the faces of the frame. The clip joins the film like any generated beat (trim, crossfade, restore, locked, --only)."""
+    from_: Optional[str] = Field(None, alias="from", description="Freeze the last frame of this beat (an earlier beat of "
+                                                                 "the film, after its trim); or give `image:`")
+    image: Optional[ImageRef] = Field(None, description="Freeze this image instead (a file, or any image input; "
+                                                        "`beat_frame:` takes a frame of a beat)")
+    pick: Literal["sharpest", "last"] = Field("sharpest", description="With `from`: `sharpest` takes the sharpest of the "
+                                                                      "last `pick_window` frames (the very last of a "
+                                                                      "moving shot is often motion-blurred, bad for "
+                                                                      "close-ups), `last` the very last one. Sharpness is "
+                                                                      "measured in the camera's tightest boxes")
+    pick_window: int = Field(6, ge=1, le=48, description="How many of the last frames `pick: sharpest` looks at")
+    upscale: float = Field(1.0, ge=1, le=4, description="Upscale the frame this many times before moving through it, "
+                                                        "so crops stay sharp (a 3x crop of a 1920 frame needs 2). "
+                                                        "1 = off")
+    upscale_method: Literal["auto", "seedvr2", "lanczos"] = Field(
+        "auto", description="seedvr2: SeedVR2 image restoration through ComfyUI (redraws fine detail; the model "
+                            "downloads on first use). lanczos: a local detail-preserving resample, no model. auto: "
+                            "seedvr2 when its weights are installed, else lanczos")
+    camera: list[FreezeKey] = Field(default_factory=list, description="Camera keys over the beat. The camera rests on "
+                                                                      "the first box until its t and on the last after "
+                                                                      "its t; none: the whole frame, with the parallax")
+    parallax: float = Field(0.6, ge=0, le=2, description="Strength of the 2.5D depth effect (0 = flat Ken Burns; the "
+                                                         "subject plane stays put while nearer and farther things shift)")
+    dolly: Optional[float] = Field(None, ge=0, le=3, description="Extra push-in of near things as the camera closes in "
+                                                                 "(default follows `parallax`)")
+    ease: FreezeEase = Field("inOutSine", description="How the camera travels between boxes. inOutSine/Quad/Cubic/Quart: "
+                                                      "eased, resting at every key. flow: keeps moving through keys "
+                                                      "(it rests only at keys with a hold)")
+    depth_model: Literal["small", "base", "large"] = Field("small", description="Depth Anything V2 size (small is "
+                                                                                  "Apache-2.0; base and large are CC-BY-NC)")
+    blur: float = Field(0.0, ge=0, le=1, description="Motion blur: the shutter, as a fraction of a frame (0 = off, 0.5 = "
+                                                     "180 degrees). Sub-frames are averaged")
+    grain: float = Field(0.0, ge=0, le=0.2, description="Film grain laid over the render (0.01-0.03 is faint) so it "
+                                                        "matches generated shots")
+    seed: int = 7
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+
 class Beat(Model):
     """One shot of a story film: a still generated from `prompt` (or taken from `image`), brought to life by `motion`."""
     id: str
-    prompt: str = Field(..., description="The opening frame, described like a photograph: subject, place, light, lens")
-    motion: str = Field(..., description="What moves and how the camera moves, e.g. 'the door swings open, the camera pushes in'")
-    seconds: float = Field(4.0, ge=1, le=10)
+    prompt: str = Field("", description="The opening frame, described like a photograph: subject, place, light, lens "
+                                        "(not used by a frozen moment)")
+    motion: str = Field("", description="What moves and how the camera moves, e.g. 'the door swings open, the camera pushes in'"
+                                        " (not used by a frozen moment)")
+    seconds: float = Field(4.0, ge=1, le=60, description="Length of the shot (1 to 10 generated; a frozen moment may run longer)")
     seed: int = 7
     image: Optional[ImageRef] = Field(None, description="Start from this image instead of generating it from `prompt`: "
                                                         "a file, or an image input (generate:, edit: ...)")
@@ -379,6 +456,41 @@ class Beat(Model):
     video_model: Optional[VideoModel] = Field(None, description=VIDEO_MODEL_DOC + ". `strength` applies to ltx only")
     locked: bool = Field(False, description="Keep this beat's clip (and its storyboard still) as rendered, even when "
                                             "its prompt or motion changes; the rest of the film still builds around it")
+    freeze: Optional[Freeze] = Field(None, description="A frozen moment instead of a generated clip: one frame, upscaled, "
+                                                       "with a 2.5D camera moving through it, rendered offline in seconds "
+                                                       "(see Freeze). prompt, motion, image and end_image are not used")
+
+    @model_validator(mode="after")
+    def _generated_or_frozen(self):
+        if self.freeze is None:
+            if not self.prompt or not self.motion:
+                raise ValueError(f"beat '{self.id}': `prompt` and `motion` are required (or make it a frozen moment with `freeze:`)")
+            if self.seconds > 10:
+                raise ValueError(f"beat '{self.id}': a generated beat is 1 to 10 seconds (a `freeze:` beat may be longer)")
+            return self
+        f = self.freeze
+        if bool(f.from_) == (f.image is not None):
+            raise ValueError(f"beat '{self.id}': freeze needs exactly one of `from` (a beat id) and `image`")
+        if f.from_ == self.id:
+            raise ValueError(f"beat '{self.id}': freeze cannot take its own frame")
+        for name in ("image", "end_image", "video_model", "motion_seed"):
+            if getattr(self, name) is not None:
+                raise ValueError(f"beat '{self.id}': `{name}` does not apply to a frozen moment (use freeze.image / freeze.from)")
+        if self.strength != 1.0:
+            raise ValueError(f"beat '{self.id}': `strength` does not apply to a frozen moment")
+        ks = f.camera
+        for i, k in enumerate(ks):
+            x0, y0, x1, y1 = k.box
+            if not (0 <= x0 < x1 <= 1 and 0 <= y0 < y1 <= 1):
+                raise ValueError(f"beat '{self.id}': camera box {i} {list(k.box)} must be [x0, y0, x1, y1] inside 0-1 "
+                                 "with x0 < x1 and y0 < y1")
+            if i and k.t <= ks[i - 1].t + ks[i - 1].hold - 1e-9:
+                raise ValueError(f"beat '{self.id}': camera keys must go forward in time (key {i} at t={k.t} comes before "
+                                 f"the previous key's hold ends at {ks[i - 1].t + ks[i - 1].hold:g})")
+        if ks and ks[-1].t + ks[-1].hold > 1 + 1e-9:
+            raise ValueError(f"beat '{self.id}': the last camera key's hold runs past the end of the beat")
+        return self
+
 
 
 class FilmScene(SceneBase):

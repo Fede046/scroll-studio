@@ -335,7 +335,13 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
     W, H = sec.beat_res[0] // 32 * 32, sec.beat_res[1] // 32 * 32
     clips, standing = [], []
     only = ctx.options.get("only_beats")      # build --only: the beats to render (None: all)
+    from ..freeze_beats import set_lenient    # frozen moments: under --only a beat that is not rendered stands in
+    set_lenient(only is not None)
     for b in sec.beats:
+        if b.freeze is not None:              # a frozen moment: rendered offline in seconds (engine/freeze_beats.py)
+            from ..freeze_beats import beat_clip as freeze_clip
+            clips.append(freeze_clip(ctx, sec, b, only, standing))
+            continue
         bdir = ctx.work / "beats" / b.id
         clip = bdir / "clip.mp4"
 
@@ -372,8 +378,10 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
                 return r
             if isinstance(r, str):
                 return file_key(ctx.project.path(r))
+            from ..freeze_beats import beat_frame_deps
             from ..inputs import stable_dump
-            return stable_dump(r)
+            deps = beat_frame_deps(ctx.project, r)      # an image that is a beat's frame depends on that beat's clip
+            return {**stable_dump(r), "beat_frame_deps": deps} if deps else stable_dump(r)
         key = {"prompt": b.prompt, "motion": b.motion, "seconds": b.seconds, "seed": b.seed, "res": [W, H],
                "image": ref_key(b.image)}
         model = video_model(b.video_model, ctx.options.get("site_video_model"))
@@ -436,6 +444,7 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
                   lambda: fb.stage_upscale(shot, str(ctx.work), _restore_args(ctx, out)))
         out = restored
 
+    set_lenient(False)
     pin_steps(sec, durs, fade)
     return out
 
