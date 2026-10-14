@@ -251,7 +251,9 @@ beats:
 ```
 
 `locked: true` works on a beat, a take and any scene section; the build logs `locked, kept the existing render` for
-each stage it keeps (a locked shot that was never rendered is rendered once).
+each stage it keeps (a locked shot that was never rendered is rendered once). `studio build` prints its plan and
+estimate before any heavy GPU work; with `confirm_over = 30` in studio.toml it asks first when a build would run
+longer than that many minutes (`--yes` skips the question; without a terminal it stops instead of waiting).
 
 ### Edit it, one image at a time
 
@@ -284,10 +286,9 @@ page is `/sb/<project>` in `studio ui`). One card per shot, with every field edi
   notices, reloads the values and says which; a save whose fields changed under it is refused instead of overwriting.
 
 Agents drive the same loop through the MCP tools `storyboard_shots`, `set_shot_field`, `regenerate_shot_image` (returns
-the new image's path), `pick_shot_variant` and `approve_shot`. *Update sheet* in the page (or `studio storyboard
-my-site`) rebuilds `sheet.jpg`, the stand-in page and the animatic from the edited spec; the frames come from the caches. `studio build` prints its plan and
-estimate before any heavy GPU work; with `confirm_over = 30` in studio.toml it asks first when a build would run
-longer than that many minutes (`--yes` skips the question; without a terminal it stops instead of waiting).
+the new image's path), `pick_shot_variant` and `approve_shot`. *Update sheet* in the page rebuilds `sheet.jpg` and the stand-in
+page from the edited spec and what is rendered so far (a sketch-level storyboard: no ComfyUI, images not drawn yet show as
+cards); `studio storyboard my-site` does the same at stills or animatic level.
 
 ## Styles
 

@@ -341,9 +341,11 @@ def _captions(b: _B, steps, base: tuple, only_beat: Optional[str] = None) -> lis
 
 
 def build(project: Project) -> Board:
+    """The board for site.yaml as it is now. Raises specdoc.SpecError when the file cannot be read as a spec (it is
+    being edited by hand, say): the page then keeps what it shows and says why."""
     text = specdoc.read_text(project)
+    site = specdoc.validate(text)
     raw = yaml.safe_load(text) or {}
-    site = Site.model_validate(raw)
     b = _B(raw)
     board = Board(project, site, raw, text, specdoc.rev_of(text))
     for i, sec in enumerate(site.sections):

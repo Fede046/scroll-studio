@@ -84,7 +84,7 @@ p.sub { color:var(--dim); font-size:13px; margin-bottom:10px; max-width:80ch; }
 .fld .ferr { color:#ff9a9a; font-size:12.5px; }
 .fld input:disabled, .fld textarea:disabled { opacity:.6; }
 .nums { display:flex; gap:10px; flex-wrap:wrap; }
-.nums .fld { width:92px; }
+.nums .fld { width:92px; } .nums .fld.bad { width:210px; }
 .fields { margin-top:12px; display:flex; flex-direction:column; gap:8px; }
 .bar2 { display:flex; align-items:center; gap:8px; margin-top:12px; padding-top:10px; border-top:1px solid var(--line); }
 .bar2 .msg { color:var(--accent); font-size:13px; }
@@ -114,7 +114,7 @@ details.chain summary { cursor:pointer; color:var(--dim); }
   <button class="btn" id="b-undo" disabled title="Put back site.yaml as it was before the last save made here">Undo last save</button>
   <a class="btn" id="b-sheet-open" target="_blank" hidden>Sheet</a>
   <a class="btn" id="b-page-open" target="_blank" hidden>Stand-in page</a>
-  <button class="btn" id="b-sheet" title="Run the storyboard (stills) again so the sheet and the stand-in page show these edits">Update sheet</button>
+  <button class="btn" id="b-sheet" title="Rebuild the sheet and the stand-in page from the edited spec and what is rendered so far (no new renders: images not drawn yet show as cards)">Update sheet</button>
 </header>
 <div id="notice"></div>
 <main>
@@ -150,6 +150,7 @@ const errors = {};           // card id -> [{loc, msg}]
 const jobs = {};             // image key -> job (from poll)
 const lastRes = {};          // image key -> {status, message, error}
 const pendingRender = new Set();
+const dismissed = {};        // image key -> finished time of the result the user closed
 const sigs = {};
 
 async function api(path, opts = {}) {
@@ -469,7 +470,7 @@ function paintJobs() {
       b.append(el("div", { class: "job" }, el("div", {}, (queued ? "queued behind another job" : (j.message || "rendering")) + (j.elapsed ? ` · ${Math.round(j.elapsed)} s` : "")),
         el("div", { class: "bar" }, el("i", { style: `width:${queued ? 3 : Math.max(4, pct)}%` }))));
     } else if (last) {
-      b.append(el("div", { class: "job " + last.status }, el("button", { class: "x", onclick: () => { delete lastRes[key]; paintJobs(); } }, "x"),
+      b.append(el("div", { class: "job " + last.status }, el("button", { class: "x", onclick: () => { dismissed[key] = last.finished || 1; delete lastRes[key]; paintJobs(); } }, "x"),
         last.status === "failed" ? "Failed: " + (last.error || "") : (last.message || "done") + (last.note ? " · " + last.note : "")));
     }
   });
@@ -500,9 +501,21 @@ function describeChanges(oldS, newS) {
   return [...new Set(names)];
 }
 
-async function refresh(own = false) {
+function invalidBanner(text) {
+  let b = $("#invalid");
+  if (!text) { if (b) b.remove(); return; }
+  if (!b) { b = el("div", { class: "note err", id: "invalid" }, el("span", {})); $("#notice").prepend(b); }
+  $("span", b).textContent = "site.yaml cannot be read as a spec right now: " + text.replace(/\s+/g, " ") + ". The cards below are from before; they reload by themselves once the file is valid again.";
+}
+
+async function refresh(own = false, seenRev = null) {
   const r = await api("/state");
-  if (!r.ok) { notice((r.data && (r.data.errors ? r.data.errors.map(e => e.loc + ": " + e.msg).join("; ") : r.data.error)) || "Could not read the spec", "err"); return; }
+  if (!r.ok) {
+    badRev = seenRev || badRev || "?";
+    invalidBanner((r.data && (r.data.errors ? r.data.errors.slice(0, 2).map(e => e.loc + ": " + e.msg).join("; ") : r.data.error)) || "unreadable");
+    return;
+  }
+  badRev = null; invalidBanner(null);
   const prev = ST; ST = r.data; REV = ST.rev;
   header();
   // fields edited here but changed on disk meanwhile: take the disk's value, tell the user
@@ -534,6 +547,7 @@ async function refresh(own = false) {
   paintJobs();
 }
 
+let badRev = null;
 let pollTimer = null;
 function schedulePoll(ms) { clearTimeout(pollTimer); pollTimer = setTimeout(poll, ms); }
 async function poll() {
@@ -543,12 +557,12 @@ async function poll() {
       const d = r.data, before = Object.keys(jobs);
       for (const k of before) if (!(k in d.jobs)) delete jobs[k];
       for (const [k, j] of Object.entries(d.jobs)) jobs[k] = j;
-      for (const [k, v] of Object.entries(d.last || {})) if (!jobs[k] && !(k in lastRes)) lastRes[k] = v;
+      for (const [k, v] of Object.entries(d.last || {})) if (!jobs[k] && !(k in lastRes) && (v.finished || 0) > (dismissed[k] || 0)) lastRes[k] = v;
       if (d.last && d.last.__sheet__ && !lastRes.__sheet__ && before.includes("__sheet__")) { notice(d.last.__sheet__.message || d.last.__sheet__.error || "sheet done", d.last.__sheet__.status === "failed" ? "err" : "info"); }
       $("#p-comfy .dot").classList.toggle("on", d.comfy);
       $("#b-undo").disabled = !d.undo;
       const finished = before.filter(k => !(k in d.jobs));
-      if (finished.length || (ST && d.rev !== REV)) await refresh(!!d.own);
+      if (finished.length || (ST && d.rev !== REV && d.rev !== badRev)) await refresh(!!d.own, d.rev);
       else paintJobs();
       for (const cid of [...pendingRender]) { const a = document.activeElement; const c = document.getElementById("c-" + cssId(cid)); if (!c || !a || !c.contains(a)) { pendingRender.delete(cid); renderCard(cid, true); } }
     }
@@ -567,7 +581,7 @@ $("#b-undo").addEventListener("click", async () => {
 $("#b-sheet").addEventListener("click", async () => {
   const r = await api("/sheet", { body: {} });
   if (!r.ok) { notice((r.data && r.data.error) || "Could not start", "err"); return; }
-  jobs.__sheet__ = r.data.job; notice("Updating the sheet and the stand-in page (stills, from the caches)...", "info"); schedulePoll(500);
+  jobs.__sheet__ = r.data.job; notice("Updating the sheet and the stand-in page from what is rendered so far...", "info"); schedulePoll(500);
 });
 document.addEventListener("focusout", () => setTimeout(() => {
   for (const cid of [...pendingRender]) { const c = document.getElementById("c-" + cssId(cid)); const a = document.activeElement; if (!c || !a || !c.contains(a)) { pendingRender.delete(cid); renderCard(cid, true); } }

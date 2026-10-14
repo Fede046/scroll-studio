@@ -24,7 +24,7 @@ from ...server.jobs import Job, JobQueue, logger
 from . import approvals, images, render, shots, specdoc, variants
 from .shots import Board, Fld, Node, Shot, Slot
 
-PAGE_LEVEL = "stills"
+PAGE_LEVEL = "sketch"      # the sheet is rebuilt from what is cached: renders happen per image, on their own buttons
 
 
 class _ToLog:
@@ -83,16 +83,41 @@ class Workspace:
 
     # ------------------------------------------------------------ reading
     def comfy_alive(self) -> bool:
+        """Whether ComfyUI answers (checked in the background with a short timeout: a ComfyUI busy loading a model must
+        not make the page wait)."""
         t, v = self._comfy
-        if time.time() - t < 5:
-            return v
-        try:
-            from ...backends import comfy
-            v = bool(comfy.alive())
-        except Exception:
-            v = False
-        self._comfy = (time.time(), v)
+        if time.time() - t >= 5 and not getattr(self, "_checking", False):
+            self._checking = True
+
+            def check():
+                import urllib.request
+                ok = False
+                try:
+                    from ...config import settings
+                    with urllib.request.urlopen(settings()["comfy_url"] + "/system_stats", timeout=2.5) as r:
+                        ok = r.status == 200
+                except Exception:
+                    ok = False
+                self._comfy = (time.time(), ok)
+                self._checking = False
+            threading.Thread(target=check, daemon=True).start()
+            if t == 0.0:
+                time.sleep(0.4)
+                return self._comfy[1]
         return v
+
+    @staticmethod
+    def _comfy_url() -> str:
+        from ...config import settings
+        return settings()["comfy_url"]
+
+    def _comfy_now(self) -> bool:
+        import urllib.request
+        try:
+            with urllib.request.urlopen(self._comfy_url() + "/system_stats", timeout=6) as r:
+                return r.status == 200
+        except Exception:
+            return False
 
     def job_json(self, key: str) -> Optional[dict]:
         j = self.active.get(key)
@@ -107,7 +132,7 @@ class Workspace:
         jobs = {k: self.job_json(k) for k in list(self.active)}
         rev = specdoc.current_rev(self.project)
         return {"rev": rev, "own": rev in specdoc.WRITTEN, "jobs": jobs, "comfy": self.comfy_alive(),
-                "last": {k: v for k, v in self.last.items() if k not in self.active},
+                "last": {k: v for k, v in self.last.items() if k not in self.active and time.time() - v.get("finished", 0) < 900},
                 "undo": bool(specdoc.can_undo(self.project))}
 
     def _img(self, p: Path) -> dict:
@@ -287,6 +312,10 @@ class Workspace:
             render._guard(node, shot)
             if mode == "regenerate" and not node.regen:
                 raise BuildError("this image has no seed to change; edit its text and use Re-run")
+            if node.kind in ("generate", "edit", "keyframe") or (node.kind == "product" and node.regen):
+                if not self._comfy_now():
+                    raise BuildError("ComfyUI is not answering at " + self._comfy_url() + " (not running, or busy loading a "
+                                     "model). Nothing was started; try again in a moment.")
             lock = variants.claim(self.project, key, mode)
             label = f"{'Regenerate' if mode == 'regenerate' else 'Re-run'} {key}"
             est = render.estimate(node)
