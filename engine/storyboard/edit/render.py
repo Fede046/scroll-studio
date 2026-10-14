@@ -78,7 +78,10 @@ def register_current(project: Project, board: Board, node: Node, origin: str = "
     pr = images.probe(project, board.site, node)
     if pr.state != "current" or pr.path is None:
         return None
-    return variants.register(project, node.key, pr.path, pr.cache, node.recipe(), origin, seed=node.recipe().get("seed"))
+    v = variants.register(project, node.key, pr.path, pr.cache, node.recipe(), origin, seed=node.recipe().get("seed"))
+    if not variants.load(project, node.key)["history"]:      # the first image is where Revert can always go back to
+        variants.push_history(project, node.key, v["n"])
+    return v
 
 
 def run_image(project: Project, key: str, mode: str, seed: Optional[int] = None, log: Log = print,
