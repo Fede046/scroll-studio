@@ -26,11 +26,12 @@ Everything so far is version 1. On 2026-10-12 the releases first published as 2.
   stage stamps' `seconds`, `engine/plan.py`); every build prints it first, and studio.toml `confirm_over` (minutes)
   asks before longer builds (`--yes` for unattended runs). MCP `build` takes `only` and `plan_only`.
 - The `keyframes` stage repaints only the keyframes whose own settings changed (stage keys unchanged).
-- `stage` scene: an opening on a dark stage. A faceless figure stands in the dark; each scroll brings one `lines:` entry
-  (set heavier than the last) and a little more light, `platform:` raises a stage under them, and on `name:` (the
-  page's <h1>) the view swings round behind them to face a follow-spot that floods the page with light, where `body:`
-  and `buttons:` sit. The figure is a drawn outline and never shows a face. Every word is real text; with no scripting
-  it is a plain dark panel, and reduced motion keeps the beats as fades.
+- Overlay captions can sit anywhere on the shot (`place: top-right`, `bottom-left`, `center`...), take their own
+  colours with a soft glow behind them when the shot under them is brighter or darker than the rest (`surface:`),
+  and carry a `button:`, so a film can end on its call to action. A caption pinned to the end of a film's last beat
+  stays up until the scene lets go.
+- A scene's `surface:` now applies to the scene itself in the flow layout (it used to colour only the stack layout's
+  panel), and the nav takes the colours of the section under it, so a dark film on a light site gets a dark nav.
 - `site.product`: the product declared once (name, maker, url, model, licence, credit, `concept`). Models in GLB/glTF,
   OBJ, FBX, STL, PLY, **STEP/STP** (converted locally with OpenCascade through `cascadio`, parts kept as separate meshes
   with their names) and **3MF** (trimesh), from a file or URL. `up`, `units` and `rotation` fix any file; `parts` sets

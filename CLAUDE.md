@@ -9,7 +9,7 @@ or a script tied to one image or one shot. If a site needs something the engine 
 - `engine/spec.py`: the site spec (Pydantic). Source of truth for site.yaml, the UI forms and the MCP tools.
 - `engine/scenes/<type>.py`: one builder per scene type: film (with `take:` for One Take: Blender world blockout ->
   LTX-2.3, plus the real product rendered by `backends/blender_scripts/take.py` and composited), artwork, scene3d,
-  sequence, parallax, type, stage (an opening: a faceless figure comes into the light line by line), vector, chart (callouts resolved from the data), map, splat (`backends/splats.py`: .ply /
+  sequence, parallax, type, vector, chart (callouts resolved from the data), map, splat (`backends/splats.py`: .ply /
   gsplat .pt -> SPZ for Spark).
 - `runtime/src/players/<type>.ts`: the browser player for each scene type; `runtime/src/index.ts` is the scroll core.
 - `engine/plan.py`: dry-run build plans and estimates; `engine/storyboard/`: `studio storyboard` (cards per shot from

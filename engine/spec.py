@@ -180,6 +180,13 @@ class Step(Model):
     length: float = Field(1.2, description="split/cards layouts: scroll distance of this step, in screen heights")
     intro: bool = Field(False, description="Render as the section's opening headline (h1)")
     hint: Optional[str] = Field(None, description="Small 'scroll to begin' line under an intro step")
+    place: Optional[Literal["left", "right", "center", "top-left", "top-right", "bottom-left", "bottom-right"]] = Field(
+        None, description="overlay layout: where this caption sits on the shot (default: left, centred vertically)")
+    surface: Optional[Literal["light", "dark"]] = Field(
+        None, description="overlay layout: this caption's colours, when the shot under it is lighter or darker than the "
+                          "rest of the scene (dark words on a bright sky: light), with a soft glow behind them")
+    button: Optional[Link] = Field(None, description="overlay layout: a button under the caption, e.g. the call to "
+                                                     "action on a film's last shot")
     image: Optional[ImageRef] = Field(None, description="parallax: this step's photo")
     state: dict[str, Any] = Field(default_factory=dict,
         description="Scene-specific state for this step. chart: {show, focus, x, y, reveal, marks}; map: {center, zoom, pitch, bearing, route, marker}")
@@ -582,25 +589,6 @@ class TypeScene(SceneBase):
         "passage", description="passage: reading size, left-aligned. display: a headline, bigger and centred")
 
 
-class StageScene(SceneBase):
-    """A dark stage where someone comes into the light. A faceless figure stands in the dark; each scroll brings one
-    line and a little more light, every line set heavier than the last. On `platform` a stage rises under them; on
-    `name` the view swings round behind them to face a follow-spot, then the light floods the page and the copy
-    after it sits in that light. Every line is real text, so the page reads with no motion at all. Use it as the
-    opening section: the name is the page's <h1>."""
-    type: Literal["stage"] = "stage"
-    lines: list[str] = Field(..., min_length=1, description="One line per scroll, said to the visitor ('You, who have a "
-                                                            "story.'). <em> marks a phrase in the light colour")
-    platform: Optional[str] = Field(None, description="The line on which a stage rises under the figure "
-                                                      "('You just need the platform. <em>We can get you that.</em>')")
-    name: str = Field(..., description="Said as the follow-spot comes up; the page's <h1>")
-    body: Optional[str] = Field(None, description="Under the name, once the page is in the light")
-    buttons: list[Link] = Field(default_factory=list, description="Under the body; the first is the primary button")
-    weights: list[int] = Field(default_factory=lambda: [200, 760], min_length=2, max_length=2,
-                               description="The display face's weight on the first line and on the last")
-    length: float = Field(0.0, description="Scroll distance in screen heights (0: one per line, plus the platform, "
-                                           "the turn and the light)")
-
 
 class CodeFile(Model):
     """One file on the route through the codebase."""
@@ -840,13 +828,13 @@ class FaqBlock(BlockBase):
 
 
 Section = Annotated[Union[
-    FilmScene, ArtworkScene, Scene3DScene, SequenceScene, ParallaxScene, TypeScene, StageScene, VectorScene, ChartScene,
-    MapScene, SplatScene, CodeScene, ShowroomScene,
+    FilmScene, ArtworkScene, Scene3DScene, SequenceScene, ParallaxScene, TypeScene, VectorScene, ChartScene, MapScene,
+    SplatScene, CodeScene, ShowroomScene,
     IntroBlock, FeaturesBlock, StatsBlock, TimelineBlock, QuoteBlock, CtaBlock, GalleryBlock,
     HeroBlock, ProductBlock, StripBlock, OrbitBlock, FaqBlock,
 ], Field(discriminator="type")]
 
-SCENE_TYPES = ("film", "artwork", "scene3d", "sequence", "parallax", "type", "stage", "vector", "chart", "map", "splat", "code",
+SCENE_TYPES = ("film", "artwork", "scene3d", "sequence", "parallax", "type", "vector", "chart", "map", "splat", "code",
                "showroom")
 
 

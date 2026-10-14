@@ -26,7 +26,6 @@ site.yaml ──► studio build ──► dist/  (plain static files: host anyw
  CLI               ├─ sequence  Blender (Cycles) renders a 3D model: turntable, explode, reassemble
                    ├─ parallax  photos + estimated depth (Depth Anything V2) → 2.5D camera moves
                    ├─ type      kinetic typography: reveal, stack, swap, scale, weight
-                   ├─ stage     someone comes into the light, one line at a time, then the name
                    ├─ vector    SVG or vectorised artwork drawing itself stroke by stroke
                    ├─ chart     CSV data stories with D3: series, zooms, callouts read from the data
                    ├─ map       live vector maps (MapLibre): camera flights and routes per step

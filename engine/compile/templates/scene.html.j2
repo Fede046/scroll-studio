@@ -10,6 +10,15 @@
 </div>
 {% endmacro %}
 
+{% macro ocap(st) %}
+<div class="ss-caption{% if st.surface %} ss-surface-{{ st.surface }}{% endif %}" data-from="{{ (st.at or [0, 1])[0] }}" data-to="{{ (st.at or [0, 1])[1] }}">
+  {% if st.kicker %}<div class="ss-eyebrow"><i></i><span>{{ st.kicker | rich }}</span></div>{% endif %}
+  {% if st.intro %}<h1 class="ss-h1 ss-split-words">{{ st.title | rich }}</h1>{% else %}<h2 class="ss-display ss-split-words">{{ st.title | rich }}</h2>{% endif %}
+  {% if st.body %}<p class="ss-body">{{ st.body | rich }}</p>{% endif %}
+  {% if st.button %}<a class="ss-btn ss-btn--hot" href="{{ st.button.href }}">{{ st.button.label }} <span class="ss-arrow">→</span></a>{% endif %}
+</div>
+{% endmacro %}
+
 {% macro hud(h) %}
 {% if h.kind == "telemetry" %}
 <div class="ss-hud ss-telemetry" aria-hidden="true">
@@ -27,107 +36,18 @@
 {% endif %}
 {% endmacro %}
 
-{% macro figure(cfg, cls, uid, sheen=False) %}
-{# three stacked layers (shape, light falling on it, rim), so the runtime only fades layers that are already drawn:
-   the rim's filter runs once, not on every frame #}
-<div class="st-fig {{ cls }}">
-  <svg class="st-layer st-shape" viewBox="{{ cfg.viewbox }}" preserveAspectRatio="xMidYMax meet"><path d="{{ cfg.figure }}"/></svg>
-  {% if sheen %}<svg class="st-layer st-sheen" viewBox="{{ cfg.viewbox }}" preserveAspectRatio="xMidYMax meet">
-    <defs><linearGradient id="{{ uid }}-s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color: var(--st-glow)" stop-opacity=".62"/><stop offset=".22" style="stop-color: var(--st-glow)" stop-opacity=".3"/><stop offset=".55" style="stop-color: var(--st-glow)" stop-opacity=".08"/><stop offset="1" style="stop-color: var(--st-glow)" stop-opacity="0"/></linearGradient></defs>
-    <path d="{{ cfg.figure }}" fill="url(#{{ uid }}-s)"/>
-  </svg>{% endif %}
-  <svg class="st-layer st-rim" viewBox="{{ cfg.viewbox }}" preserveAspectRatio="xMidYMax meet">
-    <defs>
-      <linearGradient id="{{ uid }}-g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color: var(--st-glow)"/><stop offset=".45" style="stop-color: var(--st-glow)" stop-opacity=".55"/><stop offset="1" style="stop-color: var(--st-glow)" stop-opacity=".12"/></linearGradient>
-      {# rim light: a soft band just inside the outline, coloured by the gradient (brightest on the head and shoulders) #}
-      <filter id="{{ uid }}-r" x="-10%" y="-5%" width="120%" height="110%">
-        <feMorphology in="SourceAlpha" operator="erode" radius="1.6" result="in"/>
-        <feComposite in="SourceAlpha" in2="in" operator="out" result="edge"/>
-        <feGaussianBlur in="edge" stdDeviation="1.3" result="soft"/>
-        <feComposite in="SourceGraphic" in2="soft" operator="in" result="lit"/>
-        <feComposite in="lit" in2="SourceAlpha" operator="in"/>
-      </filter>
-    </defs>
-    <path d="{{ cfg.figure }}" fill="url(#{{ uid }}-g)" filter="url(#{{ uid }}-r)"/>
-  </svg>
-</div>
-{% endmacro %}
-
-{% macro riser(uid) %}
-<svg class="st-riser" viewBox="0 0 300 64" preserveAspectRatio="none">
-  <defs><linearGradient id="{{ uid }}-rt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color: var(--st-glow)" stop-opacity=".5"/><stop offset="1" style="stop-color: var(--st-glow)" stop-opacity=".16"/></linearGradient>
-  <linearGradient id="{{ uid }}-rf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color: var(--st-glow)" stop-opacity=".16"/><stop offset="1" style="stop-color: var(--st-glow)" stop-opacity="0"/></linearGradient></defs>
-  <polygon points="22,0 278,0 300,12 0,12" fill="url(#{{ uid }}-rt)"/>
-  <rect x="0" y="12" width="300" height="52" fill="url(#{{ uid }}-rf)"/>
-  <rect x="0" y="12" width="300" height="1.2" style="fill: var(--st-glow)" opacity=".5"/>
-</svg>
-{% endmacro %}
-
-{# stage: the lines are real text in reading order and the name is the <h1>; without the runtime the scene is a
-   plain dark panel with the figure behind the words. #}
-{% macro stage(s, cfg, sdata) %}
-<section class="ss-scene ss-overlay ss-type-stage st" id="{{ s.id }}" data-scene="stage" style="--st-dark: {{ cfg.dark }}; --st-light: {{ cfg.light }}; --st-glow: {{ cfg.glow }}; --st-accent: {{ cfg.accent }}; --st-page: {{ cfg.page }}">
-  <div class="ss-track st-track" style="height: {{ cfg.length | vh }}">
-    <div class="ss-stage st-stage">
-      <div class="ss-visual st-visual" aria-hidden="true">
-        <div class="st-shot st-front">
-          <div class="st-upstage"></div>
-          <div class="st-floor"></div>
-          <div class="st-pool"></div>
-          <div class="st-lift">
-            <div class="st-actor">
-              {{ figure(cfg, "st-fig--front", s.id ~ "-f") }}
-              {{ riser(s.id ~ "-f") }}
-            </div>
-          </div>
-        </div>
-        <div class="st-shot st-back">
-          <div class="st-house"></div>
-          <div class="st-beam"></div>
-          <div class="st-lamp"></div>
-          <div class="st-special"></div>
-          <div class="st-mark">
-            {{ figure(cfg, "st-fig--back", s.id ~ "-b", sheen=True) }}
-            {{ riser(s.id ~ "-b") }}
-          </div>
-        </div>
-        <div class="st-flood"></div>
-      </div>
-      <div class="st-words">
-        <div class="st-lines">
-          {% for l in s.lines %}<p class="st-line">{{ l | rich }}</p>
-          {% endfor %}{% if s.platform %}<p class="st-line st-line--platform">{{ s.platform | rich }}</p>{% endif %}
-        </div>
-        <div class="st-title">
-          <h1 class="st-name">{{ s.name | rich }}</h1>
-          {% if s.body %}<p class="st-body">{{ s.body | rich }}</p>{% endif %}
-          {% if s.buttons %}<div class="ss-btns st-btns">{% for l in s.buttons %}<a class="ss-btn{% if loop.first %} ss-btn--hot{% endif %}" href="{{ l.href }}">{{ l.label }}{% if loop.first %} <span class="ss-arrow">→</span>{% endif %}</a>{% endfor %}</div>{% endif %}
-        </div>
-      </div>
-    </div>
-  </div>
-  <script type="application/json" class="ss-config">{{ cfg | tojson }}</script>
-  <script type="application/json" class="ss-section">{{ sdata | tojson }}</script>
-</section>
-{% endmacro %}
-
 {% macro render(s, cfg, sdata) %}
-{% if s.type == "stage" %}{{ stage(s, cfg, sdata) }}{% else %}
-<section class="ss-scene ss-{{ s.layout }} ss-side-{{ s.side }} ss-type-{{ s.type }} ss-shade-{{ s.shade }}{% if s.type == "type" and s.size == "display" %} ss-type--display{% endif %}" id="{{ s.id }}" data-scene="{{ s.type }}">
+<section class="ss-scene ss-{{ s.layout }} ss-side-{{ s.side }} ss-type-{{ s.type }} ss-shade-{{ s.shade }}{% if s.surface %} ss-surface-{{ s.surface }}{% endif %}{% if s.type == "type" and s.size == "display" %} ss-type--display{% endif %}" id="{{ s.id }}" data-scene="{{ s.type }}">
 {% if s.layout == "overlay" %}
   <div class="ss-track" style="height: {{ s.length | vh }}">
     <div class="ss-stage">
       <div class="ss-visual">{% if cfg.poster %}<img class="ss-poster" src="{{ cfg.poster }}" alt="">{% endif %}</div>
       <div class="ss-shade"></div>
       <div class="ss-captions">
-        {% for st in s.steps %}
-        <div class="ss-caption" data-from="{{ (st.at or [0, 1])[0] }}" data-to="{{ (st.at or [0, 1])[1] }}">
-          {% if st.kicker %}<div class="ss-eyebrow"><i></i><span>{{ st.kicker | rich }}</span></div>{% endif %}
-          {% if st.intro %}<h1 class="ss-h1 ss-split-words">{{ st.title | rich }}</h1>{% else %}<h2 class="ss-display ss-split-words">{{ st.title | rich }}</h2>{% endif %}
-          {% if st.body %}<p class="ss-body">{{ st.body | rich }}</p>{% endif %}
-        </div>
-        {% endfor %}
+        {% for st in s.steps if not st.place %}{{ ocap(st) }}{% endfor %}
       </div>
+      {% for st in s.steps if st.place %}<div class="ss-captions ss-captions--{{ st.place }}">{{ ocap(st) }}</div>
+      {% endfor %}
       {{ hud(s.hud) }}
       {% if s.cue %}<div class="ss-cue">{{ s.cue }}</div>{% endif %}
       <div class="ss-outro"></div>
@@ -157,5 +77,4 @@
   <script type="application/json" class="ss-config">{{ cfg | tojson }}</script>
   <script type="application/json" class="ss-section">{{ sdata | tojson }}</script>
 </section>
-{% endif %}
 {% endmacro %}

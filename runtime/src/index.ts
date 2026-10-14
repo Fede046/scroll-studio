@@ -24,7 +24,6 @@ const PLAYERS: Record<string, () => Promise<{ default: PlayerFactory }>> = {
   scene3d: () => import("./players/scene3d"),
   parallax: () => import("./players/parallax"),
   type: () => import("./players/type"),
-  stage: () => import("./players/stage"),
   vector: () => import("./players/vector"),
   chart: () => import("./players/chart"),
   map: () => import("./players/map"),
@@ -208,12 +207,31 @@ const scenes = [...document.querySelectorAll<HTMLElement>("[data-scene]")].map((
 
 const nav = document.getElementById("ss-nav");
 const updateBlocks = makeBlocks();
+// The nav reads in the colours of the section under it: a dark film on a light site gets a dark nav, and back.
+const surfaced = [...document.querySelectorAll<HTMLElement>("main [class*='ss-surface-']")]
+  .filter((el) => el.matches("section, .ss-panel, .ss-backdrop"));
+let navSurface = "";
+function surfaceUnderNav() {
+  if (!nav) return;
+  const y = nav.offsetHeight / 2;
+  let found = "";
+  for (const el of surfaced) {
+    const r = el.getBoundingClientRect();
+    if (r.top <= y && r.bottom > y) { found = (el.className.match(/ss-surface-(\w+)/) || [])[1] || ""; break; }
+  }
+  if (found !== navSurface) {
+    if (navSurface) nav.classList.remove("ss-surface-" + navSurface);
+    if (found) nav.classList.add("ss-surface-" + found);
+    navSurface = found;
+  }
+}
 function frame() {
   const t = (performance.now() - t0) / 1000;
   for (const s of scenes) s.tick(t);
   updateReveals();
   updateBlocks();
   nav?.classList.toggle("ss-solid", scrollY > 40);
+  surfaceUnderNav();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

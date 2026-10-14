@@ -211,7 +211,7 @@ class Maker:
                     fn = getattr(self, f"scene_{sec.type}", None)
                     if fn is not None:
                         made = fn(sec)
-                if not is_scene(sec) or sec.type in ("type", "stage", "chart", "code", "map", "scene3d", "splat"):
+                if not is_scene(sec) or sec.type in ("type", "chart", "code", "map", "scene3d", "splat"):
                     made += self.block(sec)
             except Exception as e:   # one broken shot never stops the storyboard: it shows as a card with the error
                 sid = getattr(sec, "id", None) or sec.type

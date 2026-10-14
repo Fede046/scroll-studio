@@ -458,7 +458,8 @@ def pin_steps(sec: FilmScene, durs: list[float], fade: float) -> None:
         if part:
             a, b2 = a + (b2 - a) * float(part[0]), a + (b2 - a) * float(part[1])
         pad = (b2 - a) * 0.1
-        st.at = (round(a + pad, 4), round(b2 - pad * 0.6, 4))
+        # a caption on the film's last moment stays up until the scene lets go (a closing line, a button)
+        st.at = (round(a + pad, 4), 1.0 if b2 >= 0.999 else round(b2 - pad * 0.6, 4))
 
 
 def build(sec: FilmScene, ctx: BuildContext, theme: dict) -> dict:
