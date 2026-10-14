@@ -53,6 +53,13 @@ the real first frames (same stages and caches), so approving them is not wasted 
    its path: read it, then keep it or `pick_shot_variant` an earlier one. The user can do the same in the browser with
    `studio storyboard <project> --edit`. `approve_shot` marks a shot approved (the sheet and `build(plan_only)` list
    the rest). It renders stills only: it never starts a film.
+   **Notes first.** The user writes plain-language notes in the editor (a "What should change?" box per shot, a Notes
+   tab for the whole page). When asked to handle them, call `storyboard_notes(project)` (or `studio storyboard <project>
+   --notes`): each open note comes with its shot's current values and image paths. Decide what it means (a prompt or edit
+   instruction reworded, a seed re-rolled, a caption or length changed, copy or order changed in `site.yaml`), do it with
+   the tools above, LOOK at any new image before you call it done, then `resolve_note(project, id, reply)` with a short
+   plain reply (what you did, or what you did not and why). Do not lecture about prompts; never touch a locked shot; and
+   never start a film: only stills render from here. The user plays the result in the editor's Play tab.
 4. Lock approved shots (`locked: true` on a beat, take or scene, or `set_shot_field(..., "locked", true)`) so later
    edits never re-render them.
 5. `build(project, plan_only=True)` shows what will render and how long; tell the user before a long render.

@@ -222,6 +222,30 @@ def storyboard_shots(project: str, shot: Optional[str] = None) -> dict:
 
 
 @mcp.tool()
+def storyboard_notes(project: str, claim: bool = True, include_working: bool = False, include_done: bool = False) -> dict:
+    """The inbox of plain-language notes the owner wrote in the storyboard editor ("warmer light", "she should look
+    older", "tighten the pacing", ...). Each open note comes with its shot's current spec values (every editable field by
+    name), its images (path to read, state, seeds, the steps of the edit chain) and the variants kept; a note for
+    'general' comes with the list of all shots. Interpret each note yourself: then act with set_shot_field (text, seconds,
+    seeds), regenerate_shot_image (mode rerun after changing an image's prompt or instruction, step 1 for a shared base),
+    pick_shot_variant, or by editing site.yaml for page-wide changes (copy, order, pacing); LOOK at the new image
+    (Read its path) before you resolve. Then call resolve_note with a short plain reply. claim=True marks the notes
+    as 'working' (the page shows it, and attaches the edits you make to the note)."""
+    with contextlib.redirect_stdout(sys.stderr):
+        return _workspace(project).notes_for_agent(claim, include_working, include_done)
+
+
+@mcp.tool()
+def resolve_note(project: str, note_id: str, reply: str, changed: Optional[list[str]] = None, status: str = "done") -> dict:
+    """Close a storyboard note with a short plain-language reply for the owner (what you understood and what you did, or
+    why you did not: "made the light warmer (new variant 4, seed 5231); the other shots keep their look"). changed: extra
+    things worth listing (edits and new variants made through the editing tools are attached automatically).
+    status: done (default), or open to hand it back, or working."""
+    from .storyboard.edit import notes
+    return notes.resolve(_find(project), note_id, reply, changed, None, status)
+
+
+@mcp.tool()
 def set_shot_field(project: str, shot: str, field: str, value: Any) -> dict:
     """Set one field of a storyboard shot in site.yaml (comments and layout kept, validated first, the previous text is
     kept in storyboard/history/). field: a name from storyboard_shots, e.g. caption, prompt, motion, seconds, seed,

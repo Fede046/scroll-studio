@@ -87,6 +87,7 @@ p.sub { color:var(--dim); font-size:13px; margin-bottom:10px; max-width:80ch; }
 .nums .fld { width:92px; } .nums .fld.bad { width:210px; }
 .fields { margin-top:12px; display:flex; flex-direction:column; gap:8px; }
 .bar2 { display:flex; align-items:center; gap:8px; margin-top:12px; padding-top:10px; border-top:1px solid var(--line); }
+.card:not(.is-dirty) .bar2 { display:none; }
 .bar2 .msg { color:var(--accent); font-size:13px; }
 .errs { margin-top:8px; display:flex; flex-direction:column; gap:3px; color:#ff9a9a; font-size:13px; }
 details.chain { margin-top:8px; font-size:13px; }
@@ -102,12 +103,63 @@ details.chain summary { cursor:pointer; color:var(--dim); }
 #lightbox { position:fixed; inset:0; background:rgba(0,0,0,.92); z-index:50; display:none; align-items:center; justify-content:center; cursor:zoom-out; }
 #lightbox.on { display:flex; } #lightbox img { max-width:96vw; max-height:94vh; }
 .kfgrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:14px; }
+nav#tabs { display:flex; gap:4px; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:3px; }
+nav#tabs button { background:none; border:0; border-radius:7px; padding:3px 14px; font-size:13.5px; color:var(--dim); }
+nav#tabs button.on { background:var(--panel2); color:var(--ink); box-shadow:0 0 0 1px #4a4d55 inset; }
+nav#tabs .nb { background:var(--accent); color:#1a1209; border-radius:99px; padding:0 7px; font-size:11.5px; margin-left:6px; font-weight:600; }
+details.adv { margin-top:12px; border-top:1px solid var(--line); padding-top:8px; }
+details.adv > summary { cursor:pointer; color:var(--dim); font-size:13px; padding:2px 0; user-select:none; }
+details.adv > summary:hover { color:var(--ink); }
+details.adv[open] > summary { margin-bottom:8px; }
+details.adv .advh { font-size:11.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--dim); margin:12px 0 4px; }
+details.sharedbox { margin:22px 0 4px; } details.sharedbox > summary { cursor:pointer; font-size:13px; letter-spacing:.08em; text-transform:uppercase; color:var(--dim); font-weight:600; }
+details.sharedbox[open] > summary { margin-bottom:8px; }
+.notebox { margin-top:12px; }
+.notebox label { font-size:12.5px; color:var(--dim); display:block; margin-bottom:3px; }
+.notebox .row { display:flex; gap:8px; align-items:flex-end; }
+.notebox textarea { flex:1; background:#141519; color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:7px 10px; font:inherit; resize:vertical; min-height:38px; }
+.notebox textarea:focus { outline:none; border-color:var(--accent); }
+.notelist { margin-top:8px; display:flex; flex-direction:column; gap:7px; }
+.note1 { border:1px solid var(--line); border-left:4px solid #7c818c; border-radius:8px; padding:7px 10px; background:#17181c; font-size:13.5px; }
+.note1.open { border-left-color:var(--blue); } .note1.working { border-left-color:var(--warn); } .note1.done { border-left-color:var(--ok); }
+.note1 .nh { display:flex; gap:8px; align-items:center; font-size:12px; color:var(--dim); margin-bottom:3px; flex-wrap:wrap; }
+.note1 .nt { white-space:pre-wrap; overflow-wrap:anywhere; }
+.note1 .reply { margin-top:5px; padding:5px 9px; background:#122019; border-radius:6px; color:#bfeed6; white-space:pre-wrap; }
+.note1 .chg { margin-top:4px; color:var(--dim); font-size:12.5px; }
+.note1 .na { margin-left:auto; display:flex; gap:6px; }
+.card.is-playing { box-shadow:0 0 0 3px var(--accent); }
+.tabpanel[hidden] { display:none !important; }
+.composer { max-width:900px; margin-bottom:18px; }
+.noteitem { max-width:900px; }
+.noteitem .shotlink { color:var(--accent); cursor:pointer; text-decoration:underline; }
+.filters { display:flex; gap:6px; margin:14px 0 10px; }
+.player { max-width:1100px; }
+.vwrap { position:relative; background:#000; border-radius:10px; overflow:hidden; border:1px solid var(--line); }
+.vwrap video { width:100%; display:block; aspect-ratio:16/9; background:#000; }
+.vwrap .nowshot { position:absolute; left:12px; top:12px; background:rgba(0,0,0,.65); border-radius:8px; padding:2px 10px; font-size:13px; }
+.ctl { display:flex; align-items:center; gap:10px; margin:8px 0 4px; }
+.ctl .t { font-variant-numeric:tabular-nums; color:var(--dim); font-size:13px; min-width:92px; }
+.tl { position:relative; height:46px; background:#16171b; border:1px solid var(--line); border-radius:8px; cursor:pointer; overflow:hidden; user-select:none; }
+.tl .seg { position:absolute; top:0; bottom:0; border-right:1px solid #0b0b0c; background:#23252c; display:flex; align-items:flex-end; padding:0 5px 3px; font-size:11.5px; color:var(--dim); overflow:hidden; white-space:nowrap; }
+.tl .seg:hover { background:#2d3039; color:var(--ink); } .tl .seg.now { background:#4a3622; color:#ffd9bd; }
+.tl .seg.end { background:#1d1e23; }
+.tl .head { position:absolute; top:0; bottom:0; width:2px; background:var(--accent); pointer-events:none; }
+.chips { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+.chip2 { display:flex; flex-direction:column; width:104px; border:2px solid var(--line); border-radius:8px; overflow:hidden; background:#000; cursor:pointer; padding:0; text-align:left; }
+.chip2 img { width:100%; aspect-ratio:16/9; object-fit:cover; display:block; } .chip2 span { font-size:11.5px; padding:1px 6px; background:#17181c; }
+.chip2.now { border-color:var(--accent); }
+.subtabs { display:flex; gap:6px; margin:6px 0 14px; }
+.subtabs button.btn.on { background:var(--panel2); border-color:#6b6f7a; color:var(--ink); }
+.frame { width:100%; height:72vh; border:1px solid var(--line); border-radius:10px; background:#fff; }
+.banner { display:flex; gap:12px; align-items:center; background:#2a2417; border:1px solid #6b4f12; color:#ffd89b; border-radius:10px; padding:8px 14px; margin-bottom:12px; }
+.banner.ok { background:#122019; border-color:#235c46; color:#bfeed6; }
 .foot { color:var(--dim); font-size:12.5px; margin:34px clamp(16px,3vw,40px) 0; }
 </style>
 </head>
 <body>
 <header class="top">
   <h1>Storyboard <small id="proj"></small></h1>
+  <nav id="tabs"><button data-tab="shots" class="on">Shots</button><button data-tab="notes">Notes<span class="nb" id="nbadge" hidden></span></button><button data-tab="play">Play</button></nav>
   <span class="pill" id="p-appr">...</span>
   <span class="pill" id="p-comfy"><i class="dot"></i> ComfyUI</span>
   <span class="spacer"></span>
@@ -117,16 +169,29 @@ details.chain summary { cursor:pointer; color:var(--dim); }
   <button class="btn" id="b-sheet" title="Rebuild the sheet and the stand-in page from the edited spec and what is rendered so far (no new renders: images not drawn yet show as cards)">Update sheet</button>
 </header>
 <div id="notice"></div>
-<main>
-  <div id="shared-wrap" hidden>
-    <h2 class="sec">Shared steps</h2>
-    <p class="sub">These steps draw more than one shot: a base image, a relight, a style edit. Each shot below shows only what is its own. Editing a shared step changes every shot that uses it; its shots then need a Re-run.</p>
+<main id="tab-shots" class="tabpanel">
+  <details class="sharedbox" id="shared-wrap" hidden><summary id="shared-sum">Shared steps</summary>
+    <p class="sub">These steps draw more than one shot: a base image, a relight, a style edit. Each shot shows only what is its own. Editing a shared step changes every shot that uses it; its shots then need a Re-run.</p>
     <div class="grid" id="shared"></div>
-  </div>
+  </details>
   <h2 class="sec">Shots</h2>
   <div class="grid" id="cards"><p class="sub">Loading...</p></div>
 </main>
-<p class="foot">Edits are written into site.yaml (comments and layout kept; the previous text is kept in storyboard/history/). Regenerate renders one more variant of just that image; click a variant to make it the one the build uses.</p>
+<main id="tab-notes" class="tabpanel" hidden>
+  <h2 class="sec">Notes</h2>
+  <p class="sub">Say what should change, in your own words: for the whole storyboard here (pacing, tone, copy, order, anything), or for one shot from its card. Claude reads these, makes the changes with the editing tools, and answers each note here.</p>
+  <div class="composer notebox"><label for="gnote">General note</label><div class="row"><textarea id="gnote" rows="2" placeholder="e.g. the opening feels too slow; make the whole thing warmer; swap the last two shots"></textarea><button class="btn primary" id="gsend">Send</button></div></div>
+  <div class="filters" id="nfilters"></div>
+  <div class="notelist noteitem" id="nlist"></div>
+</main>
+<main id="tab-play" class="tabpanel" hidden>
+  <h2 class="sec">Play</h2>
+  <div class="subtabs" id="psub"><button class="btn on" data-p="animatic">Animatic</button><button class="btn" data-p="standin">Stand-in page (stills)</button><button class="btn" data-p="dist">Built page</button></div>
+  <div id="p-animatic" class="player"></div>
+  <div id="p-standin" class="player" hidden></div>
+  <div id="p-dist" class="player" hidden></div>
+</main>
+<p class="foot">Notes go to Claude; Advanced holds the exact fields. Edits are written into site.yaml (comments and layout kept; the previous text is kept in storyboard/history/). Regenerate renders one more variant of just that image; click a variant to make it the one the build uses.</p>
 <div id="lightbox"><img alt=""></div>
 <script>
 const NAME = "__NAME__";
@@ -369,7 +434,6 @@ function slotEl(cid, shot, sl) {
   wrap.append(el("div", { class: "slotlab" }, el("b", {}, sl.label), top.kind !== "file" ? el("span", {}, top.label) : null));
   wrap.append(nodeImage(top, sl.label));
   if (top.render) { wrap.append(strip(top)); wrap.append(actions(cid, shot, top)); }
-  wrap.append(recipe(cid, shot, sl));
   return wrap;
 }
 
@@ -378,6 +442,79 @@ function approvalPill(shot) {
   if (shot.approval === "approved") return el("span", { class: "pill ok" }, "approved");
   if (shot.approval === "changed") return el("span", { class: "pill warn", title: "edited since it was approved" }, "changed since approval");
   return null;
+}
+
+const noteDraft = {};
+const isPrimary = (f) => /^caption/.test(f.name);
+function advStore(id, v) {
+  const k = "sbadv:" + NAME + ":" + id;
+  try { if (v === undefined) return localStorage.getItem(k) === "1"; localStorage.setItem(k, v ? "1" : "0"); } catch (e) { return false; }
+}
+function hasPendingIn(cid, fields) {
+  const d = dirty[cid] || {}, er = errors[cid] || [];
+  return fields.some(f => f.paths.some(p => p in d) || er.some(e => e.field === f.paths[0]));
+}
+// the exact fields: every prompt, instruction, motion, seed ... (closed unless the viewer opened it, or something in it is unsaved)
+function advanced(cid, shot) {
+  const other = shot.fields.filter(f => !isPrimary(f));
+  const inner = [...other];
+  for (const sl of shot.slots) for (const n of sl.nodes) if (!n.shared || n === sl.nodes[0]) inner.push(...n.fields);
+  const det = el("details", { class: "adv" }, el("summary", {}, "Advanced: the exact prompts, seeds and settings"));
+  if (advStore(cid) || hasPendingIn(cid, inner)) det.open = true;
+  det.addEventListener("toggle", () => advStore(cid, det.open));
+  if (other.length) {
+    const nums = el("div", { class: "nums" });
+    for (const f of other) { const fe = fieldEl(cid, f); if (f.type === "int" || f.type === "float") nums.append(fe); else det.append(fe); }
+    if (nums.children.length) det.append(nums);
+  }
+  for (const sl of shot.slots) {
+    const r = recipe(cid, shot, sl);
+    if (!r.children.length) continue;
+    det.append(el("div", { class: "advh" }, sl.label));
+    det.append(r);
+  }
+  if (det.children.length <= 1) det.append(el("p", { class: "hint" }, "Nothing more to set for this shot."));
+  return det;
+}
+
+function noteBox(shotId) {
+  const ta = el("textarea", { rows: 1, placeholder: "e.g. warmer light, she should look older, less grain" });
+  ta.value = noteDraft[shotId] || ""; ta.addEventListener("input", () => { noteDraft[shotId] = ta.value; });
+  const send = async () => {
+    const t = ta.value.trim(); if (!t) return;
+    const r = await api("/notes", { body: { shot: shotId, text: t } });
+    if (!r.ok) { notice((r.data && r.data.error) || "Could not save the note", "err"); return; }
+    ta.value = ""; delete noteDraft[shotId]; await refresh(true);
+    notice("Note saved. Claude will pick it up; its answer appears here.", "info");
+  };
+  ta.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && (ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); send(); } });
+  const mine = (ST.notes || []).filter(n => n.shot === shotId);
+  return el("div", { class: "notebox" }, el("label", {}, "What should change?"),
+    el("div", { class: "row" }, ta, el("button", { class: "btn small primary", onclick: send }, "Send")),
+    mine.length ? el("div", { class: "notelist" }, ...mine.map(n => noteEl(n, false))) : null);
+}
+
+const NSTAT = { open: "waiting for Claude", working: "Claude is on it", done: "done" };
+function noteEl(n, showShot) {
+  const chg = [...(n.changes || [])];
+  const box = el("div", { class: "note1 " + n.status },
+    el("div", { class: "nh" }, el("span", { class: "pill " + (n.status === "done" ? "ok" : n.status === "working" ? "warn" : "blue") }, NSTAT[n.status] || n.status),
+      showShot ? (n.shot === "general" ? el("span", {}, "General") : el("span", { class: "shotlink", onclick: () => goShot(n.shot) }, "Shot " + n.shot)) : null,
+      el("span", {}, n.time),
+      el("span", { class: "na" },
+        n.status === "done" ? el("button", { class: "btn small", title: "not quite: send it back to Claude with a follow-up", onclick: async () => {
+          const more = window.prompt("What is still not right? (optional)", ""); if (more === null) return;
+          await api("/notes/reopen", { body: { id: n.id, more } }); await refresh(true); } }, "Not quite") : null,
+        el("button", { class: "btn small", title: "remove this note", onclick: async () => { await api("/notes/delete", { body: { id: n.id } }); await refresh(true); } }, "x"))),
+    el("div", { class: "nt" }, n.text),
+    n.reply ? el("div", { class: "reply" }, n.reply) : null,
+    chg.length ? el("div", { class: "chg" }, "Led to: " + chg.join("; ")) : null);
+  return box;
+}
+function goShot(id) {
+  showTab("shots");
+  const c = document.getElementById("c-" + cssId(id));
+  if (c) { c.scrollIntoView({ behavior: "smooth", block: "start" }); c.classList.add("is-playing"); setTimeout(() => c.classList.remove("is-playing"), 1800); }
 }
 
 function buildCard(shot) {
@@ -393,14 +530,11 @@ function buildCard(shot) {
     const kind = shot.slots.length > 2 ? "kfgrid" : "slots";
     card.append(el("div", { class: kind }, ...shot.slots.map(sl => slotEl(cid, shot, sl))));
   }
-  const fields = el("div", { class: "fields" });
-  const nums = el("div", { class: "nums" });
-  for (const f of shot.fields) {
-    const fe = fieldEl(cid, f);
-    if (f.type === "int" || f.type === "float") nums.append(fe); else fields.append(fe);
-  }
-  if (nums.children.length) fields.append(nums);
-  if (fields.children.length) card.append(fields);
+  const cap = el("div", { class: "fields" });
+  for (const f of shot.fields.filter(isPrimary)) cap.append(fieldEl(cid, f));
+  if (cap.children.length) card.append(cap);
+  card.append(noteBox(shot.id));
+  card.append(advanced(cid, shot));
   const errs = (errors[cid] || []).filter(e => !e.field);
   if (errs.length) card.append(el("div", { class: "errs" }, ...errs.map(e => el("div", {}, e.loc + ": " + e.msg))));
   card.append(el("div", { class: "bar2" }, el("button", { class: "btn small primary save", onclick: () => save(cid) }, "Save"),
@@ -445,7 +579,7 @@ async function rerunDependents(n) {
   paintJobs(); schedulePoll(400);
 }
 
-function cardSig(x) { return JSON.stringify(x, (k, v) => (k === "job" ? undefined : v)); }
+function cardSig(x) { return JSON.stringify(x, (k, v) => (k === "job" ? undefined : v)) + (x.id && ST ? JSON.stringify((ST.notes || []).filter(n => n.shot === x.id)) : ""); }
 
 function renderCard(cid, force = false) {
   const isShared = cid.startsWith("shared:");
@@ -516,7 +650,7 @@ async function refresh(own = false, seenRev = null) {
     return;
   }
   badRev = null; invalidBanner(null);
-  const prev = ST; ST = r.data; REV = ST.rev;
+  const prev = ST; ST = r.data; REV = ST.rev; VREV = ST.vrev;
   header();
   // fields edited here but changed on disk meanwhile: take the disk's value, tell the user
   const reloaded = [];
@@ -536,6 +670,8 @@ async function refresh(own = false, seenRev = null) {
   }
   // shared panel
   $("#shared-wrap").hidden = !ST.shared.length;
+  $("#shared-sum").textContent = `Shared steps (${ST.shared.length})`;
+  if (!$("#shared-wrap").dataset.init) { $("#shared-wrap").dataset.init = "1"; $("#shared-wrap").open = advStore("shared"); $("#shared-wrap").addEventListener("toggle", () => advStore("shared", $("#shared-wrap").open)); }
   const ids = [...ST.shared.map(n => "shared:" + n.key), ...ST.shots.map(s => s.id)];
   document.querySelectorAll(".card").forEach(c => { if (!ids.some(i => "c-" + cssId(i) === c.id)) c.remove(); });
   if ($("#cards .sub")) $("#cards .sub").remove();
@@ -545,9 +681,11 @@ async function refresh(own = false, seenRev = null) {
   const order = (box, list) => list.forEach(id => { const e = document.getElementById("c-" + cssId(id)); if (e && e.parentNode === box) box.append(e); });
   order($("#shared"), ST.shared.map(n => "shared:" + n.key)); order($("#cards"), ST.shots.map(s => s.id));
   paintJobs();
+  renderNotesTab(); renderPlay(); updateBadge();
 }
 
 let badRev = null;
+let VREV = null;
 let pollTimer = null;
 function schedulePoll(ms) { clearTimeout(pollTimer); pollTimer = setTimeout(poll, ms); }
 async function poll() {
@@ -562,8 +700,8 @@ async function poll() {
       $("#p-comfy .dot").classList.toggle("on", d.comfy);
       $("#b-undo").disabled = !d.undo;
       const finished = before.filter(k => !(k in d.jobs));
-      if (finished.length || (ST && d.rev !== REV && d.rev !== badRev)) await refresh(!!d.own, d.rev);
-      else paintJobs();
+      if (finished.length || (ST && ((d.rev !== REV && d.rev !== badRev) || (d.vrev && d.vrev !== VREV)))) await refresh(!!d.own || d.rev === REV, d.rev);
+      else { paintJobs(); if (TAB === "play" && PSUB === "animatic") renderPlay(); }
       for (const cid of [...pendingRender]) { const a = document.activeElement; const c = document.getElementById("c-" + cssId(cid)); if (!c || !a || !c.contains(a)) { pendingRender.delete(cid); renderCard(cid, true); } }
     }
   } catch (e) { /* server restarting */ }
@@ -588,7 +726,196 @@ document.addEventListener("focusout", () => setTimeout(() => {
 }, 60));
 window.addEventListener("beforeunload", (e) => { if (Object.values(dirty).some(d => Object.keys(d).length)) { e.preventDefault(); e.returnValue = ""; } });
 
-refresh(true).then(() => schedulePoll(1500));
+// ------------------------------------------------------------------ tabs
+let TAB = "shots";
+function showTab(t) {
+  TAB = t;
+  for (const b of document.querySelectorAll("#tabs button")) b.classList.toggle("on", b.dataset.tab === t);
+  for (const x of ["shots", "notes", "play"]) $("#tab-" + x).hidden = x !== t;
+  try { history.replaceState(null, "", "#" + t); } catch (e) {}
+  if (t === "play") renderPlay(true);
+}
+document.querySelectorAll("#tabs button").forEach(b => b.addEventListener("click", () => showTab(b.dataset.tab)));
+
+function updateBadge() {
+  const n = (ST.notes || []).filter(x => x.status !== "done").length;
+  const b = $("#nbadge"); b.hidden = !n; b.textContent = n;
+}
+
+// ------------------------------------------------------------------ notes tab
+let NFILTER = "open";
+function renderNotesTab() {
+  const f = $("#nfilters"); f.innerHTML = "";
+  for (const [k, lab] of [["open", "Not done"], ["done", "Done"], ["all", "All"]])
+    f.append(el("button", { class: "btn small" + (NFILTER === k ? " on" : ""), onclick: () => { NFILTER = k; renderNotesTab(); } }, lab));
+  const list = (ST.notes || []).filter(n => NFILTER === "all" || (NFILTER === "done" ? n.status === "done" : n.status !== "done"));
+  const box = $("#nlist"); box.innerHTML = "";
+  if (!list.length) box.append(el("p", { class: "hint" }, NFILTER === "done" ? "Nothing done yet." : "No notes waiting. Write one above, or from a shot's card."));
+  for (const n of list) box.append(noteEl(n, true));
+}
+$("#gsend").addEventListener("click", async () => {
+  const ta = $("#gnote"), t = ta.value.trim(); if (!t) return;
+  const r = await api("/notes", { body: { shot: "general", text: t } });
+  if (!r.ok) { notice((r.data && r.data.error) || "Could not save the note", "err"); return; }
+  ta.value = ""; await refresh(true);
+});
+
+// ------------------------------------------------------------------ play tab
+const BASE = "/sb/" + encodeURIComponent(NAME);
+let PSUB = "animatic", animSrc = null, PL = null;
+document.querySelectorAll("#psub button").forEach(b => b.addEventListener("click", () => { PSUB = b.dataset.p; renderPlay(true); }));
+const fmtT = (t) => { t = Math.max(0, t || 0); return Math.floor(t / 60) + ":" + String(Math.floor(t % 60)).padStart(2, "0"); };
+
+function thumbOf(id) {
+  const s = ST.shots.find(x => x.id === id);
+  const n = s && s.slots[0] && s.slots[0].nodes[0];
+  return n && n.image && n.image.p ? imgUrl(n.image, 200) : "";
+}
+
+function renderPlay(force = false) {
+  if (!ST) return;
+  const p = ST.play || {};
+  for (const b of document.querySelectorAll("#psub button")) b.classList.toggle("on", b.dataset.p === PSUB);
+  for (const x of ["animatic", "standin", "dist"]) $("#p-" + x).hidden = x !== PSUB;
+  if (TAB !== "play" && !force) return;
+  if (PSUB === "animatic") renderAnimatic(p);
+  else renderPage(PSUB, p[PSUB]);
+}
+
+function renderAnimatic(p) {
+  const box = $("#p-animatic"), a = p.animatic, j = jobs.__animatic__;
+  const sig = JSON.stringify([a && a.v, a && a.stale, a && a.reason, a && a.shots.length, !!j, ST.shots.map(s => s.id + ":" + ((s.slots[0] && s.slots[0].nodes[0].image.p) || "")).join(",")]);
+  if (box.dataset.sig === sig && !j) return;
+  if (box.dataset.sig === sig && j) { paintAnimJob(box, j); return; }
+  box.dataset.sig = sig;
+  if (PL) { PL.stop(); PL = null; }
+  box.innerHTML = "";
+  const rebuild = el("button", { class: "btn primary", disabled: !!j, onclick: rebuildAnimatic, title: "cut it again from the stills and clips that exist now: nothing new is rendered" }, a ? "Rebuild animatic" : "Cut the animatic");
+  if (!a) {
+    box.append(el("div", { class: "banner" }, el("span", {}, "No animatic yet: it is the whole storyboard as a rough cut, every shot at its length with slow camera moves and the captions."), rebuild));
+    box.append(el("div", { class: "jobline" }));
+    paintAnimJob(box, j); return;
+  }
+  box.append(el("div", { class: "banner" + (a.stale ? "" : " ok") }, el("span", {}, a.stale ? "Out of date. " + a.reason : "Up to date with the shots." + (a.reason ? " " + a.reason : "")), el("span", { style: "flex:1" }), rebuild));
+  const jl = el("div", { class: "jobline" }); box.append(jl);
+  const video = el("video", { playsinline: true, preload: "metadata", src: `${BASE}/${a.url}?v=${a.v}` });
+  const now = el("div", { class: "nowshot" }, "");
+  const playBtn = el("button", { class: "btn" }, "Play");
+  const tcode = el("span", { class: "t" }, "0:00");
+  const dur = () => a.duration || video.duration || 1;
+  const tl = el("div", { class: "tl", title: "click to jump" });
+  const head = el("div", { class: "head" });
+  const segs = [];
+  for (const s of a.shots) {
+    const seg = el("div", { class: "seg", style: `left:${(s.t0 / dur()) * 100}%;width:${((s.t1 - s.t0) / dur()) * 100}%`, title: `${s.id}: click to jump here`, onclick: (ev) => { ev.stopPropagation(); video.currentTime = s.t0 + 0.05; highlight(s.id); } }, s.id);
+    seg.dataset.id = s.id; segs.push([s, seg]); tl.append(seg);
+  }
+  if (a.shots.length) {
+    const last = a.shots[a.shots.length - 1].t1;
+    if (dur() > last + 0.2) tl.append(el("div", { class: "seg end", style: `left:${(last / dur()) * 100}%;width:${((dur() - last) / dur()) * 100}%` }, "end"));
+  } else tl.append(el("div", { class: "seg", style: "left:0;width:100%" }, "rebuild the animatic once to get the shot markers"));
+  tl.append(head);
+  tl.addEventListener("click", (ev) => { const r = tl.getBoundingClientRect(); video.currentTime = ((ev.clientX - r.left) / r.width) * dur(); });
+  let cur = null;
+  const highlight = (id) => {
+    if (id === cur) return; cur = id;
+    for (const [s, seg] of segs) seg.classList.toggle("now", s.id === id);
+    for (const c of box.querySelectorAll(".chip2")) c.classList.toggle("now", c.dataset.id === id);
+    document.querySelectorAll(".card.is-playing").forEach(c => c.classList.remove("is-playing"));
+    const c = id && document.getElementById("c-" + cssId(id)); if (c) c.classList.add("is-playing");
+    now.textContent = id ? "Shot: " + id : ""; now.hidden = !id;
+  };
+  let raf = null;
+  const tick = () => {
+    const t = video.currentTime;
+    head.style.left = (t / dur()) * 100 + "%";
+    tcode.textContent = fmtT(t) + " / " + fmtT(dur());
+    let id = null; for (const [s] of segs) if (t >= s.t0 && t < s.t1) id = s.id;
+    highlight(id);
+    raf = video.paused ? null : requestAnimationFrame(tick);
+  };
+  video.addEventListener("play", () => { playBtn.textContent = "Pause"; if (!raf) raf = requestAnimationFrame(tick); });
+  video.addEventListener("pause", () => { playBtn.textContent = "Play"; tick(); });
+  video.addEventListener("ended", () => { playBtn.textContent = "Play"; });
+  video.addEventListener("seeked", tick); video.addEventListener("loadedmetadata", tick);
+  playBtn.addEventListener("click", () => video.paused ? video.play() : video.pause());
+  video.addEventListener("click", () => playBtn.click());
+  box.append(el("div", { class: "vwrap" }, video, now));
+  box.append(el("div", { class: "ctl" }, playBtn, tcode, el("span", { class: "hint", style: "flex:1" }, "Click a shot on the timeline to jump to it. The shot playing is highlighted here and on its card.")));
+  box.append(tl);
+  const chips = el("div", { class: "chips" });
+  for (const s of a.shots) chips.append(el("button", { class: "chip2", "data-id": s.id, title: "jump to " + s.id, onclick: () => { video.currentTime = s.t0 + 0.05; highlight(s.id); } },
+    thumbOf(s.id) ? el("img", { src: thumbOf(s.id), alt: "" }) : el("div", { style: "aspect-ratio:16/9" }), el("span", {}, s.id)));
+  box.append(chips);
+  PL = { stop() { video.pause(); highlight(null); } };
+  paintAnimJob(box, j);
+}
+function paintAnimJob(box, j) {
+  const jl = $(".jobline", box); if (!jl) return; jl.innerHTML = "";
+  const last = lastRes.__animatic__;
+  if (j) jl.append(el("div", { class: "banner" }, el("span", {}, (j.status === "queued" ? "Queued behind another job" : (j.message || "Cutting the animatic")) + "  " + Math.round((j.progress || 0) * 100) + "%"),
+    el("div", { class: "bar", style: "flex:1;height:6px;border-radius:3px;background:#333;overflow:hidden" }, el("i", { style: `display:block;height:100%;background:var(--accent);width:${Math.max(4, Math.round((j.progress || 0) * 100))}%` }))));
+  else if (last && last.status === "failed") jl.append(el("div", { class: "note err" }, "The animatic could not be cut: " + (last.error || "")));
+  const btn = $(".banner button.primary", box); if (btn) btn.disabled = !!j;
+}
+async function rebuildAnimatic() {
+  const r = await api("/animatic", { body: {} });
+  if (!r.ok) { notice((r.data && r.data.error) || "Could not start", "err"); return; }
+  delete lastRes.__animatic__; jobs.__animatic__ = r.data.job; renderPlay(true); schedulePoll(400);
+}
+
+// the page, played: stills (stand-in) or the real build, in a frame that scrolls itself top to bottom
+const framed = {};
+function renderPage(kind, info) {
+  const box = $("#p-" + kind);
+  if (!info) {
+    box.innerHTML = ""; box.dataset.sig = "";
+    box.append(el("div", { class: "banner" }, kind === "dist" ? "The real page is not built yet: run studio build (or Build in studio ui)." : "No stand-in page yet: Update sheet, or Rebuild animatic, makes it."));
+    return;
+  }
+  const sig = info.url + (info.stale ? "s" : "") + (info.built || "");
+  if (box.dataset.sig === sig) return;
+  box.dataset.sig = sig; box.innerHTML = "";
+  const frame = el("iframe", { class: "frame", src: `${BASE}/${info.url}` });
+  const btn = el("button", { class: "btn" }, "Play"), speed = el("select", { class: "btn" }, ...[["0.5", "0.5x"], ["1", "1x"], ["2", "2x"], ["4", "4x"]].map(([v, l]) => el("option", { value: v, selected: v === "1" }, l)));
+  const pos = el("input", { type: "range", min: 0, max: 1000, value: 0, style: "flex:1" });
+  const reload = el("button", { class: "btn", onclick: () => { frame.src = frame.src; } }, "Reload");
+  box.append(el("div", { class: "ctl" }, btn, el("span", { class: "hint" }, "speed"), speed, pos, reload,
+    el("a", { class: "btn", href: `${BASE}/${info.url}`, target: "_blank" }, "Open")));
+  if (info.stale) box.prepend(el("div", { class: "banner" }, "This page was built before the latest edits. Update sheet makes it again."));
+  box.append(frame);
+  let raf = null, last = 0, y = 0, playing = false, waited = 0;
+  const win = () => frame.contentWindow, root = () => win().document.documentElement;
+  const maxY = () => Math.max(1, root().scrollHeight - win().innerHeight);
+  const step = (ts) => {
+    if (!playing) return;
+    try {
+      const dt = Math.min(0.1, (ts - last) / 1000); last = ts;
+      if (root().classList.contains("ss-loading") || maxY() < 60) {      // the page holds scrolling until its media is in
+        btn.textContent = "Waiting for the page..."; waited += dt;
+        if (waited > 90) { stop(); return; }
+        raf = requestAnimationFrame(step); return;
+      }
+      btn.textContent = "Pause"; waited = 0;
+      if (Math.abs(win().scrollY - y) > 4) y = win().scrollY;        // the viewer scrolled: carry on from there
+      y = Math.min(maxY(), y + win().innerHeight * 0.3 * parseFloat(speed.value) * dt);
+      win().scrollTo(0, y); pos.value = Math.round((y / maxY()) * 1000);
+      if (y >= maxY() - 1) { stop(); return; }
+    } catch (e) { stop(); return; }
+    raf = requestAnimationFrame(step);
+  };
+  const start = () => { try { if (win().scrollY >= maxY() - 2) { win().scrollTo(0, 0); y = 0; } else y = win().scrollY; } catch (e) { return; } playing = true; btn.textContent = "Pause"; last = performance.now(); raf = requestAnimationFrame(step); };
+  const stop = () => { playing = false; btn.textContent = "Play"; if (raf) cancelAnimationFrame(raf); };
+  btn.addEventListener("click", () => playing ? stop() : start());
+  pos.addEventListener("input", () => { try { y = (pos.value / 1000) * maxY(); win().scrollTo(0, y); } catch (e) {} });
+  frame.addEventListener("load", () => { stop(); pos.value = 0; try { win().addEventListener("scroll", () => { if (!playing) pos.value = Math.round((win().scrollY / maxY()) * 1000); }); } catch (e) {} });
+  framed[kind] = { stop };
+}
+
+// open on the tab in the address (#notes, #play)
+const startTab = (location.hash || "").replace("#", "");
+if (["notes", "play"].includes(startTab)) { TAB = startTab; }
+refresh(true).then(() => { showTab(TAB); schedulePoll(1500); });
 </script>
 </body>
 </html>

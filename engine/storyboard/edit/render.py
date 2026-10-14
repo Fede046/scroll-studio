@@ -118,6 +118,9 @@ def run_image(project: Project, key: str, mode: str, seed: Optional[int] = None,
     elif node.kind == "keyframe":
         applied = True
     progress(1.0, "done")
+    from . import notes
+    notes.record(project, shot.id, f"{slot.label}: new variant {variant['n']}" + (f" (seed {recipe['seed']})" if recipe.get("seed") is not None else ""),
+                 {"shot": shot.id, "slot": slot.name, "key": key, "n": variant["n"]})
     return {"key": key, "shot": shot.id, "slot": slot.name, "variant": variant["n"], "seed": recipe.get("seed"),
             "mode": mode, "image": str(variants.file_of(project, key, variant)), "applied": applied, "note": why,
             "unchanged": seen}
@@ -226,6 +229,8 @@ def pick(project: Project, key: str, n: int, log: Log = print, push: bool = True
     pr = images.probe(project, board2.site, node2)
     if push:
         variants.push_history(project, key, n)
+        from . import notes
+        notes.record(project, shot.id, f"{slot.label}: went back to variant {n}", {"shot": shot.id, "slot": slot.name, "key": key, "n": n})
     return {"key": key, "variant": n, "wrote": sorted(changes), "restored_cache": restored,
             "in_cache": pr.state == "current", "note": "" if pr.state == "current" else
             "the cached render is gone and cannot be rebuilt from here: use Re-run"}

@@ -37,7 +37,9 @@ STAND_IN_SKETCH = ("artwork", "parallax", "vector")   # image scenes: at sketch 
 
 def storyboard(project: Project, level: str = "stills", only: Optional[Iterable[str]] = None, motion: bool = False,
                site_too: bool = True, log: Callable[[str], None] = print,
-               progress: Callable[[float, str], None] = lambda f, m="": None) -> dict:
+               progress: Callable[[float, str], None] = lambda f, m="": None, generate: bool = True) -> dict:
+    """generate=False cuts everything from what is already rendered (cached stills, rendered clips) and renders nothing
+    new: no ComfyUI, no Blender; an image not drawn yet is a placeholder card."""
     from ..compile.compiler import build_site
     from . import animatic, sheet, standin
     if level not in LEVELS:
@@ -51,7 +53,7 @@ def storyboard(project: Project, level: str = "stills", only: Optional[Iterable[
     log(f"storyboard {project.name}: {level}" + (f", only {', '.join(sorted(only_set))}" if only_set else ""))
     plan = plan_build(project)            # what the full build would still render: statuses and estimates
     progress(0.05, "frames")
-    mk = Maker(project, site, plan, level, prev, only_set, motion and level == "animatic", log)
+    mk = Maker(project, site, plan, level, prev, only_set, motion and level == "animatic" and generate, log, generate)
     cards = mk.cards()
     if only_set:
         known = {c.id for c in cards} | {c.section for c in cards}
@@ -86,14 +88,14 @@ def storyboard(project: Project, level: str = "stills", only: Optional[Iterable[
                 si = standin.section(project, sec, mine, level, log)
                 if si:
                     standins[sec.id] = si
-        with previewing(level):
+        with previewing(level if generate else "sketch"):
             site_index = build_site(project, log=lambda m: None, out=out / "site", options={"draft": True},
                                     standin=lambda s: standins.get(s.id), badge=f"Storyboard · {level}")
         log(f"  page: {site_index}" + (f" ({len(standins)} scene(s) standing in)" if standins else ""))
     anim = None
     if level == "animatic":
         progress(0.75, "animatic")
-        anim = animatic.build(project, site, cards, out / "animatic.mp4", log, progress)
+        anim = animatic.build(project, site, cards, out / "animatic.mp4", log, lambda f, m="": progress(0.75 + 0.15 * f, m))
     progress(0.9, "sheet")
     from .edit import approvals
     appr = approvals.summary(project)       # None until the project has used approvals in the edit workspace

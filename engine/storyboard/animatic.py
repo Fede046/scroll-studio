@@ -15,6 +15,21 @@ from .motion import Piece, render, timings
 FADE = 0.4
 
 
+def write_timeline(project: Project, out: Path, total: float, shots: list[dict]) -> None:
+    """animatic.timeline.json beside the mp4: where each shot sits in the cut, and what the spec and each shot looked like
+    when it was cut (the edit workspace marks the cut stale when they change). `cut_at` is when it was last checked."""
+    import time
+    sigs, rev = {}, None
+    try:
+        from .edit import shots as shots_mod, specdoc
+        board = shots_mod.build(project)
+        sigs, rev = {s.id: s.sig() for s in board.shots}, board.rev
+    except Exception:
+        pass
+    (out.parent / "animatic.timeline.json").write_text(json.dumps(
+        {"cut_at": time.time(), "duration": round(total, 3), "shots": shots, "sigs": sigs, "rev": rev}, indent=1), encoding="utf-8")
+
+
 def build(project: Project, site, cards: list[Card], out: Path, log: Callable[[str], None] = print,
           progress: Callable[[float, str], None] = lambda f, m="": None) -> Path:
     import cv2
@@ -82,14 +97,17 @@ def build(project: Project, site, cards: list[Card], out: Path, log: Callable[[s
             cache[name] = cv2.imread(str(tdir / name), cv2.IMREAD_UNCHANGED)
         return cache[name]
 
+    timeline = [{"id": c.id, "t0": round(starts[a], 3), "t1": round(starts[b] + pieces[b].seconds, 3)} for c, a, b in spans]
     key = {"p": [p.key() for p in pieces], "type": tdir.name, "size": [W, H], "v": 1}
     stamp = work / "animatic.json"
     if out.exists() and stamp.exists() and json.loads(stamp.read_text()).get("key") == _digest(key) and \
             json.loads(stamp.read_text()).get("out") == str(out):
         log("  animatic: up to date")
+        write_timeline(project, out, total, timeline)
         return out
     log(f"  animatic: {len(pieces) - 1} shot(s), {total:.1f}s")
     render(pieces, out, (W, H), fps=fps, fade=FADE, gop=None, crf=20, moves=True, overlay=overlay, log=log,
            progress=progress)
     stamp.write_text(json.dumps({"key": _digest(key), "out": str(out)}))
+    write_timeline(project, out, total, timeline)
     return out

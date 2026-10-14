@@ -411,3 +411,103 @@ def test_keyframe_identity_ignores_an_explicit_default_seed():
     c = {"keyframes": {"seed": 5, "frames": [{"name": "room", "t": 0, "prompt": "p", "seed": 6}]}}
     bk = {"w": 1}
     assert keyframe_ident(a, bk, "room") == keyframe_ident(b, bk, "room") != keyframe_ident(c, bk, "room")
+
+
+# ---------------------------------------------------------------- notes: the inbox an agent works through
+
+def test_notes_lifecycle_and_changes_attach_to_the_working_note(project):
+    from engine.storyboard.edit import notes
+    ws = Workspace(project)
+    n1 = ws.add_note("a", "warmer light, and slower")
+    g = ws.add_note("general", "tighten the pacing")
+    with pytest.raises(Exception):
+        ws.add_note("nope", "x")
+    with pytest.raises(Exception):
+        ws.add_note("a", "   ")
+    ws.set_fields("a", {"seconds": 5})                    # nobody is working on anything yet: nothing is attached
+    assert notes.get(project, n1["id"])["changes"] == []
+    data = ws.notes_for_agent(claim=True)                 # the agent picks both up
+    assert [n["status"] for n in data["notes"]] == ["working", "working"]
+    one = next(n for n in data["notes"] if n["id"] == n1["id"])
+    assert one["shot_state"]["fields"]["seconds"] == 5 and one["shot_state"]["images"][0]["slot"] == "still"
+    assert [s["id"] for s in next(n for n in data["notes"] if n["id"] == g["id"])["storyboard"]] == ["a", "b", "c"]
+    ws.set_fields("a", {"motion": "pans slowly"})         # edits to shot a attach to its note and to the general one
+    ws.set_fields("b", {"seconds": 6})                    # an edit to b only to the general note
+    assert notes.get(project, n1["id"])["changes"] == ["edited motion"]
+    assert notes.get(project, g["id"])["changes"] == ["edited motion", "edited seconds"]
+    done = notes.resolve(project, n1["id"], "slowed the move", ["kept the light"])
+    assert done["status"] == "done" and done["reply"] == "slowed the move" and done["changes"] == ["edited motion", "kept the light"]
+    assert ws.notes_for_agent(claim=False)["notes"] == []              # only the general one is left, and it is working
+    assert len(ws.notes_for_agent(claim=False, include_working=True)["notes"]) == 1
+    notes.reopen(project, n1["id"], "still too warm")
+    again = notes.get(project, n1["id"])
+    assert again["status"] == "open" and again["text"].endswith("+ still too warm")
+    ws.delete_note(n1["id"])
+    assert [n["id"] for n in notes.all_notes(project)] == [g["id"]]
+
+
+def test_notes_http_and_the_page_state(project):
+    from fastapi.testclient import TestClient
+    from engine.storyboard.edit.api import make_app
+    c = TestClient(make_app(project))
+    n = project.name
+    r = c.post(f"/api/sb/{n}/notes", json={"shot": "b", "text": "less grain"})
+    assert r.status_code == 200 and r.json()["note"]["status"] == "open"
+    assert c.post(f"/api/sb/{n}/notes", json={"shot": "zzz", "text": "x"}).status_code == 400
+    st = c.get(f"/api/sb/{n}/state").json()
+    assert [x["text"] for x in st["notes"]] == ["less grain"] and st["vrev"]
+    v0 = c.get(f"/api/sb/{n}/poll").json()["vrev"]
+    import time
+    time.sleep(0.02)
+    nid = r.json()["note"]["id"]
+    assert c.post(f"/api/sb/{n}/notes/delete", json={"id": nid}).status_code == 200
+    assert c.get(f"/api/sb/{n}/poll").json()["vrev"] != v0              # the page reloads when a note changes
+
+
+# ---------------------------------------------------------------- playing the whole thing
+
+def test_play_info_and_files(project):
+    import json as _json
+    import time
+    from fastapi.testclient import TestClient
+    from engine.storyboard.edit.api import make_app
+    ws = Workspace(project)
+    assert ws.play_info() == {"animatic": None, "standin": None, "dist": None, "rebuilding": False}
+    sb = project.root / "storyboard"
+    sb.mkdir(exist_ok=True)
+    (sb / "animatic.mp4").write_bytes(b"\x00" * 4096)
+    board = shots.build(project)
+    (sb / "animatic.timeline.json").write_text(_json.dumps({
+        "cut_at": time.time() + 1, "duration": 20.0, "shots": [{"id": "a", "t0": 0, "t1": 6}, {"id": "b", "t0": 5.6, "t1": 10}],
+        "sigs": {s.id: s.sig() for s in board.shots}, "rev": board.rev}))
+    a = ws.play_info()["animatic"]
+    assert a["stale"] is False and [s["id"] for s in a["shots"]] == ["a", "b"] and a["duration"] == 20.0
+    ws.set_fields("b", {"seconds": 7})                                   # a shot changes after the cut
+    a = ws.play_info()["animatic"]
+    assert a["stale"] and a["changed"] == ["b"] and "b" in a["reason"]
+    # the files are served, with ranges (a video seeks), and so is the built page
+    (project.dist).mkdir(exist_ok=True)
+    (project.dist / "index.html").write_text("<html>built</html>")
+    c = TestClient(make_app(project))
+    r = c.get(f"/sb/{project.name}/files/animatic.mp4", headers={"Range": "bytes=0-99"})
+    assert r.status_code == 206 and len(r.content) == 100
+    assert "built" in c.get(f"/sb/{project.name}/dist/index.html").text
+    assert c.get(f"/sb/{project.name}/dist/../site.yaml").status_code in (403, 404)
+    assert c.get(f"/api/sb/{project.name}/play").json()["dist"]["url"] == "dist/index.html"
+
+
+def test_storyboard_without_generation_renders_nothing(project, monkeypatch):
+    """generate=False: images that are not cached become placeholder cards and no render is attempted."""
+    from engine.plan import plan_build
+    from engine.storyboard.cards import Maker
+    from engine.backends import comfy
+
+    def boom(*a, **k):
+        raise AssertionError("a render was attempted")
+    monkeypatch.setattr(comfy, "alive", boom)
+    monkeypatch.setattr(comfy, "run", boom)
+    site = project.load()
+    mk = Maker(project, site, plan_build(project), "animatic", {}, None, False, lambda m: None, generate=False)
+    cards = mk.cards()
+    beat = next(c for c in cards if c.id == "c")
+    assert [f.level for f in beat.frames] == ["placeholder", "final"]       # its own still is a card; the end image is a file

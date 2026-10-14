@@ -3,7 +3,8 @@
   studio new my-site [--example lodestar-orbital]   create projects/my-site (from an example or a starter)
   studio build my-site [--only hero,door] [--force] [--draft] [--yes] [--plan]
   studio storyboard my-site [--level sketch|stills|animatic] [--only id,id] [--motion] [--open]
-  studio storyboard my-site --edit [--port 8971]    edit every shot in the browser: captions, prompts, seeds, regenerate one image
+  studio storyboard my-site --edit [--port 8971]    edit every shot in the browser: notes, captions, regenerate one image, play it
+  studio storyboard my-site --notes                 the open notes written there, with each shot's current values
   studio preview my-site [--port 5173]
   studio record my-site [--section hero] [--seconds 12] [--gif]
   studio trailer my-site [--format 9x16] [--plan]      launch trailer from the site's renders -> dist/trailer/
@@ -115,11 +116,40 @@ def storyboard(name: str, level: str = typer.Option("stills", help="sketch (no C
                                                                "site.yaml), regenerate one image at a time, keep every "
                                                                "variant, lock and approve shots"),
                port: Optional[int] = typer.Option(None, help="--edit: port (default: the first free one of 8971-8979)"),
-               browser: bool = typer.Option(True, "--browser/--no-browser", help="--edit: open the browser")):
+               browser: bool = typer.Option(True, "--browser/--no-browser", help="--edit: open the browser"),
+               notes: bool = typer.Option(False, "--notes", help="Print the open notes written in the editor, each with "
+                                                                 "its shot's current values and image paths (for an "
+                                                                 "agent without MCP), and stop"),
+               all_notes: bool = typer.Option(False, "--all", help="--notes: include working and done notes")):
     """Storyboard the site before the full render: <project>/storyboard/ (the page with stills standing in for films,
     storyboard.html + sheet.jpg with a card per shot and the render estimate, animatic.mp4). With --edit: the same
     shots as an editing workspace on a local server."""
     from .project import Project
+    if notes:
+        from .storyboard.edit.workspace import Workspace
+        ws = Workspace(Project(resolve(name)))
+        data = ws.notes_for_agent(claim=False, include_working=all_notes, include_done=all_notes)
+        if not data["notes"]:
+            typer.echo("no open notes")
+        for n in data["notes"]:
+            typer.echo(f"{n['id']} [{n['shot']}] {n['status']} {n['time']}: {n['text']}")
+            if n.get("reply"):
+                typer.echo(f"    reply: {n['reply']}")
+            ss = n.get("shot_state")
+            if ss:
+                typer.echo(f"    shot {ss['id']} ({ss['kind']}){' LOCKED' if ss['locked'] else ''}: " +
+                           "; ".join(f"{k}={str(v)[:90]!r}" for k, v in ss["fields"].items() if v not in (None, "")))
+                for im in ss["images"]:
+                    typer.echo(f"    image {im['slot']} ({im['state']}): {im['image']}")
+                    for st in im["steps"]:
+                        typer.echo(f"      step {st['kind']}{' (shared)' if st['shared'] else ''}: " +
+                                   "; ".join(f"{k}={str(v)[:70]!r}" for k, v in st["fields"].items()))
+            for b in n.get("storyboard") or []:
+                typer.echo(f"    shot {b['id']} ({b['kind']}, {b['seconds'] or '-'} s): {b['caption'] or b['title']}")
+        if data["notes"]:
+            typer.echo("\nact with the MCP tools (set_shot_field, regenerate_shot_image, resolve_note) or edit site.yaml; "
+                       "see the scroll-site skill")
+        return
     if edit:
         from .storyboard.edit.api import serve
         serve(Project(resolve(name)), port=port, open_browser=browser, log=typer.echo)

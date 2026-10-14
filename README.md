@@ -258,9 +258,21 @@ longer than that many minutes (`--yes` skips the question; without a terminal it
 ### Edit it, one image at a time
 
 `studio storyboard my-site --edit [--port 8971]` opens the storyboard as an editing workspace (a local server; the same
-page is `/sb/<project>` in `studio ui`). One card per shot, with every field editable in place and a button per image:
+page is `/sb/<project>` in `studio ui`). Three tabs: **Shots**, **Notes** and **Play**. A card shows what you judge by:
+the image or images with their variants, the caption, a *What should change?* box, Regenerate / Re-run / Revert and
+Lock / Approve. The exact prompts, edit instructions, motion, seeds and strengths are behind **Advanced** on each card
+(and the shared steps behind their own fold), closed until you open them; each browser remembers what it opened.
 
-- **Edit any field.** Caption, prompt, motion, seconds, seed, trim, strength, a take's keyframe prompts and motion
+- **Say what should change.** Type a note in plain words on a card ("warmer light", "she should look older", "less
+  grain"), or on the **Notes** tab for the whole storyboard (pacing, tone, copy, order, anything). Notes are an inbox
+  in `<project>/storyboard/notes.json`; the page only collects them and shows each one's status (waiting for Claude,
+  Claude is on it, done), Claude's reply, and what it led to (the fields edited, the variants added). An agent does the
+  interpreting: the MCP tool `storyboard_notes` lists the open notes with each shot's current values and image paths
+  (`studio storyboard my-site --notes` prints the same for an agent without MCP); it acts with `set_shot_field`,
+  `regenerate_shot_image`, `pick_shot_variant` or by editing `site.yaml`, looks at the result, and calls `resolve_note`
+  with a short reply. The page refreshes by itself when the spec, a variant or a note changes, wherever the change came
+  from, and **Not quite** sends a note back with a follow-up.
+- **Edit any field** (under Advanced). Caption, prompt, motion, seconds, seed, trim, strength, a take's keyframe prompts and motion
   segments, an edit's instruction, a product still's scene and view. Save writes the change into `site.yaml` *in
   place*: only the edited text changes, so comments, column alignment, quoting and line endings stay as you wrote them
   (a change a text splice cannot make, such as switching a source, falls back to ruamel's round-trip dump with the
@@ -285,8 +297,16 @@ page is `/sb/<project>` in `studio ui`). One card per shot, with every field edi
 - **Safe beside other editors.** If `site.yaml` changes on disk while the page is open (you, an agent, git), the page
   notices, reloads the values and says which; a save whose fields changed under it is refused instead of overwriting.
 
-Agents drive the same loop through the MCP tools `storyboard_shots`, `set_shot_field`, `regenerate_shot_image` (returns
-the new image's path), `pick_shot_variant` and `approve_shot`. *Update sheet* in the page rebuilds `sheet.jpg` and the stand-in
+- **Play the whole thing.** The **Play** tab plays `animatic.mp4` (every shot at its length, with the page's captions)
+  with a timeline of shot markers: click one to jump to that shot; the shot on screen is named and its card is
+  highlighted. *Rebuild animatic* cuts it again as a background job from the stills and clips that exist now (it
+  renders nothing new: no ComfyUI, no Blender; an image not drawn yet is a placeholder card) and the player says when
+  the cut is out of date and which shots changed since. The stand-in page (stills scrolling like the real one) and, once
+  `studio build` has run, the real built page play in a frame with an auto-scroll that runs top to bottom (speed, pause,
+  scrub; it waits out the page's loader).
+
+Agents drive the same loop through the MCP tools `storyboard_notes`, `resolve_note`, `storyboard_shots`,
+`set_shot_field`, `regenerate_shot_image` (returns the new image's path), `pick_shot_variant` and `approve_shot`. *Update sheet* in the page rebuilds `sheet.jpg` and the stand-in
 page from the edited spec and what is rendered so far (a sketch-level storyboard: no ComfyUI, images not drawn yet show as
 cards); `studio storyboard my-site` does the same at stills or animatic level.
 

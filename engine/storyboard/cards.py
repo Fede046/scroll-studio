@@ -132,7 +132,10 @@ class Maker:
     """Builds the cards of one storyboard run."""
 
     def __init__(self, project: Project, site: Site, plan: Plan, level: str, prev: dict, only: Optional[set],
-                 motion: bool, log: Callable[[str], None]):
+                 motion: bool, log: Callable[[str], None], generate: bool = True):
+        # generate=False: nothing is rendered for the cards (no ComfyUI, no Blender): what is cached is shown, what is
+        # not becomes a placeholder card. The edit workspace's "Rebuild animatic" cuts from what exists this way.
+        self.nogen = not generate
         self.project, self.site, self.plan, self.level = project, site, plan, level
         self.prev, self.only, self.motion, self.log = prev, only, motion, log
         self.cache = project.build / "_storyboard"
@@ -161,6 +164,10 @@ class Maker:
                 return resolve_image(self.project, ref, self.quiet, alpha=alpha), "final"
         except WouldRender:
             pass
+        if self.nogen:
+            from ..fidelity import placeholder
+            size = tuple(ref.size) if not isinstance(ref, str) else (1280, 720)
+            return placeholder(self.cache / "placeholders", describe(ref), size), "placeholder"
         lvl = "sketch" if cache_only or self.level == "sketch" else "stills"
         try:
             with previewing(lvl):
@@ -317,7 +324,7 @@ class Maker:
         if not ((c.locked or not self.selected(c.id, sec.id)) and self.reuse(c)):
             ctx = BuildContext(self.project, sec.id, log=self.log, locked=c.locked,
                                options={"site_video_model": self.site.video_model})
-            sketch = self.level == "sketch" or not self.selected(c.id, sec.id)
+            sketch = self.level == "sketch" or not self.selected(c.id, sec.id) or self.nogen
             if sketch:
                 shot, bkey, legacy = film.blockout_key(sec, ctx)
                 bdir = ctx.work / "blockout"
@@ -343,6 +350,10 @@ class Maker:
             frames = []
             if world_ok:
                 at = lambda t: ctx.work / "blockout" / "frames" / f"{min(n, 1 + int(round(t * fps))):04d}.png"
+            elif self.nogen:
+                from ..fidelity import placeholder
+                at = lambda t: placeholder(self.cache / "placeholders", f"{sec.id} at {t:g}s: {prompt}", (1280, 720),
+                                           "blockout not rendered yet")
             else:
                 try:
                     at = self.world_stills(sec, ctx, times)
@@ -357,7 +368,7 @@ class Maker:
                 else:
                     p = at(t)
                     frames.append(Frame(p, f"blockout @{t:g}s", "placeholder" if "placeholder" in p.name else "sketch", t))
-            if take and take.product:
+            if take and take.product and not self.nogen:
                 frames = self.with_product(sec, ctx, frames, n, fps)
             c.frames = frames
         if keys:
@@ -467,6 +478,8 @@ class Maker:
         if c.rendered and d.exists():
             picks = [1, max(1, sec.frames // 2), sec.frames]
             c.frames = [Frame(d / f"{i:04d}.png", f"frame {i}", "final", 0) for i in picks if (d / f"{i:04d}.png").exists()]
+        elif self.nogen:
+            self.reuse(c)
         elif not ((c.locked or not self.selected(c.id, sec.id)) and self.reuse(c)):
             p = None if sec.model in (None, "product") else Product(name=sec.id, model=sec.model)
             lvl = "sketch" if self.level == "sketch" or not self.selected(c.id, sec.id) else "stills"
@@ -487,7 +500,9 @@ class Maker:
                  caption=" / ".join(plain(st.title) for st in sec.steps), scroll=sec.length, locked=sec.locked,
                  fingerprint=_digest(sec.model_dump(mode="json", include={"model", "keys", "lighting", "background"})))
         self.estimate_section(c)
-        if not ((c.locked or not self.selected(c.id, sec.id)) and self.reuse(c)):
+        if self.nogen:
+            self.reuse(c)
+        elif not ((c.locked or not self.selected(c.id, sec.id)) and self.reuse(c)):
             lvl = "sketch" if self.level == "sketch" else "stills"
             with previewing(lvl):
                 path = prod.product_still(self.project, None, "three-quarter", (960, 600), "transparent", self.log,

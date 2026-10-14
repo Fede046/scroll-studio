@@ -153,7 +153,15 @@ UI (React) ◄─► engine server (FastAPI + job queue + websocket events) ◄�
   the spec describes, never stored), and picking one writes the recipe back and restores the cache entry (a
   keyframe's file and `_frames.json` digest, then `BuildContext.adopt`). `workspace.py` runs image jobs on the server's
   `JobQueue` (one per image: a lock file in the variants folder) and shares ComfyUI with other sessions without ever
-  stopping or interrupting it. Approvals live in `storyboard/state.json`, outside the spec.
+  stopping or interrupting it. Approvals live in `storyboard/state.json`, outside the spec. `notes.py` is the inbox of
+  plain-language notes (`storyboard/notes.json`); the page only collects them, an agent interprets them through the MCP
+  tools `storyboard_notes` / `resolve_note` (or `--notes`), and `render.py` / `workspace.py` attach the edits and variants
+  made while a note is `working` to it. The poll endpoint carries a `vrev` (variants, notes, approvals) next to the spec's
+  revision, so a page follows changes made by another process, and shows renders another process holds a lock for. The
+  Play tab serves `storyboard/animatic.mp4` (with its `animatic.timeline.json`: shot spans, the shots' signatures and
+  the spec revision at the cut, which is what "stale" compares), the stand-in page and `dist/`; `Workspace.animatic()` is
+  `storyboard(level="animatic", generate=False)`, where `Maker(generate=False)` shows cached images and placeholder
+  cards and renders nothing.
 - **Launch trailers** (`engine/trailer/`, `studio trailer`): a second output from the same spec and the same cache.
   `plan.py` cuts shots from what the builders already rendered (takes, beats, scroll recordings, product stills) onto
   a beat grid; `frame.py` reframes each for 16:9 and 9:16 (the take's product projected through its camera by

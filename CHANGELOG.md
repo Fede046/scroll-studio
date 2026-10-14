@@ -23,6 +23,18 @@ Everything so far is version 1. On 2026-10-12 the releases first published as 2.
   the top (an edit there reaches every shot using it). Lock (`locked: true`), Approve (`storyboard/state.json`, shown
   on the sheet and by `build --plan`), one job per image, and a page that notices `site.yaml` changing on disk.
   MCP: `storyboard_shots`, `set_shot_field`, `regenerate_shot_image`, `pick_shot_variant`, `approve_shot`.
+- The storyboard editor takes notes instead of instructions: each card has a *What should change?* box and a **Notes**
+  tab takes general notes (pacing, tone, copy, order), saved as an inbox in `storyboard/notes.json` with status (open,
+  working, done), the agent's reply and what the note led to. Claude reads them through the MCP tools `storyboard_notes`
+  (each open note with its shot's current spec values and image paths) and `resolve_note`, or from
+  `studio storyboard <project> --notes`; edits and renders made while a note is being worked on are attached to it, and
+  the page refreshes when the spec, a variant or a note changes in another process. The exact prompts, instructions,
+  motion and seeds are behind an **Advanced** fold per card (closed by default, remembered per browser), and the shared
+  steps fold the same way.
+- A **Play** tab plays the whole storyboard in the editor: `animatic.mp4` with shot markers on the timeline (click to
+  jump, the playing shot and its card highlighted), *Rebuild animatic* (a job that re-cuts from what is rendered, with
+  `storyboard(generate=False)`: no ComfyUI, no Blender; marks the cut stale when shots change), and the stand-in page and
+  the built page in a frame with an auto-scroll. `animatic.timeline.json` records where each shot sits in the cut.
 - A take's keyframe may set its own `seed` (default: the keyframes' shared seed, so nothing existing re-renders).
 - `inputs.generated_path` / `inputs.edit_path` (the cache digests of generated and edited images, unchanged) and
   `BuildContext.adopt` (record that outputs on disk are what a stage key makes).

@@ -13,6 +13,7 @@ mounted in `studio ui`'s server too.
 """
 from __future__ import annotations
 
+import mimetypes
 import socket
 import threading
 import webbrowser
@@ -28,16 +29,15 @@ from ...server.jobs import JobQueue
 from . import images, specdoc, variants
 from .workspace import Workspace
 
+# Windows can map .js to text/plain from the registry, which stops module scripts of the pages played in the editor
+for _ext, _typ in ((".js", "text/javascript"), (".mjs", "text/javascript"), (".css", "text/css"), (".webp", "image/webp"),
+                   (".glb", "model/gltf-binary"), (".json", "application/json"), (".mp4", "video/mp4"),
+                   (".woff2", "font/woff2")):
+    mimetypes.add_type(_typ, _ext)
+
 PAGE = Path(__file__).with_name("page.html")
 PORTS = range(8971, 8980)
 IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp"}
-
-
-class Edit(BaseModel):
-    path: str
-    value: object = None
-    old: object = None
-    has_old: bool = True
 
 
 class SaveReq(BaseModel):
@@ -68,6 +68,16 @@ class PickReq(BaseModel):
 
 class KeyReq(BaseModel):
     key: str
+
+
+class NoteReq(BaseModel):
+    shot: str = "general"
+    text: str
+
+
+class NoteIdReq(BaseModel):
+    id: str
+    more: str = ""
 
 
 def make_router(resolve: Callable[[str], Project], jobs: JobQueue) -> APIRouter:
@@ -136,6 +146,26 @@ def make_router(resolve: Callable[[str], Project], jobs: JobQueue) -> APIRouter:
     def revert(name: str, req: KeyReq):
         return guarded(lambda: {"ok": True, **ws(name).revert(req.key)})
 
+    @r.post("/api/sb/{name}/notes")
+    def add_note(name: str, req: NoteReq):
+        return guarded(lambda: {"ok": True, "note": ws(name).add_note(req.shot, req.text)})
+
+    @r.post("/api/sb/{name}/notes/reopen")
+    def reopen_note(name: str, req: NoteIdReq):
+        return guarded(lambda: {"ok": True, "note": ws(name).reopen_note(req.id, req.more)})
+
+    @r.post("/api/sb/{name}/notes/delete")
+    def delete_note(name: str, req: NoteIdReq):
+        return guarded(lambda: (ws(name).delete_note(req.id), {"ok": True})[1])
+
+    @r.post("/api/sb/{name}/animatic")
+    def animatic(name: str):
+        return guarded(lambda: {"ok": True, "job": ws(name).animatic().public(tail=3)})
+
+    @r.get("/api/sb/{name}/play")
+    def play(name: str):
+        return guarded(lambda: ws(name).play_info())
+
     @r.post("/api/sb/{name}/sheet")
     def sheet(name: str):
         return guarded(lambda: {"ok": True, "job": ws(name).sheet().public(tail=3)})
@@ -163,6 +193,20 @@ def make_router(resolve: Callable[[str], Project], jobs: JobQueue) -> APIRouter:
             f = f / "index.html"
         if not f.is_file():
             raise HTTPException(404, "not made yet: use Update sheet")
+        return FileResponse(f, headers={"Cache-Control": "no-store"})
+
+    @r.get("/sb/{name}/dist/{path:path}")
+    def dist(name: str, path: str):
+        """The built page (dist/), so the editor can play it in a frame."""
+        project = resolve(name)
+        base = project.dist.resolve()
+        f = (base / (path or "index.html")).resolve()
+        if base not in f.parents and f != base:
+            raise HTTPException(403)
+        if f.is_dir():
+            f = f / "index.html"
+        if not f.is_file():
+            raise HTTPException(404, "not built yet: run studio build")
         return FileResponse(f, headers={"Cache-Control": "no-store"})
 
     return r

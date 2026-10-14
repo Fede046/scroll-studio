@@ -12,6 +12,7 @@ interrupts it, and an image's job is the only thing this module ever queues for 
 from __future__ import annotations
 
 import contextlib
+import json
 import math
 import sys
 import threading
@@ -21,7 +22,7 @@ from typing import Any, Optional
 
 from ...project import BuildError, Project
 from ...server.jobs import Job, JobQueue, logger
-from . import approvals, images, render, shots, specdoc, variants
+from . import approvals, images, notes, render, shots, specdoc, variants
 from .shots import Board, Fld, Node, Shot, Slot
 
 PAGE_LEVEL = "sketch"      # the sheet is rebuilt from what is cached: renders happen per image, on their own buttons
@@ -79,6 +80,7 @@ class Workspace:
         self.active: dict[str, Job] = {}
         self.last: dict[str, dict] = {}
         self._lock = threading.RLock()
+        self._busy_cache: set = set()
         self._comfy: tuple[float, bool] = (0.0, False)
 
     # ------------------------------------------------------------ reading
@@ -131,9 +133,38 @@ class Workspace:
         """Cheap: what changed since the page last looked (the spec's revision, running jobs, ComfyUI)."""
         jobs = {k: self.job_json(k) for k in list(self.active)}
         rev = specdoc.current_rev(self.project)
-        return {"rev": rev, "own": rev in specdoc.WRITTEN, "jobs": jobs, "comfy": self.comfy_alive(),
+        for key in self.busy_elsewhere():
+            jobs.setdefault(key, {"status": "running", "progress": 0.1, "message": "being rendered by another session "
+                                  "(an agent or a second editor)", "external": True, "log": []})
+        return {"rev": rev, "vrev": self.vrev(), "own": rev in specdoc.WRITTEN, "jobs": jobs, "comfy": self.comfy_alive(),
                 "last": {k: v for k, v in self.last.items() if k not in self.active and time.time() - v.get("finished", 0) < 900},
                 "undo": bool(specdoc.can_undo(self.project))}
+
+    def vrev(self) -> str:
+        """Changes when a variant is added or picked, a note is written or an approval is made, by anyone (another
+        process included): the page then reloads its cards."""
+        vs = self.project.root / "storyboard" / "variants"
+        m = 0.0
+        try:
+            for f in vs.glob("*/*/index.json"):
+                m = max(m, f.stat().st_mtime)
+        except OSError:
+            pass
+        sp = approvals.path(self.project)
+        m = max(m, notes.mtime(self.project), sp.stat().st_mtime if sp.exists() else 0.0)
+        return f"{m:.3f}"
+
+    def busy_elsewhere(self) -> list[str]:
+        out = []
+        vs = self.project.root / "storyboard" / "variants"
+        try:
+            for f in vs.glob("*/*/.busy"):
+                key = f.parent.relative_to(vs).as_posix()
+                if key not in self.active and variants.busy(self.project, key):
+                    out.append(key)
+        except OSError:
+            pass
+        return out
 
     def _img(self, p: Path) -> dict:
         try:
@@ -168,6 +199,8 @@ class Workspace:
                        "current": bool(pr.cache) and v.get("cache") == pr.cache, **self._img(f),
                        "recipe": {k: val for k, val in (v.get("recipe") or {}).items() if k != "seed"}})
         job = self.job_json(node.key)
+        if job is None and node.key in self._busy_cache:
+            job = {"status": "running", "progress": 0.1, "message": "being rendered by another session", "external": True}
         return {"key": node.key, "kind": node.kind, "label": node.label, "depth": node.depth, "summary": node.summary,
                 "shared": node.shared, "used_by": node.used_by, "regen": node.regen and node.kind != "file",
                 "render": regenerable, "image": img, "variants": vs,
@@ -179,6 +212,7 @@ class Workspace:
         project = self.project
         board = shots.build(project)
         ap = approvals.status(project, board)
+        self._busy_cache = set(self.busy_elsewhere())
         probes: dict = {}
         out_shots = []
         for s in board.shots:
@@ -198,6 +232,8 @@ class Workspace:
         return {"project": project.name, "name": board.site.name, "rev": board.rev, "shots": out_shots, "shared": shared,
                 "approved": approved, "total": len(ap), "comfy": self.comfy_alive(),
                 "undo": bool(specdoc.can_undo(project)), "has_sheet": (sb / "storyboard.html").exists(),
+                "notes": list(reversed(notes.all_notes(project))), "vrev": self.vrev(),
+                "play": self.play_info(board),
                 "has_page": (sb / "site" / "index.html").exists(), "time": time.time()}
 
     # ------------------------------------------------------------ editing
@@ -206,11 +242,12 @@ class Workspace:
         for s in board.shots:
             for f in s.all_fields():
                 for p in f.paths:
-                    allowed[specdoc.dotted(p)] = f
+                    allowed[specdoc.dotted(p)] = (s.id, f)
         ops, expect, changed, errors = [], {}, [], []
+        self._touched = {}
         for e in edits:
             ds = e.get("path") or ""
-            f = allowed.get(ds)
+            sid, f = allowed.get(ds, (None, None))
             if f is None:
                 errors.append({"loc": ds, "msg": "not an editable field of this spec (it changed? reload the page)"})
                 continue
@@ -232,6 +269,8 @@ class Workspace:
                     if expect[p] is specdoc.MISSING:
                         expect[p] = None
                 changed.append(specdoc.dotted(p))
+            if f.paths and any(specdoc.dotted(p) in changed for p in f.paths):
+                self._touched.setdefault(sid, []).append(f.label)
         return ops, expect, changed, errors
 
     def save(self, edits: list[dict], base_rev: Optional[str] = None, label: str = "edit") -> dict:
@@ -244,6 +283,8 @@ class Workspace:
             if not ops:
                 return {"ok": True, "changed": [], "rev": board.rev}
             res = specdoc.save(self.project, ops, expect=expect or None, label=label)
+            for sid, labels in self._touched.items():
+                notes.record(self.project, sid, "edited " + ", ".join(dict.fromkeys(labels)))
             return {"ok": True, "changed": changed, "rev": res["rev"]}
 
     def set_fields(self, shot_id: str, values: dict[str, Any], label: str = "edit") -> dict:
@@ -270,6 +311,7 @@ class Workspace:
                 ops = board.lock_ops(s, lock)
                 if ops:
                     r2 = specdoc.save(self.project, ops, label=f"{'lock' if lock else 'unlock'} {shot_id}")
+                    notes.record(self.project, shot_id, "locked" if lock else "unlocked")
                     res = {"ok": True, "changed": res["changed"] + [specdoc.dotted(o.path) for o in ops], "rev": r2["rev"]}
         return res
 
@@ -405,3 +447,142 @@ class Workspace:
             self.active[key] = job
             self.last.pop(key, None)
             return job
+
+    # ------------------------------------------------------------ notes
+    def add_note(self, shot: str, text: str) -> dict:
+        board = shots.build(self.project)
+        if shot != notes.GENERAL and board.shot(shot) is None:
+            raise BuildError(f"no shot '{shot}'")
+        return notes.add(self.project, shot, text)
+
+    def reopen_note(self, nid: str, more: str = "") -> dict:
+        return notes.reopen(self.project, nid, more)
+
+    def delete_note(self, nid: str) -> None:
+        notes.delete(self.project, nid)
+
+    # ------------------------------------------------------------ playing the whole thing
+    def play_info(self, board: Optional[Board] = None) -> dict:
+        """What there is to play: the animatic (with its shot markers and whether it is out of date), the stand-in page of
+        stills, the real built page. Paths are relative to /sb/<project>/."""
+        project = self.project
+        sb = project.root / "storyboard"
+        mp4 = sb / "animatic.mp4"
+        spec_m = project.spec_path.stat().st_mtime if project.spec_path.exists() else 0.0
+        out: dict = {"animatic": None, "standin": None, "dist": None}
+        if mp4.exists():
+            tl = {}
+            try:
+                tl = json.loads((sb / "animatic.timeline.json").read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                pass
+            a = {"url": "files/animatic.mp4", "v": int(mp4.stat().st_mtime), "duration": tl.get("duration"),
+                 "shots": tl.get("shots") or [], "cut_at": tl.get("cut_at") or mp4.stat().st_mtime, "changed": [],
+                 "stale": False, "reason": ""}
+            try:
+                board = board or shots.build(project)
+            except specdoc.SpecError:
+                board = None
+            if board is not None:
+                sigs = tl.get("sigs") or {}
+                vs = sb / "variants"
+                for s in board.shots:
+                    newer = False       # a render made since the cut (not the original image being kept as variant 1)
+                    for f in (vs / s.id).glob("*/index.json") if (vs / s.id).exists() else []:
+                        if f.stat().st_mtime <= a["cut_at"] + 1:
+                            continue
+                        try:
+                            for v in json.loads(f.read_text(encoding="utf-8")).get("variants", []):
+                                if v.get("origin") != "original" and time.mktime(time.strptime(v["time"], "%Y-%m-%d %H:%M:%S")) > a["cut_at"] - 1:
+                                    newer = True
+                        except (OSError, ValueError, KeyError):
+                            pass
+                    if sigs and (sigs.get(s.id) != s.sig() or newer):
+                        a["changed"].append(s.id)
+                    elif not sigs and newer:
+                        a["changed"].append(s.id)
+                gone = [i for i in sigs if board.shot(i) is None]
+                a["changed"] += gone
+                if a["changed"]:
+                    a["stale"], a["reason"] = True, "changed since it was cut: " + ", ".join(a["changed"][:8])
+                elif tl.get("rev") and tl["rev"] != board.rev:
+                    a["stale"], a["reason"] = True, "site.yaml changed since it was cut"
+                elif not tl and spec_m > mp4.stat().st_mtime:
+                    a["stale"], a["reason"] = True, "site.yaml changed since it was cut"
+                if not a["shots"]:
+                    a["reason"] = (a["reason"] + "; " if a["reason"] else "") + "rebuild it once to get the shot markers"
+            out["animatic"] = a
+        si = sb / "site" / "index.html"
+        if si.exists():
+            out["standin"] = {"url": "files/site/index.html", "stale": spec_m > si.stat().st_mtime}
+        if (project.dist / "index.html").exists():
+            out["dist"] = {"url": "dist/index.html", "built": time.strftime("%Y-%m-%d %H:%M", time.localtime((project.dist / "index.html").stat().st_mtime))}
+        out["rebuilding"] = "__animatic__" in self.active
+        return out
+
+    def animatic(self) -> Job:
+        """Cut the animatic again from what is rendered now (stills, clips): a storyboard at animatic level that renders
+        nothing new (no ComfyUI, no Blender product pass). Also refreshes the sheet and the stand-in page."""
+        if self.jobs is None:
+            raise BuildError("this workspace has no job queue")
+        key = "__animatic__"
+        with self._lock:
+            if key in self.active:
+                raise variants.Busy("the animatic is already being rebuilt")
+
+            def run(job: Job):
+                from .. import storyboard as run_sb
+                log, progress = logger(job)
+                try:
+                    with contextlib.redirect_stdout(_ToLog(log)):
+                        res = run_sb(self.project, level="animatic", log=log, progress=progress, generate=False)
+                    self.last[key] = {"status": "done", "message": f"animatic cut: {res['shots']} shots", "finished": time.time()}
+                    return {k: res[k] for k in ("sheet", "animatic", "shots")}
+                except Exception as e:
+                    self.last[key] = {"status": "failed", "error": str(e).splitlines()[0][:300] if str(e) else type(e).__name__,
+                                      "finished": time.time()}
+                    raise
+                finally:
+                    self.active.pop(key, None)
+            job = self.jobs.submit("animatic", self.project.name, "Rebuild the animatic", run)
+            self.active[key] = job
+            self.last.pop(key, None)
+            return job
+
+    # ------------------------------------------------------------ what an agent sees of a note
+    def shot_summary(self, st: dict, shot_id: str) -> Optional[dict]:
+        """A shot as an agent needs it to interpret a note: current field values, its images (path, state, seeds, steps)
+        and the variants kept for each. `st` is state()."""
+        s = next((x for x in st["shots"] if x["id"] == shot_id), None)
+        if s is None:
+            return None
+        root = self.project.root
+        return {"id": s["id"], "kind": s["kind"], "title": s["title"], "locked": s["locked"], "approval": s["approval"],
+                "fields": {f["name"]: f["value"] for f in s["fields"]},
+                "images": [{"slot": sl["name"], "label": sl["label"], "state": sl["nodes"][0]["image"]["state"],
+                            "image": str(root / sl["nodes"][0]["image"]["p"]) if sl["nodes"][0]["image"].get("p") else None,
+                            "variants": [{"n": v["n"], "seed": v["seed"], "current": v["current"]} for v in sl["nodes"][0]["variants"]],
+                            "steps": [{"kind": n["kind"], "shared": n["shared"], "summary": n["summary"][:140],
+                                       "fields": {f["name"]: f["value"] for f in n["fields"]}} for n in sl["nodes"]]}
+                           for sl in s["slots"]]}
+
+    def notes_for_agent(self, claim: bool = True, include_working: bool = False, include_done: bool = False) -> dict:
+        """The notes an agent should act on, each with its shot's current spec values and image paths; a general note comes
+        with the list of all shots. `claim` marks the open ones as working (the page shows that)."""
+        todo = [n for n in notes.all_notes(self.project)
+                if n["status"] == "open" or (include_working and n["status"] == "working") or (include_done and n["status"] == "done")]
+        if claim:
+            notes.claim(self.project, [n["id"] for n in todo if n["status"] == "open"])
+            todo = [notes.get(self.project, n["id"]) for n in todo]
+        st = self.state() if todo else None
+        out = []
+        for n in todo:
+            item = dict(n)
+            if st and n["shot"] != notes.GENERAL:
+                item["shot_state"] = self.shot_summary(st, n["shot"])
+            elif st:
+                item["storyboard"] = [{"id": s["id"], "kind": s["kind"], "title": s["title"], "locked": s["locked"],
+                                       "caption": next((f["value"] for f in s["fields"] if f["name"] == "caption"), None),
+                                       "seconds": s["seconds"]} for s in st["shots"]]
+            out.append(item)
+        return {"project": self.project.name, "notes": out}
