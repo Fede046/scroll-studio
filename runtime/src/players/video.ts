@@ -4,6 +4,14 @@ import type { PlayerFactory } from "../lib/types";
 import { fetchBlobURL, follow, isMobile } from "../lib/util";
 
 const factory: PlayerFactory = async (cfg, ctx) => {
+  // reveal: the film drawn through a shader that brings colour into tracked regions (engine/reveal.py); without WebGL2
+  // (or if anything about it fails) the colour film plays as it is, below
+  if (cfg.reveal) {
+    try {
+      const player = await (await import("./reveal")).default(cfg, ctx);
+      if (player) return player;
+    } catch (err) { console.warn("[scroll-studio] reveal failed, playing the colour film", err); }
+  }
   const video = document.createElement("video");
   video.muted = true;
   video.playsInline = true;
