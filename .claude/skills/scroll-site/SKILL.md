@@ -64,6 +64,20 @@ the real first frames (same stages and caches), so approving them is not wasted 
    edits never re-render them.
 5. `build(project, plan_only=True)` shows what will render and how long; tell the user before a long render.
 
+### Colour that follows the camera, and faces
+
+- A film that should come into colour where the camera looks (a black-and-white crowd with one couple in colour, a product
+  that colours in as you scroll): render the film in **full colour**, then add `reveal:` (`base: mono`, `regions` with a
+  `prompt` and an `at: {beat, t}` frame where the thing is plainly in view, `keys` mapping the section's scroll progress to
+  0-1 per region). Never ask the video model to colour only part of the picture: it colours the rest and moves things.
+- A region shows only in shots where it has an `at` (a cut ends its track): one `at` per shot it must be seen in.
+- A prompt matching several things (both hands) reveals all of them: narrow it with `pick: left`, `within: "the woman"`, an
+  "X's Y" prompt, or `points: [[x, y]]` (0-1 on the `at` frame). Look at `.build/<section>/reveal/<id>/ground.jpg`.
+- Edit `keys`, `feather` and `base` freely: they re-pack in seconds and re-track nothing. `studio storyboard` shows each shot
+  with the reveal applied (base look; real colour once a build made the masks).
+- `faces: restore` (a beat or the film) repairs faces in generated video; off by default, ~0.7 s per 1080p frame. Needs
+  `studio setup-comfy` once (and a ComfyUI restart); `studio doctor` checks it.
+
 ## 4. Build, look, fix
 1. `build(project, draft=True)` (or `only=[ids]` for a few shots) then `wait_for_job`. Read the log on failure: it names the stage and the cause.
 2. `snapshot(project)`, then read the sheet image. Check: text legible over the visual, the subject framed

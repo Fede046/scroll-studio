@@ -69,6 +69,10 @@ tiktoken (`cl100k_base`) on the files in this repo; other tokenizers differ by r
 
 ### New in 1.3
 
+- **Colour that follows the camera** (`reveal:` on a film section): render the film once in full colour; the page shows
+  it black and white (or dimmed, blurred, tinted) and brings colour into tracked regions as you scroll.
+  ([Colour that follows the camera](#colour-that-follows-the-camera-reveal))
+- **Face repair** for generated video (`faces: restore`, GFPGAN v1.4).
 - **Five styles from classic animation.** `zoetrope`: the landing page is one wheel of cards you spin, land on and
   open to read. `pop-up-book`: scenes fold up out of the gutter as the book opens. `flipbook`: one scroll notch, one
   pencil page. `pinscreen`: a lamp-lit wall of pins rolling from picture to picture. `sand`: a backlit sand table swept
@@ -481,6 +485,69 @@ cached on its own, so changing one shot re-renders only that shot. Steps pin the
 slow, camera-led motion best; for an action shot that holds its first frame, lower `strength` (0.7-0.85), re-roll the
 motion alone with `motion_seed`, and cut the hold with `trim` (seconds, re-uses the render).
 Example: [Feel](examples/feel/site.yaml).
+
+### Colour that follows the camera (`reveal:`)
+
+Say you want a black-and-white crowd with a couple in it, and colour that comes into exactly the part the camera looks
+at: her hand, then their shoes, then the two of them, while the crowd stays grey. Asking a video model to colour only
+the hands colours the crowd, reframes and changes faces. So the film is rendered **once, in full colour**, and the
+page reveals the colour region by region from tracked masks, in the browser, driven by scroll. Any film section can do
+it (beats, a take, or your own `video:`), and any site can "bring the product into colour" as you scroll:
+
+```yaml
+    reveal:
+      base: mono              # what un-revealed pixels look like: mono, dim, blur, or a tint colour such as "#2a4a6a"
+      regions:
+        - { id: her_hand, prompt: "the woman's hand", pick: left, at: { beat: hands, t: 0.5 } }
+        - { id: shoes,    prompt: "the shoes of the woman and the man", at: { beat: feet, t: 0.5 } }
+        - { id: couple,   prompt: "the woman in the long coat and the man in the jacket", at: { beat: walk, t: 0 } }
+      keys:                   # scroll progress of the section (0-1) -> how revealed each region is (0-1), eased
+        - { at: 0.40, her_hand: 0 }
+        - { at: 0.48, her_hand: 1 }
+        - { at: 0.55, shoes: 0 }
+        - { at: 0.62, shoes: 1 }
+        - { at: 0.70, couple: 0 }
+        - { at: 0.80, couple: 1 }
+      feather: 6              # mask edge softness, px at film size
+```
+
+How it works: each region is described (`prompt`, found on its `at` frame by Florence-2) or pointed at (`points`,
+`box`, in 0-1 picture coordinates), then followed through the film by SAM 2.1's video predictor, forwards and
+backwards from that frame, **inside its shot** (a cut ends a track: tracking never runs across one, so a region
+shows only in shots where it has an `at`; give it one `at` per shot it must show in: `at: [{beat: walk, t: 0}, {beat:
+seen, t: 0.5}]`; a non-beats film's cuts are found by scene detection, or listed in `reveal.cuts`). The masks are packed
+(up to four per video) into grayscale videos with the film's own frame rate, frame count and keyframe interval, and the
+page draws each frame of the film through a small WebGL2 shader: the base look everywhere, colour where mask x reveal
+amount, a film frame and its mask frames always from the same frame number (a seek goes to both videos and the canvas is
+drawn only when both have landed). Without WebGL2 the colour film plays as it is; with reduced motion each region jumps
+to colour as its moment arrives; phones get half-size masks and a 1280-wide canvas.
+
+A prompt that matches several things (both hands) reveals all of them unless you narrow it: `pick:` (`first`,
+`largest`, `smallest`, `left`, `right`, `top`, `bottom`, or an index), `within: "the woman in the long coat"`, or a
+prompt shaped "the X's Y" / "the Y of the X", which does that by itself; for the awkward cases give `points`. Each
+region leaves `ground.jpg` (the boxes it found) beside its masks in `.build/<section>/reveal/<id>/`. `grow:` widens or
+shrinks a finished mask in pixels; `tracker: base_plus` uses the smaller SAM 2.1.
+
+Everything is cached per region: the film, the prompt, its frame and the model are its key, so editing `keys:`,
+`feather` or `base` re-packs in seconds and re-tracks nothing. The storyboard draws every shot the way the page will
+show it (base look; with masks from a full build, the colour at that moment), and the animatic is cut from those frames.
+It runs on ComfyUI with `studio setup-comfy` (below) and about 2 GB of models.
+
+### Faces, repaired (`faces: restore`)
+
+Generated video bends faces. `faces: restore` on a film or on a beat repairs them after generation: faces above
+`min_size` pixels are found in every frame (RetinaFace), restored with GFPGAN v1.4 (Apache-2.0; CodeFormer is left out,
+its licence is non-commercial), blended back through a soft face mask, and the change is smoothed over time in the
+face's own aligned space so it never flickers. Off by default, cached by the clip and the settings:
+
+```yaml
+    beats:
+      - { id: walk, prompt: ..., motion: ..., faces: restore }                              # this beat
+    faces: { strength: 0.7, min_size: 96, smooth: 0.6 }                                    # or the whole film
+```
+
+About 0.7 s per frame of 1080p on an RTX 4090 with two faces in view. `studio setup-comfy` installs the nodes and
+weights.
 
 ### Two video models: LTX-2.3 and Wan 2.2
 

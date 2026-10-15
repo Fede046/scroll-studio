@@ -9,6 +9,24 @@ Everything so far is version 1. On 2026-10-12 the releases first published as 2.
 ## Unreleased
 
 ### Added
+- Scroll-driven colour reveal: `reveal:` on a film section. The film renders once in full colour; `base` (mono, dim, blur
+  or a tint colour) is what un-revealed pixels look like, and each region (a `prompt`, `points` or a `box` on an `at`
+  frame) comes into colour by `keys` over the section's scroll progress, eased. Masks: Florence-2 turns a prompt into
+  boxes on the frame, SAM 2.1's video predictor follows them forwards and backwards inside their shot (a cut ends a
+  track; beats are known cuts, other films are scene-detected or listed in `reveal.cuts`), cached per region
+  (`reveal_ground_<id>`, `reveal_track_<id>`). The masks are packed up to four to a grayscale atlas video with the
+  film's frame rate, frame count and GOP, plus a half-size copy for phones (`reveal_pack`: feathered, `grow`n). The
+  runtime draws the film through a WebGL2 shader (`runtime/src/players/reveal.ts`): a film frame and its masks always
+  from the same frame, colour film without WebGL2, jumps per region with reduced motion. The storyboard and animatic
+  draw every shot as the page will show it (base look; masked colour once a build made the masks); the plan lists the
+  stages with estimates; `studio doctor` checks the nodes and models. Spec: `FilmScene.reveal`, `Reveal`, `RevealRegion`,
+  `RevealAt`.
+- Face repair for generated video: `faces: restore` on a film or a beat (`Faces`: `strength`, `min_size`, `smooth`).
+  GFPGAN v1.4 (Apache-2.0) over faces found by facexlib, blended back softly, smoothed over time in aligned space,
+  in chunks of frames through ComfyUI; cached (`faces`, `faces_<beat>`); off by default.
+- `studio setup-comfy` installs what these need into ComfyUI (kijai's ComfyUI-segment-anything-2 and ComfyUI-Florence2,
+  Scroll Studio's own `scroll_studio_nodes`, the GFPGAN weights); `comfy_dir` in studio.toml says where ComfyUI is.
+  `comfy.run_outputs` returns every output node's record, not only saved images.
 - The storyboard is editable: `studio storyboard <project> --edit [--port N]` (also `/sb/<project>` in `studio ui`) serves
   one card per shot with every field editable in place (caption, prompt, motion, seconds, seed, trim, strength, motion
   seed, a take's keyframe prompts and motion segments, an edit's instruction, a product still's scene and view). Saves

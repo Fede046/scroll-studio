@@ -48,7 +48,7 @@ precision highp float;
 in vec2 vUv; out vec4 o;
 uniform sampler2D uFilm;
 ${rv.masks.map((_, g) => `uniform sampler2D uMask${g};`).join("\n")}
-uniform vec2 uInset[${rv.masks.length}];
+uniform vec2 uInset[${Math.max(1, rv.masks.length)}];
 uniform float uAmt[${Math.max(1, rv.regions.length)}];
 uniform float uStrength; uniform vec3 uTint; uniform float uBlur; uniform vec2 uAspect;
 float lum(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
@@ -153,7 +153,7 @@ export default async function reveal(cfg: Cfg, ctx: PlayerContext): Promise<Play
   gl.uniform1i(gl.getUniformLocation(prog, "uFilm"), 0);
   rv.masks.forEach((_, g) => gl.uniform1i(gl.getUniformLocation(prog, `uMask${g}`), g + 1));
   const insets = new Float32Array(rv.masks.flatMap((m) => [0.5 / m.tile[0] * (mobile ? 2 : 1), 0.5 / m.tile[1] * (mobile ? 2 : 1)]));
-  gl.uniform2fv(gl.getUniformLocation(prog, "uInset"), insets);
+  if (insets.length) gl.uniform2fv(gl.getUniformLocation(prog, "uInset"), insets);
   const uAmt = gl.getUniformLocation(prog, "uAmt");
   gl.uniform1f(gl.getUniformLocation(prog, "uStrength"), rv.strength);
   if (rv.base[0] === "#") gl.uniform3fv(gl.getUniformLocation(prog, "uTint"), hexToRgb(rv.base));

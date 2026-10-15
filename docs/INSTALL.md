@@ -11,6 +11,7 @@ Scroll Studio runs entirely on your machine. What you need depends on which scen
 | `sequence` | + Blender 4.2+ (Cycles uses the GPU when there is one, otherwise the CPU). |
 | `film` | + Blender, FFmpeg, ComfyUI with the LTX-2.3 and Z-Image models, a 24 GB GPU (RTX 4090/5090 class). |
 | `film` with `video_model: wan` | + the Wan 2.2 files in `engine/models.yaml` (~67 GB: two i2v experts for beats and art, two Fun Control experts for takes, UMT5, the VAE, two LoRAs) and ~32 GB of free system RAM. Same 24 GB GPU. |
+| `film` with `reveal` or `faces: restore` | + `studio setup-comfy` (SAM 2.1, Florence-2, GFPGAN: ~2.5 GB, section 4). |
 | `film` with `take.product` | + the product's 3D model (.glb/.gltf/.obj/.fbx/.stl/.ply). `from_photo:` instead needs TRELLIS (below). |
 | `site.product`, `showroom`, product stills | + Blender. STEP/STP models need `cascadio` (OpenCascade) and 3MF needs `trimesh` + `lxml`: `pip install -e .[cad]` (in `.[all]`). `scene:` stills need ComfyUI (Z-Image, Qwen-Image-Edit). |
 | `splat` | A scan as a 3DGS `.ply` (any) or a gsplat `.pt` checkpoint (needs PyTorch to read). No GPU at build time. |
@@ -68,6 +69,16 @@ no custom nodes: its nodes ship with ComfyUI). The experts are fp8 14B models of
 holds one on the GPU and swaps to the other half-way through sampling, so keep ~32 GB of system RAM free. If a file
 sits in a subfolder or under another name, set it in `studio.toml` under `[wan]` (see `studio.example.toml`);
 `studio doctor` asks ComfyUI which files it can load and lists every Wan file as found or missing, with its URL.
+
+**Reveal and faces (optional: `reveal:` and `faces: restore` on a film).** Both run in ComfyUI. `studio setup-comfy`
+clones kijai's [ComfyUI-segment-anything-2](https://github.com/kijai/ComfyUI-segment-anything-2) (Apache-2.0) and
+[ComfyUI-Florence2](https://github.com/kijai/ComfyUI-Florence2) (MIT) into `custom_nodes/`, copies Scroll Studio's own
+`scroll_studio_nodes` there (it holds SAM 2.1 tracking with box prompts and the face repair, and bundles GFPGAN's
+network definition under its Apache-2.0 licence) and downloads GFPGAN v1.4 (~350 MB) into `models/facerestore_models/`.
+Set `comfy_dir` in `studio.toml` first if ComfyUI isn't at `<model_dir>/ComfyUI`. Then **restart ComfyUI when its queue is
+empty** so it loads the nodes. SAM 2.1 Hiera Large (0.45 GB, `models/sam2/`) and Florence-2 large (1.5 GB,
+`models/LLM/`) download on the first reveal build, and facexlib's face detector and mask (0.2 GB) on the first `faces`
+build. The stages need ~4 GB of VRAM and, per frame of film, ~6 MB of system RAM. `studio doctor` lists every node and file.
 
 ## 5. TRELLIS (optional: a product model from one photo)
 
