@@ -204,7 +204,10 @@ def units(sec, name: str) -> tuple[str, float]:
             return "film:reveal_track", frames
         if name == "reveal_pack":
             return "film:reveal_pack", frames
-        if name.startswith("faces"):
+        if name.startswith("faces_"):
+            b = next((b for b in sec.beats if f"faces_{b.id}" == name), None)
+            return "film:faces", float((b.seconds - b.trim) * 24 if b else frames)
+        if name == "faces":
             return "film:faces", frames
         if name == "track":
             return "film:track", 1.0
@@ -220,10 +223,11 @@ def units(sec, name: str) -> tuple[str, float]:
 def expected(sec, beats: Optional[set] = None) -> list[str]:
     """The stages a scene section runs, in order (films only; other builders report what they reach)."""
     if sec.type != "film" or sec.video:
-        return (["encode"] + expected_reveal(sec)) if sec.type == "film" else []
+        return ((["faces"] if sec.faces else []) + ["encode"] + expected_reveal(sec)) if sec.type == "film" else []
     if sec.beats:
-        names = [f"beat_{b.id}" for b in sec.beats if beats is None or b.id in beats] + ["beats_join"]
-        return names + (["beats_restore"] if sec.beat_restore else []) + ["encode"] + expected_reveal(sec)
+        names = [n for b in sec.beats if beats is None or b.id in beats
+                 for n in [f"beat_{b.id}"] + ([f"faces_{b.id}"] if b.faces else [])] + ["beats_join"]
+        return names + (["beats_restore"] if sec.beat_restore else []) + (["faces"] if sec.faces else []) + ["encode"] + expected_reveal(sec)
     from .animate import video_model
     shot = sec.take.model_dump(mode="json") if sec.take else sec.shot
     model = video_model(shot.get("video_model"))
@@ -236,7 +240,7 @@ def expected(sec, beats: Optional[set] = None) -> list[str]:
         names.append("restore")
     if sec.take and sec.take.product:
         names += ["track"] + ([] if sec.take.product.hdri else ["plate_env"]) + ["product", "composite"]
-    return names + ["encode"] + expected_reveal(sec)
+    return names + (["faces"] if sec.faces else []) + ["encode"] + expected_reveal(sec)
 
 
 def expected_reveal(sec) -> list[str]:

@@ -402,6 +402,10 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
             standing.append(b.id)
             continue
         ctx.stage(f"beat_{b.id}", key, [clip], run, locked=lock)
+        # ---- faces (engine/faces.py): this beat's clip with its faces repaired, before the join
+        if b.faces:
+            from .. import faces
+            clip = faces.restore_beat(ctx, b.id, clip, b.faces)
         clips.append(clip)
 
     # join: each clip crossfades into the next
@@ -478,6 +482,7 @@ def build(sec: FilmScene, ctx: BuildContext, theme: dict) -> dict:
     # ---- faces (engine/faces.py): repair the faces of the whole film before it is encoded
     if sec.faces:
         from .. import faces
+        faces.preflight(ctx)
         src = faces.restore_film(sec, ctx, src)
     cfg = encode(src, ctx, sec.gop)
     # ---- reveal (engine/reveal.py): tracked masks and the scroll-driven colour config, from the same film file

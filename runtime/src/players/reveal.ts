@@ -186,7 +186,8 @@ export default async function reveal(cfg: Cfg, ctx: PlayerContext): Promise<Play
   // ---- paired seeking: both videos to the middle of the same frame; draw when both have landed
   let busy = false, want = 0, timer = 0, seekId = 0;
   let amounts = amountsAt(rv.keys, ids, 0, rv.ease, reducedMotion);
-  const debug = ((window as any).__ssReveal ||= {}) as Record<string, any>;
+  const debug = ((window as any).__ssReveal ||= {}) as Record<string, any>;   // read by tests and the Browser pane
+  debug.videos = all;
   function seek(fi: number) {
     busy = true; want = fi;
     const id = ++seekId;
@@ -200,6 +201,7 @@ export default async function reveal(cfg: Cfg, ctx: PlayerContext): Promise<Play
       upload(); draw(amounts);
       debug.frame = shown;
       debug.times = all.map((v) => v.currentTime);
+      debug.onDraw?.(shown);
     };
     const landedOne = () => { if (--pending <= 0) finish(); };
     timer = window.setTimeout(finish, 800);      // never deadlock on a seek that doesn't report
