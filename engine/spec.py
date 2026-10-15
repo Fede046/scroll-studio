@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class Model(BaseModel):
@@ -360,6 +360,118 @@ class Take(Model):
                                             "when its settings change: build and storyboard log it and move on")
 
 
+# ---- reveal + faces (engine/reveal.py, engine/faces.py): kept together so they merge cleanly ----------------------
+
+class RevealAt(Model):
+    """The frame a region is first found on (before it is tracked through the whole film): a moment in a beat
+    (`beat` + `t`, 0 = its first frame, 1 = its last), or in the whole film (`t` alone, 0-1), or an exact `frame` /
+    `seconds` of the joined film. Pick a frame where the thing is plainly in view."""
+    beat: Optional[str] = Field(None, description="beats film: the beat's id")
+    t: float = Field(0.5, ge=0, le=1, description="0-1 through the beat (or through the film without `beat`)")
+    frame: Optional[int] = Field(None, ge=0, description="An exact frame of the film (overrides beat/t)")
+    seconds: Optional[float] = Field(None, ge=0, description="An exact time in the film, seconds (overrides beat/t)")
+
+
+class RevealRegion(Model):
+    """One part of the picture that comes into colour. Describe it (`prompt`: found on the `at` frame by Florence-2),
+    or point at it (`points` / `box` in 0-1 picture coordinates on the `at` frame); SAM 2.1 then follows it through
+    the whole film, forwards and backwards."""
+    id: str
+    prompt: Optional[str] = Field(None, description="What to colour, as you would say it to a person: \"the woman's hand\", "
+                                                    "\"the shoes of the woman and the man\". Every match on the `at` frame "
+                                                    "is revealed (see `pick`, `within`)")
+    points: list[tuple[float, float]] = Field(default_factory=list, description="Points ON the thing, 0-1 across and down the "
+                                                                              "`at` frame (with or without a prompt or box)")
+    negative_points: list[tuple[float, float]] = Field(default_factory=list, description="Points on what the mask must NOT take")
+    box: Optional[tuple[float, float, float, float]] = Field(None, description="x0, y0, x1, y1 around it, 0-1 on the `at` "
+                                                                              "frame (skips the prompt's search)")
+    at: Union[RevealAt, list[RevealAt]] = Field(default_factory=RevealAt, description="The frame to find it on. A film of several "
+                                                                                       "shots tracks a region only inside a shot it is found in "
+                                                                                       "(a cut ends it): give one `at` per shot it must show in")
+    pick: Union[Literal["all", "first", "largest", "smallest", "left", "right", "top", "bottom"], int] = Field(
+        "all", description="When the prompt matches several things: all of them, one by rank (largest, left, ...) or by "
+                           "index (0 is the first the search lists)")
+    within: Optional[str] = Field(None, description="Keep only the matches inside the thing this names, e.g. prompt "
+                                                    "\"hand\" within \"the woman in the long coat\". A prompt shaped \"the X's Y\" "
+                                                    "or \"the Y of the X\" does this by itself")
+    grow: int = Field(0, ge=-40, le=80, description="Widen (+) or shrink (-) the finished mask by this many pixels at film size")
+
+    @property
+    def seeds(self) -> list[RevealAt]:
+        return self.at if isinstance(self.at, list) else [self.at]
+
+    @model_validator(mode="after")
+    def _has_target(self):
+        if not (self.prompt or self.points or self.box):
+            raise ValueError(f"reveal region '{self.id}': give a prompt, points or a box")
+        return self
+
+
+class Reveal(Model):
+    """Colour that comes in where the camera looks, driven by scroll. The film is rendered once in full colour; the page
+    shows everything in the `base` look, and each region's colour is brought in through a tracked mask, in the browser
+    (a WebGL shader draws each frame of the film with its masks from the same frame). Without WebGL the colour film
+    plays as it is; with reduced motion each region jumps to colour as its moment arrives."""
+    base: str = Field("mono", description="What pixels that are not revealed look like: mono (black and white), dim (darker "
+                                          "and muted), blur (soft focus in colour), or a hex colour such as \"#2a4a6a\" "
+                                          "(a duotone from black through that colour to white)")
+    regions: list[RevealRegion] = Field(..., min_length=1)
+    keys: list[dict[str, float]] = Field(default_factory=list, description="Scroll progress of the section -> how revealed "
+                                                                          "each region is (0-1), eased between keys: "
+                                                                          "[{at: 0.4, her_hand: 0}, {at: 0.48, her_hand: 1}]. A region keeps "
+                                                                          "its last value. Default: one region after another")
+    cuts: list[float] = Field(default_factory=list, description="Times of the film's cuts, in seconds, when they can't be known "
+                                                                "(a beats film knows its own; other films are searched for them)")
+    feather: float = Field(6.0, ge=0, le=64, description="Softness of every mask's edge, in pixels at film size")
+    ease: Literal["smooth", "linear"] = Field("smooth", description="How a region eases between two keys")
+    tracker: Literal["large", "base_plus"] = Field("large", description="SAM 2.1 size: large (sharper, ~450 MB) or base_plus")
+    strength: float = Field(1.0, ge=0, le=1, description="1: revealed pixels show the film's own colour; lower mixes the base "
+                                                         "look back in")
+
+    @field_validator("base")
+    @classmethod
+    def _base(cls, v):
+        import re
+        if v not in ("mono", "dim", "blur") and not re.fullmatch(r"#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})", v):
+            raise ValueError("base is mono, dim, blur or a hex colour like #2a4a6a")
+        return v
+
+    @model_validator(mode="after")
+    def _keys(self):
+        ids = [r.id for r in self.regions]
+        if len(set(ids)) != len(ids):
+            raise ValueError("reveal: region ids must be unique")
+        for k in self.keys:
+            if "at" not in k:
+                raise ValueError("reveal.keys: every key needs `at`")
+            for name, v in k.items():
+                if name != "at" and name not in ids:
+                    raise ValueError(f"reveal.keys: '{name}' is not a region id ({', '.join(ids)})")
+                if not 0 <= v <= 1:
+                    raise ValueError(f"reveal.keys: {name} must be between 0 and 1")
+        return self
+
+
+class Faces(Model):
+    """Face repair for generated video: faces above `min_size` are found in every frame, restored with GFPGAN v1.4, and
+    blended back softly (and smoothed over time so nothing flickers)."""
+    mode: Literal["restore"] = "restore"
+    strength: float = Field(0.7, ge=0, le=1, description="How much of the restored face is blended in")
+    min_size: int = Field(96, ge=16, le=2048, description="Faces smaller than this many pixels across are left alone")
+    smooth: float = Field(0.6, ge=0, le=0.95, description="Temporal smoothing of the blend (higher: steadier, slower to follow)")
+
+
+def _faces(v):
+    if v in (None, False, "off", "none"):
+        return None
+    if v is True or v == "restore":
+        return {"mode": "restore"}
+    return v
+
+
+# ---------------------------------------------------------------------------------------------------------------
+
+
 class Beat(Model):
     """One shot of a story film: a still generated from `prompt` (or taken from `image`), brought to life by `motion`."""
     id: str
@@ -379,6 +491,14 @@ class Beat(Model):
     video_model: Optional[VideoModel] = Field(None, description=VIDEO_MODEL_DOC + ". `strength` applies to ltx only")
     locked: bool = Field(False, description="Keep this beat's clip (and its storyboard still) as rendered, even when "
                                             "its prompt or motion changes; the rest of the film still builds around it")
+    # ---- faces
+    faces: Optional[Faces] = Field(None, description="`restore`: repair the faces in this beat's clip (GFPGAN), after it is "
+                                                     "generated. Off by default; or a mapping with strength, min_size, smooth")
+
+    @field_validator("faces", mode="before")
+    @classmethod
+    def _faces_in(cls, v):
+        return _faces(v)
 
 
 class FilmScene(SceneBase):
@@ -396,6 +516,16 @@ class FilmScene(SceneBase):
     beat_restore: Optional[int] = Field(None, description="beats: run SeedVR2 over the finished film at this height "
                                                           "(e.g. 1088) to clean grain and redraw fine detail; slow")
     gop: int = 6
+    # ---- reveal + faces
+    reveal: Optional[Reveal] = Field(None, description="Scroll-driven colour: the film is full colour, the page shows the "
+                                                       "`base` look and brings colour into tracked regions as you scroll")
+    faces: Optional[Faces] = Field(None, description="`restore`: repair the faces in the whole film (GFPGAN) before it is "
+                                                     "encoded; beats can set it per beat. Off by default")
+
+    @field_validator("faces", mode="before")
+    @classmethod
+    def _faces_in(cls, v):
+        return _faces(v)
 
 
 class ArtworkScene(SceneBase):

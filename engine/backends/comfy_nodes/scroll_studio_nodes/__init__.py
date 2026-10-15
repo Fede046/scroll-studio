@@ -76,7 +76,8 @@ class SSRevealGround:
 class SSRevealTrack:
     """SAM 2.1 video predictor. `prompts` is JSON: [{"box": [x0,y0,x1,y1], "points": [[x,y],...], "labels": [1,0,...]}, ...]
     in 0-1 coordinates of the seed frame; every entry is one object, all seeded on `frame_index`, and the result is the
-    union of them for every frame (soft, 0-1). Tracks forward to the end and backward to the start."""
+    union of them for every frame (soft, 0-1). Tracks forward to `end` and backward to `start` (a shot: tracking never
+    runs across a cut, where the thing it follows is gone). Returns the masks of frames start..end only."""
 
     @classmethod
     def INPUT_TYPES(s):
@@ -84,6 +85,9 @@ class SSRevealTrack:
             "sam2_model": ("SAM2MODEL",), "images": ("IMAGE",),
             "frame_index": ("INT", {"default": 0, "min": 0}),
             "prompts": ("STRING", {"default": "[]", "multiline": True}),
+        }, "optional": {
+            "start": ("INT", {"default": 0, "min": 0, "tooltip": "first frame to track (a shot's first frame)"}),
+            "end": ("INT", {"default": -1, "min": -1, "tooltip": "last frame to track, inclusive (-1: the last frame)"}),
         }}
 
     RETURN_TYPES = ("MASK",)
@@ -91,13 +95,15 @@ class SSRevealTrack:
     FUNCTION = "run"
     CATEGORY = CATEGORY
 
-    def run(self, sam2_model, images, frame_index, prompts):
+    def run(self, sam2_model, images, frame_index, prompts, start=0, end=-1):
         if sam2_model["segmentor"] != "video":
             raise ValueError("SSRevealTrack needs a SAM2 model loaded with segmentor = video")
         model, device, dtype = sam2_model["model"], sam2_model["device"], sam2_model["dtype"]
-        N, H, W, _ = images.shape
-        if not 0 <= frame_index < N:
-            raise ValueError(f"frame_index {frame_index} is outside the {N} frames")
+        total, H, W, _ = images.shape
+        end = total - 1 if end < 0 else min(end, total - 1)
+        if not 0 <= start <= frame_index <= end:
+            raise ValueError(f"frame_index {frame_index} is outside the range {start}-{end} of the {total} frames")
+        images, frame_index, N = images[start:end + 1], frame_index - start, end - start + 1
         items = json.loads(prompts)
         if not items:
             raise ValueError("no prompts")

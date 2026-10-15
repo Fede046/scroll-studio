@@ -35,6 +35,11 @@ DEFAULTS = {
     "film:encode": 1.2,         # per second of film
     "film:beat": 100.0,         # per second of a beat (still + edit + animation)
     "film:join": 0.5,           # per second of film
+    "film:reveal_work": 0.8,    # per second of film (reveal: the working-size copy)
+    "film:reveal_ground": 25.0,  # per region (Florence-2 on one frame, model load included)
+    "film:reveal_track": 0.35,  # per frame of film per region (SAM 2.1, forward and backward)
+    "film:reveal_pack": 0.12,   # per frame of film (feathered masks into videos, poster)
+    "film:faces": 0.25,         # per frame of film (GFPGAN over every face)
     "sequence:render": 0.13,    # per frame at 96 samples, 1920x1080
     "sequence:encode": 1.0,     # per frame
 }
@@ -43,7 +48,7 @@ IMAGES = {"image": 15.0, "edit": 60.0, "product still": 25.0, "scene still": 150
           "download": 5.0, "art": 240.0, "stand-in": 5.0}
 # what counts as heavy GPU work (a video model, SeedVR2, a Cycles pass over every frame): the build lists these first
 HEAVY = ("film:generate", "film:generate_wan", "film:restore", "film:product", "film:beat", "film:keyframes",
-         "sequence:render")
+         "sequence:render", "film:reveal_track", "film:faces")
 
 
 @dataclass
@@ -189,6 +194,18 @@ def units(sec, name: str) -> tuple[str, float]:
             return "film:composite", frames
         if name == "encode":
             return "film:encode", dur
+        if name == "reveal_cuts":
+            return "film:reveal_work", dur
+        if name == "reveal_work":
+            return "film:reveal_work", dur
+        if name.startswith("reveal_ground_"):
+            return "film:reveal_ground", 1.0
+        if name.startswith("reveal_track_"):
+            return "film:reveal_track", frames
+        if name == "reveal_pack":
+            return "film:reveal_pack", frames
+        if name.startswith("faces"):
+            return "film:faces", frames
         if name == "track":
             return "film:track", 1.0
     if t == "sequence":
@@ -203,10 +220,10 @@ def units(sec, name: str) -> tuple[str, float]:
 def expected(sec, beats: Optional[set] = None) -> list[str]:
     """The stages a scene section runs, in order (films only; other builders report what they reach)."""
     if sec.type != "film" or sec.video:
-        return ["encode"] if sec.type == "film" else []
+        return (["encode"] + expected_reveal(sec)) if sec.type == "film" else []
     if sec.beats:
         names = [f"beat_{b.id}" for b in sec.beats if beats is None or b.id in beats] + ["beats_join"]
-        return names + (["beats_restore"] if sec.beat_restore else []) + ["encode"]
+        return names + (["beats_restore"] if sec.beat_restore else []) + ["encode"] + expected_reveal(sec)
     from .animate import video_model
     shot = sec.take.model_dump(mode="json") if sec.take else sec.shot
     model = video_model(shot.get("video_model"))
@@ -219,7 +236,19 @@ def expected(sec, beats: Optional[set] = None) -> list[str]:
         names.append("restore")
     if sec.take and sec.take.product:
         names += ["track"] + ([] if sec.take.product.hdri else ["plate_env"]) + ["product", "composite"]
-    return names + ["encode"]
+    return names + ["encode"] + expected_reveal(sec)
+
+
+def expected_reveal(sec) -> list[str]:
+    """The reveal stages of a film section (engine/reveal.py), after its encode."""
+    if not getattr(sec, "reveal", None):
+        return []
+    names = ["reveal_work"] + ([] if sec.beats or sec.reveal.cuts else ["reveal_cuts"])
+    for r in sec.reveal.regions:
+        for k in range(len(r.seeds)):
+            sfx = f"_{k}" if len(r.seeds) > 1 else ""
+            names += ([f"reveal_ground_{r.id}{sfx}"] if r.prompt and not r.box else []) + [f"reveal_track_{r.id}{sfx}"]
+    return names + ["reveal_pack"]
 
 
 _RATES: Optional[dict] = None
