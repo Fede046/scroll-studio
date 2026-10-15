@@ -178,6 +178,20 @@ UI (React) ◄─► engine server (FastAPI + job queue + websocket events) ◄�
   the spec revision at the cut, which is what "stale" compares), the stand-in page and `dist/`; `Workspace.animatic()` is
   `storyboard(level="animatic", generate=False)`, where `Maker(generate=False)` shows cached images and placeholder
   cards and renders nothing.
+- **Reveal and faces.** `engine/reveal.py` and `engine/faces.py` are post stages over a film's finished file, run in
+  ComfyUI through custom nodes (`engine/backends/comfy_nodes/scroll_studio_nodes/`, installed by `studio setup-comfy`
+  next to kijai's ComfyUI-segment-anything-2 and ComfyUI-Florence2). A `reveal` region is found on one frame (Florence-2
+  phrase grounding; `choose_boxes` applies `pick`/`within` and the "X's Y" owner test; or the spec's own box/points) and
+  tracked by SAM 2.1's video predictor inside its shot (`shots_of`: a beats film's beats, `reveal.cuts`, or ffmpeg scene
+  detection), forwards and backwards from the seed, over a 960x540 working copy cropped like the encode; the masks are
+  cached per region as `.npz`. `pack` feathers and grows them and encodes up to four per grayscale atlas video (2x2
+  tiles of 960x544) with the film's fps, frame count and GOP, plus a half-size phone copy, and draws the poster and end
+  frame with the reveal applied. The runtime (`players/reveal.ts`, chosen by `video.ts` when the film's config has
+  `reveal`) seeks the film and the mask video to the middle of the same frame and draws only when both have landed;
+  `lib/revealKeys.ts` eases the keys, and `engine/reveal.py` `amounts_at` / `composite` are its CPU twins (a test runs
+  both on the same keys). The storyboard (`storyboard/reveal.py`) draws every card frame, stand-in and animatic piece
+  with the same compositor. `faces` cuts a clip into overlapping chunks of frames, restores each in ComfyUI and joins
+  them; the smoothing lives in `scroll_studio_nodes/faces.py`.
 - **Launch trailers** (`engine/trailer/`, `studio trailer`): a second output from the same spec and the same cache.
   `plan.py` cuts shots from what the builders already rendered (takes, beats, scroll recordings, product stills) onto
   a beat grid; `frame.py` reframes each for 16:9 and 9:16 (the take's product projected through its camera by
@@ -268,6 +282,8 @@ Runtime: `lenis`, `gsap` (ScrollTrigger), `three`, `postprocessing`, `@sparkjsde
 | Z-Image Turbo + Fun ControlNet Union 2.1 + Qwen3 4B encoder | keyframes, stills | ~20 GB | Apache 2.0 |
 | Depth Anything V2 (Large) | `parallax`, depth from photos | 1.3 GB | CC-BY-NC (Large) / Apache (Small) |
 | BiRefNet or SAM 2 | segmentation for `artwork`, `sequence`, cutouts | 0.2–0.9 GB | MIT / Apache 2.0 |
+| SAM 2.1 Hiera Large + Florence-2 large | `film` `reveal`: a region's prompt -> a box -> a mask tracked through the film | 0.45 GB + 1.5 GB | Apache 2.0 / MIT |
+| GFPGAN v1.4 (+ facexlib RetinaFace and ParseNet) | `faces: restore` | 0.35 GB + 0.2 GB | Apache 2.0 / MIT |
 | RIFE 4.x | `morph`, frame interpolation | <0.1 GB | MIT |
 | Hunyuan3D-2 or TRELLIS | image → 3D for `sequence` from photos | 5–10 GB | Tencent community (region limits) / MIT |
 | Real-ESRGAN (or LTX upscaler) | stills and frame upscaling | <0.1 GB | BSD-3 |

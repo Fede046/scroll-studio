@@ -51,6 +51,8 @@ def settings() -> dict:
         "ffprobe": get("FFPROBE", "ffprobe", "ffprobe"),
         "comfy_url": get("COMFY_URL", "comfy_url", "http://127.0.0.1:8188").rstrip("/"),
         "model_dir": get("STUDIO_MODELS", "model_dir", str(Path.home() / ".scroll-studio" / "models")),
+        # ComfyUI's folder, for `studio setup-comfy` and `studio doctor` (default: <model_dir>/ComfyUI)
+        "comfy_dir": get("COMFY_DIR", "comfy_dir", None),
         "chrome": get("CHROME", "chrome", None),
         "projects": get("STUDIO_PROJECTS", "projects", str(ROOT / "projects")),
         # image -> 3D for product takes (engine/backends/trellis.py); optional

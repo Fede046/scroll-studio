@@ -410,6 +410,10 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
             standing.append(b.id)
             continue
         ctx.stage(f"beat_{b.id}", key, [clip], run, locked=lock)
+        # ---- faces (engine/faces.py): this beat's clip with its faces repaired, before the join
+        if b.faces:
+            from .. import faces
+            clip = faces.restore_beat(ctx, b.id, clip, b.faces)
         clips.append(clip)
 
     # join: each clip crossfades into the next
@@ -449,13 +453,19 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
     return out
 
 
-def pin_steps(sec: FilmScene, durs: list[float], fade: float) -> None:
-    """Time steps pinned with state: {beat: id} to their beat's span over the joined film (sets step.at)."""
+def beat_spans(sec: FilmScene, durs: list[float], fade: float) -> dict[str, tuple[float, float]]:
+    """Each beat's span over the joined film, as fractions 0-1 of its length (steps and reveal regions are timed by it)."""
     total = sum(durs) - fade * (len(durs) - 1)
     spans, t = {}, 0.0
     for b, d in zip(sec.beats, durs):
         spans[b.id] = (t / total, (t + d) / total)
         t += d - fade
+    return spans
+
+
+def pin_steps(sec: FilmScene, durs: list[float], fade: float) -> None:
+    """Time steps pinned with state: {beat: id} to their beat's span over the joined film (sets step.at)."""
+    spans = beat_spans(sec, durs, fade)
     for st in sec.steps:
         pin = (st.state or {}).get("beat")
         if pin is None or st.at is not None:
@@ -472,10 +482,22 @@ def pin_steps(sec: FilmScene, durs: list[float], fade: float) -> None:
 
 
 def build(sec: FilmScene, ctx: BuildContext, theme: dict) -> dict:
+    if sec.reveal:      # reveal: fail now, before a film renders, if ComfyUI lacks the nodes that mask it
+        from .. import reveal
+        reveal.preflight(ctx)
     src = ctx.project.path(sec.video) if sec.video else beats_film(sec, ctx) if sec.beats else generate(sec, ctx)
     if not src.exists():
         raise BuildError(f"film source not found: {src}")
+    # ---- faces (engine/faces.py): repair the faces of the whole film before it is encoded
+    if sec.faces:
+        from .. import faces
+        faces.preflight(ctx)
+        src = faces.restore_film(sec, ctx, src)
     cfg = encode(src, ctx, sec.gop)
+    # ---- reveal (engine/reveal.py): tracked masks and the scroll-driven colour config, from the same film file
+    if sec.reveal:
+        from .. import reveal
+        cfg["reveal"] = reveal.build(sec, ctx, src, cfg)
     if sec.take and sec.take.product and sec.take.product.credit:   # site.product's own credit is added site-wide
         cfg["credits"] = [sec.take.product.credit]
     return cfg

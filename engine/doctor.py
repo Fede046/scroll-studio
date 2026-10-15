@@ -47,6 +47,7 @@ def checks() -> list[dict]:
     except Exception as e:
         add("ComfyUI", False, str(e), "film, generated images")
     res.extend(wan_checks())
+    res.extend(reveal_checks())
     add("Chrome", shutil.which("chrome") or Path(r"C:\Program Files\Google\Chrome\Application\chrome.exe").exists() or s["chrome"],
         "found", "recordings")
     return res
@@ -76,6 +77,47 @@ def wan_checks() -> list[dict]:
             ok = hit is not None
             detail = f"{folder}/{hit}" if ok else f"missing {folder}/{want} ({m['size_gb']} GB): {m['source']}"
         out.append({"name": m["name"], "ok": ok, "detail": detail, "needed_by": ", ".join(m.get("used_by", []))})
+    return out
+
+
+def reveal_checks() -> list[dict]:
+    """`reveal` and `faces: restore`: the ComfyUI nodes (asked of ComfyUI itself, so they count only once it has loaded them)
+    and the model files that can be seen on disk (SAM 2.1 and Florence-2 download on first use, so missing is a note)."""
+    from .backends import comfy, comfy_setup
+    out = []
+    up = comfy.alive()
+    for label, nodes, need, fix in (
+            ("ComfyUI nodes: SAM 2.1 + Florence-2 (kijai)", ("DownloadAndLoadSAM2Model", "DownloadAndLoadFlorence2Model"), "film reveal",
+             "ComfyUI-segment-anything-2 and ComfyUI-Florence2 in custom_nodes"),
+            ("ComfyUI nodes: Scroll Studio (tracking, faces)", ("SSRevealTrack", "SSRevealGround", "SSFaceRestore"), "film reveal, faces: restore",
+             "")):
+        if not up:
+            out.append({"name": label, "ok": False, "detail": "ComfyUI not running, can't check", "needed_by": need})
+            continue
+        missing = []
+        for n in nodes:
+            try:
+                comfy._req(f"/object_info/{n}")
+            except Exception:
+                missing.append(n)
+        out.append({"name": label, "ok": not missing, "detail": "loaded" if not missing else
+                    f"ComfyUI has no {', '.join(missing)}: run `studio setup-comfy`, then restart ComfyUI", "needed_by": need})
+    root = comfy_setup.comfy_dir()
+    import yaml
+    for m in yaml.safe_load((Path(__file__).parent / "models.yaml").read_text(encoding="utf-8"))["comfyui"]:
+        if not m.get("node"):
+            continue
+        if root is None:
+            out.append({"name": m["name"], "ok": False, "detail": "ComfyUI folder unknown (set comfy_dir in studio.toml)",
+                        "needed_by": ", ".join(m["used_by"])})
+            continue
+        path = root / "models" / m["file"]
+        ok = path.exists()
+        auto = m["node"] in ("sam2", "florence2")
+        out.append({"name": m["name"], "ok": ok or auto,
+                    "detail": str(path) if ok else (f"not downloaded yet: it downloads on first use ({m['size_gb']} GB)" if auto else
+                                                    f"missing {path} ({m['size_gb']} GB): `studio setup-comfy`"),
+                    "needed_by": ", ".join(m["used_by"])})
     return out
 
 

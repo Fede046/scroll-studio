@@ -10,6 +10,7 @@
   studio trailer my-site [--format 9x16] [--plan]      launch trailer from the site's renders -> dist/trailer/
   studio ui                                         the Studio app (http://localhost:5180)
   studio doctor                                     check Python, Node, FFmpeg, Blender, GPU, ComfyUI, models
+  studio setup-comfy                                install the ComfyUI nodes for `reveal` and `faces` (restart ComfyUI after)
   studio schema                                     JSON Schema of site.yaml
   studio product my-site [--parts] [--still three-quarter]   the site's product: parts, stills
 """
@@ -508,6 +509,13 @@ def doctor():
     """Check the toolchain and report what each scene type needs."""
     from .doctor import report
     report()
+
+
+@app.command("setup-comfy")
+def setup_comfy(no_weights: bool = typer.Option(False, help="Skip the GFPGAN face-restore weights (~330 MB)")):
+    """Install the ComfyUI custom nodes that `reveal` (scroll-driven colour) and `faces: restore` use."""
+    from .backends.comfy_setup import install
+    install(typer.echo, weights=not no_weights)
 
 
 @app.command()
