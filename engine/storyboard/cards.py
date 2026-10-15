@@ -255,10 +255,15 @@ class Maker:
     # ------------------------------------------------------------ film: beats
     def scene_film(self, sec: FilmScene) -> list[Card]:
         if sec.video:
-            return [self.film_video(sec)]
-        if sec.beats:
-            return self.film_beats(sec)
-        return [self.film_take(sec)]
+            cards = [self.film_video(sec)]
+        elif sec.beats:
+            cards = self.film_beats(sec)
+        else:
+            cards = [self.film_take(sec)]
+        if sec.reveal:      # reveal: every frame drawn as the page shows it (base look, masked colour): storyboard/reveal.py
+            from . import reveal
+            reveal.apply(self, sec, cards)
+        return cards
 
     def film_beats(self, sec: FilmScene) -> list[Card]:
         W, H = sec.beat_res[0] // 32 * 32, sec.beat_res[1] // 32 * 32

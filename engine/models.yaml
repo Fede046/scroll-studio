@@ -119,6 +119,46 @@ comfyui:
     licence: Apache-2.0
     used_by: [film (keyframes)]
 
+  # reveal (scroll-driven colour) and faces: restore. Installed by `studio setup-comfy` (custom nodes + GFPGAN) and `studio
+  # doctor` checks them; the SAM 2.1 and Florence-2 weights download into ComfyUI/models on first use. Checked against the
+  # engine's own nodes: ComfyUI-segment-anything-2 (kijai, Apache-2.0, pinned 0c35fff), ComfyUI-Florence2 (kijai, MIT, 9ece3de)
+  # and scroll_studio_nodes (this repo, engine/backends/comfy_nodes/).
+  - name: SAM 2.1 Hiera Large (fp16)
+    file: sam2/sam2.1_hiera_large-fp16.safetensors
+    source: https://huggingface.co/Kijai/sam2-safetensors
+    size_gb: 0.45
+    vram_gb: 4
+    licence: Apache-2.0 (Meta)
+    used_by: [film reveal (tracker large, the default)]
+    node: sam2
+  - name: SAM 2.1 Hiera Base+ (fp16)
+    file: sam2/sam2.1_hiera_base_plus-fp16.safetensors
+    source: https://huggingface.co/Kijai/sam2-safetensors
+    size_gb: 0.16
+    vram_gb: 3
+    licence: Apache-2.0 (Meta)
+    used_by: [film reveal (tracker base_plus)]
+    optional: true
+  - name: Florence-2 large
+    file: LLM/Florence-2-large/model.safetensors
+    source: https://huggingface.co/microsoft/Florence-2-large
+    size_gb: 1.5
+    vram_gb: 3
+    licence: MIT (Microsoft)
+    used_by: [film reveal (a region's prompt -> a box)]
+    node: florence2
+  - name: GFPGAN v1.4
+    file: facerestore_models/GFPGANv1.4.pth
+    source: https://github.com/TencentARC/GFPGAN/releases/tag/v1.3.4
+    size_gb: 0.35
+    vram_gb: 2
+    licence: Apache-2.0 (Tencent ARC)
+    used_by: [faces restore]
+    node: gfpgan
+  # facexlib's RetinaFace detector (detection_Resnet50_Final.pth, 110 MB) and ParseNet face mask (parsing_parsenet.pth, 85 MB)
+  # download into facexlib's own weights folder the first time `faces: restore` runs (MIT). CodeFormer is deliberately not
+  # used: its licence is non-commercial.
+
 huggingface:
   - name: Depth Anything V2 Small
     repo: depth-anything/Depth-Anything-V2-Small-hf

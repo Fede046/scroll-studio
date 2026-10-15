@@ -115,7 +115,8 @@ def sheet_jpg(cards: list[Card], files: dict, out: Path, head: dict) -> Path:
             bits.append("not approved" if c.approval == "no" else "changed since approval")
         d.text((x + 16, ty + 38), " · ".join(bits), fill=DIM, font=f_s)
         yy = ty + 68
-        for label, text, col, maxl in (("", c.caption, "#ffb27a", 1), ("", c.prompt, INK, 3), ("motion: ", c.motion, DIM, 2)):
+        for label, text, col, maxl in (("", c.caption, "#ffb27a", 1), ("", c.prompt, INK, 3), ("motion: ", c.motion, DIM, 2),
+                                    ("", c.note if c.note.startswith("reveal") else "", "#8fd3ff", 2)):
             if not text:
                 continue
             for line in wrap(label + text, f_b, cw - 32)[:maxl]:
