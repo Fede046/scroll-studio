@@ -89,6 +89,22 @@ the real first frames (same stages and caches), so approving them is not wasted 
 - `faces: restore` (a beat or the film) repairs faces in generated video; off by default, ~0.7 s per 1080p frame. Needs
   `studio setup-comfy` once (and a ComfyUI restart); `studio doctor` checks it.
 
+### Edits that change only a region
+
+- Versions of one frame that dissolve into each other (a frozen moment that gets richer as the camera visits shoes, then
+  hands) must not shimmer: a plain Qwen edit nudges everything. Give the edit a `region`:
+  `image: { edit: { source: ..., instruction: "Redraw her shoes in rich detail and colour ...", region: { prompt: "the
+  girl's shoes", pick: largest, grow: 12, feather: 8 }, seed: 3 } }` (or `region: "the girl's shoes"`; or `box` /
+  `points`, 0-1 of the source). Everything outside the mask is the source, pixel for pixel; chain the edits (shoes, then
+  hands on the shoes' result, then the whole girl).
+- The editor sees a padded crop around the region (`context`), so small regions get real detail; the instruction should
+  say the colour, material and light you want (the seam is matched by the edit, the feather only hides the join).
+  `scope: image` for a region that is most of the picture; `invert: true` to edit everything except the region.
+- Look at the result with the outline on: `edit_<digest>.outline.png` / `.mask.png` beside the edit in
+  `.build/_generated/`, the card in `studio storyboard`, or the **region** button in `--edit`. A wrong mask is fixed with
+  `pick`, `within`, `points` / `negative_points`, `grow` (the boxes found are in `region_<digest>.boxes.jpg`), not by
+  rewording the instruction.
+
 ## 4. Build, look, fix
 1. `build(project, draft=True)` (or `only=[ids]` for a few shots) then `wait_for_job`. Read the log on failure: it names the stage and the cause.
 2. `snapshot(project)`, then read the sheet image. Check: text legible over the visual, the subject framed

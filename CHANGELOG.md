@@ -9,6 +9,19 @@ Everything so far is version 1. On 2026-10-12 the releases first published as 2.
 ## Unreleased
 
 ### Added
+- Region edits: `edit.region` confines an image edit to part of the picture. `region` takes a `prompt` (Florence-2
+  grounding on the source, with `pick`, `within` and the "X's Y" owner rule from `reveal`), or `box` / `points` /
+  `negative_points` (0-1); SAM 2.1 (image mode, through the existing `SSRevealTrack` node on a one-frame batch: no new
+  ComfyUI node) cuts the mask at the source's resolution. `grow` and `feather` (pixels of the source) shape it, `invert`
+  edits everything except the region, `scope: crop` (default) gives Qwen-Image-Edit a padded crop around the region
+  (`context`) so a small region is drawn with the editor's full working size, `scope: image` the whole picture. The result
+  is composited through the mask in integer arithmetic at source resolution: outside the mask the pixels are the source's,
+  exactly, so chained region edits (shoes, hands, the whole figure) leave everything outside each region as it was and
+  consecutive versions of a frame dissolve with no shimmer. `region: "the shoes"` is a prompt. The mask is saved as
+  `edit_<digest>.mask.png` with an outline overlay; the storyboard sheet draws the outline on the card, the edit workspace
+  shows it over the image and edits the region's prompt, `pick`, `grow` and `feather`. The region joins the cache key only
+  when set (existing renders are untouched; the `examples/feel` plan still shows nothing to render). Module:
+  `engine/region.py`; `reveal.find_boxes` is the grounding both features share.
 - Frozen moments: a beat with `freeze:` is rendered offline instead of generated. It takes one frame (`from: <beat>`, the
   sharpest of that beat's last frames by default, or any `image:`), upscales it (`upscale: 2`; SeedVR2 image restoration
   through ComfyUI, or a local Lanczos + sharpen when its weights are not installed), estimates its depth (Depth Anything

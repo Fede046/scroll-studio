@@ -556,6 +556,48 @@ wins at an edge), on the GPU when there is one and the CPU otherwise; it needs n
 the camera's boxes as flat crops of the source before anything renders, and `build --plan` prices a frozen beat apart
 from a generated one.
 
+### Edit only inside a region (`edit.region`)
+
+A plain image edit (Qwen-Image-Edit) redraws a little of everything: ask for richer shoes and the crowd around them
+shifts too, so two versions of the same frame shimmer when one dissolves into the other. With `region` the edit may
+change **only** part of the picture; everywhere else the result is the source image, pixel for pixel. A landing page
+can freeze a frame of a crowd, let the camera visit one person's shoes and then their hands, and have each come into
+more detail and colour while the rest of the frame stays exactly as it was:
+
+```yaml
+image:
+  edit:
+    source: { beat_frame: { beat: walk, at: last } }
+    instruction: "Redraw her shoes in rich detail: worn leather, laces, stitching, deep brown. Keep the drawing style."
+    region: { prompt: "the girl's shoes", pick: largest, grow: 12, feather: 8 }    # or  region: "the girl's shoes"
+    seed: 3
+```
+
+Chain edits like any others, each region found on the previous result: shoes, then `region: "her hands"` with the shoes
+edit as its `source`, then the whole girl. Outside each region the pixels equal that step's own source.
+
+How it works. (1) **Find**: Florence-2 turns `prompt` into boxes on the source (`pick`, `within` and the "X's Y" owner
+test work as in `reveal`; or give `box` / `points` in 0-1 picture coordinates, `negative_points` for what to leave out),
+and SAM 2.1 cuts a precise mask at the source's resolution. (2) **Shape**: `grow` widens the mask (pixels of the source;
+the edit may redraw that much beyond the thing itself, which helps it blend), `feather` softens its edge, `invert: true`
+edits everything except the region. (3) **Edit**: by default the editor is shown a padded **crop** around the region
+(`context`: how much surrounding, as a share of the region's size, 0.6 by default) rather than the whole picture. The
+editor works at a fixed size (about 1.6 megapixels), so a small region in a big picture gets several times the pixels a
+whole-image pass would give it, and that is where real detail comes from; the surroundings in the crop keep its colour
+and style consistent. `scope: image` shows it the whole picture (always used with `invert`). (4) **Composite**: the
+result is blended back through the feathered mask with integer arithmetic at the source's own size, so where the mask
+is 0 the output pixel *is* the source pixel. Colour and tone at the seam are the edit's job (say what colour and light
+you want in `instruction`); the feather only hides the join.
+
+The mask is kept beside the image: `.build/_generated/edit_<digest>.mask.png` (the exact compositing weight), plus an
+`.outline.png` overlay for review and `region_<digest>.boxes.jpg` (the boxes Florence-2 found, drawn on the source).
+`studio storyboard` draws the outline on a card whose image is a region edit, and the edit workspace (`--edit`) shows it
+over the image (a **region** button switches it off) with the region's prompt, `pick`, `grow` and `feather` as fields;
+a region given as a bare string becomes a mapping when you edit its other fields. Cache: the region is part of the
+edit's digest only when set, so nothing already rendered is redrawn. The region is found on each source once (it is
+cached by the source's content and what names the region), so changing only `seed`, `instruction`, `feather` or `grow`
+reuses it. `ComfyUI` needs the same nodes as `reveal` (`studio setup-comfy`).
+
 ### Colour that follows the camera (`reveal:`)
 
 Say you want a black-and-white crowd with a couple in it, and colour that comes into exactly the part the camera looks

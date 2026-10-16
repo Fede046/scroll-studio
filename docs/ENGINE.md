@@ -192,6 +192,22 @@ UI (React) ◄─► engine server (FastAPI + job queue + websocket events) ◄�
   both on the same keys). The storyboard (`storyboard/reveal.py`) draws every card frame, stand-in and animatic piece
   with the same compositor. `faces` cuts a clip into overlapping chunks of frames, restores each in ComfyUI and joins
   them; the smoothing lives in `scroll_studio_nodes/faces.py`.
+- **Region edits.** `engine/region.py` is what `inputs._edit` calls when an `edit:` has a `region`. `find` locates the
+  region on the source: Florence-2 boxes through `reveal.find_boxes` (`pick`, `within`, the owner rule) or the spec's
+  box/points, then SAM 2.1 in image mode, which is the video predictor over a one-frame batch (`SSRevealTrack` with
+  `frame_index: 0`; the stock node is points-only and the custom node already takes boxes, and not needing a new node
+  means a running ComfyUI never has to be restarted for it); the soft mask is cached as `region_<digest>.png` by the
+  source's content and `find_spec` (everything that names the region, nothing that shapes it). `shape` thresholds,
+  dilates (`grow`), blurs (`feather`, sigma = feather / 2) and inverts it to the 8-bit weight that is also saved as
+  `edit_<digest>.mask.png`. `crop_box` picks the editor's input (the mask's extent plus `context` of its size on each
+  side, at least `MIN_CROP` across, no more than `MAX_CROP_ASPECT` long, inside the picture): Qwen's graph rescales its
+  first image to a fixed ~1.6 MP (`ImageScaleToTotalPixels`), so a crop is drawn at several times the scale of a
+  whole-image pass; the result is resized back to the crop and `composite` blends it in with integer arithmetic
+  (`(src * (255 - m) + edit * m + 127) // 255`, and the source itself where `m == 0`), at the source's size, which is
+  why pixels outside the region are exact. `edit_path` adds `region.edit_key` to its digest only when a region is set,
+  and `inputs.LATE_FIELDS` keeps an unset `region` out of `image_key`, so no existing key moves (the dry-run plan of
+  `examples/feel` is the check). The editor shows the outline (`region.outline_of`: `edit_<digest>.outline.png` beside the
+  image, carried with variants by `copy_sidecars`) on cards (`sheet.thumbs`) and in the workspace (`node_json` `image.region`).
 - **Launch trailers** (`engine/trailer/`, `studio trailer`): a second output from the same spec and the same cache.
   `plan.py` cuts shots from what the builders already rendered (takes, beats, scroll recordings, product stills) onto
   a beat grid; `frame.py` reframes each for 16:9 and 9:16 (the take's product projected through its camera by
@@ -212,6 +228,7 @@ scroll-studio/
     backends/models/           registry.yaml, downloader, VRAM checks
     compile/                   site compiler, templates/, themes/
     plan.py                    dry-run build plans, estimates calibrated from stage stamps
+    region.py                  `edit.region`: find a region on an image (Florence-2 + SAM 2.1), edit a crop, composite exactly
     storyboard/                cards per shot, stand-in films, sheet.jpg/storyboard.html, animatic
     storyboard/edit/           the edit workspace: specdoc (site.yaml edits), shots (fields and image chains), variants,
                                render (one image's stage), approvals, workspace + api (server, page.html)

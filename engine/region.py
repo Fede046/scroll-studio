@@ -73,7 +73,7 @@ def seg_graph(image_name: str, prompts: list[dict], tracker: str, prefix: str) -
 
 def find(project, src: Path, region: EditRegion, log=print) -> Path:
     """The soft mask (L, 0-255, the source's size) of the thing the region names on `src`, found once and cached."""
-    from PIL import Image
+    from PIL import Image, ImageOps
     spec = find_spec(region)
     digest = _digest([file_key(src), spec, "large", VERSION])
     gdir = project.build / "_generated"
@@ -84,7 +84,7 @@ def find(project, src: Path, region: EditRegion, log=print) -> Path:
     from .reveal import _draw_boxes, _need_nodes, find_boxes, region_prompts
     _need_nodes(log)
     gdir.mkdir(parents=True, exist_ok=True)
-    im = Image.open(src).convert("RGB")
+    im = ImageOps.exif_transpose(Image.open(src)).convert("RGB")      # as ComfyUI's LoadImage sees it
     work = im
     if max(im.size) > WORK_MAX:
         s = WORK_MAX / max(im.size)
@@ -129,12 +129,24 @@ def find(project, src: Path, region: EditRegion, log=print) -> Path:
 
 # ---------------------------------------------------------------- shaping and compositing (pure numpy/cv2)
 
+def despeckle(m: np.ndarray, share: float = 0.01) -> np.ndarray:
+    """Drop the specks a segmentation leaves far from the thing: connected parts smaller than `share` of the biggest
+    part (two shoes stay, a stray dot goes; a speck would otherwise stretch the crop the editor is shown)."""
+    import cv2
+    n, lab, stats, _ = cv2.connectedComponentsWithStats((m > 0).astype(np.uint8), connectivity=8)
+    if n <= 2:
+        return m
+    areas = stats[1:, cv2.CC_STAT_AREA]
+    keep = np.concatenate([[False], areas >= max(16, share * areas.max())])
+    return np.where(keep[lab], m, 0).astype(np.uint8)
+
+
 def shape(raw: np.ndarray, grow: int, feather: int, invert: bool = False) -> np.ndarray:
     """A finished mask (uint8, 0 = keep the source, 255 = take the edit) from the raw soft mask (uint8, SAM's output):
-    thresholded, grown by `grow` pixels (negative shrinks), blurred so the edge fades over about `feather` pixels, then
+    thresholded, despeckled, grown by `grow` pixels (negative shrinks), blurred so the edge fades over about `feather` pixels, then
     inverted if asked. The edge sits where the grown region ends (half weight there)."""
     import cv2
-    m = (np.asarray(raw) > 127).astype(np.uint8) * 255
+    m = despeckle((np.asarray(raw) > 127).astype(np.uint8) * 255)
     if grow:
         r = max(1, int(round(abs(grow))))
         k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))
@@ -235,7 +247,7 @@ def outline_of(image_path: Path) -> Optional[Path]:
 def apply(project, src: Path, region: EditRegion, out: Path, run_editor: Callable[[Path], Path], log=print) -> Path:
     """Write the region edit of `src` to `out`. `run_editor(png)` edits one image with the instruction (Qwen-Image-Edit)
     and returns the path of its result at any size; it is given a crop of `src` or `src` itself."""
-    from PIL import Image
+    from PIL import Image, ImageOps
     raw_path = find(project, src, region, log)
     raw = np.asarray(Image.open(raw_path).convert("L"))
     mask = shape(raw, region.grow, region.feather, region.invert)
@@ -243,7 +255,7 @@ def apply(project, src: Path, region: EditRegion, out: Path, run_editor: Callabl
         raise BuildError("edit region: nothing is left of the mask after `grow` and `feather`")
     if mask.min() == 255 and not region.invert:
         log("  note: the region covers the whole picture; the edit replaces all of it")
-    srcim = Image.open(src)
+    srcim = ImageOps.exif_transpose(Image.open(src))
     has_alpha = srcim.mode in ("RGBA", "LA") or (srcim.mode == "P" and "transparency" in srcim.info)
     base = srcim.convert("RGBA" if has_alpha else "RGB")
     arr = np.asarray(base)

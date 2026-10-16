@@ -116,6 +116,16 @@ def test_shape_grows_feathers_and_inverts():
     assert np.array_equal(inv, 255 - soft)
 
 
+def test_specks_far_from_the_region_are_dropped_but_a_second_part_stays(monkeypatch):
+    monkeypatch.setattr(region, "MIN_CROP", 16)
+    raw = disc(cx=80, r=25) | disc(cx=240, r=25)                 # two shoes
+    raw[5, 5] = raw[6, 5] = raw[5, 6] = 255                       # and a stray dot
+    m = region.shape(raw, 0, 0)
+    assert m[90, 80] == 255 and m[90, 240] == 255 and m[5, 5] == 0
+    x0, y0, x1, y1 = region.crop_box(m, 0.0)
+    assert y0 > 30                                                # the dot does not stretch the crop
+
+
 def test_composite_is_exact_outside_the_mask_and_the_edit_inside():
     rng = np.random.default_rng(5)
     src = rng.integers(0, 256, (180, 320, 3), dtype=np.uint8)
