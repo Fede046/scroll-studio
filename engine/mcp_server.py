@@ -249,7 +249,8 @@ def resolve_note(project: str, note_id: str, reply: str, changed: Optional[list[
 def set_shot_field(project: str, shot: str, field: str, value: Any) -> dict:
     """Set one field of a storyboard shot in site.yaml (comments and layout kept, validated first, the previous text is
     kept in storyboard/history/). field: a name from storyboard_shots, e.g. caption, prompt, motion, seconds, seed,
-    trim, strength, motion_seed, duration, still.instruction, still.seed, key.<name>.prompt, locked (true/false).
+    trim, strength, motion_seed, duration, still.instruction, still.seed, still.region (an edit's region: what it may change),
+    still.region.prompt / .pick / .grow / .feather, key.<name>.prompt, locked (true/false).
     Changing text does not render anything: follow with regenerate_shot_image (mode rerun) to redraw the image."""
     from .storyboard.edit import specdoc
     try:
