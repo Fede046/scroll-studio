@@ -55,6 +55,10 @@ p.sub { color:var(--dim); font-size:13px; margin-bottom:10px; max-width:80ch; }
 .imgbox { position:relative; aspect-ratio:16/9; background:#000; border-radius:9px; overflow:hidden; border:1px solid var(--line); }
 .imgbox img { width:100%; height:100%; object-fit:contain; display:block; cursor:zoom-in; }
 .imgbox.stale img { opacity:.45; filter:saturate(.6); }
+.imgbox img.regionov { position:absolute; inset:0; cursor:default; pointer-events:none; }
+.imgbox.noregion img.regionov { display:none; }
+.imgbox .rgbtn { position:absolute; right:8px; top:8px; font-size:11.5px; border-radius:6px; padding:0 7px; color:#fff; background:rgba(255,40,80,.85); border:0; cursor:pointer; text-transform:uppercase; letter-spacing:.03em; }
+.imgbox.noregion .rgbtn { background:rgba(60,62,70,.85); }
 .imgbox .empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center; color:var(--dim); padding:14px; font-size:13px; background:repeating-linear-gradient(135deg,#15161a,#15161a 12px,#181a1e 12px,#181a1e 24px); }
 .imgbox .chip { position:absolute; left:8px; top:8px; font-size:11.5px; border-radius:6px; padding:0 7px; color:#0b0b0c; background:var(--ok); text-transform:uppercase; letter-spacing:.03em; }
 .imgbox .chip.stale { background:var(--warn); } .imgbox .chip.missing { background:#7c818c; } .imgbox .chip.file { background:var(--blue); } .imgbox .chip.error { background:var(--bad); }
@@ -369,6 +373,11 @@ function nodeImage(n, label) {
   const box = el("div", { class: "imgbox " + (i.state === "stale" ? "stale" : ""), "data-key": n.key });
   if (i.p) box.append(el("img", { src: imgUrl(i, 640), alt: "", loading: "lazy", onclick: () => lightbox(imgUrl(i, 0)) }));
   else box.append(el("div", { class: "empty" }, i.error ? i.error : (n.kind === "file" ? "file not found" : "not rendered yet. Re-run draws it with the settings below.")));
+  if (i.p && i.region) {      // an edit made inside a region: its outline over the image, switchable
+    box.append(el("img", { class: "regionov", src: imgUrl(i.region, 0), alt: "" }));
+    box.append(el("button", { class: "rgbtn", title: "the region this edit was allowed to change; everything outside it is the source, pixel for pixel",
+      onclick: (ev) => { ev.stopPropagation(); box.classList.toggle("noregion"); } }, "region"));
+  }
   const chip = { current: "rendered", stale: "out of date", missing: "not rendered", file: "file", error: "problem" }[i.state] || i.state;
   box.append(el("span", { class: "chip " + (i.state || "") }, chip));
   box.append(el("div", { class: "jobbox" }));

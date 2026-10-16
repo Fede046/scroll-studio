@@ -198,7 +198,8 @@ def choose_boxes(found: list[list[float]], pick, owners: Optional[list[list[floa
     if isinstance(pick, int):
         return [boxes[min(pick, len(boxes) - 1)]]
     key = {"first": None, "largest": lambda b: -_area(b), "smallest": lambda b: _area(b), "left": lambda b: b[0] + b[2],
-           "right": lambda b: -(b[0] + b[2]), "top": lambda b: b[1] + b[3], "bottom": lambda b: -(b[1] + b[3])}
+           "right": lambda b: -(b[0] + b[2]), "top": lambda b: b[1] + b[3], "bottom": lambda b: -(b[1] + b[3]),
+           "center": lambda b: abs(b[0] + b[2] - 1) + abs(b[1] + b[3] - 1)}
     if pick == "all":
         return boxes
     return [sorted(boxes, key=key[pick])[0]] if key[pick] else [boxes[0]]
@@ -259,6 +260,19 @@ def ground(frame_png: Path, text: str, task: str = "caption_to_phrase_grounding"
     from .backends import comfy
     out = comfy.run_outputs(ground_graph(comfy.upload(str(frame_png)), text, task), poll=2)
     return json.loads(out["gr"]["text"][0])["boxes"]
+
+
+def find_boxes(png: Path, prompt: str, pick, within: Optional[str] = None, log=print) -> tuple[list, list, Optional[list]]:
+    """The boxes a region's prompt names on one image: Florence-2 grounding, narrowed to the matches inside the owner
+    ("the girl's shoes" -> shoes inside the girl; or `within`), then `pick`. Returns (chosen boxes, every match's box,
+    the owner boxes or None). `reveal` and the image editor's `region` both find things this way."""
+    what, owner = split_owner(prompt)
+    owner = within or owner
+    matches = ground(png, what if owner else prompt)
+    owners = [m["box"] for m in ground(png, owner)] if owner else None
+    if owner and not owners:
+        log(f"    note: '{owner}' was not found on the frame; keeping every '{what}'")
+    return choose_boxes([m["box"] for m in matches], pick, owners), [m["box"] for m in matches], owners
 
 
 # ---------------------------------------------------------------- stages
@@ -353,18 +367,12 @@ def track_region(sec: FilmScene, ctx: BuildContext, rv: Reveal, rg: RevealRegion
 
             def find(frame=frame, gj=gj, sfx=sfx, at=at):
                 png = _frame_png(clip, frame, rdir / f"frame{sfx}.png")
-                what, owner = split_owner(rg.prompt)
-                owner = rg.within or owner
-                matches = ground(png, what if owner else rg.prompt)
-                owners = [m["box"] for m in ground(png, owner)] if owner else None
-                if owner and not owners:
-                    ctx.log(f"    note: '{owner}' was not found on the frame; keeping every '{what}'")
-                boxes = choose_boxes([m["box"] for m in matches], rg.pick, owners)
+                boxes, found_all, owners = find_boxes(png, rg.prompt, rg.pick, rg.within, ctx.log)
                 if not boxes:
                     raise BuildError(f"reveal region '{rg.id}': nothing matching \"{rg.prompt}\" on frame {frame}"
                                      f"{'' if at.beat is None else ' of beat ' + at.beat}. Move `at`, reword the prompt, "
                                      f"or give `box` / `points`.")
-                gj.write_text(json.dumps({"frame": frame, "boxes": boxes, "found": [m["box"] for m in matches],
+                gj.write_text(json.dumps({"frame": frame, "boxes": boxes, "found": found_all,
                                           "owner": owners, "source": "prompt"}))
                 _draw_boxes(png, boxes, rdir / f"ground{sfx}.jpg")
             ctx.stage(f"reveal_ground_{rg.id}{sfx}", gkey, [gj], find)

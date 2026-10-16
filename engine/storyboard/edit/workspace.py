@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from ...project import BuildError, Project
+from ...region import outline_of
 from ...server.jobs import Job, JobQueue, logger
 from . import approvals, images, notes, render, shots, specdoc, variants
 from .shots import Board, Fld, Node, Shot, Slot
@@ -189,6 +190,9 @@ class Workspace:
         img: dict = {"state": pr.state, "error": pr.error}
         if pr.path is not None and pr.state in ("current", "file"):
             img |= self._img(pr.path)
+            ol = outline_of(pr.path) if node.kind == "edit" else None     # an edit inside a region: its outline
+            if ol is not None:
+                img["region"] = self._img(ol)
         elif data["variants"]:
             last = data["variants"][-1]
             img |= {"state": "stale"} | self._img(variants.file_of(project, node.key, last))

@@ -225,6 +225,8 @@ def pick(project: Project, key: str, n: int, log: Log = print, push: bool = True
             if target is not None and src.exists():
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(src, target)
+                from ...region import copy_sidecars
+                copy_sidecars(src, target)
                 restored = True
     pr = images.probe(project, board2.site, node2)
     if push:

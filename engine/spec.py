@@ -175,6 +175,50 @@ class ImageInput(Model):
 ImageRef = Union[str, ImageInput]   # a bare string is a file path
 
 
+class EditRegion(Model):
+    """Where an image edit is allowed to change the picture; everywhere else the result is the source, pixel for pixel.
+
+    Name the region (`prompt`, found on the source image by Florence-2 grounding), or point at it (`box`, `points`;
+    0-1 picture coordinates). SAM 2.1 then cuts a precise mask around it. A bare string is a prompt:
+    `region: "the girl's shoes"`. The editor works on a padded crop around the region (see `scope`), and the result is
+    composited back through the feathered mask at the source's own resolution."""
+    prompt: Optional[str] = Field(None, description="What the edit may change, as you would say it to a person: \"the girl's "
+                                                    "shoes\", \"the shoes of the woman and the man\"")
+    points: list[tuple[float, float]] = Field(default_factory=list, description="Points ON the thing, 0-1 across and down the "
+                                                                              "source image (with or without a prompt or box)")
+    negative_points: list[tuple[float, float]] = Field(default_factory=list, description="Points on what the mask must NOT take")
+    box: Optional[tuple[float, float, float, float]] = Field(None, description="x0, y0, x1, y1 around it, 0-1 of the source "
+                                                                              "(skips the prompt's search)")
+    pick: Union[Literal["all", "first", "largest", "smallest", "left", "right", "top", "bottom", "center"], int] = Field(
+        "all", description="When the prompt matches several things: all of them, one by rank (largest, left, center ...) or "
+                           "by index (0 is the first the search lists)")
+    within: Optional[str] = Field(None, description="Keep only the matches inside the thing this names, e.g. prompt \"hands\" "
+                                                    "within \"the girl in the red coat\". A prompt shaped \"the X's Y\" or "
+                                                    "\"the Y of the X\" does this by itself")
+    grow: int = Field(0, ge=-80, le=200, description="Widen (+) or shrink (-) the mask by this many pixels of the source image "
+                                                      "(the edit is free to redraw this much beyond the thing itself)")
+    feather: int = Field(8, ge=0, le=100, description="Softness of the mask's edge in pixels of the source image: the edit "
+                                                       "fades into the untouched picture over about this distance")
+    invert: bool = Field(False, description="Edit everything EXCEPT the region (the region stays the source, pixel for pixel)")
+    scope: Literal["crop", "image"] = Field(
+        "crop", description="crop: the editor sees only a padded crop around the region, upscaled to its working size, so a "
+                            "small region gets full detail; image: the editor sees the whole picture (always used with "
+                            "`invert`)")
+    context: float = Field(0.6, ge=0, le=4, description="scope crop: how much of the surroundings the editor sees, as a share "
+                                                         "of the region's size added on every side")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _bare_prompt(cls, v):
+        return {"prompt": v} if isinstance(v, str) else v
+
+    @model_validator(mode="after")
+    def _has_target(self):
+        if not (self.prompt or self.points or self.box):
+            raise ValueError("an edit region needs a prompt, points or a box")
+        return self
+
+
 class ImageEdit(Model):
     """Derive an image from another with a local image editor (Qwen-Image-Edit): change one thing, keep the rest."""
     source: ImageRef = Field(..., description="The image to edit (a file, or another generated image)")
@@ -183,6 +227,10 @@ class ImageEdit(Model):
                                                                    "('put the second image on the laptop screen')")
     seed: int = 7
     steps: int = Field(30, ge=4, le=60)
+    region: Optional[EditRegion] = Field(
+        None, description="Edit only inside this region of the source image (or, with `invert`, everywhere but inside it): "
+                          "the rest of the result is the source, pixel for pixel, so consecutive versions of a frame "
+                          "differ only where the edit is")
 
 
 ImageInput.model_rebuild()

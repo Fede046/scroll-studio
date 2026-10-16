@@ -132,7 +132,12 @@ def describe(ref) -> str:
         while not isinstance(src, str) and src.edit and not src.generate and not src.file and src.product is None:
             src = src.edit.source
         base = describe(src)
-        return f"edit: {ref.edit.instruction}" + (f"  (from: {base[:70]}{'...' if len(base) > 70 else ''})" if base else "")
+        rg = ref.edit.region
+        where = ""
+        if rg is not None:
+            what = rg.prompt or ("box" if rg.box else "points")
+            where = f" [{'outside' if rg.invert else 'only in'}: {what}]"
+        return f"edit{where}: {ref.edit.instruction}" + (f"  (from: {base[:70]}{'...' if len(base) > 70 else ''})" if base else "")
     if ref.product is not None:
         view = ref.product if isinstance(ref.product, str) else ref.product.view
         scene = ref.scene or (getattr(ref.product, "scene", None) if not isinstance(ref.product, str) else None)

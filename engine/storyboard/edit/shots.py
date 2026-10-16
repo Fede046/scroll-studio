@@ -28,7 +28,7 @@ import yaml
 from ...inputs import image_key
 from ...plan import image_refs, section_locked
 from ...project import Project
-from ...spec import FilmScene, FreezeEase, ImageInput, Site, is_scene
+from ...spec import EditRegion, FilmScene, FreezeEase, ImageInput, Site, is_scene
 from . import specdoc
 from .specdoc import MISSING, dotted
 
@@ -223,6 +223,34 @@ def _view_options() -> list[str]:
 
 # ---------------------------------------------------------------- image chains
 
+def _region_fields(b: _B, e, prefix: str, P: tuple) -> list[Fld]:
+    """The fields of an edit's `region`: one text field to name it (also how a region is added), and, once it is a
+    mapping, how it is picked and shaped. A region given as a box or points keeps those in the file; only its shape
+    fields are offered."""
+    path = P + ("edit", "region")
+    raw = b.got(path)
+    if not isinstance(raw, dict):               # none yet, or the bare-string form: one text field either way
+        return [b.fld(f"{prefix}.region", "edit only inside (region)", TEXT, path, e.region.prompt if e.region else "",
+                      hint="describe what the edit may change, e.g. \"the girl's shoes\"; empty = the whole image. "
+                           "Everything outside it stays the source, pixel for pixel")]
+    r = e.region
+    out = []
+    if r.prompt is not None or not (r.box or r.points):
+        out.append(b.fld(f"{prefix}.region.prompt", "region (what the edit may change)", TEXT, path + ("prompt",), r.prompt or "",
+                         recipe=True, attr=("edit", "region", "prompt")))
+    elif r.box or r.points:
+        out.append(Fld(f"{prefix}.region.where", "region", TEXT, [path], None, "box / points (edit them in site.yaml)",
+                       readonly=True))
+    out += [
+        b.fld(f"{prefix}.region.pick", "pick", SELECT, path + ("pick",), r.pick if isinstance(r.pick, str) else str(r.pick),
+              options=list(get_args(get_args(EditRegion.model_fields["pick"].annotation)[0])),
+              recipe=True, attr=("edit", "region", "pick"), hint="when the prompt matches several things"),
+        b.fld(f"{prefix}.region.grow", "grow (px)", INT, path + ("grow",), r.grow, recipe=True, attr=("edit", "region", "grow")),
+        b.fld(f"{prefix}.region.feather", "feather (px)", INT, path + ("feather",), r.feather, recipe=True,
+              attr=("edit", "region", "feather"))]
+    return out
+
+
 def _node_for(b: _B, m: ImageInput, path: tuple, alpha: bool, prefix: str, depth: int) -> Node:
     """The node an ImageInput is (the same precedence `resolve_image` uses; a `crop` rides on whichever it wraps)."""
     from ...spec import ProductShot
@@ -273,8 +301,12 @@ def _node_for(b: _B, m: ImageInput, path: tuple, alpha: bool, prefix: str, depth
                   recipe=True, attr=("edit", "instruction")),
             b.fld(f"{prefix}.seed", "seed", INT, P + ("edit", "seed"), e.seed, recipe=True, attr=("edit", "seed")),
             b.fld(f"{prefix}.steps", "steps", INT, P + ("edit", "steps"), e.steps, recipe=True, attr=("edit", "steps"))]
+        n.fields += _region_fields(b, e, prefix, P)
         n.regen = True
         n.summary = e.instruction + (f"  (+{len(e.refs)} reference image{'s' if len(e.refs) > 1 else ''})" if e.refs else "")
+        if e.region is not None:
+            what = e.region.prompt or ("a box" if e.region.box else "points")
+            n.summary += f"  [{'everywhere but' if e.region.invert else 'only inside'}: {what}]"
         return n
     if m.gradient:
         n.kind, n.label, n.regen = "gradient", "gradient", True

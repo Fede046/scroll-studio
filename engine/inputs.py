@@ -63,7 +63,7 @@ def _lfs_check(url: str, out: Path, log=print) -> None:
 
 # Image-input fields added after earlier builds were keyed: left out of keys while unset, so adding a field never
 # re-renders finished work.
-LATE_FIELDS = ("product", "scene", "beat_frame")
+LATE_FIELDS = ("product", "scene", "beat_frame", "region")
 
 
 def stable_dump(model) -> dict:
@@ -96,7 +96,11 @@ def edit_path(project: Project, ref: ImageInput, srcs: list[Path]) -> Path:
     """Where an `edit:` image is cached, given its resolved source images (the edit's source, then its refs)."""
     from .project import file_key
     e = ref.edit
-    digest = hashlib.sha1(json.dumps([[file_key(s) for s in srcs], e.instruction, e.seed, e.steps, 2]).encode()).hexdigest()[:12]
+    key = [[file_key(s) for s in srcs], e.instruction, e.seed, e.steps, 2]
+    if e.region is not None:       # a region is part of the key only when set: edits made before it keep their images
+        from .region import edit_key
+        key.append(edit_key(e.region))
+    digest = hashlib.sha1(json.dumps(key).encode()).hexdigest()[:12]
     return project.build / "_generated" / f"edit_{digest}.png"
 
 
@@ -178,14 +182,31 @@ def _edit(project: Project, ref: ImageInput, log=print) -> Path:
                            Image.open(srcs[0]).size)
     if not comfy.alive():
         raise BuildError(f"this image is edited locally with Qwen-Image-Edit, but ComfyUI is not running at {comfy.COMFY}.")
-    log(f"  editing image (Qwen-Image-Edit, seed {e.seed}): {e.instruction[:80]}")
-    comfy.free()
-    names = [comfy.upload(str(s)) for s in srcs]
-    images = comfy.run(comfy.build_qwen_edit_graph(names, e.instruction, e.seed, e.steps, prefix=f"studio/edit_{digest}"), poll=2)
-    tmp = comfy.fetch(images, str(out.parent / f"_edit_{digest}"))
     out.parent.mkdir(parents=True, exist_ok=True)
-    shutil.move(str(Path(tmp) / "0001.png"), out)
-    shutil.rmtree(tmp, ignore_errors=True)
+
+    def qwen(first: Path) -> Path:
+        """Qwen-Image-Edit of `first` (the source, or a crop of it) with the edit's references; the result's path."""
+        comfy.free()
+        names = [comfy.upload(str(s)) for s in [first, *srcs[1:]]]
+        images = comfy.run(comfy.build_qwen_edit_graph(names, e.instruction, e.seed, e.steps, prefix=f"studio/edit_{digest}"), poll=2)
+        tmp = comfy.fetch(images, str(out.parent / f"_edit_{digest}"))
+        res = out.parent / f"_edit_{digest}.png"
+        shutil.move(str(Path(tmp) / "0001.png"), res)
+        shutil.rmtree(tmp, ignore_errors=True)
+        return res
+
+    if e.region is not None:
+        from . import region
+        log(f"  editing image inside a region (Qwen-Image-Edit, seed {e.seed}): {e.instruction[:80]}")
+        try:
+            region.apply(project, srcs[0], e.region, out, qwen, log)
+        finally:
+            (out.parent / f"_edit_{digest}.png").unlink(missing_ok=True)
+            comfy.free()
+        return out
+    log(f"  editing image (Qwen-Image-Edit, seed {e.seed}): {e.instruction[:80]}")
+    res = qwen(srcs[0])
+    shutil.move(str(res), out)
     comfy.free()
     return out
 

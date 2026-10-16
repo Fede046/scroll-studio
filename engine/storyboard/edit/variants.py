@@ -79,6 +79,8 @@ def register(project: Project, key: str, src: Path, cache: str, recipe: dict, or
         d = folder(project, key)
         d.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, d / name)
+        from ...region import copy_sidecars          # an edit inside a region: its mask and outline go with it
+        copy_sidecars(Path(src), d / name)
         v = {"n": n, "cache": cache, "file": name, "seed": seed, "recipe": recipe, "origin": origin,
              "time": time.strftime("%Y-%m-%d %H:%M:%S")}
         data["variants"].append(v)

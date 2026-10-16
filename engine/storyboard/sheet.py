@@ -7,6 +7,7 @@ from pathlib import Path
 
 from ..fidelity import font, wrap
 from ..plan import fmt
+from ..region import outline_of as region_outline
 from .cards import Card, _digest
 
 STATUS = {"new": "#3d8bfd", "changed": "#ff8a3d", "unchanged": "#7c818c", "locked": "#a479f0", "rendered": "#2fb67c"}
@@ -24,7 +25,8 @@ def thumbs(cards: list[Card], out: Path, width: int = 640) -> dict[str, list[str
         names = []
         for f in c.frames:
             st = f.path.stat()
-            name = f"{_digest([str(f.path), st.st_size, int(st.st_mtime), width])}.jpg"
+            ol = region_outline(f.path)          # an image edited inside a region: its outline is drawn on the card
+            name = f"{_digest([str(f.path), st.st_size, int(st.st_mtime), width, ol.stat().st_mtime_ns if ol else 0])}.jpg"
             dst = d / name
             if not dst.exists():
                 im = Image.open(f.path)
@@ -35,6 +37,11 @@ def thumbs(cards: list[Card], out: Path, width: int = 640) -> dict[str, list[str
                     im = flat
                 im = im.convert("RGB")
                 im.thumbnail((width, width), Image.LANCZOS)
+                if ol:
+                    mark = Image.open(ol).convert("RGBA").resize(im.size, Image.LANCZOS)
+                    im = im.convert("RGBA")
+                    im.alpha_composite(mark)
+                    im = im.convert("RGB")
                 im.save(dst, quality=84)
             keep.add(name)
             names.append(f"frames/{name}")
