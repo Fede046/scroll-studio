@@ -254,11 +254,17 @@ def refine_depth(parent_up: np.ndarray, rgb: np.ndarray, grow: int = 0) -> tuple
 
 @dataclass
 class TileImage:
-    """A built tile: its picture (uint8 H x W x 3), its depth for the render (float 0-1, grown) and where it sits."""
+    """A built tile: its picture (uint8 H x W x 3), its depth for the render (float 0-1, grown) and where it sits. With
+    layered depth it also carries, at its own resolution, the alpha of every subject plane (P, H, W uint8), the
+    background plane's picture (the plate where subjects stood), and the plane depths (P, H, W) and background depth."""
     level: int
     box: tuple
     rgb: np.ndarray
     depth: np.ndarray
+    alpha: Optional[np.ndarray] = None
+    bg: Optional[np.ndarray] = None
+    pdepth: Optional[np.ndarray] = None
+    bgdepth: Optional[np.ndarray] = None
 
     @property
     def size(self) -> float:
@@ -275,3 +281,29 @@ def raw_depth(depth: np.ndarray, rgb: np.ndarray, size: tuple[int, int]) -> np.n
     d = cv2.resize(depth.astype(np.float32), (W, H), interpolation=cv2.INTER_CUBIC)
     g = cv2.cvtColor(cv2.resize(rgb, (W, H), interpolation=cv2.INTER_AREA), cv2.COLOR_RGB2GRAY).astype(np.float32) / 255
     return np.clip(guided_filter(g, np.clip(d, 0, 1), max(3, W // 240), 2e-3), 0, 1).astype(np.float32)
+
+
+def despeckle(img: np.ndarray, radius: int = 4, contrast: float = 22.0, max_area: int = 60) -> tuple[np.ndarray, int]:
+    """Remove the specks a redraw leaves: small, compact bright dots on a dark ground and dark dots on a light one (the
+    sampler's stray pixels, which at 20x are the first thing the eye finds). A speck is a part of the picture smaller
+    than `radius` pixels that stands out from its surroundings by `contrast` levels (white or black top-hat), is
+    compact (a stitch or a hair is thin and long, and is kept), and is at most `max_area` pixels; it is replaced by
+    what surrounds it. Returns (picture, specks removed)."""
+    import cv2
+    g = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * radius + 1, 2 * radius + 1))
+    hot = (cv2.morphologyEx(g, cv2.MORPH_TOPHAT, k) > contrast).astype(np.uint8)
+    cold = (cv2.morphologyEx(g, cv2.MORPH_BLACKHAT, k) > contrast).astype(np.uint8)
+    mask = np.zeros(g.shape, np.uint8)
+    n = 0
+    for m in (hot, cold):
+        cnt, lab, st, _ = cv2.connectedComponentsWithStats(m, connectivity=8)
+        for i in range(1, cnt):
+            x, y, w, h, area = st[i]
+            if area <= max_area and max(w, h) <= 2 * radius + 1 and max(w, h) <= 2.2 * min(w, h):
+                mask[lab == i] = 255
+                n += 1
+    if not n:
+        return img, 0
+    mask = cv2.dilate(mask, np.ones((3, 3), np.uint8))
+    return cv2.inpaint(img, mask, 3, cv2.INPAINT_TELEA), n

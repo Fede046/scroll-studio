@@ -37,12 +37,20 @@ GENERIC_PROMPT = ("the same style, lighting, line work and colours as the pictur
 @dataclass
 class Level0:
     """The base level the pyramid starts from: the (upscaled) frame, its raw depth (edge-snapped, not grown) at the
-    beat's size, and a key naming what made them."""
+    beat's size, and a key naming what made them. `layers`: the frame's planes (layers.LayerSet) when it is layered."""
     rgb: np.ndarray
     depth_raw: np.ndarray
     key: str
+    layers: object = None
 
     box = (0.0, 0.0, 1.0, 1.0)
+
+    def planes(self):
+        """(alpha (P,H,W) float, hole (H,W) float, background picture uint8): what a layered tile starts from."""
+        from . import layers as L
+        if not hasattr(self, "_bg"):
+            self._bg = L.base_background(self.rgb, self.layers)
+        return self.layers.alpha, self.layers.hole, self._bg
 
 
 def digest(*parts) -> str:
@@ -133,7 +141,7 @@ def redraw(img: np.ndarray, d, seed: int, work: Path, log: Callable) -> np.ndarr
 
 def make_tile(parent, tile: Tile, tsize: tuple[int, int], d, sr_method: str, seed: int, work: Path, log: Callable
               ) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict]:
-    """One tile from its parent (a Level0 or a TileImage-like with .rgb, .depth_raw, .box): (picture uint8, raw depth,
+    """One tile from its parent (a Level0 or a Built with .rgb, .depth_raw, .box): (picture uint8, raw depth,
     depth for the render, info)."""
     import cv2
     tw, th = tsize
@@ -141,6 +149,9 @@ def make_tile(parent, tile: Tile, tsize: tuple[int, int], d, sr_method: str, see
     parent_up = zoom.resample_box(parent.rgb, parent.box, tile.box, tsize, "cubic")
     big = enlarge(parent.rgb, parent.box, tile, tsize, sr_method, seed, work, log)
     drawn = redraw(big, d, seed, work, log)
+    specks = 0
+    if d.strength > 0:
+        drawn, specks = zoom.despeckle(drawn, contrast=18.0)
     aligned, ainfo = zoom.align(drawn, parent_up)
     s = (tw / (tile.box[2] - tile.box[0])) / (pw / (parent.box[2] - parent.box[0]))        # tile pixels per parent pixel
     sigma = max(0.8, d.lock * s)
@@ -149,22 +160,41 @@ def make_tile(parent, tile: Tile, tsize: tuple[int, int], d, sr_method: str, see
     pd = zoom.resample_box(parent.depth_raw.astype(np.float32), parent.box, tile.box, tsize, "linear")
     raw, grown = zoom.refine_depth(pd, out, grow=max(1, tw // 800))
     hf = lambda a: float(np.std(a.astype(np.float32) - cv2.GaussianBlur(a.astype(np.float32), (0, 0), sigma)))
-    info = {"align": ainfo, "sigma": sigma, "scale": s, "detail_gain": hf(out) / max(hf(parent_up), 1e-3)}
+    info = {"align": ainfo, "sigma": sigma, "scale": s, "specks": specks, "detail_gain": hf(out) / max(hf(parent_up), 1e-3)}
     return out, raw, grown, info
 
 
 @dataclass
 class Built:
-    """A tile as built: what the next level starts from (picture, raw depth, box) and what the render uses."""
+    """A tile as built: what the next level starts from (picture, raw depth, box) and what the render uses. A layered tile
+    also has its planes: alphas (P,H,W) u8, hole (H,W) u8, background picture, and the plane depths."""
     level: int
     box: tuple
     rgb: np.ndarray
     depth_raw: np.ndarray
     depth: np.ndarray
     key: str
+    alpha: Optional[np.ndarray] = None
+    hole: Optional[np.ndarray] = None
+    bg: Optional[np.ndarray] = None
+    pdepth: Optional[np.ndarray] = None
+    bgdepth: Optional[np.ndarray] = None
+
+    def planes(self):
+        return self.alpha.astype(np.float32) / 255, self.hole.astype(np.float32) / 255, self.bg
 
     def image(self) -> TileImage:
-        return TileImage(self.level, self.box, self.rgb, self.depth)
+        return TileImage(self.level, self.box, self.rgb, self.depth, self.alpha, self.bg, self.pdepth, self.bgdepth)
+
+
+def layer_planes(parent, tile: Tile, rgb: np.ndarray, raw: np.ndarray, tsize: tuple[int, int]):
+    """A layered tile's planes from its parent's: refined alphas, hole, background picture, plane depths."""
+    from . import layers as L
+    pa, ph, pb = parent.planes()
+    rs = lambda img, sb, db: zoom.resample_box(np.ascontiguousarray(img), sb, db, tsize, "linear" if img.dtype != np.uint8 or img.ndim == 2 else "cubic")
+    alpha, hole, bg = L.tile_layers(pa, ph, pb, rgb, parent.box, tile.box, rs)
+    pd, bd = L.tile_plane_depths(raw, alpha, hole)
+    return alpha, hole, bg, pd, bd
 
 
 def tile_keys(tiles: list[Tile], base_key: str, tsize: tuple[int, int], d, sr_method: str, seed0: int) -> list[str]:
@@ -198,21 +228,34 @@ def build_pyramid(bdir: Path, base: Level0, f, seconds: float, size: tuple[int, 
         parent = base if t.parent < 0 else built[t.parent]
         key = keys[i]
         png, npz, js = zdir / f"L{t.level}_{key}.png", zdir / f"L{t.level}_{key}.npz", zdir / f"L{t.level}_{key}.json"
-        if png.exists() and npz.exists() and js.exists():
+        bgp = png.with_name(png.stem + ".bg.png")
+        if png.exists() and npz.exists() and js.exists() and (base.layers is None or bgp.exists()):
             z = np.load(npz)
-            built.append(Built(t.level, t.box, _read(png), z["raw"].astype(np.float32), z["depth"].astype(np.float32), key))
+            b = Built(t.level, t.box, _read(png), z["raw"].astype(np.float32), z["depth"].astype(np.float32), key)
+            if base.layers is not None:
+                b.alpha, b.hole, b.bg = z["alpha"], z["hole"], _read(bgp)
+                b.pdepth, b.bgdepth = z["pdepth"].astype(np.float32), z["bgdepth"].astype(np.float32)
+            built.append(b)
             continue
         t0 = time.time()
         log(f"  tile {i + 1}/{len(tiles)}: level {t.level}, box [{', '.join(f'{v:.3f}' for v in t.box)}]")
         rgb, raw, grown, info = make_tile(parent, t, tsize, d, sr_method, seed0 + 101 * t.level, zdir, log)
+        extra: dict = {}
+        if base.layers is not None:
+            alpha, hole, bg, pd, bd = layer_planes(parent, t, rgb, raw, tsize)
+            extra = {"alpha": alpha, "hole": hole, "pdepth": pd.astype(np.float16), "bgdepth": bd.astype(np.float16)}
+            _write(bg, bgp)
         _write(rgb, png.with_name("_tmp_" + png.name))
-        np.savez(zdir / "_tmp.npz", raw=raw.astype(np.float16), depth=grown.astype(np.float16))
+        np.savez(zdir / "_tmp.npz", raw=raw.astype(np.float16), depth=grown.astype(np.float16), **extra)
         (zdir / "_tmp.npz").replace(npz)
         png.with_name("_tmp_" + png.name).replace(png)
         js.write_text(json.dumps(info))
         log(f"    done in {time.time() - t0:.0f}s: aligned dx={info['align']['dx']:.2f} dy={info['align']['dy']:.2f} "
             f"px, new detail x{info['detail_gain']:.2f}")
-        built.append(Built(t.level, t.box, rgb, raw, grown, key))
+        b = Built(t.level, t.box, rgb, raw, grown, key)
+        if base.layers is not None:
+            b.alpha, b.hole, b.bg, b.pdepth, b.bgdepth = alpha, hole, bg, pd, bd
+        built.append(b)
     return built
 
 

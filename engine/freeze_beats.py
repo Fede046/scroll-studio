@@ -383,10 +383,13 @@ def render_beat(project, sec, b, log=print, preview_size: Optional[tuple[int, in
     rkey = {"up": digest(upkey), "depth": digest(dkey), "cam": f.model_dump(mode="json", by_alias=True,
             include={"camera", "parallax", "dolly", "ease", "blur", "grain", "seed"}), "seconds": b.seconds,
             "trim": trim_n, "size": size, "v": VERSION}
-    zoomed = f.detail is not None
+    zoomed, layered = f.detail is not None, f.layers is not None
+    lkey = ""
+    if layered:                                   # layered depth: the render is keyed by the planes it is made of
+        lkey = digest("layers", f.layers.model_dump(mode="json"), f.seed)
+        rkey["layers"] = lkey
     if zoomed:                                    # deep zoom: the render is keyed by the tiles it is made of
-        from . import zoom_build
-        rkey["zoom"] = zoom_beat_key(f, b, upscaled_key=digest(upkey), size=size, depth_key=digest(dkey),
+        rkey["zoom"] = zoom_beat_key(f, b, upscaled_key=digest(upkey) + lkey, size=size, depth_key=digest(dkey),
                                      method=up.resolve_method(f.upscale_method))
     stamp = clip.with_name(clip.name + ".key")
     if clip.exists() and stamp.exists() and stamp.read_text() == digest(rkey) and (bdir / "last.png").exists():
@@ -394,16 +397,23 @@ def render_beat(project, sec, b, log=print, preview_size: Optional[tuple[int, in
         return clip
     rgb = read_rgb(upscaled)
     t1 = time.time()
-    if zoomed:
+    if zoomed or layered:
         from . import zoom_build, zoom_render
         raw = np.load(_cached(bdir / "depth_raw.npy", {"depth": digest(dkey), "raw": 1}, lambda tmp: _make_raw_depth(
             tmp, upscaled, f, size))).astype(np.float32)
-        built = zoom_build.build_pyramid(bdir, zoom_build.Level0(rgb, raw, digest(upkey) + digest(dkey)), f, b.seconds, size,
-                                         up.resolve_method(f.upscale_method), log)
+        ls = None
+        if layered:
+            from . import layers as L
+            ls = L.build_cached(bdir, frozen, read_rgb(frozen), raw, f.layers, f.seed if f.layers.seed is None else f.layers.seed,
+                                digest(upkey) + digest(dkey), log)
+        built = []
+        if zoomed:
+            base = zoom_build.Level0(rgb, raw, digest(upkey) + digest(dkey) + lkey, ls)
+            built = zoom_build.build_pyramid(bdir, base, f, b.seconds, size, up.resolve_method(f.upscale_method), log)
         t1 = time.time()
         frames = zoom_render.render_frames(rgb, depth, [x.image() for x in built], f.camera, size=size, seconds=b.seconds,
                                            first_frame=trim_n, parallax=f.parallax, dolly=f.dolly, ease=f.ease,
-                                           blur=f.blur, grain=f.grain, seed=f.seed)
+                                           blur=f.blur, grain=f.grain, seed=f.seed, layers=ls)
     else:
         frames = fz.render_frames(rgb, depth, f.camera, size=size, seconds=b.seconds, first_frame=trim_n,
                                   parallax=f.parallax, dolly=f.dolly, ease=f.ease, blur=f.blur, grain=f.grain, seed=f.seed)

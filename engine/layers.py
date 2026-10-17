@@ -118,7 +118,7 @@ def refine_alpha(parent_up: np.ndarray, rgb: np.ndarray, radius: int = 0, eps: f
     from .freeze import guided_filter
     H, W = rgb.shape[:2]
     g = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY).astype(np.float32) / 255
-    r = radius or max(2, W // 600)
+    r = radius or max(3, W // 400)
     a = guided_filter(g, np.clip(parent_up.astype(np.float32), 0, 1), r, eps)
     return np.clip((a - 0.5) * 1.25 + 0.5, 0, 1)
 
@@ -302,3 +302,59 @@ def tile_layers(parent_alpha: np.ndarray, parent_hole: np.ndarray, parent_bg: np
     h = hole[..., None]
     bg = rgb.astype(np.float32) * (1 - h) + plate_up * h
     return (alpha * 255 + 0.5).astype(np.uint8), (hole * 255 + 0.5).astype(np.uint8), np.clip(bg + 0.5, 0, 255).astype(np.uint8)
+
+
+def base_background(rgb: np.ndarray, ls: LayerSet) -> np.ndarray:
+    """The background plane's picture at the base level's size (`rgb`: the upscaled frame, uint8): the frame's own pixels
+    outside the hole, the plate (enlarged) inside it."""
+    import cv2
+    H, W = rgb.shape[:2]
+    plate = cv2.resize(ls.plate, (W, H), interpolation=cv2.INTER_CUBIC).astype(np.float32)
+    hole = cv2.resize(ls.hole, (W, H), interpolation=cv2.INTER_LINEAR)[..., None]
+    return np.clip(rgb.astype(np.float32) * (1 - hole) + plate * hole + 0.5, 0, 255).astype(np.uint8)
+
+
+def tile_plane_depths(depth_raw: np.ndarray, alpha_u8: np.ndarray, hole_u8: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """(plane depths (P,H,W), background depth (H,W)) of a tile, float32, from its raw depth and its alphas."""
+    P = alpha_u8.shape[0]
+    pd = np.stack([plane_depth(depth_raw, alpha_u8[p].astype(np.float32) / 255) for p in range(P)])
+    return pd.astype(np.float32), background_depth(depth_raw, hole_u8.astype(np.float32) / 255).astype(np.float32)
+
+
+def build_cached(bdir: Path, frozen_png: Path, frozen: np.ndarray, depth_raw: np.ndarray, layers, seed: int, key: str,
+                 log: Callable) -> LayerSet:
+    """The frame's planes, made once and kept under bdir/layers/ (keyed by the frame, its depth and the layers settings)."""
+    from PIL import Image
+    ldir = bdir / "layers"
+    ldir.mkdir(parents=True, exist_ok=True)
+    stamp, npz, plate = ldir / "planes.key", ldir / "planes.npz", ldir / "plate.png"
+    k = hashlib.sha1(json.dumps([VERSION, key, layers.model_dump(mode="json"), seed], sort_keys=True).encode()).hexdigest()[:16]
+    if stamp.exists() and stamp.read_text() == k and npz.exists() and plate.exists():
+        z = np.load(npz, allow_pickle=False)
+        return LayerSet(z["alpha"].astype(np.float32) / 255, z["depth"].astype(np.float32), z["hole"].astype(np.float32) / 255,
+                        np.asarray(Image.open(plate).convert("RGB")), z["bg_depth"].astype(np.float32),
+                        json.loads(str(z["ids"])), k)
+    ls = build_planes(frozen, depth_raw, layers, seed, ldir, log, png=frozen_png)
+    review(ldir, frozen, ls)
+    np.savez(ldir / "_tmp.npz", alpha=(ls.alpha * 255 + 0.5).astype(np.uint8), depth=ls.depth.astype(np.float16),
+             hole=(ls.hole * 255 + 0.5).astype(np.uint8), bg_depth=ls.bg_depth.astype(np.float16), ids=json.dumps(ls.ids))
+    (ldir / "_tmp.npz").replace(npz)
+    Image.fromarray(ls.plate).save(plate)
+    stamp.write_text(k)
+    ls.key = k
+    return ls
+
+
+def review(ldir: Path, frozen: np.ndarray, ls: LayerSet) -> None:
+    """planes.jpg beside the planes: the frame, the plate, and each plane's alpha tinted over the frame (what to look at
+    when a subject was missed or a plate came out wrong)."""
+    from PIL import Image
+    tints = [(255, 60, 60), (60, 200, 90), (70, 120, 255), (255, 200, 40), (200, 80, 255), (40, 220, 220), (255, 130, 40), (160, 160, 160)]
+    over = frozen.astype(np.float32).copy()
+    for i, a in enumerate(ls.alpha):
+        over = over * (1 - 0.55 * a[..., None]) + np.array(tints[i % len(tints)], np.float32) * 0.55 * a[..., None]
+    h, w = frozen.shape[:2]
+    sheet = np.concatenate([frozen, np.clip(over, 0, 255).astype(np.uint8), ls.plate], axis=1)
+    im = Image.fromarray(sheet)
+    im.thumbnail((2400, 700))
+    im.save(ldir / "planes.jpg", quality=88)

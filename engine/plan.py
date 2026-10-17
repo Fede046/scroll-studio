@@ -36,6 +36,8 @@ DEFAULTS = {
     "film:beat": 100.0,         # per second of a beat (still + edit + animation)
     "film:freeze": 1.5,         # per second of a frozen moment (depth + camera render, no upscale)
     "film:freeze_up": 10.0,     # per second of a frozen moment that upscales its frame (SeedVR2: ~2 min, then seconds)
+    "film:freeze_zoom": 150.0,  # per tile of a deep zoom (SeedVR2 enlarge + Z-Image redraw + the agreement, model loads included)
+    "film:freeze_layers": 150.0,  # per frozen moment with layered depth (Florence-2, SAM 2.1 per subject, Qwen background fill)
     "film:join": 0.5,           # per second of film
     "film:reveal_work": 0.8,    # per second of film (reveal: the working-size copy)
     "film:reveal_ground": 25.0,  # per region (Florence-2 on one frame, model load included)
@@ -50,7 +52,7 @@ IMAGES = {"beat frame": 3.0, "image": 15.0, "edit": 60.0, "product still": 25.0,
           "download": 5.0, "art": 240.0, "stand-in": 5.0}
 # what counts as heavy GPU work (a video model, SeedVR2, a Cycles pass over every frame): the build lists these first
 HEAVY = ("film:generate", "film:generate_wan", "film:restore", "film:product", "film:beat", "film:keyframes",
-         "film:freeze_up", "sequence:render", "film:reveal_track", "film:faces")
+         "film:freeze_up", "film:freeze_zoom", "film:freeze_layers", "sequence:render", "film:reveal_track", "film:faces")
 
 
 @dataclass
@@ -171,7 +173,16 @@ def units(sec, name: str) -> tuple[str, float]:
         if name.startswith("beat_") and name != "beats_join":
             b = next((b for b in sec.beats if f"beat_{b.id}" == name), None)
             if b is not None and b.freeze is not None:     # a frozen moment: offline, seconds (minutes with an upscale)
-                return ("film:freeze_up" if b.freeze.upscale > 1 else "film:freeze"), float(b.seconds)
+                f = b.freeze
+                if f.detail is not None:                    # deep zoom: one stage per tile of the camera's pyramid
+                    from .backends.upscale import target_size
+                    from .freeze_beats import beat_size
+                    from .zoom_build import make_plan
+                    size = beat_size(sec)
+                    return "film:freeze_zoom", float(max(1, len(make_plan(f, b.seconds, target_size(size, max(1.0, f.upscale))[0], size)[0])))
+                if f.layers is not None:
+                    return "film:freeze_layers", 1.0
+                return ("film:freeze_up" if f.upscale > 1 else "film:freeze"), float(b.seconds)
             return "film:beat", float(b.seconds if b else 4.0)
         if name == "blockout":
             return "film:blockout", frames
