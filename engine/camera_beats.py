@@ -32,6 +32,19 @@ def backend_of(move) -> str:
     return DEFAULT_BACKEND if move.backend == "auto" else move.backend
 
 
+def start_ref(sec, i: int, size: tuple[int, int]):
+    """The image beat `i` starts from: its own `image`; a camera beat that `continues` starts on the last frame of the beat
+    before it (exactly where that one ended); else its prompt, generated. One answer for the build, the storyboard and the
+    `--only` stand-ins."""
+    from .spec import BeatFrame, ImageInput
+    b = sec.beats[i]
+    if b.image:
+        return b.image
+    if b.camera is not None and b.camera.continues and i > 0:
+        return ImageInput(beat_frame=BeatFrame(beat=sec.beats[i - 1].id, at="last"))
+    return ImageInput(generate=b.prompt, size=tuple(size), seed=b.seed)
+
+
 # ---------------------------------------------------------------- sizes
 
 def gen_size(size: tuple[int, int], backend: str, frames: int) -> tuple[int, int]:
@@ -260,15 +273,8 @@ def guide_only(project, beat_id: str, section: Optional[str] = None, log: Callab
     bdir.mkdir(parents=True, exist_ok=True)
     still = bdir / "still.png"
     if not still.exists():
-        from .spec import ImageInput
         W, H = sec.beat_res[0] // 32 * 32, sec.beat_res[1] // 32 * 32
-        if b.image:
-            ref = b.image
-        elif b.camera.continues and i > 0:
-            from .spec import BeatFrame
-            ref = ImageInput(beat_frame=BeatFrame(beat=sec.beats[i - 1].id, at="last"))
-        else:
-            ref = ImageInput(generate=b.prompt, size=(W, H), seed=b.seed)
+        ref = start_ref(sec, i, (W, H))
         ImageOps.fit(Image.open(resolve_image(project, ref, log)).convert("RGB"), (W, H), Image.LANCZOS).save(still)
     guide, info = guide_for(project, sec, i, still, bdir, log)
     return {"beat": b.id, "dir": str(bdir), "guide": str(guide.depth), "preview": str(guide.rgb), "static": str(guide.static),

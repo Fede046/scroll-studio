@@ -332,6 +332,7 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
     from ..animate import FPS, animate, video_model, wan_settings
     from ..inputs import resolve_image
     from ..spec import ImageInput
+    from ..camera_beats import start_ref
     W, H = sec.beat_res[0] // 32 * 32, sec.beat_res[1] // 32 * 32
     clips, standing = [], []
     only = ctx.options.get("only_beats")      # build --only: the beats to render (None: all)
@@ -347,7 +348,7 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
 
         def run(b=b, bdir=bdir, clip=clip, bi=bi):
             bdir.mkdir(parents=True, exist_ok=True)
-            ref = start_ref(b, bi)
+            ref = start_ref(sec, bi, (W, H))
             src = resolve_image(ctx.project, ref, ctx.log)
             still = bdir / "still.png"
             ImageOps.fit(Image.open(src).convert("RGB"), (W, H), Image.LANCZOS).save(still)
@@ -390,22 +391,13 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
             from ..inputs import stable_dump
             deps = beat_frame_deps(ctx.project, r)      # an image that is a beat's frame depends on that beat's clip
             return {**stable_dump(r), "beat_frame_deps": deps} if deps else stable_dump(r)
-        def start_ref(b, bi):
-            """The beat's start image: its own, or a prompt's; a camera beat that `continues` starts on the last frame of
-            the beat before it (exactly where that one ended)."""
-            if b.image:
-                return b.image
-            if b.camera is not None and b.camera.continues and bi > 0:
-                from ..spec import BeatFrame
-                return ImageInput(beat_frame=BeatFrame(beat=sec.beats[bi - 1].id, at="last"))
-            return ImageInput(generate=b.prompt, size=(W, H), seed=b.seed)
         key = {"prompt": b.prompt, "motion": b.motion, "seconds": b.seconds, "seed": b.seed, "res": [W, H],
                "image": ref_key(b.image)}
         if b.camera is not None:   # only for a camera beat, so every other beat keeps its cache
             from ..camera_beats import key_of as camera_key
             key["camera"] = camera_key(sec, bi)
             if not b.image and b.camera.continues and bi > 0:
-                key["image"] = ref_key(start_ref(b, bi))
+                key["image"] = ref_key(start_ref(sec, bi, (W, H)))
         model = video_model(b.video_model, ctx.options.get("site_video_model"))
         wan = wan_settings(ctx.options.get("site_wan")) if model == "wan" else None
         if model != "ltx":   # only when not the default, so LTX beats rendered before video_model existed stay cached
