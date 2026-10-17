@@ -152,17 +152,25 @@ def make_thumbs(report: dict, sc: A.Scan, st: dict, spans, joins: list[dict], pa
                 h, w = f0.shape[:2]
                 pts = sc.samples[p["frame"]]["edge"].get("points")
                 marked = f0.copy()
+                crops = []
                 if pts is not None and len(pts):
                     for px, py in pts[:: max(1, len(pts) // 1500)]:
                         cv2.circle(marked, (int(px * w), int(py * h)), 3, (0, 0, 255), -1)
-                    x0, y0 = _densest(pts, w, h)
-                else:
-                    x0, y0 = _busiest(f0)
-                crop = f0[y0:y0 + 270, x0:x0 + 480]
-                crop = cv2.resize(crop, None, fx=1.5, fy=1.5, interpolation=cv2.INTER_NEAREST)
-                cm = marked[y0:y0 + 270, x0:x0 + 480]
-                cm = cv2.resize(cm, None, fx=1.5, fy=1.5, interpolation=cv2.INTER_NEAREST)
-                img = _row([_label(M.resize_w(marked, W_SINGLE), f"{x['t']:.1f}s, rims marked red"), _label(crop, "1:1 crop"), _label(cm, "marked")], 315)
+                    rest = pts
+                    for _ in range(2):                         # the two places the rims are densest
+                        if len(rest) < 8:
+                            break
+                        x0, y0 = _densest(rest, w, h)
+                        crops.append((x0, y0))
+                        inside = ((rest[:, 0] * w >= x0) & (rest[:, 0] * w < x0 + 480) & (rest[:, 1] * h >= y0) & (rest[:, 1] * h < y0 + 270))
+                        rest = rest[~inside]
+                if not crops:
+                    crops = [_busiest(f0)]
+                panes = [_label(M.resize_w(marked, W_SINGLE), f"{x['t']:.1f}s, rims marked red")]
+                for n_, (x0, y0) in enumerate(crops):
+                    cm = marked[y0:y0 + 270, x0:x0 + 480]
+                    panes.append(_label(cv2.resize(cm, None, fx=1.5, fy=1.5, interpolation=cv2.INTER_NEAREST), f"1:1 crop {n_ + 1}"))
+                img = _row(panes, 315)
             elif m == "drift":
                 img = _row([_label(M.resize_w(fr[0], 480), "start of the scene"), _label(M.resize_w(fr[-1], 480), f"{x['t']:.1f}s")], 270)
             elif m == "morphs":

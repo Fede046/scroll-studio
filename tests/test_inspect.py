@@ -356,3 +356,15 @@ def test_a_crossfade_between_shots_that_do_not_line_up_ghosts_and_one_that_does_
             assert j["disp"] > 60 and j["sev"] > 0.9, j
         else:
             assert j["disp"] < 5 and j["sev"] == 0.0, j
+
+
+def test_a_video_section_is_one_shot_and_its_badge_is_named_by_the_section(tmp_path):
+    from engine import polish
+    root = tmp_path / "v"
+    (root / "inputs").mkdir(parents=True)
+    (root / "site.yaml").write_text("name: V\nsections:\n  - id: reel\n    type: film\n    video: inputs/reel.mp4\n", encoding="utf-8")
+    write_video(root / "inputs" / "reel.mp4", [shifted(scene(70), 0.6 * i) for i in range(3 * FPS)])
+    project = Project(root)
+    rep = polish.inspect_section(project, "reel", log=lambda m: None)
+    assert [b["id"] for b in rep["beats"]] == ["film"] and rep["joins"] == []
+    assert set(polish.beat_badges(project)) == {"reel"}

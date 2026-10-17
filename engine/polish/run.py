@@ -26,7 +26,7 @@ from . import analyze as A
 from . import metrics as M
 from .explain import HINTS, LABELS, level_of, reason
 
-VERSION = 5
+VERSION = 6
 METRICS = ("pops", "softness", "halos", "drift", "morphs")
 Log = Callable[[str], None]
 
@@ -208,7 +208,7 @@ def inspect_film(path: Path, spans: list[A.BeatSpan], fade: float, out_dir: Path
 
     by_id = {s.id: s for s in spans}
     ctx = {"fade": fade, "spans": by_id, "ref_width": A.width_reference(sc.samples), "ref_detail": A.detail_reference(sc.samples),
-           "spec": spec_info, "rim_base": A.rim_baseline(sc)}
+           "spec": spec_info, "rim_base": A.rim_baseline(sc)[0]}
     issues: list[dict] = []
     for m in METRICS:
         for st_ in _stretches(rows[m], m, spans, fade):
@@ -220,7 +220,7 @@ def inspect_film(path: Path, spans: list[A.BeatSpan], fade: float, out_dir: Path
                            "level": level_of(st_["severity"]), "t": round(st_["t"], 2), "t0": round(st_["t0"], 2),
                            "t1": round(st_["t1"], 2), "beat": st_["beat"], "reason": why, "hint": hint,
                            "_peak": peak})
-    issues.sort(key=lambda i: -i["severity"])
+    issues.sort(key=lambda i: (-i["severity"], i["t"]))
 
     # per beat: score of every metric over the beat's own stretch, and its worst issue
     beats_out = []

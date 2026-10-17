@@ -342,29 +342,36 @@ def score_softness(sc: Scan) -> list[dict]:
     return out
 
 
-def rim_baseline(sc: Scan) -> float:
+def rim_baseline(sc: Scan) -> tuple[float, int]:
     """What a bright rim beside an edge costs this film's own look: the median over 2-second chunks of the share of clean
-    edges with one (ink art 1-3%, rim-lit photography 10%). Halos are scored against it."""
+    edges with one (ink art 1-3%, rim-lit photography 10%), and how many chunks that is. Halos are scored against it."""
     chunks: dict[int, list] = {}
     for i, s in sc.samples.items():
         e = s["edge"]
         if e["rim"] is not None and e["n_rim"] >= 300:
             chunks.setdefault(int(i / sc.fps // 2), []).append(e["rim"])
-    return float(np.median([np.median(v) for v in chunks.values()])) if chunks else 0.0
+    if not chunks:
+        return 0.0, 0
+    return float(np.median([np.median(v) for v in chunks.values()])), len(chunks)
 
 
 def score_halos(sc: Scan) -> list[dict]:
     """Bright rims and seams beside clean edges: the share of flat-sided strong edges with one, scored against the film's
     own baseline (`rim_baseline`) so that rim-lit photography is not a halo and ink art with a seam is. Severity from 2.5x
     the baseline (fine) to 5x, and never under 6-10% (at 6% or less a rim is just how edges look). Presence: baseline 3%,
-    the hands close-up 19-20% (7x), the boots 9-19%, everything else under 7%. Needs 300 such edges."""
+    the hands close-up 19-20% (7x), the boots 9-19%, everything else under 7%. A film under six seconds has no baseline to
+    speak of: it is judged on the share alone, from 15% (fine) to 25%. Needs 300 such edges."""
     out = []
-    base = max(rim_baseline(sc), 0.02)
+    base, n_chunks = rim_baseline(sc)
+    base = max(base, 0.02)
     for i, s in sorted(sc.samples.items()):
         e = s["edge"]
         if e["rim"] is None or e["n_rim"] < 300:
             continue
-        sev = ramp(e["rim"] / base, 2.5, 5.0) * ramp(e["rim"], 0.06, 0.10)
+        if n_chunks >= 3:
+            sev = ramp(e["rim"] / base, 2.5, 5.0) * ramp(e["rim"], 0.06, 0.10)
+        else:
+            sev = ramp(e["rim"], 0.15, 0.25)
         out.append({"t": i / sc.fps, "sev": sev, "rim": e["rim"], "base": base, "n": e["n_rim"], "frame": i})
     return out
 

@@ -131,7 +131,7 @@ def beat_badges(project) -> dict[str, dict]:
     except Exception:
         return out
     for sec in site.sections:
-        if sec.type != "film" or not sec.beats:
+        if sec.type != "film":
             continue
         rep = load_report(project, sec.id)
         if rep is None:
@@ -146,7 +146,8 @@ def beat_badges(project) -> dict[str, dict]:
         for b in rep["beats"]:
             w = b.get("worst")
             sev = w["severity"] if w else 0.0
-            out[b["id"]] = {"section": sec.id, "severity": sev, "level": (w or {}).get("level") or ("clean" if sev < 0.25 else "slight"),
+            key = b["id"] if sec.beats else sec.id               # a take or a video is one shot, named by its section
+            out[key] = {"section": sec.id, "severity": sev, "level": (w or {}).get("level") or ("clean" if sev < 0.25 else "slight"),
                             "metric": w["metric"] if w else None, "tag": SHORT.get(w["metric"]) if w else None,
                             "reason": w["reason"] if w else "No polish problems found.", "t": w["t"] if w else None,
                             "scores": b["scores"], "issues": b.get("issues", 0), "stale": stale,
