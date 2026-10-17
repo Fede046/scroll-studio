@@ -134,3 +134,32 @@ def test_layered_render_has_no_fringe_of_the_old_background_on_a_moving_subject(
                                          layers=ls, device="cpu"))[18]
     assert out.shape == (112, 192, 3)
     assert np.isfinite(out).all()
+
+
+# ---------------------------------------------------------------- a layered pyramid, end to end (no ComfyUI)
+
+def test_layered_deep_zoom_builds_tiles_with_planes_and_renders(tmp_path, monkeypatch):
+    import cv2
+    from engine import zoom_build
+    from engine.backends import comfy
+    from engine.spec import Freeze
+    monkeypatch.setattr(comfy, "alive", lambda: False)                          # the plate is filled smoothly, nothing else is called
+    frame, bg, depth, alpha = _scene(192, 96)
+    spec = Freeze.model_validate({"image": "x.png", "detail": {"strength": 0, "tile": 1.25},
+                                  "layers": [{"box": [0.4, 0.3, 0.6, 0.9]}],
+                                  "camera": [{"t": 0, "box": [0, 0, 1, 1]}, {"t": 0.5, "box": [0.42, 0.40, 0.50, 0.48], "hold": 0.2},
+                                             {"t": 1, "box": [0, 0, 1, 1]}]})
+    subj = [L.Subject("s1", alpha)]
+    ls = L.build_planes(frame, depth, spec.layers, 7, tmp_path, lambda m: None, subjects=subj)
+    assert ls.alpha.shape == (1, 96, 192) and ls.plate.shape == frame.shape and ls.bg_depth.shape == depth.shape
+    assert ls.plate[50, 95].astype(int).sum() > 0 and abs(int(ls.plate[50, 95, 0]) - int(bg[50, 95, 0])) < 80    # painted out, roughly the background
+    base = zoom_build.Level0(frame, depth, "k", ls)
+    built = zoom_build.build_pyramid(tmp_path, base, spec, 2.0, (192, 96), "lanczos", lambda m: None)
+    assert built and all(b.alpha is not None and b.alpha.shape[0] == 1 and b.bg.shape == b.rgb.shape for b in built)
+    assert all(b.pdepth.shape[0] == 1 and b.bgdepth.shape == b.depth.shape for b in built)
+    # reloading finds every tile (planes included) in the cache
+    again = zoom_build.build_pyramid(tmp_path, base, spec, 2.0, (192, 96), "lanczos", lambda m: None)
+    assert [b.key for b in again] == [b.key for b in built] and np.array_equal(again[0].alpha, built[0].alpha)
+    frames = list(zoom_render.render_frames(frame, depth, [b.image() for b in built], spec.camera, size=(192, 96), seconds=2.0,
+                                            parallax=0.8, device="cpu", layers=ls))
+    assert len(frames) == 48 and all(np.isfinite(f).all() for f in frames)

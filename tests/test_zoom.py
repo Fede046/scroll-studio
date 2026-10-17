@@ -241,3 +241,98 @@ def test_unset_detail_and_layers_do_not_change_old_stage_keys():
         k0, k1 = fb.beat_key(p, sec, sec.beats[0]), fb.beat_key(p, sec, sec.beats[1])
         assert "detail" not in k0["freeze"] and "layers" not in k0["freeze"]
         assert k1["freeze"]["detail"]["strength"] == 0.35 and k0 != k1
+
+
+# ---------------------------------------------------------------- the stage: tiles are cached one by one
+
+SPEC = '''name: T
+theme: { preset: night }
+sections:
+  - id: s
+    type: film
+    beat_res: [192, 96]
+    beats:
+      - id: z
+        seconds: 2
+        freeze:
+          image: inputs/still.png
+          upscale_method: lanczos
+          detail: { strength: 0, tile: 1.25 }
+          camera:
+            - { t: 0, box: [0, 0, 1, 1] }
+            - { t: 0.5, box: [0.40, 0.40, 0.46, 0.46], hold: 0.2 }
+            - { t: 1, box: [0, 0, 1, 1] }
+'''
+
+
+@pytest.fixture
+def zproject(tmp_path, monkeypatch):
+    import shutil
+    if shutil.which("ffmpeg") is None:
+        pytest.skip("ffmpeg is not installed")
+    from PIL import Image
+    from engine.project import Project
+    from engine.backends import depth as depthmod
+    root = tmp_path / "p"
+    (root / "inputs").mkdir(parents=True)
+    (root / "site.yaml").write_text(SPEC, encoding="utf-8")
+    rng = np.random.default_rng(9)
+    import cv2
+    img = cv2.GaussianBlur((rng.random((96, 192, 3)) * 255).astype(np.float32), (0, 0), 2).astype(np.uint8)
+    Image.fromarray(img).save(root / "inputs" / "still.png")
+    monkeypatch.setattr(depthmod, "estimate", lambda im, size="small": np.tile(np.linspace(0, 1, im.width, dtype=np.float32), (im.height, 1)))
+    return Project(root)
+
+
+def test_deep_zoom_beat_renders_and_caches_tile_by_tile(zproject):
+    import yaml
+    from engine import freeze_beats as fb
+    sec = zproject.load().sections[0]
+    b = sec.beats[0]
+    logs = []
+    clip = fb.render_beat(zproject, sec, b, logs.append)
+    bdir = fb.beat_dir(zproject, sec, b)
+    tiles = sorted((bdir / "zoom").glob("L*.png"))
+    assert clip.exists() and len(tiles) >= 3 and (bdir / "depth_raw.npy").exists()
+    assert any("deep zoom:" in m for m in logs)
+    stamp = clip.stat().st_mtime_ns
+    logs.clear()
+    fb.render_beat(zproject, sec, b, logs.append)
+    assert clip.stat().st_mtime_ns == stamp and any("up to date" in m for m in logs)
+    # moving only the deepest box a little: the tiles it did not touch are kept, the clip is re-rendered
+    before = {p.name: p.stat().st_mtime_ns for p in tiles}
+    spec = yaml.safe_load((zproject.root / "site.yaml").read_text())
+    spec["sections"][0]["beats"][0]["freeze"]["camera"][1]["box"] = [0.55, 0.40, 0.61, 0.46]
+    zproject.save(spec)
+    sec2 = zproject.load().sections[0]
+    fb.render_beat(zproject, sec2, sec2.beats[0], logs.append)
+    after = {p.name: p.stat().st_mtime_ns for p in (bdir / "zoom").glob("L*.png")}
+    kept = [n for n in before if n in after and after[n] == before[n]]
+    assert kept, "no tile was kept"
+    assert set(after) - set(before), "the new box has its own tiles"
+    assert clip.stat().st_mtime_ns != stamp
+
+
+def test_deep_zoom_tiles_agree_with_their_parent(zproject):
+    """Every tile's low frequencies are its parent's: the enlarged parent and the tile differ only in fine detail."""
+    import cv2
+    from engine import freeze_beats as fb, zoom_build
+    from PIL import Image
+    sec = zproject.load().sections[0]
+    b = sec.beats[0]
+    fb.render_beat(zproject, sec, b, lambda m: None)
+    bdir = fb.beat_dir(zproject, sec, b)
+    up = np.asarray(Image.open(bdir / "up.png").convert("RGB"))
+    f = b.freeze
+    tiles, sizes, ratio, tsize = zoom_build.make_plan(f, b.seconds, up.shape[1], fb.beat_size(sec))
+    first = next(t for t in tiles if t.level == 1)
+    got = sorted((bdir / "zoom").glob("L1_*.png"))
+    tile_img = [np.asarray(Image.open(p).convert("RGB")) for p in got if not p.name.endswith(".bg.png")]
+    assert tile_img
+    ref = zoom.resample_box(up, (0, 0, 1, 1), first.box, tsize, "cubic").astype(np.float32)
+    d = None
+    for t in tile_img:
+        lp = lambda a: cv2.GaussianBlur(a.astype(np.float32), (0, 0), 6.0)
+        e = np.abs(lp(t) - lp(ref)).mean()
+        d = e if d is None else min(d, e)
+    assert d < 3.0
