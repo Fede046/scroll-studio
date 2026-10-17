@@ -440,6 +440,86 @@ class FreezeKey(Model):
                                                      "reaching it (the frozen moment still breathes with the parallax)")
 
 
+# ---- deep zoom + layered depth for frozen moments (engine/zoom.py, engine/layers.py) ------------------------------
+
+class FreezeDetail(Model):
+    """Deep zoom: the camera may push from the wide shot to a 10-20x close-up and every scale stays sharp. The frame is
+    not enlarged, it is built into a pyramid of tiles (about `ratio` times the detail per level, as many levels as the
+    tightest camera box needs): each tile is a crop of its parent, enlarged (SeedVR2), re-drawn at low `strength` so it
+    gains fine detail in the same style, aligned to its parent, and given the parent's low frequencies exactly, so colours
+    and shapes agree at every level and only fine detail is new. The render takes each pixel from the finest tile that
+    covers it and fades levels in by screen-space pixel density, so detail arrives as the camera does and nothing pops.
+    Every tile is its own cached stage. Needs ComfyUI (SeedVR2, Z-Image Turbo)."""
+    levels: Union[Literal["auto"], int] = Field("auto", description="Levels of tiles below the frame: auto stops when the "
+                                                                    "tightest camera box has a tile pixel for every output "
+                                                                    "pixel; or a number (1-8)")
+    ratio: float = Field(2.0, ge=1.3, le=4.0, description="The most detail one level adds to the one above (pixels per unit "
+                                                          "of the frame). auto levels lower it so the levels share the gain "
+                                                          "evenly; a smaller ratio means more levels and tiles, and no "
+                                                          "moment where the picture is much softer than the screen")
+    strength: float = Field(0.35, ge=0, le=0.9, description="How much each tile is re-drawn (img2img denoise): 0 keeps the "
+                                                            "enlargement as it is, 0.3-0.5 invents fine detail (stitching, "
+                                                            "creases, paper grain) without moving a shape")
+    prompt: str = Field("", description="What the re-draw should add, in the picture's own words, e.g. 'hand-drawn ink, "
+                                        "fine cross-hatching, stitched leather'. Added to a generic 'same style, fine "
+                                        "detail' line")
+    tile: float = Field(1.25, ge=1.0, le=2.0, description="A tile's resolution as a multiple of the beat's (1.25 = 2400 px "
+                                                          "across for a 1920 beat): more means fewer, sharper tiles and a "
+                                                          "slower build")
+    lock: float = Field(0.7, ge=0.2, le=2.0, description="How firmly a tile agrees with its parent: the parent's detail is "
+                                                         "kept below this many parent pixels of blur. Lower lets a tile "
+                                                         "change more of what the parent drew")
+    method: Literal["zimage", "qwen"] = Field("zimage", description="The re-draw: zimage (Z-Image Turbo img2img, fast, "
+                                                                    "keeps shapes) or qwen (Qwen-Image-Edit asked to add "
+                                                                    "fine detail: understands the picture, slower and "
+                                                                    "freer)")
+    seed: Optional[int] = Field(None, description="Seed of the re-draw (default: the freeze's seed)")
+
+
+class FreezeLayer(Model):
+    """A subject that gets its own plane."""
+    id: Optional[str] = None
+    prompt: Optional[str] = Field(None, description="The subject as you would say it: 'the woman in the black coat', "
+                                                    "'the people'. Every match is cut out (Florence-2 finds it, SAM 2.1 "
+                                                    "cuts it out)")
+    box: Optional[tuple[float, float, float, float]] = Field(None, description="Or a box [x0, y0, x1, y1] around it, 0-1 of "
+                                                                                "the frozen frame (skips the search)")
+    points: list[tuple[float, float]] = Field(default_factory=list, description="Points ON the subject, 0-1")
+
+    @model_validator(mode="after")
+    def _has_target(self):
+        if not (self.prompt or self.box or self.points):
+            raise ValueError("a layer needs a prompt, a box or points")
+        return self
+
+
+class FreezeLayers(Model):
+    """Layered depth: the picture is cut into planes, back to front: a background plate with the subjects painted out
+    (what was really behind them), and a plane per subject (or group of subjects at a similar depth) with its own
+    smooth depth and a soft alpha edge. The camera then reveals true background behind a person instead of smearing
+    the person, and a depth jump no longer leaves a halo or a double edge. The planes are cut from the same picture
+    (and, with `detail`, the same tiles) at render time, so every level of a deep zoom is layered too."""
+    subjects: Union[Literal["auto"], list[FreezeLayer]] = Field(
+        "auto", description="auto: every person found on the frame (Florence-2 'person'); or the subjects to cut out")
+    planes: int = Field(3, ge=1, le=8, description="At most this many subject planes: subjects at a similar depth share one")
+    plate: str = Field("", description="What the empty background should look like where the subjects stood (added to "
+                                       "'remove the people, continue the background in the same style'), e.g. 'the empty "
+                                       "foggy street'")
+    grow: int = Field(6, ge=0, le=60, description="How far (pixels of the frame at beat resolution) the hole in the "
+                                                   "background plate extends past a subject's edge")
+    feather: float = Field(1.5, ge=0, le=12, description="Softness of a subject's alpha edge (pixels at beat resolution)")
+    seed: Optional[int] = Field(None, description="Seed of the background fill (default: the freeze's seed)")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _shorthand(cls, v):
+        if v is True or v == "auto":
+            return {}
+        if isinstance(v, list):
+            return {"subjects": v}
+        return v
+
+
 class Freeze(Model):
     """A frozen moment: the beat is not generated but rendered from one frame, offline, in seconds. The frame is
     upscaled, given a depth map (Depth Anything V2) and the camera moves through it as a 2.5D parallax move along
@@ -479,6 +559,18 @@ class Freeze(Model):
     grain: float = Field(0.0, ge=0, le=0.2, description="Film grain laid over the render (0.01-0.03 is faint) so it "
                                                         "matches generated shots")
     seed: int = 7
+    detail: Optional[FreezeDetail] = Field(None, description="Deep zoom: a pyramid of re-drawn tiles so a push to a 10-20x "
+                                                              "close-up stays sharp at every scale (see FreezeDetail). "
+                                                              "`detail: {}` for the defaults")
+    layers: Optional[FreezeLayers] = Field(None, description="Layered depth: background plate + a plane per subject, so "
+                                                              "depth jumps have no halos and the camera reveals real "
+                                                              "background behind people (see FreezeLayers). `layers: auto` "
+                                                              "or a list of subjects")
+
+    @field_validator("detail", mode="before")
+    @classmethod
+    def _detail_shorthand(cls, v):
+        return {} if v is True or v == "auto" else v
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
