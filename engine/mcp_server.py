@@ -183,6 +183,49 @@ def storyboard(project: str, level: str = "stills", only: Optional[list[str]] = 
     return job.public(tail=20)
 
 
+@mcp.tool()
+def inspect_film(project: str, section: Optional[str] = None, video: Optional[str] = None, force: bool = False,
+                 embed: bool = False, issues: int = 12, timeout_s: int = 900) -> dict:
+    """Polish report of a built film (`studio inspect`): scores it second by second and beat by beat for pops (jumps,
+    flicker, judder, crossfades between shots that should line up), softness (looks upscaled: fine detail lost),
+    halos (bright rims and seams along edges: depth-warp halos, double edges), style drift (the look moving from the
+    scene's start: sketchier, different grain) and morphs (shapes rebuilding instead of moving), so problems are found
+    before the owner sees them. CPU only; a film that has not changed answers at once from the saved report.
+    section: a film section id (default: every film section with a built film); video: any video file instead, judged as
+    one shot. embed=True adds a CLIP-embedding drift check (local weights only, slow). Returns per section: `report_html`
+    (open it or Read its pictures: one JPEG per worst moment, under .build/inspect/<section>/), `report_json`, a
+    `summary` (verdict clean/slight/visible/bad, counts), the worst `issues` (metric, level, time span, beat, a one-line
+    reason and what to try) and every beat's `scores` (0-100, 100 clean, for pops/softness/halos/drift/morphs) and worst
+    issue. The storyboard editor shows each beat's worst issue as a badge that links to the report. Runs as a job; waits up
+    to timeout_s, else returns the job to poll with job_status."""
+    from . import polish
+    p = _find(project)
+
+    def run(job):
+        log, progress = logger(job)
+        if video:
+            reps = [polish.inspect_video(p, video, force=force, embed=embed, log=log, progress=progress)]
+        else:
+            reps = polish.inspect_project(p, section, force=force, embed=embed, log=log)
+        out = []
+        for r in reps:
+            j, h = polish.report_path(p, r["section"])
+            out.append({"section": r["section"], "report_html": str(h), "report_json": str(j), "cached": r.get("cached", False),
+                        "film": r["film"], "summary": r["summary"],
+                        "issues": [{k: x.get(k) for k in ("metric", "level", "severity", "t0", "t1", "beat", "reason", "hint", "thumb")}
+                                   for x in r["issues"][:issues]],
+                        "beats": [{"id": b["id"], "start": b["start"], "end": b["end"], "scores": b["scores"],
+                                   "worst": b["worst"]} for b in r["beats"]]})
+        return {"reports": out, "metrics": list(polish.METRICS), "scores": "0-100, 100 = clean"}
+    job = jobs.submit("inspect", p.name, "polish report", run)
+    t0 = time.time()
+    while time.time() - t0 < timeout_s and job.status not in ("done", "failed"):
+        time.sleep(1.0)
+    if job.status == "done":
+        return job.result
+    return job.public(tail=20)
+
+
 _WORKSPACES: dict = {}
 
 

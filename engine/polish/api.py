@@ -140,6 +140,9 @@ def beat_badges(project) -> dict[str, dict]:
             stale = content_key(find_film(project, sec)) != rep["film"].get("content")
         except Exception:
             stale = True
+        first = {}
+        for n, x in enumerate(rep["issues"]):                      # the worst issue of a beat is its first in the list
+            first.setdefault(x["beat"], n)
         for b in rep["beats"]:
             w = b.get("worst")
             sev = w["severity"] if w else 0.0
@@ -147,5 +150,5 @@ def beat_badges(project) -> dict[str, dict]:
                             "metric": w["metric"] if w else None, "tag": SHORT.get(w["metric"]) if w else None,
                             "reason": w["reason"] if w else "No polish problems found.", "t": w["t"] if w else None,
                             "scores": b["scores"], "issues": b.get("issues", 0), "stale": stale,
-                            "report": f"{sec.id}.html"}
+                            "report": f"{sec.id}.html", "anchor": first.get(b["id"])}
     return out

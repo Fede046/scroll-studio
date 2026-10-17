@@ -22,6 +22,10 @@ header.top h1 small { color:var(--dim); font-weight:400; font-size:13px; margin-
 .pill.warn { color:#0b0b0c; background:var(--warn); border-color:var(--warn); }
 .pill.bad { color:#0b0b0c; background:var(--bad); border-color:var(--bad); }
 .pill.violet { color:#0b0b0c; background:var(--violet); border-color:var(--violet); }
+a.pill { text-decoration:none; }
+.pill.polish { cursor:pointer; }
+.pill.polish.clean { background:transparent; color:var(--dim); }
+.pill.polish.stale { opacity:.6; }
 .pill.blue { color:#0b0b0c; background:var(--blue); border-color:var(--blue); }
 .dot { width:8px; height:8px; border-radius:50%; background:var(--bad); display:inline-block; } .dot.on { background:var(--ok); }
 .spacer { flex:1; }
@@ -170,6 +174,7 @@ details.sharedbox[open] > summary { margin-bottom:8px; }
   <button class="btn" id="b-undo" disabled title="Put back site.yaml as it was before the last save made here">Undo last save</button>
   <a class="btn" id="b-sheet-open" target="_blank" hidden>Sheet</a>
   <a class="btn" id="b-page-open" target="_blank" hidden>Stand-in page</a>
+  <button class="btn" id="b-inspect" title="Check the built films for pops, softness, halos, style drift and morphs (studio inspect): each beat card then shows its worst problem and links to the report. CPU only; unchanged films answer at once">Polish check</button>
   <button class="btn" id="b-sheet" title="Rebuild the sheet and the stand-in page from the edited spec and what is rendered so far (no new renders: images not drawn yet show as cards)">Update sheet</button>
 </header>
 <div id="notice"></div>
@@ -526,11 +531,24 @@ function goShot(id) {
   if (c) { c.scrollIntoView({ behavior: "smooth", block: "start" }); c.classList.add("is-playing"); setTimeout(() => c.classList.remove("is-playing"), 1800); }
 }
 
+// the polish report's word for a beat: its worst problem, linking to the report (the beat's own picture and reason there)
+function polishPill(shot) {
+  const p = shot.polish;
+  if (!p) return null;
+  const lv = p.level, cls = lv === "bad" ? "bad" : lv === "visible" ? "warn" : lv === "slight" ? "blue" : "clean";
+  const at = p.t != null ? ` ${Math.floor(p.t / 60)}:${(p.t % 60).toFixed(1).padStart(4, "0")}` : "";
+  const text = p.metric ? `${p.tag}${at}` : "polish ok";
+  const href = `/sb/${encodeURIComponent(NAME)}/inspect/${encodeURIComponent(p.report)}` + (p.anchor != null ? `#i${p.anchor}` : "");
+  const scores = ["pops", "softness", "halos", "drift", "morphs"].map(m => p.scores[m]).join(" / ");
+  return el("a", { class: `pill polish ${cls}${p.stale ? " stale" : ""}`, href, target: "_blank",
+    title: (p.metric ? `Polish report: ${p.reason}` : p.reason) + ` Scores (pops, softness, halos, drift, morphs): ${scores}.` + (p.stale ? " The film has changed since: run Polish check." : "") }, text);
+}
+
 function buildCard(shot) {
   const cid = shot.id;
   const card = el("article", { class: "card" + (shot.approval === "approved" ? " is-approved" : "") + (shot.locked ? " is-locked" : ""), id: "c-" + cssId(cid) });
   const hd = el("div", { class: "hd" }, el("h3", {}, shot.title), el("span", { class: "pill" }, shot.kind + (shot.seconds ? ` · ${(+shot.seconds).toFixed(1).replace(/\.0$/, "")} s` : "")),
-    shot.locked ? el("span", { class: "pill violet" }, "locked") : null, approvalPill(shot), el("span", { class: "spacer" }),
+    shot.locked ? el("span", { class: "pill violet" }, "locked") : null, approvalPill(shot), polishPill(shot), el("span", { class: "spacer" }),
     shot.can_lock ? el("button", { class: "btn small lock" + (shot.locked ? " on" : ""), title: shot.locked ? "locked: build and storyboard keep what is rendered. Click to unlock" : "lock: keep this shot's renders as they are (locked: true in the spec)", onclick: () => toggleLock(shot) }, shot.locked ? "Locked" : "Lock") : null,
     el("button", { class: "btn small" + (shot.approval === "approved" ? " on" : ""), title: "mark this shot as approved on the storyboard (not saved in the spec)", onclick: () => toggleApprove(shot) }, shot.approval === "approved" ? "Approved" : "Approve"));
   card.append(hd);
@@ -705,6 +723,7 @@ async function poll() {
       for (const k of before) if (!(k in d.jobs)) delete jobs[k];
       for (const [k, j] of Object.entries(d.jobs)) jobs[k] = j;
       for (const [k, v] of Object.entries(d.last || {})) if (!jobs[k] && !(k in lastRes) && (v.finished || 0) > (dismissed[k] || 0)) lastRes[k] = v;
+      if (d.last && d.last.__inspect__ && !lastRes.__inspect__ && before.includes("__inspect__")) { notice(d.last.__inspect__.message || d.last.__inspect__.error || "polish check done", d.last.__inspect__.status === "failed" ? "err" : "info"); }
       if (d.last && d.last.__sheet__ && !lastRes.__sheet__ && before.includes("__sheet__")) { notice(d.last.__sheet__.message || d.last.__sheet__.error || "sheet done", d.last.__sheet__.status === "failed" ? "err" : "info"); }
       $("#p-comfy .dot").classList.toggle("on", d.comfy);
       $("#b-undo").disabled = !d.undo;
@@ -724,6 +743,11 @@ $("#b-undo").addEventListener("click", async () => {
   const r = await api("/undo", { body: {} });
   if (!r.ok) notice((r.data && r.data.error) || "Nothing to undo", "err"); else notice("Put back site.yaml as it was before the last save.", "info");
   await refresh(true);
+});
+$("#b-inspect").addEventListener("click", async () => {
+  const r = await api("/inspect", { body: {} });
+  if (!r.ok) { notice((r.data && r.data.error) || "Could not start", "err"); return; }
+  jobs.__inspect__ = r.data.job; notice("Checking the built films for pops, softness, halos, style drift and morphs (CPU, about 30 s per film)...", "info"); schedulePoll(500);
 });
 $("#b-sheet").addEventListener("click", async () => {
   const r = await api("/sheet", { body: {} });
