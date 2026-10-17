@@ -149,9 +149,9 @@ def render_html(r: dict) -> str:
             return "clean" if v < .25 else "slight" if v < .5 else "visible" if v < .75 else "bad"
         jr = "".join(f'<tr><td>{html.escape(j["from"])} &rarr; {html.escape(j["to"])}</td><td class="mono">{_t(j["t0"])}</td>'
                      f'<td>{"one scene (a continuation)" if j.get("related", True) else "scene change, dissolve on purpose"}</td>'
-                     f'<td class="mono">{j["edges"] * 100:.0f}%</td><td class="mono">{j["chroma"]:.1f}</td>'
+                     f'<td class="mono">{j.get("disp", 0):.0f} px</td><td class="mono">{j["chroma"]:.1f}</td>'
                      f'<td><span class="chip {lvl(j["sev"])}">{j["sev"]:.2f}</span></td></tr>' for j in r["joins"])
-        lines.append('<h2>Joins</h2><table><thead><tr><th>Join</th><th>At</th><th>Kind</th><th>Edges that differ</th><th>Colour change</th>'
+        lines.append('<h2>Joins</h2><table><thead><tr><th>Join</th><th>At</th><th>Kind</th><th>Out of line at mid-fade</th><th>Colour change</th>'
                      f'<th>Severity</th></tr></thead><tbody>{jr}</tbody></table>'
                      f'<p class="mute" style="font-size:13px">Measured at the middle of the {r["fade"]:.1f} s crossfade, where both pictures show at half '
                      'strength. A join between frames that look nothing alike is a scene change: that dissolve is intended and is not scored.</p>')

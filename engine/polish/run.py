@@ -26,7 +26,7 @@ from . import analyze as A
 from . import metrics as M
 from .explain import HINTS, LABELS, level_of, reason
 
-VERSION = 4
+VERSION = 5
 METRICS = ("pops", "softness", "halos", "drift", "morphs")
 Log = Callable[[str], None]
 

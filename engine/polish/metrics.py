@@ -257,11 +257,25 @@ def edge_map(bgr: np.ndarray, w: int = 480) -> np.ndarray:
     return np.hypot(gx, gy)
 
 
+def misalignment(a: np.ndarray, b: np.ndarray, w: int = FLOW_W) -> dict:
+    """How far out of line two frames are: the optical flow that would lay one on the other.
+
+    disp     the 90th percentile flow length, in pixels of a 1920 px frame (what a viewer sees as the gap between the two
+             images of a double exposure); mean is the average over the frame
+    """
+    ga = cv2.cvtColor(resize_w(a, w), cv2.COLOR_BGR2GRAY)
+    gb = cv2.cvtColor(resize_w(b, w), cv2.COLOR_BGR2GRAY)
+    flow = cv2.calcOpticalFlowFarneback(ga, gb, None, 0.5, 4, 15, 3, 5, 1.2, 0)
+    mag = np.hypot(flow[..., 0], flow[..., 1])
+    k = REF_W / w
+    return {"disp": float(np.percentile(mag, 90) * k), "disp_mean": float(mag.mean() * k)}
+
+
 def mismatch(a: np.ndarray, b: np.ndarray, w: int = 480) -> dict:
     """How two frames that are about to be dissolved into each other differ.
 
-    edges    share of the edge energy that is not in both pictures (0 = the same drawing, 1 = nothing in common): the
-             double image a crossfade shows
+    edges    share of the edge energy that is not in both pictures (0 = the same drawing, 1 = nothing in common); it
+             saturates after a pixel or two of misalignment, so it is reported but `misalignment` scores
     luma     mean absolute brightness difference, levels
     chroma   mean colour difference (Lab a/b), levels
     """

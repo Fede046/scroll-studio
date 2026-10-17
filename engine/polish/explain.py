@@ -50,14 +50,17 @@ def reason(metric: str, r: dict, span, ctx: dict) -> tuple[str, str]:
     if metric == "pops":
         k = r.get("kind")
         if k in ("dissolve", "cut"):
-            s = (f"{'Crossfade' if k == 'dissolve' else 'Hard cut'} {r['from']} to {r['to']}: at "
-                 f"{'mid-fade' if k == 'dissolve' else 'the cut'} {_pct(r['edges'])} of the edges differ between the two shots"
-                 f"{', so a double image shows' if k == 'dissolve' else ''}")
-            if r.get("chroma", 0) >= 1.5:
-                s += f", and the colour changes (by {r['chroma']:.1f} levels)"
+            parts = []
+            if r["disp"] >= 20:
+                parts.append(f"the two shots are up to {r['disp']:.0f} px out of line, so a double image shows"
+                             if k == "dissolve" else f"the picture jumps by up to {r['disp']:.0f} px")
+            if r.get("chroma", 0) >= 1.0:
+                parts.append(f"the colour changes (by {r['chroma']:.1f} levels)")
             elif r.get("luma", 0) >= 18:
-                s += f", and the brightness changes (by {r['luma']:.0f} levels)"
-            return s + ".", HINTS[k]
+                parts.append(f"the brightness changes (by {r['luma']:.0f} levels)")
+            what = "mid-fade" if k == "dissolve" else "the cut"
+            return (f"{'Crossfade' if k == 'dissolve' else 'Hard cut'} {r['from']} to {r['to']}: at {what} "
+                    + " and ".join(parts or ["the two shots do not line up"]) + "."), HINTS[k]
         if k == "jump":
             return (f"The change between two frames jumps to {r['ratio']:.1f}x what its neighbours show, more than motion "
                     f"explains (a pop)."), HINTS["jump"]

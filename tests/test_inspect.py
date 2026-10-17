@@ -331,3 +331,28 @@ def test_a_video_file_is_one_shot(tmp_path, project):
     rep = polish.inspect_video(project, str(clip), log=lambda m: None)
     assert rep["section"] == "x" and [b["id"] for b in rep["beats"]] == ["x"]
     assert polish.report_path(project, "x")[1].exists()
+
+
+def test_a_crossfade_between_shots_that_do_not_line_up_ghosts_and_one_that_does_not(tmp_path):
+    """A continuation: the outgoing shot still moves while the incoming one holds the last frame, so at mid-fade the two
+    pictures are far out of line (a double image). With both held there is nothing to see."""
+    s1 = scene(60)
+    n = 2 * FPS
+    moving = [shifted(s1, 6.0 * i) for i in range(n)]
+    hold_moving = [moving[-1]] * n
+    hold_a = [moving[0]] * n
+    hold_b = [moving[0]] * n
+    ghost = tmp_path / "ghost"
+    write_video(ghost / "a.mp4", moving)
+    write_video(ghost / "b.mp4", hold_moving)
+    still = tmp_path / "still"
+    write_video(still / "a.mp4", hold_a)
+    write_video(still / "b.mp4", hold_b)
+    for folder, expect_bad in ((ghost, True), (still, False)):
+        spans = [A.BeatSpan("a", 0.0, 2.0, folder / "a.mp4"), A.BeatSpan("b", 1.0, 3.0, folder / "b.mp4")]
+        (j,) = A.score_joins(spans, 1.0)
+        assert j["related"] is True
+        if expect_bad:
+            assert j["disp"] > 60 and j["sev"] > 0.9, j
+        else:
+            assert j["disp"] < 5 and j["sev"] == 0.0, j

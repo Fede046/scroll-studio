@@ -480,11 +480,14 @@ RELATED_CHROMA = 10.0
 
 def score_joins(spans: list[BeatSpan], fade: float, log: Callable[[str], None] = lambda s: None) -> list[dict]:
     """The dissolve between two shots. Two kinds: a scene change (the frames that meet look nothing alike: Presence 1-12 luma
-    levels apart, a cut between unrelated scenes 70-80) is a dissolve on purpose and is never a problem; a continuation
-    (the new shot picks up where the old one ended) must look like one, and there at the middle of the crossfade, where the
-    viewer sees both pictures at half strength, `edges` is the share of edge energy that is not in both. Same drawing = 0,
-    two shots that do not line up = 0.6-0.9. Severity from 0.45 (fine) to 0.85. A colour change (`chroma`, Lab levels)
-    counts from 1.5 to 4.5, and a hard cut (no fade) is judged on the two frames it joins."""
+    levels apart, a cut between unrelated scenes 70-80) is a dissolve on purpose and is never a problem; a continuation (the
+    new shot picks up where the old one ended) must look like one. In the middle of the crossfade the viewer sees both
+    pictures at half strength, so what shows is how far out of line they are (`disp`: the 90th percentile of the optical
+    flow that would lay one on the other, in pixels of a 1920 frame; a gap under 20 px is a soft edge, 100 px a plain
+    double image) and whether the colours change (`chroma`, Lab levels). Severity from 20 to 100 px, and from 1.0 to 3.5
+    levels of colour change; the worse of the two. A hard cut (no fade) is judged on the two frames it joins.
+    Presence at mid-fade: walk to zoom 15 px (fine), zoom to shoes 99 px, shoes to hands 68 px, hands to her 43 px and
+    3.1 levels (black coat to orange), her to turn 27 px."""
     out = []
     for i, (prev, cur) in enumerate(zip(spans[:-1], spans[1:]), start=1):
         if prev.clip is None or cur.clip is None or not prev.clip.exists() or not cur.clip.exists():
@@ -503,16 +506,14 @@ def score_joins(spans: list[BeatSpan], fade: float, log: Callable[[str], None] =
         meet = M.mismatch(fa[na - 1], fb[0])                       # the two frames a cut would join
         related = meet["luma"] <= RELATED_LUMA and meet["chroma"] <= RELATED_CHROMA
         if fade < 0.15:
-            m0, kind = meet, "cut"
-            sev = ramp(m0["edges"], 0.25, 0.6)
+            m0, kind, pair = meet, "cut", (fa[na - 1], fb[0])
         else:
-            m0, kind = mm[0.5], "dissolve"
-            sev = max(ramp(m0["edges"], 0.45, 0.85), 0.8 * ramp(m0["chroma"], 1.5, 4.5))
-        if not related:
-            sev = 0.0
+            m0, kind, pair = mm[0.5], "dissolve", (fa[ia[0.5]], fb[ib[0.5]])
+        mis = M.misalignment(*pair)
+        sev = max(ramp(mis["disp"], 20.0, 100.0), ramp(m0["chroma"], 1.0, 3.5)) if related else 0.0
         out.append({"t": cur.start + fade / 2, "t0": cur.start, "t1": cur.start + fade, "sev": sev, "kind": kind,
-                    "related": bool(related), "from": prev.id, "to": cur.id, "to_index": i, "edges": m0["edges"],
-                    "luma": m0["luma"], "chroma": m0["chroma"], "meet_luma": meet["luma"], "meet_chroma": meet["chroma"],
-                    "phases": {f"{s:.1f}": mm[s]["edges"] for s in mm},
+                    "related": bool(related), "from": prev.id, "to": cur.id, "to_index": i, "disp": mis["disp"],
+                    "edges": m0["edges"], "luma": m0["luma"], "chroma": m0["chroma"], "meet_luma": meet["luma"],
+                    "meet_chroma": meet["chroma"], "phases": {f"{s:.1f}": mm[s]["edges"] for s in mm},
                     "frames": {"a": ia[0.5], "b": ib[0.5], "prev": prev.id, "cur": cur.id}})
     return out
