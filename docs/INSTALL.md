@@ -33,6 +33,11 @@ studio doctor
 
 The built runtime is committed, so `npm run build` is only needed for the UI or after editing `runtime/src`.
 
+`studio inspect` (the polish report) needs nothing more: OpenCV, SciPy and NumPy are core dependencies and it runs on the
+CPU. Its optional `--embed` drift check also needs `pip install -e .[embed]` (open_clip_torch) and the LAION CLIP ViT-H/14
+weights (`laion/CLIP-ViT-H-14-laion2B-s32B-b79K`, 3.9 GB, MIT) already in the Hugging Face cache; it never downloads them
+(`huggingface-cli download laion/CLIP-ViT-H-14-laion2B-s32B-b79K open_clip_pytorch_model.bin` fetches them once).
+
 ## 2. GPU stages (parallax, film)
 
 Install PyTorch for your CUDA driver first, then the ML extras:

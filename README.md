@@ -661,6 +661,33 @@ face's own aligned space so it never flickers. Off by default, cached by the cli
 About 0.7 s per frame of 1080p on an RTX 4090 with two faces in view. `studio setup-comfy` installs the nodes and
 weights.
 
+### Find the polish problems before the owner does (`studio inspect`)
+
+```bash
+studio inspect my-site [--section story] [--json] [--embed] [--video recording.mp4]
+```
+
+A finished film (beats, a take or any `video:`) is scored second by second and beat by beat, on the CPU, for the five
+things people see without being able to say why, each measured so it can be said in a sentence:
+
+| | what it measures | how it reads |
+|---|---|---|
+| **Pops** | a frame change that motion cannot explain, over a large part of the picture; a one-frame flicker; judder (motion updating under 12 times a second); and the dissolve between two beats that are meant to be one scene but do not line up (a double image, a colour change) | "Crossfade shoes to hands: at mid-fade 90% of the edges differ, so a double image shows" |
+| **Softness** | how much fine detail the busiest parts of the frame hold (a frequency-domain index, so a soft-focus photograph is not mistaken for an upscale), with the edge width in pixels beside it | "only 2% of the fine detail of this film's sharpest frames is left here (edges 3.1 px wide), as if enlarged" |
+| **Halos** | the share of clean edges with a bright rim or seam beside them, against the film's own usual share | "19% of the clean edges have a bright rim, 6.2x this film's usual 3%" |
+| **Style drift** | how far the look moves from the scene's first second: the share of the picture's structure that is weak hatching or pencil texture (drawn styles), grain, and, within a still shot, tone, line density and saturation; `--embed` adds a CLIP image-embedding distance (local OpenCLIP weights only, nothing is downloaded) | "66% of the structure is soft hatching, against 37% at the start of the scene (sketchier)" |
+| **Morphs** | the share of the change between frames that optical flow cannot explain: things appearing, dissolving or rearranging instead of moving | "93% of the change is things rebuilding themselves rather than travelling" |
+
+Beats that join like one scene (the two frames that meet look alike) are judged as a continuation; a join between frames
+that look nothing alike is a scene change, a dissolve on purpose, and is never flagged. It writes
+`.build/inspect/<section>.json` (the contract: per-beat scores 0-100, issues with a level, time span, reason and what to
+try, a per-second timeline) and `<section>.html`: a timeline strip of every metric by second, the worst moments as
+pictures (before and after, the dissolve's three frames, a 1:1 crop with the rim pixels marked) each with one line saying
+what is wrong, and a score table per beat. Reports are cached by the film's content (a copy of a build is the same key;
+an unchanged film answers at once), a rebuilt beat re-measures. The storyboard editor (`studio storyboard --edit`) shows a
+badge on every beat card with its worst problem, linking to the report, and a **Polish check** button; MCP: `inspect_film`.
+`--video` judges any video file as one shot, e.g. a `studio record` scroll-through.
+
 ### Two video models: LTX-2.3 and Wan 2.2
 
 Beats, takes and `theme.art` animate with LTX-2.3 by default. `video_model: wan` switches to Wan 2.2 A14B, a second

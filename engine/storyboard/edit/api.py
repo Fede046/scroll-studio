@@ -10,6 +10,8 @@ mounted in `studio ui`'s server too.
   POST /api/sb/{name}/pick | revert       make a kept variant current
   GET  /api/sb/{name}/img?p=&w=           an image of the project, as a thumbnail (w) or whole
   GET  /sb/{name}/files/...               the storyboard folder (sheet, stand-in page)
+  POST /api/sb/{name}/inspect             run the polish check (`studio inspect`) as a job
+  GET  /sb/{name}/inspect/...             the polish reports (.build/inspect: <section>.html, .json, pictures)
 """
 from __future__ import annotations
 
@@ -181,6 +183,21 @@ def make_router(resolve: Callable[[str], Project], jobs: JobQueue) -> APIRouter:
             if t is not None:
                 f = t
         return FileResponse(f, headers={"Cache-Control": "private, max-age=86400"})
+
+    @r.post("/api/sb/{name}/inspect")
+    def inspect_run(name: str):
+        return guarded(lambda: {"ok": True, "job": ws(name).inspect().public(tail=3)})
+
+    @r.get("/sb/{name}/inspect/{path:path}")
+    def inspect_files(name: str, path: str):
+        project = resolve(name)
+        base = (project.build / "inspect").resolve()
+        f = (base / path).resolve()
+        if base not in f.parents or f.suffix.lower() not in (".html", ".json", ".jpg", ".png"):
+            raise HTTPException(403)
+        if not f.is_file():
+            raise HTTPException(404, "no polish report yet: use Polish check")
+        return FileResponse(f, headers={"Cache-Control": "no-store"})
 
     @r.get("/sb/{name}/files/{path:path}")
     def files(name: str, path: str):

@@ -124,6 +124,33 @@ UI (React) ◄─► engine server (FastAPI + job queue + websocket events) ◄�
   sticky stage + scrolling step cards, the players, shared HUD/caption/progress components, theme tokens,
   asset preloading by priority, and mobile and `prefers-reduced-motion` behaviour.
 - **`doctor`** checks the whole stack: Python, Node, FFmpeg, Blender, CUDA/VRAM, ComfyUI, disk space, models.
+- **Polish report** (`engine/polish/`: `metrics.py` the measurements on frames, `analyze.py` the scorers over a film, `run.py`
+  the section glue and the report, `explain.py` the sentences, `thumbs.py` the pictures, `report.py` the HTML, `embed.py`
+  the optional embedding, `api.py` cache and read-back). `studio inspect` finds a film section's finished film
+  (`gen/gen_sr.mp4` or `beats.mp4`, `take.mp4`, the `video:` file), places every beat on it from the clips' lengths and the
+  engine's own crossfade formula, and reads it once: a 384 px gray copy of every frame (optical flow, between *new* frames:
+  a 12 fps clip written at 24 repeats every frame, and a held shot repeats its frame) and edge, fine-detail and style
+  statistics of every sixth frame at full size. Each scorer returns severities 0 (fine) to 1 (clearly visible) with the
+  numbers behind them; stretches at 0.4 or more become issues (a reason, a hint, a picture), and every beat is scored 100
+  minus 100 x its worst severity per metric. Calibration (Presence landing page, `examples/feel`, `examples/one-take`):
+
+  | measure | clean | broken (Presence) | severity from, to |
+  |---|---|---|---|
+  | fine-detail index | 0.0003-0.01 (feel: lowest frame 0.00027; Presence beats 0.0006-0.006) | hands close-up median 0.00012, boots 0.00004, end of the zoom 0.00004 | 0.00025 to 0.00008 (log) |
+  | rim share / film baseline | Presence 3% baseline, others under 7%; feel baseline 10%, max 26% (2.5x gate) | hands close-up 19-20% (6.2x), boots 9-19% | 2.5x to 5x, never under 6-10% |
+  | hatch share (drawn plate only) | ink and wash 0.37 | pencil look 0.64-0.66 | 1 to 2 JND of 0.15 |
+  | unexplained change / residual | walking crowd, camera push 0.2-0.5 | crowd dissolving into rows 0.93 at 4.7 levels | 0.55 to 0.85, scaled by 1.2 to 4.5 levels |
+  | join, edges that differ at mid-fade | (continuation, same drawing) 0 | Presence stage changes 0.67-0.90, colour +1.6 to 3.1 | 0.45 to 0.85 |
+
+  Limits worth knowing: halos and softness are scored against what this film's own look makes normal (so a film that is
+  soft or haloed everywhere reads clean on halos); drift only trusts hatch against a drawn plate (in a photograph weak
+  texture is the content) and tone/line/saturation only while the picture barely moves; a morph is a morph whether the
+  story wanted the dissolve or not (`examples/feel` has a few real ones). `--embed` (OpenCLIP ViT-H/14, about 1 s a frame on
+  the CPU) is a weak extra: on Presence the distance to the scene's first second is 0.10-0.15 for clean wide frames and
+  0.19-0.22 once the turn beat goes pencil, but 0.3-0.55 for any close-up, so it measures framing as much as look; it is
+  therefore judged against each beat's own first second, only while the picture hardly moves, and agrees with the hatch
+  measure without adding to it. Reports are cached under `.build/inspect/` by the
+  content of the film and clips (size and three slices, not dates), so a copied build is the same key.
 - **Frozen moments** (`engine/freeze.py`, `engine/freeze_beats.py`, `engine/backends/upscale.py`). A `film` beat with
   `freeze:` is not generated: the beat stage renders one frame offline. Steps, each cached by its own digest in the
   beat's folder: the source frame (a beat's sharpest-of-last-N frame, or an image input, fitted to `beat_res`), the

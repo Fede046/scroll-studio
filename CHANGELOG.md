@@ -9,6 +9,22 @@ Everything so far is version 1. On 2026-10-12 the releases first published as 2.
 ## Unreleased
 
 ### Added
+- Polish report: `studio inspect <project> [--section ID] [--json] [--embed] [--video FILE]` and the MCP tool
+  `inspect_film`. A built film section (beats, a take, a `video:`) is scored on the CPU, second by second and beat by
+  beat, for **pops** (flow-residual jumps over a large part of the frame, one-frame flicker, judder, and crossfades between
+  beats that should line up), **softness** (fine-detail index in the frequency domain on the busiest tiles, with the edge
+  width), **halos** (share of clean edges with a bright rim or seam, against the film's own baseline), **style drift**
+  (hatch/pencil share of the picture's structure against the scene's first second, grain, and within a still shot tone,
+  line density and saturation; optional OpenCLIP embedding distance with local weights, nothing downloaded) and **morphs**
+  (the share of the change between frames that optical flow cannot explain). Beats that join like one scene (the meeting
+  frames look alike) are scored as a continuation; a join between unlike frames is a scene change and is not flagged.
+  Every measure is a number that reads as a sentence, calibrated on the Presence landing page (the hands close-up is soft
+  and haloed, the turn beat drifts to a pencil look and rearranges the crowd, the stage changes pop) and checked against
+  `examples/feel` and `examples/one-take` for false alarms. Output: `.build/inspect/<section>.json` (per-beat scores, issues
+  with level, span, one-line reason and a hint, per-second timeline) and `.html` (timeline strip, the worst moments as
+  pictures, scores per beat). Cached by the film's and clips' content: an unchanged build answers at once. The storyboard
+  editor shows each beat's worst problem as a badge linking to the report and has a **Polish check** job button. Module
+  `engine/polish/`; no new dependency (`--embed` needs `open_clip_torch` and the cached LAION ViT-H/14 weights).
 - Region edits: `edit.region` confines an image edit to part of the picture. `region` takes a `prompt` (Florence-2
   grounding on the source, with `pick`, `within` and the "X's Y" owner rule from `reveal`), or `box` / `points` /
   `negative_points` (0-1); SAM 2.1 (image mode, through the existing `SSRevealTrack` node on a one-frame batch: no new
