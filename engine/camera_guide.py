@@ -36,7 +36,7 @@ from . import freeze as fz
 from .freeze import FPS, CameraPath, View
 from .project import BuildError
 
-VERSION = 1
+VERSION = 2
 
 
 # ---------------------------------------------------------------- the path
@@ -507,12 +507,13 @@ def noise_level(rgb: np.ndarray, mask: Optional[np.ndarray] = None) -> float:
 
 
 def tone_match(frames: list[np.ndarray], refs: list[np.ndarray], static: list[np.ndarray], strength: float,
-               grain: Optional[float] = None, seed: int = 7) -> list[np.ndarray]:
+               grain: Optional[float] = None, seed: int = 7, ramp: int = 0) -> list[np.ndarray]:
     """Pull every generated frame toward the plate: per channel, a gain and an offset that make the mean and spread of
     the frame's static world (where `static` is 255) match the same area of the pure-camera render `refs`, smoothed over
     time so nothing flickers, applied `strength` (0-1); then grain is added where the frame is cleaner than `grain` (the
     plate's own noise level) so a clip graded this way does not turn waxy next to the plate. The people are never used
-    to measure (they move), but the correction is global, so they take it too."""
+    to measure (they move), but the correction is global, so they take it too. `ramp`: the correction fades in over this
+    many frames (frame 0 is left exactly as it is), for a clip that starts on the last frame of another."""
     import cv2
     from scipy.ndimage import gaussian_filter1d
     n = len(frames)
@@ -536,11 +537,15 @@ def tone_match(frames: list[np.ndarray], refs: list[np.ndarray], static: list[np
     out = []
     for k, f in enumerate(frames):
         x = f.astype(np.float32)
-        y = x * (1 - strength + strength * gains[k]) + strength * offs[k]
+        st = strength * (min(1.0, k / ramp) if ramp > 0 else 1.0)
+        if st <= 0:
+            out.append(f)
+            continue
+        y = x * (1 - st + st * gains[k]) + st * offs[k]
         if grain:
             have = noise_level(np.clip(y, 0, 255).astype(np.uint8))
             if have < grain * 0.9:
-                add = float(np.sqrt(max(grain ** 2 - have ** 2, 0))) * strength
+                add = float(np.sqrt(max(grain ** 2 - have ** 2, 0))) * st
                 nz = cv2.GaussianBlur(rng.standard_normal(y.shape[:2]).astype(np.float32), (0, 0), 0.6)
                 nz = nz / max(float(nz.std()), 1e-6)
                 y = y + nz[..., None] * add
@@ -622,3 +627,41 @@ def contact_sheet(rows: list[tuple[str, list[np.ndarray]]], out: Path, cols: int
         d.text((4, y + 2), label, fill=(255, 220, 0))
         y += ch
     sheet.save(out, quality=88)
+
+
+def world_view(rel: View, origin: View) -> View:
+    """A view measured in a beat's own first frame (`rel`, as `track_views` gives it) as a view of the world, given the view
+    `origin` that first frame shows (the inverse of `relative_view`)."""
+    return View(origin.cx + (rel.cx - 0.5) * origin.w, origin.cy + (rel.cy - 0.5) * origin.w, rel.w * origin.w)
+
+
+def zoom_rate(views: list[Optional[View]], fps: float) -> float:
+    """The slope of log view width over time (per second) of a stretch of measured views, a straight-line fit (0 when fewer
+    than three frames registered)."""
+    pts = [(i / fps, math.log(v.w)) for i, v in enumerate(views) if v is not None]
+    if len(pts) < 3:
+        return 0.0
+    t, y = np.array(pts).T
+    return float(np.polyfit(t, y, 1)[0])
+
+
+def join_report(prev: list[np.ndarray], cur: list[np.ndarray], prev_plan: CameraPlan, plan: CameraPlan,
+                prev_static: Optional[list[np.ndarray]] = None, static: Optional[list[np.ndarray]] = None,
+                fps: float = FPS, span: int = 8) -> dict:
+    """How well two beats join at the cut, measured on their frames: the pixel difference between the last frame of `prev`
+    and the first of `cur` (0 = the cut is invisible: `cur` starts exactly on it), the mean brightness step, and the camera's
+    zoom rate (per second, of log view width) over the last `span` frames before the cut and the first `span` after it,
+    both measured and as keyed. A camera that carries across the cut keeps its rate; one that eases to a stop and starts
+    again goes to about zero and back."""
+    a, b = prev[-1].astype(np.float32), cur[0].astype(np.float32)
+    tail = track_views(prev, prev_static)[-span:]
+    head = track_views(cur, static)[:span]
+    o_prev, o_cur = prev_plan.at(0.0), plan.at(0.0)
+    tail_w = [None if v is None else world_view(v, o_prev) for v in tail]
+    head_w = [None if v is None else world_view(v, o_cur) for v in head]
+    secs = lambda p: len(p) / fps
+    key_before = (math.log(prev_plan.at(1.0).w) - math.log(prev_plan.at(1.0 - 1.0 / max(len(prev) - 1, 1)).w)) * (len(prev) - 1) * fps / len(prev)
+    key_after = (math.log(plan.at(1.0 / max(len(cur) - 1, 1)).w) - math.log(plan.at(0.0).w)) * (len(cur) - 1) * fps / len(cur)
+    return {"frame_diff": float(np.abs(a - b).mean()), "brightness_step": float(b.mean() - a.mean()),
+            "rate_before": zoom_rate(tail_w, fps), "rate_after": zoom_rate(head_w, fps),
+            "rate_before_keyed": float(key_before), "rate_after_keyed": float(key_after)}

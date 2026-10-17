@@ -5,7 +5,7 @@ Folder of the beat (.build/<section>/beats/<id>/), each file with a `.key` besid
 so changing a key's box re-renders the guide in seconds and never repeats the depth or the people mask:
 
     still.png    the start image fitted to beat_res (made by the film stage)
-    cam_depth.npy   its depth at the generation size       cam_people.png   the moving subjects' mask at that size
+    (depth and people masks are cached project-wide in .build/_generated/cam_depth_*.npy, cam_people_*.png)
     guide.mp4 / guide_rgb.mp4 / guide_static.mp4   the camera flown through the image (see camera_guide)
     frames/      the generated frames (24 fps, PNG, beat_res), what every beat leaves for the clip and `beat_frame`
     camera.json  the measured follow error (studio camera <project> <beat> --check)
@@ -24,6 +24,7 @@ from .animate import FPS
 from .freeze_beats import _cached, digest, read_rgb
 from .project import BuildError
 
+RAMP = 12                        # frames over which a continued beat fades its plate grading in (frame 0 stays the previous last frame)
 DEFAULT_BACKEND = "ltx"          # what `backend: auto` picks (decided by measurement: docs/ENGINE.md)
 
 
@@ -117,7 +118,8 @@ def prepare(project, sec, i: int, still: Path, bdir: Path, log: Callable = print
         log("  depth: Depth Anything V2 (small)")
         d = depthmod.estimate(img, "small")
         np.save(tmp, fz.prepare_depth(d, rgb, size).astype(np.float16))
-    depth = np.load(_cached(bdir / "cam_depth.npy", dkey, make_depth)).astype(np.float32)
+    shared = project.build / "_generated"
+    depth = np.load(_cached(shared / f"cam_depth_{digest(dkey)}.npy", dkey, make_depth)).astype(np.float32)
     people = None
     if move.subjects.strip():
         pkey = {**base, "subjects": move.subjects, "v": cg.VERSION}
@@ -125,14 +127,14 @@ def prepare(project, sec, i: int, still: Path, bdir: Path, log: Callable = print
         def make_people(tmp):
             from .region import find
             from .spec import EditRegion
-            png = bdir / "_cam_still_gen.png"
+            png = shared / f"_cam_still_{digest(pkey)}.png"
             img.save(png)
             try:
                 m = find(project, png, EditRegion(prompt=move.subjects, pick="all"), log)
                 Image.open(m).convert("L").resize(size, Image.BILINEAR).save(tmp, format="PNG")
             finally:
                 png.unlink(missing_ok=True)
-        people = np.asarray(Image.open(_cached(bdir / "cam_people.png", pkey, make_people)).convert("L"))
+        people = np.asarray(Image.open(_cached(shared / f"cam_people_{digest(pkey)}.png", pkey, make_people)).convert("L"))
     return rgb, depth, people, size, frames, fps_of(backend), cg.plan_for(sec.beats, i)
 
 
@@ -141,8 +143,7 @@ def guide_for(project, sec, i: int, still: Path, bdir: Path, log: Callable = pri
     b = sec.beats[i]
     move = b.camera
     rgb, depth, people, size, frames, fps, plan = prepare(project, sec, i, still, bdir, log)
-    gkey = {"depth": (bdir / "cam_depth.npy.key").read_text(), "people": (bdir / "cam_people.png.key").read_text()
-            if people is not None else None, "move": move.model_dump(mode="json", include={"parallax", "dolly", "soften"}),
+    gkey = {"plate": _sha(plate_of(project, sec, i, still)), "subjects": move.subjects if people is not None else None, "move": move.model_dump(mode="json", include={"parallax", "dolly", "soften"}),
             "plan": [plan.lo, plan.hi, [[k.t, list(k.box), k.hold, move.ease] for k in move.keys]],
             "chain": key_of(sec, i).get("chain"), "frames": frames, "fps": fps, "size": size, "v": cg.VERSION}
     stamp = bdir / "guide.json"
@@ -185,9 +186,10 @@ def make_frames(project, sec, i: int, still: Path, bdir: Path, text: str, negati
     else:
         raise BuildError(f"camera backend '{backend}': use ltx, wan or uni3c")
     gstill.unlink(missing_ok=True)
-    strength = move.match if move.match is not None else (0.7 if move.continues else 0.0)
+    chained = len(cg.chain_of(sec.beats, i)) > 1
+    strength = move.match if move.match is not None else (0.7 if chained else 0.0)
     if strength > 0:
-        pngs = _match_plate(pngs, guide, info, strength, bdir, log)
+        pngs = _match_plate(pngs, guide, info, strength, bdir, log, ramp=RAMP if move.continues else 0)
     frames = bdir / "frames"
     if frames.exists():
         shutil.rmtree(frames)
@@ -213,7 +215,7 @@ def make_frames(project, sec, i: int, still: Path, bdir: Path, text: str, negati
     return out
 
 
-def _match_plate(pngs: list[Path], guide, info: dict, strength: float, bdir: Path, log: Callable) -> list[Path]:
+def _match_plate(pngs: list[Path], guide, info: dict, strength: float, bdir: Path, log: Callable, ramp: int = 0) -> list[Path]:
     """Grade the generated frames (in place) toward the plate: tone from the pure-camera render of the plate, grain from the
     plate itself (camera_guide.tone_match)."""
     from PIL import Image
@@ -226,7 +228,7 @@ def _match_plate(pngs: list[Path], guide, info: dict, strength: float, bdir: Pat
     n = len(frames)
     pick = lambda arr: [arr[round(k / max(n - 1, 1) * (len(arr) - 1))] for k in range(n)]
     grain = cg.noise_level(info["rgb"], None)
-    out = cg.tone_match(frames, pick(refs), pick(stat), strength, grain or None)
+    out = cg.tone_match(frames, pick(refs), pick(stat), strength, grain or None, ramp=ramp)
     log(f"  matched the plate: tone x{strength:g}, grain {grain:.2f}")
     res = []
     for p, f in zip(pngs, out):
@@ -289,8 +291,10 @@ def check(project, beat_id: str, section: Optional[str] = None, log: Callable = 
     frames = [np.asarray(Image.open(p).convert("RGB").resize(size, Image.LANCZOS)) for p in pngs]
     static_v = [m[..., 0] for m in cg.read_video(bdir / "guide_static.mp4", size)]
     ref_v = cg.read_video(bdir / "guide_rgb.mp4", size)
-    people = np.asarray(Image.open(bdir / "cam_people.png").convert("L").resize(size, Image.BILINEAR)) \
-        if (bdir / "cam_people.png").exists() else None
+    people = None
+    if b.camera.subjects.strip():       # the subjects' mask in the world (cached with the guide: instant)
+        people = prepare(project, sec, i, bdir / "still.png", bdir, log)[2]
+        people = np.asarray(Image.fromarray(people).resize(size, Image.BILINEAR))
     plan = cg.plan_for(sec.beats, i)
     origin = plan.at(0.0)
     if people is not None and origin.w < 0.999:     # a beat that starts zoomed (a continued camera): the mask in its first frame's view
@@ -321,6 +325,16 @@ def check(project, beat_id: str, section: Optional[str] = None, log: Callable = 
         ok = [c for c in crops if c is not None]
         if ok:
             rows.append(("the tightest keyed view, camera taken out", [c if c is not None else np.zeros_like(ok[0]) for c in crops]))
+    if b.camera.continues and i > 0:     # the join with the beat before: is the cut invisible, does the camera carry on?
+        pdir = project.build / sec.id / "beats" / sec.beats[i - 1].id
+        ppngs = sorted((pdir / "frames").glob("*.png"))
+        if ppngs and (pdir / "guide_static.mp4").exists():
+            pframes = [np.asarray(Image.open(p).convert("RGB").resize(size, Image.LANCZOS)) for p in ppngs]
+            pn = len(pframes)
+            pst = cg.read_video(pdir / "guide_static.mp4", size)
+            pstatic = [pst[round(k / max(pn - 1, 1) * (len(pst) - 1))][..., 0] for k in range(pn)]
+            out["join"] = cg.join_report(pframes, frames, cg.plan_for(sec.beats, i - 1), plan, pstatic, static)
+            (bdir / "camera.json").write_text(json.dumps(out, indent=1))
     cg.contact_sheet(rows, bdir / "camera_sheet.jpg")
     out["sheet"] = str(bdir / "camera_sheet.jpg")
     return out
