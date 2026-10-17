@@ -342,3 +342,25 @@ def test_a_beat_that_starts_zoomed_is_measured_against_its_own_first_frame():
     assert r["lost"] == 0 and r["zoom_rms"] < 1.5 and r["shift_rms"] < 0.02
     rel = cg.relative_view(plan.at(0.0), origin)
     assert (rel.cx, rel.cy, rel.w) == pytest.approx((0.5, 0.5, 1.0))
+
+
+def test_a_continued_beats_grading_fades_in_and_leaves_frame_zero_alone():
+    ref = texture(160, 96, seed=4)
+    drifted = np.clip(ref.astype(np.float32) * 0.8 + 35, 0, 255).astype(np.uint8)
+    static = np.full((96, 160), 255, np.uint8)
+    out = cg.tone_match([drifted] * 12, [ref] * 12, [static] * 12, 1.0, ramp=6)
+    assert out[0].tolist() == drifted.tolist()                       # the first frame is the previous beat's last frame, untouched
+    steps = [abs(float(o.mean()) - float(drifted.mean())) for o in out]
+    assert steps[1] < steps[3] < steps[6] and steps[11] > 5          # the correction arrives gradually, then holds
+
+
+def test_a_continued_beat_starts_on_the_last_frame_of_the_beat_before():
+    from engine.spec import FilmScene
+    sec = FilmScene.model_validate({"id": "s", "beats": [
+        {"id": "a", "prompt": "p", "motion": "m", "seconds": 3, "image": "x.png", "camera": KEYS},
+        {"id": "b", "prompt": "p", "motion": "m", "seconds": 3, "camera": {"keys": KEYS[1:], "continues": True}},
+        {"id": "c", "prompt": "p", "motion": "m", "seconds": 3}]})
+    assert cb.start_ref(sec, 0, (768, 448)) == "x.png"
+    ref = cb.start_ref(sec, 1, (768, 448))
+    assert ref.beat_frame.beat == "a" and ref.beat_frame.at == "last"
+    assert cb.start_ref(sec, 2, (768, 448)).generate == "p"
