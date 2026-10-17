@@ -469,10 +469,15 @@ class FreezeDetail(Model):
     lock: float = Field(0.7, ge=0.2, le=2.0, description="How firmly a tile agrees with its parent: the parent's detail is "
                                                          "kept below this many parent pixels of blur. Lower lets a tile "
                                                          "change more of what the parent drew")
-    method: Literal["zimage", "qwen"] = Field("zimage", description="The re-draw: zimage (Z-Image Turbo img2img, fast, "
-                                                                    "keeps shapes) or qwen (Qwen-Image-Edit asked to add "
-                                                                    "fine detail: understands the picture, slower and "
-                                                                    "freer)")
+    method: Literal["zimage", "qwen"] = Field("zimage", description="The re-draw: zimage (Z-Image Turbo img2img: keeps "
+                                                                    "every shape where it is, fast; adds texture and "
+                                                                    "creases, and draws what the prompt names where the "
+                                                                    "picture already has the shape) or qwen "
+                                                                    "(Qwen-Image-Edit asked to add fine detail: it "
+                                                                    "understands the picture and draws laces and "
+                                                                    "stitching, but also moves and reshapes things by "
+                                                                    "several percent, which a tile cannot be made to agree "
+                                                                    "with: ghosting. Experimental)")
     seed: Optional[int] = Field(None, description="Seed of the re-draw (default: the freeze's seed)")
 
 

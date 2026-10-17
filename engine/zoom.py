@@ -90,12 +90,13 @@ def views_of(path, n: int) -> list[View]:
 def plan_tiles(views: Sequence[View], *, base_px: int, out_px: int, tile_px: int, ratio: float = 2.0,
                levels: Optional[int] = None, pad: float = VIEW_PAD, demand: float = DEMAND
                ) -> tuple[list[Tile], list[float], float]:
-    """The tiles the camera needs. Every view is served by the finest level whose tile is about as wide as the view (a
-    wider view is served by a coarser level, where the pixels are enough); a tile is made where no tile of that level
-    holds enough of the view, centred on the tightest views first, and it brings its ancestors: a tile of the level
-    above that holds it (found, or made), so every tile has a parent that contains it and the camera's whole path is
-    covered at the sharpness its zoom needs. Tiles snap to a 0.5% grid, so a small change to the camera keeps the tiles
-    it did not move. Returns (tiles in build order, nominal width per level, the ratio between levels)."""
+    """The tiles the camera needs, level by level. A view asks for tiles of every level whose tile is about as wide as
+    the view or wider (the finest of them is the one that makes it sharp, the others hold the pyramid together: a tile's
+    parent must contain it). For each level the fewest tiles that hold what is asked of them are chosen (greedy set cover
+    over the tiles of a lattice, origins every quarter tile): a view that fits in a tile must be wholly inside one, a view
+    as wide as the tile's fade-out only mostly. A tile sits inside a parent tile of the level above, and lies on the
+    lattice, so a small change to the camera keeps the tiles it did not touch, and they are not rebuilt.
+    Returns (tiles, parents before children; the nominal tile width per level; the ratio between levels)."""
     w_min = min((v.w for v in views), default=1.0)
     if levels is None:
         L, ratio = auto_levels(w_min, base_px, out_px, ratio)
@@ -103,61 +104,83 @@ def plan_tiles(views: Sequence[View], *, base_px: int, out_px: int, tile_px: int
         L = int(levels)
         ratio = max(1.05, min(ratio, (out_px / (w_min * base_px)) ** (1.0 / L))) if L and w_min * base_px < out_px else ratio
     sizes = level_sizes(base_px, tile_px, ratio, L)
+    vx = np.array([v.cx for v in views])
+    vy = np.array([v.cy for v in views])
+    vw = np.array([v.w for v in views])
+    # the deepest level a view asks for: the finest whose tile is at most 1/demand of the view wide or wider
+    lvl = np.zeros(len(views), int)
+    for k, S in enumerate(sizes, start=1):
+        if S < 1.0:
+            lvl[vw <= demand * S] = k
     tiles: list[Tile] = []
-
-    def level_of(w: float) -> int:
-        k = 0
-        for i, S in enumerate(sizes, start=1):
-            if S < 1.0 and w <= demand * S:
-                k = i
-        return k
-
-    def make(k: int, v: Optional[View], inner=None) -> int:
-        """Index of a new tile of level k: on the lattice, the one that holds most of view `v` (or all of the box `inner`,
-        a child's), with its ancestors made first."""
-        S = sizes[k - 1]
-        box = _lattice_pick(S, v, inner, pad)
-        same = next((i for i, t in enumerate(tiles) if t.level == k and t.box == box), None)
-        if same is not None:                      # the best tile this view can have is already there
-            return same
-        p = -1
-        if k > 1:
-            p = next((i for i, t in enumerate(tiles) if t.level == k - 1 and _holds(t.box, box)), -1)
-            if p < 0:
-                p = make(k - 1, None, box)
-        tiles.append(Tile(k, box, p))
-        return len(tiles) - 1
-
-    for v in sorted(views, key=lambda v: v.w):
-        k = level_of(v.w)
-        if k and not any(t.level == k and _serves(t, v, pad) for t in tiles):
-            make(k, v)
+    for k, S in enumerate(sizes, start=1):
+        ask = np.nonzero(lvl >= k)[0]
+        if S >= 1.0 or not len(ask):
+            continue
+        parents = [i for i, t in enumerate(tiles) if t.level == k - 1]
+        boxes = _candidates(S, vx[ask], vy[ask], tiles, parents)
+        if not len(boxes):
+            continue
+        cov = _coverage(boxes, vx[ask], vy[ask], vw[ask], pad)                       # (candidates, views)
+        need = np.interp(vw[ask] / S, [0.8, demand], [0.98, 0.55])
+        served = cov >= need[None, :]
+        left = np.ones(len(ask), bool)
+        chosen: list[int] = []
+        while left.any():
+            gain = (served & left[None, :]).sum(axis=1)
+            j = int(np.argmax(gain))
+            if gain[j] == 0:
+                break
+            chosen.append(j)
+            left &= ~served[j]
+        for i in np.nonzero(left)[0]:                                               # a view no tile holds enough of: the best it can have
+            j = int(np.argmax(cov[:, i]))
+            if cov[j, i] > 0.3 and j not in chosen:
+                chosen.append(j)
+        for j in sorted(set(chosen), key=lambda j: (boxes[j][1], boxes[j][0])):
+            box = tuple(float(v) for v in boxes[j])
+            p = -1
+            if k > 1:
+                p = next((i for i in parents if _holds(tiles[i].box, box)), -1)
+            tiles.append(Tile(k, box, p))
     return tiles, sizes, ratio                      # a parent always comes before its children
 
 
-def _lattice_pick(S: float, v: Optional[View], inner, pad: float) -> tuple[float, float, float, float]:
-    """A tile of width S on the lattice of this level (origins every S / 4, plus the frame's far edge): among the lattice
-    boxes near the view, the one holding the most of it (ties: the nearest centre); or, for a child's box `inner`, the one
-    holding the whole box with its centre nearest. Placing on a lattice, not on the view, keeps a tile where it was when the
-    camera moves a little, so the tiles a change did not touch are not rebuilt."""
+def _candidates(S: float, xs: np.ndarray, ys: np.ndarray, tiles: list[Tile], parents: list[int]) -> np.ndarray:
+    """The boxes a tile of width S may take for views centred at (xs, ys): the lattice (origins every S / 4, and the frame's
+    far edge) within a tile's width of some view, each inside a parent tile (moved inside the one that holds its centre best
+    when it is not). (N, 4), sorted, without duplicates."""
     step = S / 4
     n = int(math.floor((1 - S) / step + 1e-9))
-    xs = [i * step for i in range(n + 1)] + ([1 - S] if (1 - S) - n * step > 1e-6 else [])
-    cx, cy = (v.cx, v.cy) if v is not None else ((inner[0] + inner[2]) / 2, (inner[1] + inner[3]) / 2)
-    near = [x for x in xs if abs(x + S / 2 - cx) <= S] or [min(xs, key=lambda x: abs(x + S / 2 - cx))]
-    nearly = [y for y in xs if abs(y + S / 2 - cy) <= S] or [min(xs, key=lambda y: abs(y + S / 2 - cy))]
-    best, score = None, None
-    for x0 in near:
-        for y0 in nearly:
-            box = (_snap(x0), _snap(y0), round(_snap(x0) + S, 6), round(_snap(y0) + S, 6))
-            d = abs(x0 + S / 2 - cx) + abs(y0 + S / 2 - cy)
-            if inner is not None:
-                sc = (1 if _holds(box, inner) else 0, -d)
-            else:
-                sc = (round(_covered(box, v, pad), 3), -d)
-            if score is None or sc > score:
-                best, score = box, sc
-    return best
+    grid = np.array([i * step for i in range(n + 1)] + ([1 - S] if (1 - S) - n * step > 1e-6 else []))
+    gx = np.nonzero((np.abs((grid[:, None] + S / 2) - xs[None, :]) <= S).any(axis=1))[0]
+    gy = np.nonzero((np.abs((grid[:, None] + S / 2) - ys[None, :]) <= S).any(axis=1))[0]
+    out = set()
+    for i in gx:
+        for j in gy:
+            x0, y0 = _snap(grid[i]), _snap(grid[j])
+            box = (x0, y0, round(x0 + S, 6), round(y0 + S, 6))
+            if parents:
+                host = None
+                if not any(_holds(tiles[q].box, box) for q in parents):
+                    cx, cy = x0 + S / 2, y0 + S / 2
+                    host = max(parents, key=lambda q: min(cx - tiles[q].box[0], tiles[q].box[2] - cx, cy - tiles[q].box[1], tiles[q].box[3] - cy))
+                    o = tiles[host].box
+                    if S >= o[2] - o[0]:
+                        continue
+                    x0 = min(max(x0, o[0]), o[2] - S)
+                    y0 = min(max(y0, o[1]), o[3] - S)
+                    box = (round(x0, 6), round(y0, 6), round(x0 + S, 6), round(y0 + S, 6))
+            out.add(box)
+    return np.array(sorted(out, key=lambda b: (b[1], b[0])), dtype=float).reshape(-1, 4)
+
+
+def _coverage(boxes: np.ndarray, vx, vy, vw, pad: float) -> np.ndarray:
+    """(candidates, views): the share of each view (with its sway) that each box holds."""
+    h = (vw * pad / 2)[None, :]
+    ix = np.clip(np.minimum(boxes[:, 2:3], vx[None, :] + h) - np.maximum(boxes[:, 0:1], vx[None, :] - h), 0, None)
+    iy = np.clip(np.minimum(boxes[:, 3:4], vy[None, :] + h) - np.maximum(boxes[:, 1:2], vy[None, :] - h), 0, None)
+    return ix * iy / (2 * h) ** 2
 
 
 def _holds(outer, box) -> bool:
