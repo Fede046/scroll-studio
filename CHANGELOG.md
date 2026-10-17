@@ -9,6 +9,19 @@ Everything so far is version 1. On 2026-10-12 the releases first published as 2.
 ## Unreleased
 
 ### Added
+- Camera moves on moving beats: a generated beat with `camera:` keys (`{t, box, hold}` and `ease`, as a frozen moment's camera)
+  gets the camera it asks for instead of the one the prompt hopes for, while the crowd keeps walking. The start image gets
+  a depth map (Depth Anything V2) and its moving subjects (`camera.subjects`, Florence-2 + SAM 2.1) a mask; the keyed
+  path is flown through the depth with the freeze renderer into a guide video (the subjects' depth softened into blobs so
+  the guide fixes the camera and the static world and leaves people free, `soften`), plus a pure-camera render of the picture
+  and a static-world mask; then LTX-2.3 (the take's IC-LoRA depth control, the default) or Wan 2.2 Fun Control paints the
+  beat along the guide, or Wan Uni3C (`backend: uni3c`, which names its missing 2 GB controlnet file, URL and folder).
+  `camera.continues` makes beats share one camera path (position and speed carry across the cut, no ease to a stop), start
+  on the previous beat's last frame and fly their guide through the chain's base plate; `match` grades the frames toward
+  the plate's tone and grain so clips do not drift. `studio camera <project> <beat> --guide` renders the pure-camera preview
+  in seconds; `--check` (and MCP `camera_guide` / `camera_check`) measures the render against the keys (zoom and shift
+  error per frame, how far the people walked, the measurement's floor) and writes a contact sheet. Beats without `camera`
+  keep their cache; the plan prices it as `film:camera`. Modules: `engine/camera_guide.py`, `engine/camera_beats.py`.
 - Region edits: `edit.region` confines an image edit to part of the picture. `region` takes a `prompt` (Florence-2
   grounding on the source, with `pick`, `within` and the "X's Y" owner rule from `reveal`), or `box` / `points` /
   `negative_points` (0-1); SAM 2.1 (image mode, through the existing `SSRevealTrack` node on a one-frame batch: no new
