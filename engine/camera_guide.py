@@ -320,19 +320,18 @@ def view_from_transform(A: np.ndarray, size: tuple[int, int]) -> View:
     return View(float(cx), float(cy), float(1.0 / s))
 
 
-def track_views(frames: list[np.ndarray], static: Optional[list[np.ndarray]] = None) -> list[Optional[View]]:
-    """Where the camera was in every frame, measured on the frames themselves: each frame is registered against the first
-    (on its static parts: `static` masks, 255 = static world), falling back to the previous frame's registration chained
-    on when the direct match fails. The first frame is the reference: View(0.5, 0.5, 1)."""
-    H, W = frames[0].shape[:2]
-    out: list[Optional[View]] = [View(0.5, 0.5, 1.0)]
-    last = np.array([[1, 0, 0], [0, 1, 0]], np.float64)
-    prev_i = 0
+def register_all(frames: list[np.ndarray], static: Optional[list[np.ndarray]] = None) -> list[Optional[np.ndarray]]:
+    """The transform (first frame -> frame i, 2x3) of every frame, registered on the static world: directly against the first
+    frame, or, when that match fails (a close-up sees only part of it), against the previous good frame chained on.
+    The first entry is the identity; None where nothing matched."""
+    ident = np.array([[1, 0, 0], [0, 1, 0]], np.float64)
+    out: list[Optional[np.ndarray]] = [ident]
+    last, prev_i = ident, 0
     for i in range(1, len(frames)):
         ma = None if static is None else static[0]
         mb = None if static is None else static[i]
         A = register(frames[0], frames[i], ma, mb)
-        if A is None:                       # chain: the previous good frame -> this one, composed with its transform
+        if A is None:
             B = register(frames[prev_i], frames[i], None if static is None else static[prev_i], mb)
             if B is not None:
                 A = (np.vstack([B, [0, 0, 1]]) @ np.vstack([last, [0, 0, 1]]))[:2]
@@ -340,8 +339,21 @@ def track_views(frames: list[np.ndarray], static: Optional[list[np.ndarray]] = N
             out.append(None)
             continue
         last, prev_i = A, i
-        out.append(view_from_transform(A, (W, H)))
+        out.append(A)
     return out
+
+
+def track_views(frames: list[np.ndarray], static: Optional[list[np.ndarray]] = None) -> list[Optional[View]]:
+    """Where the camera was in every frame, measured on the frames themselves (see `register_all`). The first frame is the
+    reference: View(0.5, 0.5, 1)."""
+    H, W = frames[0].shape[:2]
+    return [None if A is None else view_from_transform(A, (W, H)) for A in register_all(frames, static)]
+
+
+def relative_view(k: View, origin: View) -> View:
+    """The view `k` (of the world) as seen in the picture of the view `origin` (so the first frame of a beat that starts
+    zoomed in is the reference, as it is in `track_views`)."""
+    return View((0.5 + (k.cx - origin.cx) / origin.w), (0.5 + (k.cy - origin.cy) / origin.w), k.w / origin.w)
 
 
 def follow_error(frames: list[np.ndarray], plan: CameraPlan, static: Optional[list[np.ndarray]] = None,
@@ -353,9 +365,10 @@ def follow_error(frames: list[np.ndarray], plan: CameraPlan, static: Optional[li
     n = len(frames)
     views = track_views(frames, static)
     ts = times or [i / max(n - 1, 1) for i in range(n)]
+    origin = plan.at(0.0)
     rows, lost = [], 0
     for i, (v, t) in enumerate(zip(views, ts)):
-        k = plan.at(t)
+        k = relative_view(plan.at(t), origin)
         if v is None:
             lost += 1
             rows.append({"i": i, "t": t, "key": [k.cx, k.cy, k.w], "got": None})
@@ -377,14 +390,9 @@ def people_motion(frames: list[np.ndarray], people: np.ndarray, static: Optional
     crowd reads clearly above the floor; a pinned one does not)."""
     import cv2
     H, W = frames[0].shape[:2]
-    warped = [frames[0]]
-    for i in range(1, len(frames)):
-        A = register(frames[0], frames[i], None if static is None else static[0], None if static is None else static[i])
-        if A is None:
-            warped.append(None)
-            continue
-        warped.append(cv2.warpAffine(frames[i], cv2.invertAffineTransform(A), (W, H), flags=cv2.INTER_LINEAR,
-                                     borderMode=cv2.BORDER_REPLICATE))
+    warped = [None if A is None else cv2.warpAffine(f, cv2.invertAffineTransform(A), (W, H), flags=cv2.INTER_LINEAR,
+                                                     borderMode=cv2.BORDER_REPLICATE)
+              for f, A in zip(frames, register_all(frames, static))]
     pm = cv2.erode((people > 127).astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
     sm = ~(cv2.dilate((people > 127).astype(np.uint8), np.ones((15, 15), np.uint8)) > 0)
     pf, sf = [], []
@@ -552,8 +560,9 @@ def people_displacement(frames: list[np.ndarray], people: np.ndarray, static: Op
     pm0 = cv2.erode((people > 127).astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
     sm0 = ~(cv2.dilate((people > 127).astype(np.uint8), np.ones((15, 15), np.uint8)) > 0)
     pk, sk = [0.0], [0.0]
+    mats = register_all(frames, static)
     for i in range(1, len(frames)):
-        A = register(frames[0], frames[i], None if static is None else static[0], None if static is None else static[i])
+        A = mats[i]
         if A is None:
             pk.append(float("nan")); sk.append(float("nan"))
             continue
@@ -577,26 +586,39 @@ def stabilised(frames: list[np.ndarray], static: Optional[list[np.ndarray]] = No
     registered): what the world, and the people walking in it, look like through a camera that never moved."""
     import cv2
     H, W = frames[0].shape[:2]
-    out: list[Optional[np.ndarray]] = [frames[0]]
-    for i in range(1, len(frames)):
-        A = register(frames[0], frames[i], None if static is None else static[0], None if static is None else static[i])
-        out.append(None if A is None else cv2.warpAffine(frames[i], cv2.invertAffineTransform(A), (W, H), flags=cv2.INTER_LINEAR,
-                                                         borderMode=cv2.BORDER_REPLICATE))
+    return [None if A is None else cv2.warpAffine(f, cv2.invertAffineTransform(A), (W, H), flags=cv2.INTER_LINEAR,
+                                                  borderMode=cv2.BORDER_CONSTANT, borderValue=(48, 48, 48))
+            for f, A in zip(frames, register_all(frames, static))]
+
+
+def crop_view(frames: list[Optional[np.ndarray]], view: View) -> list[Optional[np.ndarray]]:
+    """The same square view (freeze.View units) cut out of every frame."""
+    out = []
+    for f in frames:
+        if f is None:
+            out.append(None)
+            continue
+        H, W = f.shape[:2]
+        x0, x1 = int((view.cx - view.w / 2) * W), int(math.ceil((view.cx + view.w / 2) * W))
+        y0, y1 = int((view.cy - view.w / 2) * H), int(math.ceil((view.cy + view.w / 2) * H))
+        out.append(np.ascontiguousarray(f[max(y0, 0):y1, max(x0, 0):x1]))
     return out
 
 
 def contact_sheet(rows: list[tuple[str, list[np.ndarray]]], out: Path, cols: int = 8, cell: int = 320) -> None:
-    """A review sheet: one labelled row of frames per entry (each list is sampled to `cols` frames across the beat)."""
+    """A review sheet: one labelled row of frames per entry (each list is sampled to `cols` frames across the beat; a row
+    keeps its own aspect ratio inside cells of `cell` pixels across)."""
     from PIL import Image, ImageDraw
-    h0, w0 = rows[0][1][0].shape[:2]
-    ch = int(round(cell * h0 / w0))
-    sheet = Image.new("RGB", (cols * cell, len(rows) * ch), (20, 20, 20))
+    heights = [int(round(cell * fr[0].shape[0] / fr[0].shape[1])) for _, fr in rows]
+    sheet = Image.new("RGB", (cols * cell, sum(heights)), (20, 20, 20))
     d = ImageDraw.Draw(sheet)
-    for r, (label, fr) in enumerate(rows):
+    y = 0
+    for (label, fr), ch in zip(rows, heights):
         for c in range(cols):
             k = round(c * (len(fr) - 1) / max(cols - 1, 1))
             if fr[k] is not None:
-                sheet.paste(Image.fromarray(fr[k]).resize((cell, ch), Image.LANCZOS), (c * cell, r * ch))
-        d.rectangle((0, r * ch, 8 + 7 * len(label), r * ch + 14), fill=(0, 0, 0))
-        d.text((4, r * ch + 2), label, fill=(255, 220, 0))
+                sheet.paste(Image.fromarray(fr[k]).resize((cell, ch), Image.LANCZOS), (c * cell, y))
+        d.rectangle((0, y, 8 + 7 * len(label), y + 14), fill=(0, 0, 0))
+        d.text((4, y + 2), label, fill=(255, 220, 0))
+        y += ch
     sheet.save(out, quality=88)

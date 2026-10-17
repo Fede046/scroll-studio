@@ -292,6 +292,13 @@ def check(project, beat_id: str, section: Optional[str] = None, log: Callable = 
     people = np.asarray(Image.open(bdir / "cam_people.png").convert("L").resize(size, Image.BILINEAR)) \
         if (bdir / "cam_people.png").exists() else None
     plan = cg.plan_for(sec.beats, i)
+    origin = plan.at(0.0)
+    if people is not None and origin.w < 0.999:     # a beat that starts zoomed (a continued camera): the mask in its first frame's view
+        H, W = people.shape
+        x0, y0 = (origin.cx - origin.w / 2) * W, (origin.cy - origin.w / 2) * H
+        import cv2
+        M = np.float32([[1 / origin.w, 0, -x0 / origin.w], [0, 1 / origin.w, -y0 / origin.w]])
+        people = cv2.warpAffine(people, M, (W, H), flags=cv2.INTER_LINEAR, borderValue=0)
     n = len(frames)
     static = [static_v[round(k / max(n - 1, 1) * (len(static_v) - 1))] for k in range(n)]
     out = {"beat": b.id, "backend": backend_of(b.camera), "frames": n, "size": list(size)}
@@ -308,6 +315,12 @@ def check(project, beat_id: str, section: Optional[str] = None, log: Callable = 
     rows = [("generated", frames), ("the camera alone (guide_rgb): what the keys ask for", ref_v),
             ("the guide (depth, people softened)", cg.read_video(bdir / "guide.mp4", size)),
             ("generated, camera taken out", [f if f is not None else np.zeros_like(frames[0]) for f in cg.stabilised(frames, static)])]
+    tight = min((cg.relative_view(plan.at(t), origin) for t in np.linspace(0, 1, 41)), key=lambda v: v.w)
+    if tight.w < 0.9:       # what the camera looked at, with the camera taken out: do the people there still move?
+        crops = cg.crop_view(cg.stabilised(frames, static), tight)
+        ok = [c for c in crops if c is not None]
+        if ok:
+            rows.append(("the tightest keyed view, camera taken out", [c if c is not None else np.zeros_like(ok[0]) for c in crops]))
     cg.contact_sheet(rows, bdir / "camera_sheet.jpg")
     out["sheet"] = str(bdir / "camera_sheet.jpg")
     return out

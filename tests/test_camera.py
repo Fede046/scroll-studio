@@ -325,3 +325,20 @@ def test_people_displacement_separates_walkers_from_a_frozen_picture():
     s = cg.people_displacement(still, people, static)
     assert w["people_end_px"] > s["people_end_px"] + 1.0
     assert s["people_end_px"] < 1.0
+
+
+def test_a_beat_that_starts_zoomed_is_measured_against_its_own_first_frame():
+    img = texture()
+    a = beat("a", 3, camera=[{"t": 0, "box": [0, 0, 1, 1]}, {"t": 1, "box": [0.15, 0.1, 0.85, 0.8]}])
+    b = beat("b", 3, camera={"keys": [{"t": 0.5, "box": [0.40, 0.38, 0.62, 0.97]}, {"t": 1, "box": [0, 0, 1, 1]}], "continues": True})
+    plan = cg.plan_for([a, b], 1)
+    origin = plan.at(0.0)
+    assert origin.w < 0.8                                     # it starts zoomed in, where `a` ended
+    n = 13
+    # what a camera that follows the plan sees, as a picture of the first frame of the beat: render the world, then take
+    # the beat's own first frame as the reference
+    world = [zoomed(img, plan.at(i / (n - 1))) for i in range(n)]
+    r = cg.follow_error(world, plan)
+    assert r["lost"] == 0 and r["zoom_rms"] < 1.5 and r["shift_rms"] < 0.02
+    rel = cg.relative_view(plan.at(0.0), origin)
+    assert (rel.cx, rel.cy, rel.w) == pytest.approx((0.5, 0.5, 1.0))
