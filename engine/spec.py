@@ -629,6 +629,10 @@ class CameraMove(Model):
     continues: bool = Field(False, description="Carry the previous beat's camera across the cut: this beat's camera starts "
                             "where the previous camera beat ended, with the speed it ended at (no ease to a stop at the "
                             "boundary), and it starts on that beat's last frame, graded to match")
+    match: Optional[float] = Field(None, ge=0, le=1, description="How far the generated frames are pulled back toward the base "
+                                   "plate's tone and grain (the start image of the first beat of the chain, flown along the "
+                                   "same camera): a video model drifts in contrast, haze and grain from clip to clip, and a "
+                                   "cut shows it. 0 = off. Default: 0.7 when the beat `continues`, else off")
     seed: Optional[int] = Field(None, description="Seed for the generation (default: the beat's motion_seed, then seed)")
 
     @model_validator(mode="before")

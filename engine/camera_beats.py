@@ -74,6 +74,28 @@ def key_of(sec, i: int) -> dict:
 
 # ---------------------------------------------------------------- preparing the guide
 
+def _sha(path: Path) -> str:
+    import hashlib
+    return hashlib.sha1(path.read_bytes()).hexdigest()[:16]
+
+
+def plate_of(project, sec, i: int, still: Path) -> Path:
+    """The picture the guide is flown through: the beat's own start image, or, in a chain of beats that `continue` one
+    another, the start image of the chain's first beat (the base plate: the world every beat of the chain looks at, so a
+    camera that pulls back out of a close-up has the wide street to fly through)."""
+    chain = cg.chain_of(sec.beats, i)
+    b = sec.beats[i]
+    if b.camera.continues and (i == 0 or sec.beats[i - 1].camera is None):
+        raise BuildError(f"beat '{b.id}': `camera.continues` needs the beat before it to have a `camera` too")
+    if chain[0] == i:
+        return still
+    plate = project.build / sec.id / "beats" / sec.beats[chain[0]].id / "still.png"
+    if not plate.exists():
+        raise BuildError(f"beat '{b.id}' continues the camera of '{sec.beats[chain[0]].id}', which is not rendered yet "
+                         "(its start image is the base plate): build that beat first")
+    return plate
+
+
 def prepare(project, sec, i: int, still: Path, bdir: Path, log: Callable = print):
     """(rgb, depth, people, size, frames, fps, plan) for beat i: depth and people mask cached in the beat's folder."""
     from PIL import Image
@@ -83,11 +105,10 @@ def prepare(project, sec, i: int, still: Path, bdir: Path, log: Callable = print
     beat_w, beat_h = sec.beat_res[0] // 32 * 32, sec.beat_res[1] // 32 * 32
     frames = frames_of(b.seconds, backend)
     size = gen_size((beat_w, beat_h), backend, frames)
-    img = Image.open(still).convert("RGB").resize(size, Image.LANCZOS)
+    plate = plate_of(project, sec, i, still)
+    img = Image.open(plate).convert("RGB").resize(size, Image.LANCZOS)
     rgb = np.asarray(img)
-    skey = bdir / "still.png.key"
-    base = {"still": skey.read_text() if skey.exists() else digest(str(still), still.stat().st_size, int(still.stat().st_mtime)),
-            "size": size}
+    base = {"plate": _sha(plate), "size": size}
     dkey = {**base, "model": "small", "v": cg.VERSION}
 
     def make_depth(tmp):
@@ -164,6 +185,9 @@ def make_frames(project, sec, i: int, still: Path, bdir: Path, text: str, negati
     else:
         raise BuildError(f"camera backend '{backend}': use ltx, wan or uni3c")
     gstill.unlink(missing_ok=True)
+    strength = move.match if move.match is not None else (0.7 if move.continues else 0.0)
+    if strength > 0:
+        pngs = _match_plate(pngs, guide, info, strength, bdir, log)
     frames = bdir / "frames"
     if frames.exists():
         shutil.rmtree(frames)
@@ -187,6 +211,28 @@ def make_frames(project, sec, i: int, still: Path, bdir: Path, text: str, negati
                 shutil.copy(p, dst)
             out.append(dst)
     return out
+
+
+def _match_plate(pngs: list[Path], guide, info: dict, strength: float, bdir: Path, log: Callable) -> list[Path]:
+    """Grade the generated frames (in place) toward the plate: tone from the pure-camera render of the plate, grain from the
+    plate itself (camera_guide.tone_match)."""
+    from PIL import Image
+    size = info["size"]
+    frames = [np.asarray(Image.open(p).convert("RGB")) for p in pngs]
+    if frames[0].shape[1::-1] != tuple(size):
+        frames = [np.asarray(Image.fromarray(f).resize(size, Image.LANCZOS)) for f in frames]
+    refs = cg.read_video(guide.rgb, size)
+    stat = [m[..., 0] for m in cg.read_video(guide.static, size)]
+    n = len(frames)
+    pick = lambda arr: [arr[round(k / max(n - 1, 1) * (len(arr) - 1))] for k in range(n)]
+    grain = cg.noise_level(info["rgb"], None)
+    out = cg.tone_match(frames, pick(refs), pick(stat), strength, grain or None)
+    log(f"  matched the plate: tone x{strength:g}, grain {grain:.2f}")
+    res = []
+    for p, f in zip(pngs, out):
+        Image.fromarray(f).save(p)
+        res.append(p)
+    return res
 
 
 # ---------------------------------------------------------------- the commands: guide only, and the check

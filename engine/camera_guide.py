@@ -91,10 +91,7 @@ def plan_for(beats: list, i: int) -> CameraPlan:
         b = beats[j]
         for k in b.camera.keys:
             keys.append({"t": (t0 + k.t * b.seconds) / total, "box": list(k.box), "hold": k.hold * b.seconds / total})
-        if j == chain[0] and chain[0] != i:
-            pass
         t0 += b.seconds
-    # the chain's last beat decides where the path ends: it rests on its last box at the end
     path = CameraPath(keys, "flow")
     off = sum(beats[j].seconds for j in chain if j < i)
     return CameraPlan(path, off / total, (off + beats[i].seconds) / total)
@@ -484,3 +481,60 @@ def generate_uni3c(still: Path, render: Path, text: str, negative: str, size: tu
     comfy.free()
     log(f"  uni3c: {frames} frames in {time.time() - t0:.0f}s")
     return sorted(out.glob("*.png"))
+
+
+# ---------------------------------------------------------------- matching the plate (tone and grain)
+
+def noise_level(rgb: np.ndarray, mask: Optional[np.ndarray] = None) -> float:
+    """The grain of a picture: the standard deviation (0-255) of what a light blur takes out of its luminance, over its flat
+    parts (low local gradient), so edges and ink lines do not count as noise."""
+    import cv2
+    g = _gray(rgb).astype(np.float32)
+    hf = g - cv2.GaussianBlur(g, (0, 0), 1.2)
+    grad = np.hypot(cv2.Sobel(cv2.GaussianBlur(g, (0, 0), 1.5), cv2.CV_32F, 1, 0), cv2.Sobel(cv2.GaussianBlur(g, (0, 0), 1.5), cv2.CV_32F, 0, 1))
+    flat = grad < max(2.0, float(np.percentile(grad, 40)))
+    if mask is not None:
+        flat &= mask > 127
+    return float(hf[flat].std()) if flat.sum() > 200 else 0.0
+
+
+def tone_match(frames: list[np.ndarray], refs: list[np.ndarray], static: list[np.ndarray], strength: float,
+               grain: Optional[float] = None, seed: int = 7) -> list[np.ndarray]:
+    """Pull every generated frame toward the plate: per channel, a gain and an offset that make the mean and spread of
+    the frame's static world (where `static` is 255) match the same area of the pure-camera render `refs`, smoothed over
+    time so nothing flickers, applied `strength` (0-1); then grain is added where the frame is cleaner than `grain` (the
+    plate's own noise level) so a clip graded this way does not turn waxy next to the plate. The people are never used
+    to measure (they move), but the correction is global, so they take it too."""
+    import cv2
+    from scipy.ndimage import gaussian_filter1d
+    n = len(frames)
+    gains, offs, ok = np.ones((n, 3)), np.zeros((n, 3)), np.zeros(n, bool)
+    for k in range(n):
+        m = cv2.erode((static[k] > 200).astype(np.uint8), np.ones((9, 9), np.uint8)) > 0
+        if m.mean() < 0.03:
+            continue
+        a = cv2.GaussianBlur(frames[k], (0, 0), 1.5).astype(np.float32)[m]
+        b = cv2.GaussianBlur(refs[k], (0, 0), 1.5).astype(np.float32)[m]
+        g = np.clip(b.std(0) / np.maximum(a.std(0), 1.0), 0.7, 1.4)
+        gains[k], offs[k], ok[k] = g, b.mean(0) - g * a.mean(0), True
+    if not ok.any():
+        return frames
+    idx = np.arange(n)
+    for arr in (gains, offs):
+        for c in range(3):                                   # fill frames that could not be measured, then smooth
+            arr[:, c] = np.interp(idx, idx[ok], arr[ok, c])
+            arr[:, c] = gaussian_filter1d(arr[:, c], max(1.0, n / 24), mode="nearest")
+    rng = np.random.default_rng(seed)
+    out = []
+    for k, f in enumerate(frames):
+        x = f.astype(np.float32)
+        y = x * (1 - strength + strength * gains[k]) + strength * offs[k]
+        if grain:
+            have = noise_level(np.clip(y, 0, 255).astype(np.uint8))
+            if have < grain * 0.9:
+                add = float(np.sqrt(max(grain ** 2 - have ** 2, 0))) * strength
+                nz = cv2.GaussianBlur(rng.standard_normal(y.shape[:2]).astype(np.float32), (0, 0), 0.6)
+                nz = nz / max(float(nz.std()), 1e-6)
+                y = y + nz[..., None] * add
+        out.append(np.clip(y + 0.5, 0, 255).astype(np.uint8))
+    return out
