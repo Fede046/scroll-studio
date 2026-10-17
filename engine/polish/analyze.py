@@ -57,11 +57,56 @@ class Scan:
 
 # ---------------------------------------------------------------- reading
 
+class _FfmpegCap:
+    """The small part of cv2.VideoCapture this module uses, over an ffmpeg pipe: for films OpenCV's build cannot decode
+    (HEVC, AV1, VP9 ...)."""
+
+    def __init__(self, path: Path):
+        import subprocess
+        from ..config import settings
+        from ..project import probe
+        info = probe(Path(path), "stream=width,height,r_frame_rate,nb_frames:format=duration")
+        self.w, self.h = int(info["width"]), int(info["height"])
+        num, _, den = str(info.get("r_frame_rate", "24/1")).partition("/")
+        self.fps = float(num) / float(den or 1)
+        self.n = int(round(float(info.get("duration") or 0) * self.fps))
+        self.proc = subprocess.Popen([settings()["ffmpeg"], "-hide_banner", "-loglevel", "error", "-i", str(path), "-f", "rawvideo",
+                                      "-pix_fmt", "bgr24", "-"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        self.ok = self.n > 0
+
+    def isOpened(self):
+        return self.ok
+
+    def get(self, prop):
+        return {cv2.CAP_PROP_FPS: self.fps, cv2.CAP_PROP_FRAME_COUNT: self.n, cv2.CAP_PROP_FRAME_WIDTH: self.w,
+                cv2.CAP_PROP_FRAME_HEIGHT: self.h}.get(prop, 0)
+
+    def read(self):
+        size = self.w * self.h * 3
+        buf = self.proc.stdout.read(size)
+        if len(buf) < size:
+            return False, None
+        return True, np.frombuffer(buf, np.uint8).reshape(self.h, self.w, 3).copy()
+
+    def release(self):
+        try:
+            self.proc.kill()
+        except Exception:
+            pass
+
+
 def open_film(path: Path):
     cap = cv2.VideoCapture(str(path))
-    if not cap.isOpened():
-        raise RuntimeError(f"cannot read the film {path} (OpenCV could not open it)")
-    return cap
+    if cap.isOpened() and cap.get(cv2.CAP_PROP_FRAME_COUNT) > 0:
+        return cap
+    cap.release()
+    try:
+        alt = _FfmpegCap(path)
+        if alt.isOpened():
+            return alt
+    except Exception:
+        pass
+    raise RuntimeError(f"cannot read the film {path} (neither OpenCV nor ffmpeg could decode it)")
 
 
 def scan_film(path: Path, progress: Callable[[float, str], None] = lambda f, m="": None,
