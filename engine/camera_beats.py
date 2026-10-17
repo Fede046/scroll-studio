@@ -199,6 +199,8 @@ def make_frames(project, sec, i: int, still: Path, bdir: Path, text: str, negati
     else:
         raise BuildError(f"camera backend '{backend}': use ltx, wan or uni3c")
     gstill.unlink(missing_ok=True)
+    for tmp in bdir.glob("cam_*_*"):          # the uniquely named copies uploaded to ComfyUI
+        tmp.unlink(missing_ok=True)
     chained = len(cg.chain_of(sec.beats, i)) > 1
     strength = move.match if move.match is not None else (0.7 if chained else 0.0)
     if strength > 0:

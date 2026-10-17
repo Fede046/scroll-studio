@@ -161,7 +161,10 @@ UI (React) ◄─► engine server (FastAPI + job queue + websocket events) ◄�
   noise level). Measuring (`studio camera --check`, MCP `camera_check`): `track_views` registers every frame against the
   first on the static world (SIFT + RANSAC similarity), `follow_error` compares the implied view with the keyed one,
   `people_displacement` takes the camera out and reads how far the people have walked, and the same numbers for the
-  pure-camera render are the measurement's floor. Stage key: a beat gets a `camera` entry only when it has `camera:`
+  pure-camera render are the measurement's floor. Measured on the Presence street (3 s, 768x448, the keys push from the
+  wide frame to the girl and back): `ltx` follows the keys within 0.7-0.9% rms of view width (the floor is 0.15-0.2%),
+  `wan` (Fun Control, start image pinned) lags and never completes the pull-out (22.6% rms, 43% at worst), so `auto` is
+  `ltx`; `uni3c` could not be measured (its file is not installed). Stage key: a beat gets a `camera` entry only when it has `camera:`
   (every other beat keeps its cache), including the chain it belongs to. Plan: `film:camera` units.
 - **Plans and storyboards.** `engine/plan.py` runs every builder in a dry run (`engine/fidelity.py` `planning()`):
   `BuildContext.stage` reports instead of running, a stage that would run marks its outputs dirty so stages keyed on

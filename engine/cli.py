@@ -5,6 +5,7 @@
   studio storyboard my-site [--level sketch|stills|animatic] [--only id,id] [--motion] [--open]
   studio storyboard my-site --edit [--port 8971]    edit every shot in the browser: notes, captions, regenerate one image, play it
   studio storyboard my-site --notes                 the open notes written there, with each shot's current values
+  studio camera my-site beat [--guide | --check]    a beat with `camera:` keys: preview its guide (pure camera), or measure how well it follows
   studio preview my-site [--port 5173]
   studio record my-site [--section hero] [--seconds 12] [--gif]
   studio trailer my-site [--format 9x16] [--plan]      launch trailer from the site's renders -> dist/trailer/
