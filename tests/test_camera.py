@@ -283,3 +283,43 @@ def test_ltx_graph_is_a_take_guide_with_the_start_image(monkeypatch):
     g = comfy.build_graph(cfg, "g.mp4", "s.png", 73, 768, 448, 24, "p")
     assert g["guide_vid"]["inputs"]["file"] == "g.mp4" and g["addguide"]["inputs"]["strength"] == 0.9
     assert g["i2v"]["inputs"]["bypass"] is False
+
+
+# ---------------------------------------------------------------- stabilising, displacement, the sheet
+
+def test_stabilised_frames_undo_the_camera_and_the_sheet_is_written(tmp_path):
+    img = texture()
+    move = CameraMove(keys=KEYS)
+    plan = cg.CameraPlan(cg.camera_path(move))
+    n = 9
+    frames = [zoomed(img, plan.at(i / (n - 1))) for i in range(n)]
+    st = cg.stabilised(frames)
+    mid = st[4]
+    assert mid is not None
+    # the middle frame (zoomed in) warped back lines up with the first inside the area it sees
+    H, W = img.shape[:2]
+    cy0, cx0 = H // 2, W // 2
+    a = mid[cy0 - 20:cy0 + 20, cx0 - 30:cx0 + 30].astype(int)
+    b = img[cy0 - 20:cy0 + 20, cx0 - 30:cx0 + 30].astype(int)
+    assert np.abs(a - b).mean() < 14
+    cg.contact_sheet([("a", frames), ("b", [f if f is not None else frames[0] for f in st])], tmp_path / "s.jpg", cols=4, cell=96)
+    assert (tmp_path / "s.jpg").stat().st_size > 1000
+
+
+def test_people_displacement_separates_walkers_from_a_frozen_picture():
+    bg = texture(256, 160, seed=5)
+    people = np.zeros((160, 256), np.uint8)
+    people[50:120, 100:140] = 255
+    static = [np.where(people > 0, 0, 255).astype(np.uint8)] * 12
+    walker = texture(40, 70, seed=9)
+    walking = []
+    for i in range(12):
+        f = bg.copy()
+        x = 100 + i * 2
+        f[50:120, x:x + 40] = walker
+        walking.append(f)
+    still = [bg.copy() for _ in range(12)]
+    w = cg.people_displacement(walking, people, static)
+    s = cg.people_displacement(still, people, static)
+    assert w["people_end_px"] > s["people_end_px"] + 1.0
+    assert s["people_end_px"] < 1.0

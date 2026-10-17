@@ -521,8 +521,10 @@ def camera(name: str, beat: str,
                    f"measurement floor {f['zoom_rms']:.2f}% / {f['shift_rms']:.3f}")
         if "people" in r:
             p, pf = r["people"], r["people_floor"]
-            typer.echo(f"  people: {p['people_px_per_frame']:.2f} px/frame against {p['static_px_per_frame']:.2f} on the static world "
-                       f"(a pure camera, no walking: {pf['people_px_per_frame']:.2f})")
+            typer.echo(f"  people: {p['people_end_px']:.1f} px from where they stood at the start by the end of the beat "
+                       f"(static world {p['static_end_px']:.1f} px; a frozen picture under the same camera {pf['people_end_px']:.1f} px; "
+                       f"frame is {p['width']} px wide)")
+        typer.echo(f"  sheet: {r.get('sheet')}")
 
 
 @app.command()

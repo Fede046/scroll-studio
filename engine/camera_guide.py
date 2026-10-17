@@ -538,3 +538,65 @@ def tone_match(frames: list[np.ndarray], refs: list[np.ndarray], static: list[np
                 y = y + nz[..., None] * add
         out.append(np.clip(y + 0.5, 0, 255).astype(np.uint8))
     return out
+
+
+def people_displacement(frames: list[np.ndarray], people: np.ndarray, static: Optional[list[np.ndarray]] = None) -> dict:
+    """How far the people have walked from where they stood in the first frame, with the camera taken out: every frame is
+    warped back onto the first by its own similarity registration (on the static world), then the optical flow from the first
+    frame to it is read inside the people's mask (and, as the noise floor, over the static world), only where the warped frame
+    covers the first. Returns per-frame median displacements in pixels (`people`, `static`) and the summary `end` (mean of
+    the last third): a walking crowd reads well above the static floor, a pinned one stays at it."""
+    import cv2
+    H, W = frames[0].shape[:2]
+    g0 = _gray(frames[0])
+    pm0 = cv2.erode((people > 127).astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
+    sm0 = ~(cv2.dilate((people > 127).astype(np.uint8), np.ones((15, 15), np.uint8)) > 0)
+    pk, sk = [0.0], [0.0]
+    for i in range(1, len(frames)):
+        A = register(frames[0], frames[i], None if static is None else static[0], None if static is None else static[i])
+        if A is None:
+            pk.append(float("nan")); sk.append(float("nan"))
+            continue
+        inv = cv2.invertAffineTransform(A)
+        warped = cv2.warpAffine(frames[i], inv, (W, H), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+        valid = cv2.erode(cv2.warpAffine(np.ones((H, W), np.uint8), inv, (W, H), flags=cv2.INTER_NEAREST), np.ones((9, 9), np.uint8)) > 0
+        flow = cv2.calcOpticalFlowFarneback(g0, _gray(warped), None, 0.5, 4, 31, 4, 5, 1.1, 0)
+        mag = np.hypot(flow[..., 0], flow[..., 1])
+        a, b = pm0 & valid, sm0 & valid
+        pk.append(float(np.median(mag[a])) if a.sum() > 50 else float("nan"))
+        sk.append(float(np.median(mag[b])) if b.sum() > 50 else float("nan"))
+    n = len(frames)
+    tail = slice(2 * n // 3, n)
+    end = lambda v: float(np.nanmean(v[tail])) if np.isfinite(v[tail]).any() else float("nan")
+    return {"people": pk, "static": sk, "people_end_px": end(np.array(pk)), "static_end_px": end(np.array(sk)),
+            "people_max_px": float(np.nanmax(pk)), "width": W}
+
+
+def stabilised(frames: list[np.ndarray], static: Optional[list[np.ndarray]] = None) -> list[Optional[np.ndarray]]:
+    """Every frame warped back onto the first one by its own registration (the camera taken out; None where it could not be
+    registered): what the world, and the people walking in it, look like through a camera that never moved."""
+    import cv2
+    H, W = frames[0].shape[:2]
+    out: list[Optional[np.ndarray]] = [frames[0]]
+    for i in range(1, len(frames)):
+        A = register(frames[0], frames[i], None if static is None else static[0], None if static is None else static[i])
+        out.append(None if A is None else cv2.warpAffine(frames[i], cv2.invertAffineTransform(A), (W, H), flags=cv2.INTER_LINEAR,
+                                                         borderMode=cv2.BORDER_REPLICATE))
+    return out
+
+
+def contact_sheet(rows: list[tuple[str, list[np.ndarray]]], out: Path, cols: int = 8, cell: int = 320) -> None:
+    """A review sheet: one labelled row of frames per entry (each list is sampled to `cols` frames across the beat)."""
+    from PIL import Image, ImageDraw
+    h0, w0 = rows[0][1][0].shape[:2]
+    ch = int(round(cell * h0 / w0))
+    sheet = Image.new("RGB", (cols * cell, len(rows) * ch), (20, 20, 20))
+    d = ImageDraw.Draw(sheet)
+    for r, (label, fr) in enumerate(rows):
+        for c in range(cols):
+            k = round(c * (len(fr) - 1) / max(cols - 1, 1))
+            if fr[k] is not None:
+                sheet.paste(Image.fromarray(fr[k]).resize((cell, ch), Image.LANCZOS), (c * cell, r * ch))
+        d.rectangle((0, r * ch, 8 + 7 * len(label), r * ch + 14), fill=(0, 0, 0))
+        d.text((4, r * ch + 2), label, fill=(255, 220, 0))
+    sheet.save(out, quality=88)

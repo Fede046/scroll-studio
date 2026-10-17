@@ -301,7 +301,13 @@ def check(project, beat_id: str, section: Optional[str] = None, log: Callable = 
     floor = cg.follow_error(ref_v, plan, static_v)
     out["floor"] = {k: v for k, v in floor.items() if k != "per_frame"}
     if people is not None:
-        out["people"] = cg.people_motion(frames, people, static)
-        out["people_floor"] = cg.people_motion(ref_v, people, static_v)
+        brief = lambda r: {k: r[k] for k in ("people_end_px", "static_end_px", "people_max_px", "width")}
+        out["people"] = brief(cg.people_displacement(frames, people, static))
+        out["people_floor"] = brief(cg.people_displacement(ref_v, people, static_v))
     (bdir / "camera.json").write_text(json.dumps(out, indent=1))
+    rows = [("generated", frames), ("the camera alone (guide_rgb): what the keys ask for", ref_v),
+            ("the guide (depth, people softened)", cg.read_video(bdir / "guide.mp4", size)),
+            ("generated, camera taken out", [f if f is not None else np.zeros_like(frames[0]) for f in cg.stabilised(frames, static)])]
+    cg.contact_sheet(rows, bdir / "camera_sheet.jpg")
+    out["sheet"] = str(bdir / "camera_sheet.jpg")
     return out
