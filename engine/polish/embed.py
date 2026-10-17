@@ -16,6 +16,8 @@ from . import analyze as A
 
 MODEL, PRETRAINED = "ViT-H-14", "laion2b_s32b_b79k"
 JND = 0.12                      # embedding cosine distance that counts as one noticeable step (set on Presence, see ENGINE.md)
+                                # against the beat's own start, and only while the picture hardly moves: a push, a new
+                                # framing or a different person in shot moves an embedding as far as a new style does
 EVERY = 2                       # embed every 2nd sample (two frames a second)
 
 
@@ -40,7 +42,7 @@ def load():
     return model, pre, torch
 
 
-def embed_samples(sc: A.Scan, spans, groups, fade: float, log: Callable[[str], None] = print) -> dict | None:
+def embed_samples(sc: A.Scan, spans, fade: float, log: Callable[[str], None] = print) -> dict | None:
     try:
         model, pre, torch = load()
     except EmbedUnavailable as e:
@@ -74,11 +76,10 @@ def embed_samples(sc: A.Scan, spans, groups, fade: float, log: Callable[[str], N
             i += 1
         flush()
     cap.release()
-    plate = {}
-    for g in sorted(set(groups)):
-        i0 = groups.index(g)
-        lo = spans[i0].start + (fade if i0 > 0 else 0.0)
-        ks_g = [k for k in ks if lo <= k / sc.fps < lo + 1.0] or [min(ks, key=lambda k: abs(k / sc.fps - lo))]
-        v = np.mean([vecs[k] for k in ks_g], 0)
-        plate[g] = v / np.linalg.norm(v)
-    return {"frame": vecs, "plate": plate, "jnd": JND}
+    refs = {}                      # every beat's own first second: drift is judged against where the shot started
+    for i, sp in enumerate(spans):
+        lo = sp.start + (fade if i > 0 else 0.0)
+        ks_b = [k for k in ks if lo <= k / sc.fps < lo + 1.0] or [min(ks, key=lambda k: abs(k / sc.fps - lo))]
+        v = np.mean([vecs[k] for k in ks_b], 0)
+        refs[sp.id] = v / np.linalg.norm(v)
+    return {"frame": vecs, "beat_ref": refs, "jnd": JND}

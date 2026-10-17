@@ -13,20 +13,17 @@ worst severity inside the beat's own stretch of the film.
 from __future__ import annotations
 
 import hashlib
-import json
 import math
 import time
 from pathlib import Path
 from typing import Callable, Optional
 
 import cv2
-import numpy as np
 
 from . import analyze as A
-from . import metrics as M
-from .explain import HINTS, LABELS, level_of, reason
+from .explain import level_of, reason
 
-VERSION = 6
+VERSION = 7
 METRICS = ("pops", "softness", "halos", "drift", "morphs")
 Log = Callable[[str], None]
 
@@ -180,7 +177,7 @@ def inspect_film(path: Path, spans: list[A.BeatSpan], fade: float, out_dir: Path
     if embed:
         from . import embed as E
         progress(0.9, "embedding frames (CLIP, CPU)")
-        emb = E.embed_samples(sc, spans, groups, fade, log)
+        emb = E.embed_samples(sc, spans, fade, log)
 
     rows = {m: [] for m in METRICS}
     for r in A.score_pops(st):

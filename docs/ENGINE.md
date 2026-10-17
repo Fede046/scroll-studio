@@ -145,7 +145,11 @@ UI (React) ◄─► engine server (FastAPI + job queue + websocket events) ◄�
   Limits worth knowing: halos and softness are scored against what this film's own look makes normal (so a film that is
   soft or haloed everywhere reads clean on halos); drift only trusts hatch against a drawn plate (in a photograph weak
   texture is the content) and tone/line/saturation only while the picture barely moves; a morph is a morph whether the
-  story wanted the dissolve or not (`examples/feel` has a few real ones). Reports are cached under `.build/inspect/` by the
+  story wanted the dissolve or not (`examples/feel` has a few real ones). `--embed` (OpenCLIP ViT-H/14, about 1 s a frame on
+  the CPU) is a weak extra: on Presence the distance to the scene's first second is 0.10-0.15 for clean wide frames and
+  0.19-0.22 once the turn beat goes pencil, but 0.3-0.55 for any close-up, so it measures framing as much as look; it is
+  therefore judged against each beat's own first second, only while the picture hardly moves, and agrees with the hatch
+  measure without adding to it. Reports are cached under `.build/inspect/` by the
   content of the film and clips (size and three slices, not dates), so a copied build is the same key.
 - **Frozen moments** (`engine/freeze.py`, `engine/freeze_beats.py`, `engine/backends/upscale.py`). A `film` beat with
   `freeze:` is not generated: the beat stage renders one frame offline. Steps, each cached by its own digest in the

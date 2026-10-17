@@ -7,7 +7,7 @@ from typing import Callable, Optional
 
 from . import analyze as A
 from .explain import SHORT
-from .run import (METRICS, VERSION, Nothing, content_key, find_film, inspect_film, plan_spans)
+from .run import (METRICS, VERSION, Nothing, content_key, find_film, inspect_film, plan_spans)  # noqa: F401
 
 Log = Callable[[str], None]
 

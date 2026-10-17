@@ -161,7 +161,6 @@ def read_frames(path: Path, idxs: list[int], width: Optional[int] = None) -> dic
     if not want:
         return out
     cap = open_film(path)
-    n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     last = None
     i = 0
     wi = 0
@@ -244,7 +243,6 @@ def score_pops(st: dict) -> list[dict]:
     if len(st["t"]) < 3:
         return out
     s = st["resid"] / st["gap"]
-    dl = st["dl"] / st["gap"]
     for i in range(len(s)):
         base = max(_roll_median(s, i, 8), 0.6)
         ratio = s[i] / base
@@ -398,7 +396,8 @@ def score_drift(sc: Scan, st: dict, spans: list[BeatSpan], fade: float, groups: 
              picture has barely moved since the beat began. One JND = x1.65.
     tone, line, sat   histogram, line density, saturation against the beat's own first second, only while the picture
              has barely moved, and only when the change is gross (3 JND: 0.30 / x2.7 / 0.18).
-    embed    (with --embed) 1 - cosine of a CLIP image embedding to the plate while the picture is nearly still.
+    embed    (with --embed) 1 - cosine of a CLIP image embedding to the beat's own first second, while the picture
+             is nearly still (against the scene's plate it measures the content, not the look: Presence's close-ups).
 
     Severity from 1 JND (fine) to 2 JND (clearly a different look); the worst component is the one reported."""
     out = []
@@ -461,8 +460,8 @@ def score_drift(sc: Scan, st: dict, spans: list[BeatSpan], fade: float, groups: 
                 z = abs(sy["sat"] - r_sat) / 0.06
                 if z >= 3.0:
                     comps["sat"] = (z, sy["sat"], r_sat)
-            if embed and still and k in embed.get("frame", {}) and embed.get("plate", {}).get(groups[i]) is not None:
-                dd = 1.0 - float(np.dot(embed["frame"][k], embed["plate"][groups[i]]))
+            if embed and still and k not in ref and k in embed.get("frame", {}) and sp.id in embed.get("beat_ref", {}):
+                dd = 1.0 - float(np.dot(embed["frame"][k], embed["beat_ref"][sp.id]))
                 comps["embed"] = (dd / embed.get("jnd", 0.12), dd, None)
             if not comps:
                 continue

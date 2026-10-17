@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import html
-import json
 
 from .explain import LABELS, WHAT
 
@@ -116,7 +115,6 @@ def render_html(r: dict) -> str:
     s = r["summary"]
     c = s["counts"]
     name = html.escape(r.get("section") or r["name"])
-    worst = s["worst"]
     lines = [f'<h1>Polish report: {name}</h1>',
              f'<p class="sub"><span class="chip {s["verdict"]}">{s["verdict"]}</span> &nbsp;'
              f'{s["issues"]} problem{"s" if s["issues"] != 1 else ""} found'
