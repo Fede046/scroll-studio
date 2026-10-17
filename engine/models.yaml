@@ -186,6 +186,12 @@ huggingface:
     licence: CC-BY-NC-4.0 (non-commercial)
     used_by: [parallax (depth_model: base | large), "frozen moments (freeze.depth_model: base | large)"]
 
+  - name: OpenCLIP ViT-H/14 (LAION-2B)
+    repo: laion/CLIP-ViT-H-14-laion2B-s32B-b79K
+    size_gb: 3.9
+    licence: MIT
+    used_by: ["studio inspect --embed (optional: style drift as an embedding distance; CPU; never downloaded automatically)"]
+
 optional:
   - name: BiRefNet / rembg
     note: subject cut-outs (pip extra `ml`), planned for artwork and sequence-from-photos

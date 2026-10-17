@@ -110,6 +110,10 @@ the real first frames (same stages and caches), so approving them is not wasted 
 2. `snapshot(project)`, then read the sheet image. Check: text legible over the visual, the subject framed
    (not hidden behind the copy), nothing cut off, colours on brand, every stage actually visible.
 3. Fix the spec (or the engine, if it's an engine limitation) and repeat. Finish with a full `build`.
+   After a film is built, `inspect_film(project)` (`studio inspect`) scores it for pops, softness, halos, style drift and
+   morphs second by second and beat by beat: Read its worst-moment pictures (`.build/inspect/<section>/`) and fix what it
+   names (each issue says what to try) before the owner sees it. Beats that should look like one scene start on the
+   previous beat's last frame (`image: { beat_frame }`); a crossfade between two pictures that do not line up shows as a pop.
 4. `record(project)` for an MP4 scroll-through when the user wants something to share. For a launch film, add
    `trailer: {}` to the spec and run `trailer(project)` (16:9 + 9:16 in dist/trailer/); check the cut with
    `trailer(project, plan_only=True)` and look at frames of the result before handing it over.

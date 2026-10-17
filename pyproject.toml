@@ -40,6 +40,8 @@ ml = [
   "rembg>=2.0.57",
 ]
 vector = ["vtracer>=0.6"]
+# studio inspect --embed: a CLIP image embedding for the style-drift check (weights from the local Hugging Face cache)
+embed = ["open_clip_torch>=2.24", "torch>=2.3"]
 mesh = ["trimesh>=4.4", "pygltflib>=1.16"]
 # site.product: STEP/STP through OpenCascade (cascadio), 3MF through trimesh
 cad = ["cascadio>=0.1.1", "trimesh>=4.4", "lxml>=5.0"]
