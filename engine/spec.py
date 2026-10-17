@@ -661,6 +661,8 @@ def _check_camera(b) -> None:
     if c.continues and ks[0].t <= 0:
         raise ValueError(f"beat '{b.id}': with `continues` the camera starts where the previous beat's ended, so the first "
                          "key must come after t = 0")
+    if b.trim:
+        raise ValueError(f"beat '{b.id}': `trim` cannot be combined with `camera` (the keys are timed over the whole clip)")
     if b.end_image is not None:
         raise ValueError(f"beat '{b.id}': `end_image` cannot be combined with `camera` (the camera path decides the last frame)")
 

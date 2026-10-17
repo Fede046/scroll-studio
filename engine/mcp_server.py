@@ -299,6 +299,25 @@ def approve_shot(project: str, shot: str, approved: bool = True) -> dict:
 
 
 @mcp.tool()
+def camera_guide(project: str, beat: str, section: Optional[str] = None) -> dict:
+    """For a beat with `camera:` keys: make its camera guide (depth, the moving people's mask, the guide videos) without
+    generating anything, and return the paths. `preview` is a pure-camera video of the keyed move over the start image (no
+    video model): look at it before spending minutes on the beat. The beat itself is made by `build` (only: [beat id])."""
+    from . import camera_beats
+    return camera_beats.guide_only(_find(project), beat, section, lambda m: print(m, file=sys.stderr))
+
+
+@mcp.tool()
+def camera_check(project: str, beat: str, section: Optional[str] = None) -> dict:
+    """Measure a built beat with `camera:` keys: how far the camera is from the keyed view (zoom error in %, shift in view
+    widths, per frame and rms), how far the people walked, against the floor of a perfect camera. Writes camera.json and a
+    contact sheet (camera_sheet.jpg: generated, the camera alone, the guide, and the generated beat with the camera taken
+    out) beside the beat; read the sheet."""
+    from . import camera_beats
+    return camera_beats.check(_find(project), beat, section, lambda m: print(m, file=sys.stderr))
+
+
+@mcp.tool()
 def job_status(job_id: str, log_lines: int = 40) -> dict:
     """Progress, status and log tail of a background job."""
     j = jobs.jobs.get(job_id)

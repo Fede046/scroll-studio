@@ -56,6 +56,8 @@ def test_camera_keys_must_make_sense():
         beat(camera=[{"t": 0.9, "box": [0, 0, 1, 1], "hold": 0.3}])
     with pytest.raises(ValidationError, match="end_image"):
         beat(camera=KEYS, end_image="x.png")
+    with pytest.raises(ValidationError, match="trim"):
+        beat(camera=KEYS, trim=1.0)
     with pytest.raises(ValidationError, match="first key must come after"):
         beat(camera={"keys": KEYS, "continues": True})
     with pytest.raises(ValidationError):

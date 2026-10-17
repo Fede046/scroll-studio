@@ -65,6 +65,15 @@ comfyui:
     vram_gb: 16
     licence: Apache-2.0
     used_by: [film takes (video_model wan)]
+  # Optional, NOT installed by default: the Uni3C camera controlnet for `camera.backend: uni3c` (keyed camera moves on moving
+  # beats). The engine fails with this file name, URL and folder when you pick that backend without it.
+  - name: Uni3C camera controlnet (Wan 2.1 I2V 14B)
+    file: model_patches/Wan21_Uni3C_controlnet_fp16.safetensors
+    uni3c: true
+    source: https://huggingface.co/Kijai/WanVideo_comfy/blob/main/Wan21_Uni3C_controlnet_fp16.safetensors
+    size_gb: 2
+    licence: Apache-2.0
+    used_by: [film beats (camera.backend uni3c)]
   - name: UMT5-XXL text encoder (fp8)
     file: text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors
     wan: text_encoder
