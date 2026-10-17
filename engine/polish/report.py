@@ -30,7 +30,7 @@ CSS = """
 :root{--bg:#f7f6f2;--fg:#1b1a17;--mute:#6d6a62;--card:#fff;--line:#e3e0d6;--cell:#e9e6dc;--accent:#2b5fd9;
 --ok:#1f8a5b;--slight:#b58a00;--visible:#d4691a;--bad:#c4281c}
 @media (prefers-color-scheme:dark){:root{--bg:#141413;--fg:#ecebe6;--mute:#9a978d;--card:#1d1d1b;--line:#33322e;--cell:#2a2927;--accent:#7ea3ff}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+*{box-sizing:border-box}a{color:var(--accent)}.tw{overflow-x:auto;border-radius:10px}.tw table{min-width:640px}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
 main{max-width:1180px;margin:0 auto;padding:28px 20px 80px}
 h1{font-size:26px;margin:0 0 4px;letter-spacing:-.01em}h2{font-size:18px;margin:36px 0 12px}
 .sub{color:var(--mute);margin:0 0 18px}
@@ -140,7 +140,7 @@ def render_html(r: dict) -> str:
         rows.append(f'<tr><td><b>{html.escape(b["id"])}</b><div class="mute mono">{_t(b["start"])} to {_t(b["end"])}'
                     f'{" &middot; frozen moment" if b["kind"] == "freeze" else ""}</div></td>'
                     + "".join(_score_cell(b["scores"][m]) for m in METRICS) + f'<td>{wt}</td></tr>')
-    lines.append(f'<h2>Beat by beat</h2><table><thead><tr><th>Beat</th>{th}<th>Worst</th></tr></thead><tbody>{"".join(rows)}</tbody></table>'
+    lines.append(f'<h2>Beat by beat</h2><div class="tw"><table><thead><tr><th>Beat</th>{th}<th>Worst</th></tr></thead><tbody>{"".join(rows)}</tbody></table></div>'
                  '<p class="mute" style="font-size:13px">Scores are 100 minus 100 times the worst severity inside the beat (100 = clean).</p>')
     if r["joins"]:
         def lvl(v):
@@ -149,8 +149,8 @@ def render_html(r: dict) -> str:
                      f'<td>{"one scene (a continuation)" if j.get("related", True) else "scene change, dissolve on purpose"}</td>'
                      f'<td class="mono">{j.get("disp", 0):.0f} px</td><td class="mono">{j["chroma"]:.1f}</td>'
                      f'<td><span class="chip {lvl(j["sev"])}">{j["sev"]:.2f}</span></td></tr>' for j in r["joins"])
-        lines.append('<h2>Joins</h2><table><thead><tr><th>Join</th><th>At</th><th>Kind</th><th>Out of line at mid-fade</th><th>Colour change</th>'
-                     f'<th>Severity</th></tr></thead><tbody>{jr}</tbody></table>'
+        lines.append('<h2>Joins</h2><div class="tw"><table><thead><tr><th>Join</th><th>At</th><th>Kind</th><th>Out of line at mid-fade</th><th>Colour change</th>'
+                     f'<th>Severity</th></tr></thead><tbody>{jr}</tbody></table></div>'
                      f'<p class="mute" style="font-size:13px">Measured at the middle of the {r["fade"]:.1f} s crossfade, where both pictures show at half '
                      'strength. A join between frames that look nothing alike is a scene change: that dissolve is intended and is not scored.</p>')
     mt = r.get("measures", {})
