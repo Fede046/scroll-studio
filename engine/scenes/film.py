@@ -430,9 +430,12 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
             clip = faces.restore_beat(ctx, b.id, clip, b.faces)
         clips.append(clip)
 
-    # join: each clip crossfades into the next
+    # join: each clip crossfades into the next, except a camera beat that continues the one before it: its first frame is
+    # that beat's last frame and the camera keeps its speed through the cut, so the two are one shot (a hard, frame-exact join)
     durs = [float(probe(c)["duration"]) for c in clips]
+    fades = join_fades(sec, durs)
     fade = min(sec.beat_fade, *(d / 3 for d in durs)) if len(clips) > 1 else 0
+    cont = [i > 0 and b.camera is not None and b.camera.continues for i, b in enumerate(sec.beats)]
     out = ctx.work / "gen" / "beats.mp4"
 
     def join():
@@ -440,17 +443,36 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
         if len(clips) == 1:
             shutil.copy(clips[0], out)
             return
+        groups: list = []                       # (file, seconds): continued beats merged into one clip
+        for i, c in enumerate(clips):
+            if cont[i] and groups:
+                prev, pd = groups[-1]
+                merged = ctx.work / "gen" / f"chain_{sec.beats[i].id}.mp4"
+                ffmpeg("-i", prev, "-i", c, "-filter_complex",
+                       "[1:v]trim=start_frame=1,setpts=PTS-STARTPTS[b];[0:v][b]concat=n=2:v=1:a=0[v]", "-map", "[v]",
+                       "-c:v", "libx264", "-crf", "13", "-preset", "slow", "-pix_fmt", "yuv420p", "-r", str(FPS), merged,
+                       log=ctx.log)
+                groups[-1] = (merged, pd + durs[i] - 1 / FPS)
+            else:
+                groups.append((c, durs[i]))
+        if len(groups) == 1:
+            shutil.copy(groups[0][0], out)
+            return
         args, graph, last, t = [], [], "[0:v]", 0.0
-        for c in clips:
+        for c, _ in groups:
             args += ["-i", c]
-        for i in range(1, len(clips)):
-            t += durs[i - 1] - fade
+        gfade = min(sec.beat_fade, *(d / 3 for _, d in groups))
+        for i in range(1, len(groups)):
+            t += groups[i - 1][1] - gfade
             tag = f"[v{i}]"
-            graph.append(f"{last}[{i}:v]xfade=transition=fade:duration={fade:.3f}:offset={t:.3f}{tag}")
+            graph.append(f"{last}[{i}:v]xfade=transition=fade:duration={gfade:.3f}:offset={t:.3f}{tag}")
             last = tag
         ffmpeg(*args, "-filter_complex", ";".join(graph), "-map", last, "-c:v", "libx264", "-crf", "14", "-preset", "slow",
                "-pix_fmt", "yuv420p", "-r", str(FPS), out, log=ctx.log)
-    ctx.stage("beats_join", {"clips": [file_key(c) for c in clips], "fade": fade}, [out], join)
+    jkey = {"clips": [file_key(c) for c in clips], "fade": fade}
+    if any(cont):
+        jkey["continued"] = cont                # only when there is one, so every other film keeps its cache
+    ctx.stage("beats_join", jkey, [out], join)
     if sec.beat_restore and standing:
         ctx.log(f"  beats_restore: skipped while {', '.join(standing)} stand in; a full build restores the film")
     elif sec.beat_restore:
@@ -463,21 +485,32 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
         out = restored
 
     set_lenient(False)
-    pin_steps(sec, durs, fade)
+    pin_steps(sec, durs, fades)
     return out
 
 
-def beat_spans(sec: FilmScene, durs: list[float], fade: float) -> dict[str, tuple[float, float]]:
-    """Each beat's span over the joined film, as fractions 0-1 of its length (steps and reveal regions are timed by it)."""
-    total = sum(durs) - fade * (len(durs) - 1)
+def join_fades(sec: FilmScene, durs: list[float]) -> list[float]:
+    """The overlap at each join of a beats film, in seconds (one per join): the crossfade, or, for a camera beat that
+    `continues` the one before it, one frame (the duplicate first frame of the continued beat, which is dropped: a hard cut)."""
+    from ..animate import FPS
+    n = len(durs)
+    fade = min(sec.beat_fade, *(d / 3 for d in durs)) if n > 1 else 0
+    return [1 / FPS if (sec.beats[i].camera is not None and sec.beats[i].camera.continues) else fade for i in range(1, n)]
+
+
+def beat_spans(sec: FilmScene, durs: list[float], fade) -> dict[str, tuple[float, float]]:
+    """Each beat's span over the joined film, as fractions 0-1 of its length (steps and reveal regions are timed by it).
+    `fade`: the crossfade, or one overlap per join (`join_fades`)."""
+    fades = list(fade) if isinstance(fade, (list, tuple)) else [fade] * (len(durs) - 1)
+    total = sum(durs) - sum(fades)
     spans, t = {}, 0.0
-    for b, d in zip(sec.beats, durs):
+    for i, (b, d) in enumerate(zip(sec.beats, durs)):
         spans[b.id] = (t / total, (t + d) / total)
-        t += d - fade
+        t += d - (fades[i] if i < len(fades) else 0)
     return spans
 
 
-def pin_steps(sec: FilmScene, durs: list[float], fade: float) -> None:
+def pin_steps(sec: FilmScene, durs: list[float], fade) -> None:
     """Time steps pinned with state: {beat: id} to their beat's span over the joined film (sets step.at)."""
     spans = beat_spans(sec, durs, fade)
     for st in sec.steps:

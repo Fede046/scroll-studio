@@ -364,3 +364,20 @@ def test_a_continued_beat_starts_on_the_last_frame_of_the_beat_before():
     ref = cb.start_ref(sec, 1, (768, 448))
     assert ref.beat_frame.beat == "a" and ref.beat_frame.at == "last"
     assert cb.start_ref(sec, 2, (768, 448)).generate == "p"
+
+
+def test_continued_beats_join_with_a_frame_not_a_crossfade():
+    from engine.scenes.film import beat_spans, join_fades
+    from engine.spec import FilmScene
+    sec = FilmScene.model_validate({"id": "s", "beat_fade": 0.4, "beats": [
+        {"id": "a", "prompt": "p", "motion": "m", "seconds": 3, "camera": KEYS},
+        {"id": "b", "prompt": "p", "motion": "m", "seconds": 3, "camera": {"keys": KEYS[1:], "continues": True}},
+        {"id": "c", "prompt": "p", "motion": "m", "seconds": 3}]})
+    durs = [3.0, 3.0, 3.0]
+    fades = join_fades(sec, durs)
+    assert fades[0] == pytest.approx(1 / 24) and fades[1] == pytest.approx(0.4)      # a -> b is a hard join, b -> c a crossfade
+    spans = beat_spans(sec, durs, fades)
+    total = 9.0 - sum(fades)
+    assert spans["b"][0] == pytest.approx((3.0 - 1 / 24) / total) and spans["c"][1] == pytest.approx(1.0)
+    # the old scalar form still works
+    assert beat_spans(sec, durs, 0.4)["c"][0] == pytest.approx((6 - 0.8) / (9 - 0.8))

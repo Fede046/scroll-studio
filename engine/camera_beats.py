@@ -225,6 +225,10 @@ def make_frames(project, sec, i: int, still: Path, bdir: Path, text: str, negati
             else:
                 shutil.copy(p, dst)
             out.append(dst)
+    # the first frame IS the start image (the model re-encodes it a little): a beat that starts on the last frame of the one
+    # before joins it with no step at all
+    if out and Image.open(still).size == tuple(beat_size):
+        shutil.copy(still, out[0])
     return out
 
 

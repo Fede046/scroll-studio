@@ -36,7 +36,7 @@ from . import freeze as fz
 from .freeze import FPS, CameraPath, View
 from .project import BuildError
 
-VERSION = 2
+VERSION = 3
 
 
 # ---------------------------------------------------------------- the path
