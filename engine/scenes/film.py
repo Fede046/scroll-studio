@@ -337,7 +337,7 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
     only = ctx.options.get("only_beats")      # build --only: the beats to render (None: all)
     from ..freeze_beats import set_lenient    # frozen moments: under --only a beat that is not rendered stands in
     set_lenient(only is not None)
-    for b in sec.beats:
+    for bi, b in enumerate(sec.beats):
         if b.freeze is not None:              # a frozen moment: rendered offline in seconds (engine/freeze_beats.py)
             from ..freeze_beats import beat_clip as freeze_clip
             clips.append(freeze_clip(ctx, sec, b, only, standing))
@@ -345,9 +345,9 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
         bdir = ctx.work / "beats" / b.id
         clip = bdir / "clip.mp4"
 
-        def run(b=b, bdir=bdir, clip=clip):
+        def run(b=b, bdir=bdir, clip=clip, bi=bi):
             bdir.mkdir(parents=True, exist_ok=True)
-            ref = b.image if b.image else ImageInput(generate=b.prompt, size=(W, H), seed=b.seed)
+            ref = start_ref(b, bi)
             src = resolve_image(ctx.project, ref, ctx.log)
             still = bdir / "still.png"
             ImageOps.fit(Image.open(src).convert("RGB"), (W, H), Image.LANCZOS).save(still)
@@ -361,8 +361,16 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
             stamp = bdir / "anim.json"
             frames = sorted((bdir / "frames").glob("*.png"))
             if not (frames and stamp.exists() and stamp.read_text() == akey):
-                frames = animate(still, b.prompt, b.motion, b.seconds, b.seed if b.motion_seed is None else b.motion_seed,
-                                 bdir, ctx.log, size=(W, H), strength=b.strength, end_image=end, model=model, wan=wan)
+                if b.camera is not None:     # a keyed camera move (engine/camera_beats.py): the model generates along a guide
+                    from ..camera_beats import make_frames as camera_frames
+                    from ..animate import NEGATIVE
+                    seed = b.camera.seed if b.camera.seed is not None else b.seed if b.motion_seed is None else b.motion_seed
+                    frames = camera_frames(ctx.project, sec, bi, still, bdir,
+                                           f"{b.prompt or 'The subject of the image'}. {b.motion}. Smooth natural motion.",
+                                           NEGATIVE, seed, wan_settings(ctx.options.get("site_wan")), ctx.log)
+                else:
+                    frames = animate(still, b.prompt, b.motion, b.seconds, b.seed if b.motion_seed is None else b.motion_seed,
+                                     bdir, ctx.log, size=(W, H), strength=b.strength, end_image=end, model=model, wan=wan)
                 stamp.write_text(akey)
             frames = frames[round(b.trim * FPS):]
             seq = bdir / "seq"
@@ -382,8 +390,22 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
             from ..inputs import stable_dump
             deps = beat_frame_deps(ctx.project, r)      # an image that is a beat's frame depends on that beat's clip
             return {**stable_dump(r), "beat_frame_deps": deps} if deps else stable_dump(r)
+        def start_ref(b, bi):
+            """The beat's start image: its own, or a prompt's; a camera beat that `continues` starts on the last frame of
+            the beat before it (exactly where that one ended)."""
+            if b.image:
+                return b.image
+            if b.camera is not None and b.camera.continues and bi > 0:
+                from ..spec import BeatFrame
+                return ImageInput(beat_frame=BeatFrame(beat=sec.beats[bi - 1].id, at="last"))
+            return ImageInput(generate=b.prompt, size=(W, H), seed=b.seed)
         key = {"prompt": b.prompt, "motion": b.motion, "seconds": b.seconds, "seed": b.seed, "res": [W, H],
                "image": ref_key(b.image)}
+        if b.camera is not None:   # only for a camera beat, so every other beat keeps its cache
+            from ..camera_beats import key_of as camera_key
+            key["camera"] = camera_key(sec, bi)
+            if not b.image and b.camera.continues and bi > 0:
+                key["image"] = ref_key(start_ref(b, bi))
         model = video_model(b.video_model, ctx.options.get("site_video_model"))
         wan = wan_settings(ctx.options.get("site_wan")) if model == "wan" else None
         if model != "ltx":   # only when not the default, so LTX beats rendered before video_model existed stay cached

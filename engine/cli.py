@@ -498,6 +498,34 @@ def trailer(name: str, format: Optional[str] = typer.Option(None, help="16x9 or 
 
 
 @app.command()
+def camera(name: str, beat: str,
+           guide: bool = typer.Option(False, "--guide", help="Only make the camera guide (depth, people mask, the guide videos) and print "
+                                                             "where it is: guide_rgb.mp4 is a pure-camera preview of the keyed move"),
+           check: bool = typer.Option(False, "--check", help="Measure the beat's rendered frames: does the camera follow its keys, do the "
+                                                             "people still move? Writes camera.json beside the beat's frames"),
+           section: Optional[str] = typer.Option(None, help="The film section, when the beat id is in more than one")):
+    """Keyed camera moves on a moving beat (`camera:` on a beat): preview the guide, or measure how well the render follows the keys."""
+    from . import camera_beats as cb
+    from .project import Project
+    project = Project(resolve(name))
+    if not (guide or check):
+        raise typer.BadParameter("use --guide or --check (the beat itself is made by `studio build --only <beat>`)")
+    if guide:
+        r = cb.guide_only(project, beat, section, typer.echo)
+        typer.echo(json.dumps(r, indent=1))
+    if check:
+        r = cb.check(project, beat, section, typer.echo)
+        c, f = r["camera"], r["floor"]
+        typer.echo(f"{r['beat']} ({r['backend']}, {r['frames']} frames): camera zoom error rms {c['zoom_rms']:.1f}% (max {c['zoom_max']:.1f}%), "
+                   f"shift rms {c['shift_rms']:.3f} view widths (max {c['shift_max']:.3f}), {c['lost']} frames not registered; "
+                   f"measurement floor {f['zoom_rms']:.2f}% / {f['shift_rms']:.3f}")
+        if "people" in r:
+            p, pf = r["people"], r["people_floor"]
+            typer.echo(f"  people: {p['people_px_per_frame']:.2f} px/frame against {p['static_px_per_frame']:.2f} on the static world "
+                       f"(a pure camera, no walking: {pf['people_px_per_frame']:.2f})")
+
+
+@app.command()
 def schema():
     """Print the site.yaml JSON Schema."""
     from .spec import Site
