@@ -4,6 +4,10 @@ Every measurement is written so it can be said in a sentence:
 
   edge width      how many pixels wide the sharp edges are (at 1920 px across). Clean linework or a clean photo is
                   1 to 2.5 px; a frame that was enlarged from fewer pixels has soft edges of 3 px and more.
+  fine detail     the energy a frame holds at a third of its pixel resolution, against its coarse structure, measured on
+                  its busiest parts in the frequency domain. A picture enlarged from fewer pixels has almost none (it
+                  was never drawn that finely); sharp footage and sharp drawings keep it. Content-independent, unlike an
+                  edge width, so a soft-focus photograph is not mistaken for an upscale.
   rim fraction    of the clean edges (flat on both sides) the share with a bright rim or seam beside them: the halo,
                   the double edge and the sharpening ring that a depth warp or a cut-out leaves along an edge.
   hatch share     of all the visible structure in a frame, the share that is weak texture (hatching, pencil, grain)
@@ -132,6 +136,52 @@ def edge_stats(gray: np.ndarray, want_points: bool = False) -> dict:
     return out
 
 
+# ---------------------------------------------------------------- fine detail (frequency domain)
+
+_T = 256
+_WIN = np.outer(np.hanning(_T), np.hanning(_T)).astype(np.float32)
+_RAD = np.hypot(np.fft.fftfreq(_T)[:, None], np.fft.fftfreq(_T)[None, :])
+_NB = 32
+_BIN = np.minimum((_RAD / 0.5 * _NB).astype(int), _NB)          # radius 0-0.5 cycles/px in 32 bins (corners go to bin 32)
+_COUNT = np.bincount(_BIN.ravel(), minlength=_NB + 1).astype(np.float64)
+_CENT = (np.arange(_NB) + 0.5) / _NB * 0.5
+
+
+def spectral_detail(gray: np.ndarray) -> dict:
+    """Fine-detail index of a frame (gray float32): mean power at 0.30-0.45 cycles/pixel over mean power at 0.03-0.08,
+    averaged over the busiest quarter of 256 px tiles (so a sharp subject in a blurry frame counts as sharp).
+
+    detail   the index. Clean ink and wash 0.002-0.006, sharp photo 0.0002-0.003, a picture enlarged 3.5x or more
+             0.00003-0.0001 (Presence: the hands close-up, the boots, the end of the zoom)
+    busy     mean gradient of those tiles (levels per pixel); tiny means there was nothing to judge
+    """
+    h, w = gray.shape
+    if w > REF_W:
+        gray = cv2.resize(gray, (REF_W, round(h * REF_W / w)), interpolation=cv2.INTER_AREA)
+        h, w = gray.shape
+    ny, nx = h // _T, w // _T
+    out = {"detail": None, "busy": 0.0}
+    if ny < 1 or nx < 1:
+        return out
+    gx = cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3) / 8.0
+    gy = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3) / 8.0
+    e = np.hypot(gx, gy)[: ny * _T, : nx * _T].reshape(ny, _T, nx, _T).mean((1, 3))
+    order = np.argsort(e.ravel())[::-1][: max(4, min(24, ny * nx // 4))]
+    acc = np.zeros(_NB + 1)
+    for o in order:
+        y, x = divmod(int(o), nx)
+        t = gray[y * _T:(y + 1) * _T, x * _T:(x + 1) * _T]
+        P = np.abs(np.fft.fft2((t - t.mean()) * _WIN)) ** 2
+        acc += np.bincount(_BIN.ravel(), weights=P.ravel(), minlength=_NB + 1)
+    acc = (acc / np.maximum(_COUNT, 1))[:_NB] / len(order)
+    lo = acc[(_CENT > 0.03) & (_CENT < 0.08)].mean()
+    hi = acc[(_CENT > 0.30) & (_CENT < 0.45)].mean()
+    out["busy"] = float(e.ravel()[order].mean())
+    if lo > 1e-6:
+        out["detail"] = float(hi / lo)
+    return out
+
+
 # ---------------------------------------------------------------- style statistics
 
 def style_stats(bgr: np.ndarray) -> dict:
@@ -175,6 +225,7 @@ def step_stats(a: np.ndarray, b: np.ndarray) -> dict:
     """What happened between two gray uint8 frames (FLOW_W across).
 
     plain    mean absolute difference, levels
+    area     the share of the picture that changed by more than 24 levels (a pop changes most of it, an event a corner)
     resid    the same after frame b is moved back by the optical flow (what motion cannot explain), levels
     local    the share of pixels that motion cannot explain by more than 25 levels
     mot      how much the picture moved: mean flow length (px at FLOW_W)
@@ -186,9 +237,11 @@ def step_stats(a: np.ndarray, b: np.ndarray) -> dict:
     bf = b.astype(np.float32)
     wb = cv2.remap(bf, xx + flow[..., 0], yy + flow[..., 1], cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
     r = np.abs(af - wb)[6:-6, 6:-6]
-    plain = float(np.abs(af - bf)[6:-6, 6:-6].mean())
+    diff = np.abs(af - bf)[6:-6, 6:-6]
+    plain = float(diff.mean())
     mot = float(np.hypot(flow[..., 0], flow[..., 1]).mean())
-    return {"plain": plain, "resid": float(r.mean()), "local": float((r > 25).mean()), "mot": mot}
+    return {"plain": plain, "resid": float(r.mean()), "local": float((r > 25).mean()), "area": float((diff > 24).mean()),
+            "mot": mot}
 
 
 def luma_mean(gray_u8: np.ndarray) -> float:

@@ -40,7 +40,7 @@ def load():
     return model, pre, torch
 
 
-def embed_samples(sc: A.Scan, spans, log: Callable[[str], None] = print) -> dict | None:
+def embed_samples(sc: A.Scan, spans, groups, fade: float, log: Callable[[str], None] = print) -> dict | None:
     try:
         model, pre, torch = load()
     except EmbedUnavailable as e:
@@ -74,7 +74,11 @@ def embed_samples(sc: A.Scan, spans, log: Callable[[str], None] = print) -> dict
             i += 1
         flush()
     cap.release()
-    first = [vecs[k] for k in ks if k / sc.fps < 1.0] or [vecs[ks[0]]]
-    plate = np.mean(first, 0)
-    plate = plate / np.linalg.norm(plate)
-    return {"frame": vecs, "plate": plate, "jnd": JND, "beat_ref": {}}
+    plate = {}
+    for g in sorted(set(groups)):
+        i0 = groups.index(g)
+        lo = spans[i0].start + (fade if i0 > 0 else 0.0)
+        ks_g = [k for k in ks if lo <= k / sc.fps < lo + 1.0] or [min(ks, key=lambda k: abs(k / sc.fps - lo))]
+        v = np.mean([vecs[k] for k in ks_g], 0)
+        plate[g] = v / np.linalg.norm(v)
+    return {"frame": vecs, "plate": plate, "jnd": JND}

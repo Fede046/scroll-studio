@@ -42,10 +42,10 @@ h1{font-size:26px;margin:0 0 4px;letter-spacing:-.01em}h2{font-size:18px;margin:
 .strip text{fill:var(--mute);font:11px system-ui,sans-serif}.strip .lab{fill:var(--fg);font-weight:600}
 .legend{display:flex;gap:14px;align-items:center;color:var(--mute);font-size:12px;margin:8px 2px 0}
 .legend i{display:inline-block;width:46px;height:8px;border-radius:4px;background:linear-gradient(90deg,hsl(145 70% 48%),hsl(75 70% 46%),hsl(5 70% 40%))}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(520px,1fr));gap:16px}
+.grid{display:grid;grid-template-columns:1fr;gap:16px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;scroll-margin-top:16px}
 .card:target{outline:2px solid var(--accent)}
-.card img{display:block;width:100%;height:auto;background:#000}
+.card img{display:block;max-width:100%;height:auto;background:#000;margin:0 auto}
 .card .noimg{height:90px;display:flex;align-items:center;justify-content:center;color:var(--mute);background:var(--cell);font-size:13px}
 .card .b{padding:12px 14px 14px}.card .h{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
 .card .h .t{font-variant-numeric:tabular-nums;font-weight:600}.card .h .bt{color:var(--mute)}
@@ -59,7 +59,7 @@ td.sc b{font-variant-numeric:tabular-nums}.mute{color:var(--mute)}.mono{font-var
 details{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-top:10px}
 summary{cursor:pointer;font-weight:600}dl{margin:10px 0 2px}dt{font-weight:600;margin-top:10px}dd{margin:2px 0 0;color:var(--mute)}
 .none{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px;color:var(--mute)}
-@media (max-width:640px){.grid{grid-template-columns:1fr}main{padding:18px 14px 60px}}
+@media (max-width:640px){main{padding:18px 14px 60px}}
 """
 
 
@@ -84,7 +84,7 @@ def _strip(r: dict) -> str:
         out.append(f'<text x="{X0 - 8}" y="{y + 14}" text-anchor="end" class="lab">{LABELS[m]}</text>')
         out.append(f'<rect x="{X0}" y="{y + 2}" width="{W}" height="{rowh - 4}" rx="3" fill="var(--cell)"/>')
         for bi, sev in enumerate(r["timeline"][m]):
-            if sev < 0.05:
+            if sev < 0.15:
                 continue
             x = X0 + bi * step * k
             out.append(f'<rect x="{x:.1f}" y="{y + 2}" width="{max(step * k, 1.2):.1f}" height="{rowh - 4}" fill="{_heat(sev)}">'
@@ -145,13 +145,16 @@ def render_html(r: dict) -> str:
     lines.append(f'<h2>Beat by beat</h2><table><thead><tr><th>Beat</th>{th}<th>Worst</th></tr></thead><tbody>{"".join(rows)}</tbody></table>'
                  '<p class="mute" style="font-size:13px">Scores are 100 minus 100 times the worst severity inside the beat (100 = clean).</p>')
     if r["joins"]:
+        def lvl(v):
+            return "clean" if v < .25 else "slight" if v < .5 else "visible" if v < .75 else "bad"
         jr = "".join(f'<tr><td>{html.escape(j["from"])} &rarr; {html.escape(j["to"])}</td><td class="mono">{_t(j["t0"])}</td>'
+                     f'<td>{"one scene (a continuation)" if j.get("related", True) else "scene change, dissolve on purpose"}</td>'
                      f'<td class="mono">{j["edges"] * 100:.0f}%</td><td class="mono">{j["chroma"]:.1f}</td>'
-                     f'<td class="mono">{j["luma"]:.0f}</td><td><span class="chip {("clean" if j["sev"] < .25 else "slight" if j["sev"] < .5 else "visible" if j["sev"] < .75 else "bad")}">{j["sev"]:.2f}</span></td></tr>'
-                     for j in r["joins"])
-        lines.append('<h2>Joins</h2><table><thead><tr><th>Join</th><th>At</th><th>Edges that differ</th><th>Colour change</th>'
-                     f'<th>Brightness change</th><th>Severity</th></tr></thead><tbody>{jr}</tbody></table>'
-                     f'<p class="mute" style="font-size:13px">Measured at the middle of the {r["fade"]:.1f} s crossfade, where both pictures show at half strength.</p>')
+                     f'<td><span class="chip {lvl(j["sev"])}">{j["sev"]:.2f}</span></td></tr>' for j in r["joins"])
+        lines.append('<h2>Joins</h2><table><thead><tr><th>Join</th><th>At</th><th>Kind</th><th>Edges that differ</th><th>Colour change</th>'
+                     f'<th>Severity</th></tr></thead><tbody>{jr}</tbody></table>'
+                     f'<p class="mute" style="font-size:13px">Measured at the middle of the {r["fade"]:.1f} s crossfade, where both pictures show at half '
+                     'strength. A join between frames that look nothing alike is a scene change: that dissolve is intended and is not scored.</p>')
     mt = r.get("measures", {})
     dl = "".join(f"<dt>{LABELS[m]}</dt><dd>{html.escape(WHAT[m])}</dd>" for m in METRICS)
     lines.append('<details><summary>How these are measured</summary><dl>' + dl + '</dl>'

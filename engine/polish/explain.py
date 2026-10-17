@@ -62,32 +62,36 @@ def reason(metric: str, r: dict, span, ctx: dict) -> tuple[str, str]:
             return (f"The change between two frames jumps to {r['ratio']:.1f}x what its neighbours show, more than motion "
                     f"explains (a pop)."), HINTS["jump"]
         if k == "flash":
-            return f"Brightness steps by {r['step']:.1f} levels in one frame, far more than the frames around it (a flicker).", HINTS["flash"]
+            return f"One frame is {r['step']:.1f} brightness levels off from the frames either side of it and then it is back (a flicker).", HINTS["flash"]
         if k == "stutter":
             return (f"While things move the picture updates only {r['rate']:.0f} times a second, in visible steps (judder)."), HINTS["stutter"]
     if metric == "softness":
-        w, ref = r["width"], ctx.get("ref_width")
-        s = f"Edges are {w:.1f} px wide here"
-        if ref and w / ref >= 1.3:
-            s += f" (the section's sharpest is {ref:.1f} px, so this is about {w / ref:.1f}x softer)"
-        s += ": it looks upscaled"
+        d, ref = r["detail"], r.get("ref")
+        w, wref = r.get("width"), r.get("width_ref")
+        soft_style = r.get("hatch") is not None and r["hatch"] == r["hatch"] and r["hatch"] >= 0.55
+        s = "Looks soft"
+        if ref and d < ref:
+            s += f": only {100 * d / ref:.0f}% of the fine detail of this film's sharpest frames is left here"
+        if w:
+            s += f" (edges {w:.1f} px wide" + (f", {wref:.1f} at the sharpest" if wref and w / wref >= 1.3 else "") + ")"
+        s += ", the strokes are soft (pencil-like texture, see Style drift)" if soft_style else ", as if enlarged from fewer pixels"
         if r.get("aniso") and (r["aniso"] > 1.5 or r["aniso"] < 0.67):
             s += ", and the blur runs mostly one way"
         if span.kind == "freeze" and span.zoom:
             s += f". The camera's tightest framing is {_pct(span.zoom)} of the frame, {1 / span.zoom:.0f}x the source"
         return s + ".", HINTS["softness"]
     if metric == "halos":
-        return (f"{_pct(r['rim'])} of the clean edges here have a bright rim or seam beside them (halos and double edges; "
-                f"clean frames have 1 to 5%)."), HINTS["halos"]
+        return (f"{_pct(r['rim'])} of the clean edges here have a bright rim or seam beside them, {r['rim'] / r['base']:.1f}x "
+                f"this film's usual {_pct(r['base'])} (halos and double edges)."), HINTS["halos"]
     if metric == "drift":
         what = r["what"]
         if what == "hatch":
             v, ref = r["value"], r["ref"]
             if v > ref:
                 return (f"The look has moved: {_pct(v)} of the picture's structure is soft hatching or pencil texture, "
-                        f"against {_pct(ref)} at the start of the section (it looks sketchier)."), HINTS["drift"]
+                        f"against {_pct(ref)} at the start of the scene (it looks sketchier)."), HINTS["drift"]
             return (f"The look has moved: only {_pct(v)} of the picture's structure is texture, against {_pct(ref)} at the "
-                    f"start of the section (it looks cleaner and flatter)."), HINTS["drift"]
+                    f"start of the scene (it looks cleaner and flatter)."), HINTS["drift"]
         if what == "grain":
             return (f"The grain is {r['value']:.1f} levels here against {r['ref']:.1f} at the start of the section "
                     f"({r['value'] / r['ref']:.1f}x)."), HINTS["drift"]
@@ -99,7 +103,7 @@ def reason(metric: str, r: dict, span, ctx: dict) -> tuple[str, str]:
         if what == "sat":
             return f"Saturation has moved from {r['ref']:.2f} to {r['value']:.2f} since this beat started.", HINTS["drift"]
         if what == "embed":
-            return "A CLIP image embedding of this frame has moved far from the section's first second (the look changed).", HINTS["drift"]
+            return "A CLIP image embedding of this frame has moved far from the scene's first second (the look changed).", HINTS["drift"]
     if metric == "morphs":
         return (f"{_pct(r['unexplained'])} of the change between frames is things appearing, dissolving or rearranging, "
                 f"not moving: shapes are rebuilding themselves rather than travelling."), HINTS["morphs"]

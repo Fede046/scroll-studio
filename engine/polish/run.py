@@ -26,7 +26,7 @@ from . import analyze as A
 from . import metrics as M
 from .explain import HINTS, LABELS, level_of, reason
 
-VERSION = 3
+VERSION = 4
 METRICS = ("pops", "softness", "halos", "drift", "morphs")
 Log = Callable[[str], None]
 
@@ -172,18 +172,18 @@ def inspect_film(path: Path, spans: list[A.BeatSpan], fade: float, out_dir: Path
     progress(0.88, "scoring")
     fps = sc.fps
     seconds = sc.n / fps
-    joins_win = [(s.start, s.start + fade) for s in spans[1:]] if fade > 0 else []
+    joins_win = [(s.start - 0.1, s.start + fade + 0.1) for s in spans[1:]] if fade > 0 else []
 
+    joins = A.score_joins(spans, fade, log)
+    groups = A.groups_of(joins, len(spans))
     emb = None
     if embed:
         from . import embed as E
         progress(0.9, "embedding frames (CLIP, CPU)")
-        emb = E.embed_samples(sc, spans, log)
+        emb = E.embed_samples(sc, spans, groups, fade, log)
 
     rows = {m: [] for m in METRICS}
-    pops = A.score_pops(st)
-    joins = A.score_joins(spans, fade, log)
-    for r in pops:
+    for r in A.score_pops(st):
         r["_beat"] = _owner(spans, fade, r["t"]).id
         r["metric"] = "pops"
         rows["pops"].append(r)
@@ -197,22 +197,24 @@ def inspect_film(path: Path, spans: list[A.BeatSpan], fade: float, out_dir: Path
     for r in A.score_halos(sc):
         r["_beat"] = _owner(spans, fade, r["t"]).id
         rows["halos"].append(r)
-    for r in A.score_drift(sc, st, spans, fade, emb):
+    for r in A.score_drift(sc, st, spans, fade, groups, emb):
         if any(a <= r["t"] <= b for a, b in joins_win):
             continue
         r["_beat"] = r["beat"]
         rows["drift"].append(r)
-    for r in A.score_morphs(st, tuple(joins_win)):
+    for r in A.score_morphs(st, tuple((a - 0.15, b + 0.15) for a, b in joins_win)):
         r["_beat"] = _owner(spans, fade, r["t"]).id
         rows["morphs"].append(r)
 
     by_id = {s.id: s for s in spans}
-    ctx = {"fade": fade, "spans": by_id, "ref_width": A.width_reference(sc.samples), "spec": spec_info,
-           "plate_hatch": _plate(sc, "hatch")}
+    ctx = {"fade": fade, "spans": by_id, "ref_width": A.width_reference(sc.samples), "ref_detail": A.detail_reference(sc.samples),
+           "spec": spec_info, "rim_base": A.rim_baseline(sc)}
     issues: list[dict] = []
     for m in METRICS:
         for st_ in _stretches(rows[m], m, spans, fade):
             peak = st_["peak"]
+            if m == "drift" and peak.get("what") in ("tone", "line", "sat"):
+                st_["severity"] = min(st_["severity"], 0.6)       # these move with the content too: never a "bad"
             why, hint = reason(m, peak, by_id[st_["beat"]], ctx)
             issues.append({"metric": m, "kind": peak.get("kind") or peak.get("what") or m, "severity": round(st_["severity"], 3),
                            "level": level_of(st_["severity"]), "t": round(st_["t"], 2), "t0": round(st_["t0"], 2),
@@ -228,7 +230,7 @@ def inspect_film(path: Path, spans: list[A.BeatSpan], fade: float, out_dir: Path
             sev = [r["sev"] for r in rows[m] if r["_beat"] == s.id]
             sc_m[m] = int(round(100 * (1 - (max(sev) if sev else 0.0))))
         mine = [x for x in issues if x["beat"] == s.id]
-        beats_out.append({"id": s.id, "start": round(s.start, 3), "end": round(s.end, 3), "kind": s.kind,
+        beats_out.append({"id": s.id, "start": round(s.start, 3), "end": round(s.end, 3), "kind": s.kind, "scene": groups[i],
                           "scores": sc_m, "worst": _worst_of(mine), "issues": len(mine),
                           "zoom": s.zoom})
 
@@ -264,7 +266,8 @@ def inspect_film(path: Path, spans: list[A.BeatSpan], fade: float, out_dir: Path
         "beats": beats_out, "joins": [{k: v for k, v in j.items() if not k.startswith("_") and k != "frames"} for j in joins],
         "issues": issues, "seconds": sec_rows, "timeline": timeline,
         "summary": {"worst": worst, "counts": counts, "verdict": verdict, "issues": len(issues)},
-        "measures": {"width_ref": ctx["ref_width"], "plate_hatch": ctx["plate_hatch"], "min_severity": A.MIN_SEV,
+        "measures": {"width_ref": ctx["ref_width"], "detail_ref": ctx["ref_detail"], "rim_baseline": ctx["rim_base"],
+                     "min_severity": A.MIN_SEV,
                      "embed": bool(emb), "seconds_taken": round(time.time() - t_start, 1)},
     }
     # thumbnails of the worst moments (needs the frames again: only now, and only for what is shown)
@@ -274,9 +277,3 @@ def inspect_film(path: Path, spans: list[A.BeatSpan], fade: float, out_dir: Path
     for x in report["issues"]:
         x.pop("_peak", None)
     return report
-
-
-def _plate(sc: A.Scan, f: str) -> Optional[float]:
-    ks = [k for k in sorted(sc.samples) if k / sc.fps < 1.0] or sorted(sc.samples)[:2]
-    v = [sc.samples[k]["style"][f] for k in ks if sc.samples[k]["style"][f] == sc.samples[k]["style"][f]]
-    return float(np.median(v)) if v else None

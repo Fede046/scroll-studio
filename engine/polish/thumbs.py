@@ -83,8 +83,7 @@ def _need(issue: dict, st: dict, sc: A.Scan) -> list[tuple[int, bool]]:
     if m in ("softness", "halos"):
         return [(clamp(p["frame"]), True)]
     if m == "drift":
-        plate = min(sc.samples)
-        return [(clamp(plate), False), (clamp(p["frame"]), False)]
+        return [(clamp(p["plate_frame"]), False), (clamp(p["frame"]), False)]
     if m == "morphs":
         a, b = p["a"], p["b"]
         return [(clamp(a), False), (clamp((a + b) // 2), False), (clamp(b), False)]
@@ -165,7 +164,7 @@ def make_thumbs(report: dict, sc: A.Scan, st: dict, spans, joins: list[dict], pa
                 cm = cv2.resize(cm, None, fx=1.5, fy=1.5, interpolation=cv2.INTER_NEAREST)
                 img = _row([_label(M.resize_w(marked, W_SINGLE), f"{x['t']:.1f}s, rims marked red"), _label(crop, "1:1 crop"), _label(cm, "marked")], 315)
             elif m == "drift":
-                img = _row([_label(M.resize_w(fr[0], 480), "section start"), _label(M.resize_w(fr[-1], 480), f"{x['t']:.1f}s")], 270)
+                img = _row([_label(M.resize_w(fr[0], 480), "start of the scene"), _label(M.resize_w(fr[-1], 480), f"{x['t']:.1f}s")], 270)
             elif m == "morphs":
                 img = _row([_label(M.resize_w(f, 400), t) for f, t in zip(fr, ("start", "middle", "end"))], 225)
             else:
