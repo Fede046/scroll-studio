@@ -54,7 +54,9 @@ in `studio.toml` (copy `studio.example.toml`) or the `BLENDER` environment varia
 1. Install [ComfyUI](https://github.com/comfyanonymous/ComfyUI) and these custom nodes: ComfyUI-LTXVideo,
    ComfyUI-KJNodes, ComfyUI-VideoHelperSuite, ComfyUI-SeedVR2_VideoUpscaler (`beat_restore`, `take.restore`, and the
    upscale of a frozen moment, `freeze.upscale`; it downloads its ~8 GB of weights into `models/SEEDVR2` on first use,
-   and without them a frozen moment falls back to a local Lanczos upscale).
+   and without them a frozen moment falls back to a local Lanczos upscale). Deep zoom (`freeze.detail`) also uses SeedVR2
+   and Z-Image Turbo (already listed); layered depth (`freeze.layers`) uses Florence-2, SAM 2.1 and Qwen-Image-Edit through
+   the nodes `studio setup-comfy` installs for `reveal` and region edits. No new weights.
 2. Download the models listed in `engine/models.yaml` into ComfyUI's model folders (or point
    `extra_model_paths.yaml` at another drive).
 3. Start it and leave it running:

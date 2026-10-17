@@ -9,6 +9,22 @@ Everything so far is version 1. On 2026-10-12 the releases first published as 2.
 ## Unreleased
 
 ### Added
+- Deep zoom for frozen moments: `freeze.detail` builds a pyramid of tiles (`engine/zoom.py`, `zoom_build.py`, `zoom_render.py`)
+  so a push from the wide shot to a 20x close-up is sharp at every scale. The tiles the camera needs are found from its keys
+  (set cover over a lattice, as many levels as the tightest box needs: `levels: auto`, at most `ratio` x detail per level);
+  each is a crop of its parent enlarged (SeedVR2, or Lanczos), re-drawn at low `strength` (Z-Image Turbo img2img; the
+  whole level in one ComfyUI job), despeckled, aligned to the parent (ECC), and given the parent's low frequencies exactly
+  (`lock`), with a depth snapped to its own edges. The render takes each pixel from the finest tile that covers it and fades
+  levels in by screen-space pixel density with feathered tile borders. Each tile is its own cached stage (keyed by its box and its
+  parent's key). `studio freeze <project> <beat> [--plan] [--report]` prints the plan, renders one beat and measures it
+  (sharpness per zoom, frame-difference plot, strip: `engine/zoom_report.py`). Qwen-Image-Edit is available as the re-draw
+  (`method: qwen`), experimental: it moves things. New fields join cache keys only when set.
+- Layered depth for frozen moments: `freeze.layers` (`engine/layers.py`) cuts the frame into planes: a background plate with
+  the subjects painted out (Florence-2 "people" or named subjects, SAM 2.1 masks in one job, Qwen-Image-Edit fill kept only
+  inside the hole) and subject planes grouped by depth, each with its own smooth depth and soft alpha, composited back to
+  front with foreground colour estimation at the edge. No halo or double edge at depth jumps, and real background revealed
+  behind a person. Works with `detail`: each tile carries its planes' alphas and continues the plate. `planes.jpg` shows
+  what was found. `build --plan` prices both (`film:freeze_zoom` per tile, `film:freeze_layers`).
 - Region edits: `edit.region` confines an image edit to part of the picture. `region` takes a `prompt` (Florence-2
   grounding on the source, with `pick`, `within` and the "X's Y" owner rule from `reveal`), or `box` / `points` /
   `negative_points` (0-1); SAM 2.1 (image mode, through the existing `SSRevealTrack` node on a one-frame batch: no new

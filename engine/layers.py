@@ -159,21 +159,34 @@ class Subject:
     layer: int = -1                     # which `subjects` entry named it (-1: auto)
 
 
-def _segment(png: Path, prompts: list[dict], work: Path, tag: str) -> np.ndarray:
-    """SAM 2.1 on one image: the soft mask (float 0-1) of the objects `prompts` name (their union)."""
+def _segment_many(png: Path, groups: list[list[dict]], work: Path) -> list[np.ndarray]:
+    """SAM 2.1 on one image, one soft mask (float 0-1) per group of prompts (the union of the objects its prompts name), all
+    in ONE ComfyUI job: the model loads once, and the job is not interleaved with anybody else's."""
+    import json as _json
     from PIL import Image
     from .backends import comfy
-    from .region import seg_graph
+    from .reveal import TRACKERS
     name = comfy.upload(str(png))
-    images = comfy.run(seg_graph(name, prompts, "large", f"studio/layers_{tag}"), poll=2)
-    got = Path(comfy.fetch(images, str(work / f"_seg_{tag}")))
-    try:
-        files = sorted(got.glob("*.png"))
-        if not files:
-            raise BuildError("layers: the segmentation returned no mask")
-        return np.asarray(Image.open(files[0]).convert("L"), dtype=np.float32) / 255.0
-    finally:
-        shutil.rmtree(got, ignore_errors=True)
+    g: dict = {"img": {"class_type": "LoadImage", "inputs": {"image": name}},
+               "sam": {"class_type": "DownloadAndLoadSAM2Model", "inputs": {"model": TRACKERS["large"], "segmentor": "video",
+                                                                              "device": "cuda", "precision": "fp16"}}}
+    for i, prompts in enumerate(groups):
+        g[f"tr{i}"] = {"class_type": "SSRevealTrack", "inputs": {"sam2_model": ["sam", 0], "images": ["img", 0], "frame_index": 0,
+                                                                  "prompts": _json.dumps(prompts), "start": 0, "end": -1}}
+        g[f"m{i}"] = {"class_type": "MaskToImage", "inputs": {"mask": [f"tr{i}", 0]}}
+        g[f"save{i}"] = {"class_type": "SaveImage", "inputs": {"images": [f"m{i}", 0], "filename_prefix": f"studio/layers_seg{i}"}}
+    outs = comfy.run_outputs(g, poll=3)
+    masks = []
+    for i in range(len(groups)):
+        got = Path(comfy.fetch(outs[f"save{i}"]["images"][:1], str(work / f"_seg_{i}")))
+        try:
+            files = sorted(got.glob("*.png"))
+            if not files:
+                raise BuildError("layers: the segmentation returned no mask")
+            masks.append(np.asarray(Image.open(files[0]).convert("L"), dtype=np.float32) / 255.0)
+        finally:
+            shutil.rmtree(got, ignore_errors=True)
+    return masks
 
 
 def find_subjects(png: Path, layers, work: Path, log: Callable) -> list[Subject]:
@@ -182,8 +195,9 @@ def find_subjects(png: Path, layers, work: Path, log: Callable) -> list[Subject]
     from .reveal import _need_nodes, find_boxes
     from .spec import FreezeLayer
     _need_nodes(log)
-    specs = [FreezeLayer(prompt="a person")] if layers.subjects == "auto" else list(layers.subjects)
-    out: list[Subject] = []
+    specs = [FreezeLayer(prompt="people")] if layers.subjects == "auto" else list(layers.subjects)
+    names: list[tuple[str, int]] = []
+    groups: list[list[dict]] = []
     for li, sp in enumerate(specs):
         boxes: list[list[float]] = []
         if sp.box:
@@ -192,7 +206,7 @@ def find_subjects(png: Path, layers, work: Path, log: Callable) -> list[Subject]
             log(f"  layers: finding {sp.prompt!r} (Florence-2)")
             boxes, _all, _o = find_boxes(png, sp.prompt, "all", None, log)
             if layers.subjects == "auto":
-                boxes = [b for b in boxes if (b[2] - b[0]) * (b[3] - b[1]) < 0.4 and (b[3] - b[1]) > (b[2] - b[0])]
+                boxes = [b for b in boxes if (b[2] - b[0]) * (b[3] - b[1]) < 0.4]
         items: list[dict] = [{"box": b} for b in boxes]
         for p in sp.points:
             items.append({"points": [list(p)], "labels": [1]})
@@ -200,9 +214,14 @@ def find_subjects(png: Path, layers, work: Path, log: Callable) -> list[Subject]
             raise BuildError(f"layers: nothing found for {sp.prompt or sp.box or sp.points}: reword it, or give a `box` / `points`")
         if layers.subjects == "auto":
             for k, it in enumerate(items):          # each person is cut out alone: planes group them by depth afterwards
-                out.append(Subject(f"person{k + 1}", _segment(png, [it], work, f"p{k}"), li))
+                names.append((f"person{len(names) + 1}", li))
+                groups.append([it])
         else:
-            out.append(Subject(sp.id or f"layer{li + 1}", _segment(png, items, work, f"l{li}"), li))
+            names.append((sp.id or f"layer{li + 1}", li))
+            groups.append(items)
+    log(f"  layers: cutting out {len(groups)} subject(s) (SAM 2.1)")
+    masks = _segment_many(png, groups, work)
+    out = [Subject(n, m, li) for (n, li), m in zip(names, masks)]
     out = [s for s in out if (s.mask > 0.5).mean() > 2e-5]
     if not out:
         raise BuildError("layers: no subject was found on the frame")

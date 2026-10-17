@@ -140,6 +140,32 @@ UI (React) ◄─► engine server (FastAPI + job queue + websocket events) ◄�
   (a frozen beat is rendered first when it is not; its first and last frames are kept lossless); beats that use it carry
   the source clip in their key. Storyboard: a `freeze` card of flat crops at the camera's boxes and a flat preview clip;
   editor: `_freeze_shot` (fields per box number); plan: `film:freeze` / `film:freeze_up` units.
+- **Deep zoom and layered depth** (`engine/zoom.py`, `zoom_build.py`, `zoom_render.py`, `layers.py`, `zoom_report.py`,
+  `backends/detail.py`). `freeze.detail`: `zoom_build.make_plan` samples the camera path and `zoom.plan_tiles` chooses the tiles:
+  level k has nominal width `tile_px / (base_px * ratio^k)` of the frame (auto levels: enough that the tightest view has a tile
+  pixel per output pixel, the ratio lowered to share the gain evenly); a view asks for every level whose tile is about as wide
+  as the view or wider, and per level the fewest lattice tiles (origins every quarter tile, so a small camera change keeps
+  the tiles it did not touch) that hold what is asked (greedy set cover; a view that fits must be wholly inside one, one as
+  wide as the fade-out only mostly), each inside a parent. `build_pyramid` makes a level at a time: crop of the parent ->
+  SeedVR2 + Z-Image img2img for every tile of the level in ONE graph (`detail.build_batch_graph`: shared loaders, so the models
+  load once and the job is not interleaved with other people's) -> `zoom.despeckle` -> `zoom.align` (ECC affine on blurred
+  reduced copies) -> `zoom.lock_low_frequencies` (parent_lowpass + tile - tile_lowpass at sigma = `lock` x tile px per parent
+  px) -> `zoom.refine_depth` (parent raw depth enlarged, guided filter on the tile; the grown copy is for the render, the raw
+  one seeds the next level, so a depth edge is not dilated by the ancestors' pixels). Tile key = box + parent's key + the
+  settings; `beat_key` leaves `detail` / `layers` out while unset, `rkey` holds the tile keys. The render
+  (`zoom_render.PyramidRenderer`, a `freeze.Renderer` subclass; `freeze.py`'s API is unchanged) composes per frame a depth
+  texture for the view (base depth refined by every active tile) that the ray march reads, then colour coarse to fine: per level
+  the feather-weighted average of its active tiles laid over by coverage x `lod_alpha(view_w / tile_w)` (1 below 0.95, 0 above
+  1.3 tile widths). `freeze.layers`: `layers.build_planes` finds the subjects (Florence-2 "people", boxes -> SAM 2.1 in one
+  graph), groups them into planes by median depth, softens the alphas, grows the hole, fills the plate (Qwen-Image-Edit
+  composited with `region.composite`, or a push-pull fill without ComfyUI) and gives each plane a smooth depth
+  (`plane_depth`: masked blur + push-pull) and the background its hole-filled depth. Layered tiles refine each alpha with the
+  guided filter on the tile's pixels and continue the plate (`tile_layers`). The layered render marches and samples each plane
+  with its own depth texture and alpha (both composed from the pyramid), back to front, subject colour from
+  `estimate_foreground`. Decision: layers are cut from the tiles at render time (one pyramid, one extra attribute per plane per
+  tile) rather than a pyramid per layer, because the layers would disagree where they overlap and cost a multiple of the
+  generation; the only data that exists solely per plane is what is occluded (the plate, smooth, kept at one resolution and
+  continued) and the alpha (a mask, refined per tile).
 - **Plans and storyboards.** `engine/plan.py` runs every builder in a dry run (`engine/fidelity.py` `planning()`):
   `BuildContext.stage` reports instead of running, a stage that would run marks its outputs dirty so stages keyed on
   them count too, and code that renders outside a stage (image inputs, product stills, model conversion) raises

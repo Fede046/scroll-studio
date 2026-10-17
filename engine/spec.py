@@ -505,7 +505,7 @@ class FreezeLayers(Model):
     the person, and a depth jump no longer leaves a halo or a double edge. The planes are cut from the same picture
     (and, with `detail`, the same tiles) at render time, so every level of a deep zoom is layered too."""
     subjects: Union[Literal["auto"], list[FreezeLayer]] = Field(
-        "auto", description="auto: every person found on the frame (Florence-2 'person'); or the subjects to cut out")
+        "auto", description="auto: every person found on the frame (Florence-2 'people'); or the subjects to cut out")
     planes: int = Field(3, ge=1, le=8, description="At most this many subject planes: subjects at a similar depth share one")
     plate: str = Field("", description="What the empty background should look like where the subjects stood (added to "
                                        "'remove the people, continue the background in the same style'), e.g. 'the empty "
