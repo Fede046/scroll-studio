@@ -424,3 +424,42 @@ def tile_plane_depths(depth_raw: np.ndarray, hole_u8: np.ndarray, parent_plane_d
     parent's enlarged. The background's depth is the tile's own raw depth with the hole filled from its surroundings (it has
     real edges: a lamp post, a building)."""
     return parent_plane_depth_up.astype(np.float32), background_depth(depth_raw, hole_u8.astype(np.float32) / 255).astype(np.float32)
+
+
+def build_cached(bdir: Path, frozen_png: Path, frozen: np.ndarray, depth_raw: np.ndarray, layers, seed: int, key: str,
+                 log: Callable) -> LayerSet:
+    """The frame's planes, made once and kept under bdir/layers/ (keyed by the frame, its depth and the layers settings)."""
+    from PIL import Image
+    ldir = bdir / "layers"
+    ldir.mkdir(parents=True, exist_ok=True)
+    stamp, npz, plate = ldir / "planes.key", ldir / "planes.npz", ldir / "plate.png"
+    k = hashlib.sha1(json.dumps([VERSION, key, layers.model_dump(mode="json"), seed], sort_keys=True).encode()).hexdigest()[:16]
+    if stamp.exists() and stamp.read_text() == k and npz.exists() and plate.exists():
+        z = np.load(npz, allow_pickle=False)
+        return LayerSet(z["alpha"].astype(np.float32) / 255, z["depth"].astype(np.float32), z["hole"].astype(np.float32) / 255,
+                        np.asarray(Image.open(plate).convert("RGB")), z["bg_depth"].astype(np.float32),
+                        json.loads(str(z["ids"])), k)
+    ls = build_planes(frozen, depth_raw, layers, seed, ldir, log, png=frozen_png, key=key)
+    review(ldir, frozen, ls)
+    np.savez(ldir / "_tmp.npz", alpha=(ls.alpha * 255 + 0.5).astype(np.uint8), depth=ls.depth.astype(np.float16),
+             hole=(ls.hole * 255 + 0.5).astype(np.uint8), bg_depth=ls.bg_depth.astype(np.float16), ids=json.dumps(ls.ids))
+    (ldir / "_tmp.npz").replace(npz)
+    Image.fromarray(ls.plate).save(plate)
+    stamp.write_text(k)
+    ls.key = k
+    return ls
+
+
+def review(ldir: Path, frozen: np.ndarray, ls: LayerSet) -> None:
+    """planes.jpg beside the planes: the frame, the plate, and each plane's alpha tinted over the frame (what to look at
+    when a subject was missed or a plate came out wrong)."""
+    from PIL import Image
+    tints = [(255, 60, 60), (60, 200, 90), (70, 120, 255), (255, 200, 40), (200, 80, 255), (40, 220, 220), (255, 130, 40), (160, 160, 160)]
+    over = frozen.astype(np.float32).copy()
+    for i, a in enumerate(ls.alpha):
+        over = over * (1 - 0.55 * a[..., None]) + np.array(tints[i % len(tints)], np.float32) * 0.55 * a[..., None]
+    h, w = frozen.shape[:2]
+    sheet = np.concatenate([frozen, np.clip(over, 0, 255).astype(np.uint8), ls.plate], axis=1)
+    im = Image.fromarray(sheet)
+    im.thumbnail((2400, 700))
+    im.save(ldir / "planes.jpg", quality=88)
