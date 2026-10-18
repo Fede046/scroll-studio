@@ -20,17 +20,21 @@ def test_push_pull_fills_a_hole_from_its_surroundings_and_leaves_the_rest():
     assert np.abs(out[valid == 0] - x[valid == 0]).mean() < 12               # inside: the surrounding gradient continued
 
 
-def test_plane_depth_is_smooth_inside_and_continues_outside():
+def test_a_subject_is_a_card_with_no_tear_even_when_the_depth_map_has_a_step_in_it():
     depth = np.zeros((80, 120), np.float32)
     depth[:, :60] = 0.2
-    depth[:, 60:] = 0.9                                                       # a jump the subject sits on
+    depth[:, 60:] = 0.9                                                       # a depth step across the subject (a glitch)
     alpha = np.zeros_like(depth)
-    alpha[10:70, 40:80] = 1.0                                                 # the subject straddles the jump
-    pd = L.plane_depth(depth, alpha)
+    alpha[10:70, 40:80] = 1.0
+    pd = L.plane_depth(depth, [alpha])
     inside = pd[10:70, 40:80]
-    assert np.abs(np.diff(inside, axis=1)).max() < 0.2                        # the 0.7 jump is spread out: no tear inside the plane
+    assert np.abs(np.diff(inside, axis=1)).max() < 0.02                       # one card: no step at all across it
     assert 0.2 < inside.mean() < 0.9
     assert abs(pd[40, 90] - pd[40, 81]) < 0.15                                # and it carries on past the edge, no cliff
+    near = np.zeros_like(depth)
+    near[10:70, 100:115] = 1.0                                                # a second subject of the plane, at its own depth
+    both = L.plane_depth(depth, [alpha, near])
+    assert abs(both[40, 107] - 0.9) < 0.05 and abs(both[40, 60] - inside.mean()) < 0.05
 
 
 def test_background_depth_has_no_hole():
@@ -98,7 +102,7 @@ def _scene(W=192, H=112):
 def _layerset(frame, bg, depth, alpha):
     import cv2
     hole = cv2.dilate(alpha, np.ones((5, 5), np.uint8))
-    return L.LayerSet(alpha[None], L.plane_depth(depth, alpha)[None], hole, bg, L.background_depth(depth, hole), [["person"]])
+    return L.LayerSet(alpha[None], L.plane_depth(depth, [alpha])[None], hole, bg, L.background_depth(depth, hole), [["person"]])
 
 
 def test_layered_render_at_rest_is_the_frame_and_in_motion_reveals_the_plate():

@@ -90,20 +90,36 @@ def grow_mask(m: np.ndarray, px: int) -> np.ndarray:
     return cv2.dilate((m > 0.5).astype(np.uint8) * 255, k).astype(np.float32) / 255.0
 
 
-def plane_depth(depth: np.ndarray, alpha: np.ndarray) -> np.ndarray:
-    """A subject plane's depth: the scene depth smoothed inside the subject (no jump within a plane: the part of a person
-    nearer the camera still leads, the outline does not tear) and continued smoothly outside it (so the march has
-    something sensible past the edge; the alpha cuts the colour there)."""
-    import cv2
-    inside = (alpha > 0.5).astype(np.float32)
-    if inside.sum() < 4:
+def plane_depth(depth: np.ndarray, masks: list[np.ndarray]) -> np.ndarray:
+    """A subject plane's depth: every subject is a card, a plane of its own, not the scene's depth smoothed. A monocular depth
+    map has steps and creases inside a person (a bright coat against a dark one reads as two depths), and a plane that follows
+    them tears the person apart the moment the camera moves. So each subject takes the median depth of its pixels, with
+    the gentle slope down its height that a person standing on the ground has (a line fit in y, clamped), and the card is
+    continued smoothly outside the subjects (push-pull), so the march has something sensible past the edge (the alpha cuts the
+    colour there). `masks`: float 0-1 maps of the subjects of the plane."""
+    full = np.zeros(depth.shape, np.float32)
+    valid = np.zeros(depth.shape, np.float32)
+    H, W = depth.shape
+    for m in masks:
+        inside = m > 0.5
+        if inside.sum() < 4:
+            continue
+        ys, xs = np.nonzero(inside)
+        d = depth[inside].astype(np.float64)
+        lo, hi = np.percentile(d, [10, 90])
+        keep = (d >= lo) & (d <= hi)
+        y = ys[keep].astype(np.float64)
+        if keep.sum() > 8 and y.std() > 2:
+            slope, icpt = np.polyfit(y, d[keep], 1)
+            slope = float(np.clip(slope, -0.4 / H, 0.4 / H))                   # at most 0.4 of the depth range over the frame's height
+            icpt = float(np.median(d[keep] - slope * y))
+        else:
+            slope, icpt = 0.0, float(np.median(d))
+        full[inside] = (icpt + slope * ys).astype(np.float32)
+        valid[inside] = 1.0
+    if valid.sum() < 4:
         return depth.astype(np.float32)
-    ys, xs = np.nonzero(inside)
-    sigma = max(2.0, 0.03 * (ys.max() - ys.min() + 1))
-    num = cv2.GaussianBlur(depth.astype(np.float32) * inside, (0, 0), sigma)
-    den = cv2.GaussianBlur(inside, (0, 0), sigma)
-    sm = np.where(inside > 0, num / np.maximum(den, 1e-6), 0).astype(np.float32)
-    return push_pull(sm, inside)
+    return push_pull(full, valid)
 
 
 def background_depth(depth: np.ndarray, hole: np.ndarray) -> np.ndarray:
@@ -365,7 +381,7 @@ def build_planes(frozen: np.ndarray, depth_raw: np.ndarray, layers, seed: int, w
         union = np.max([subjects[i].mask for i in g], axis=0)
         a = soft_alpha(union, layers.feather)
         alphas.append(a)
-        depths.append(plane_depth(depth_raw, a))
+        depths.append(plane_depth(depth_raw, [subjects[i].mask for i in g]))
         ids.append([subjects[i].id for i in g])
     hole = np.clip(grow_mask(np.max([(a > 0.02).astype(np.float32) for a in alphas], axis=0), layers.grow), 0, 1)
     import cv2
@@ -403,47 +419,8 @@ def base_background(rgb: np.ndarray, ls: LayerSet) -> np.ndarray:
     return np.clip(rgb.astype(np.float32) * (1 - hole) + plate * hole + 0.5, 0, 255).astype(np.uint8)
 
 
-def tile_plane_depths(depth_raw: np.ndarray, alpha_u8: np.ndarray, hole_u8: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """(plane depths (P,H,W), background depth (H,W)) of a tile, float32, from its raw depth and its alphas."""
-    P = alpha_u8.shape[0]
-    pd = np.stack([plane_depth(depth_raw, alpha_u8[p].astype(np.float32) / 255) for p in range(P)])
-    return pd.astype(np.float32), background_depth(depth_raw, hole_u8.astype(np.float32) / 255).astype(np.float32)
-
-
-def build_cached(bdir: Path, frozen_png: Path, frozen: np.ndarray, depth_raw: np.ndarray, layers, seed: int, key: str,
-                 log: Callable) -> LayerSet:
-    """The frame's planes, made once and kept under bdir/layers/ (keyed by the frame, its depth and the layers settings)."""
-    from PIL import Image
-    ldir = bdir / "layers"
-    ldir.mkdir(parents=True, exist_ok=True)
-    stamp, npz, plate = ldir / "planes.key", ldir / "planes.npz", ldir / "plate.png"
-    k = hashlib.sha1(json.dumps([VERSION, key, layers.model_dump(mode="json"), seed], sort_keys=True).encode()).hexdigest()[:16]
-    if stamp.exists() and stamp.read_text() == k and npz.exists() and plate.exists():
-        z = np.load(npz, allow_pickle=False)
-        return LayerSet(z["alpha"].astype(np.float32) / 255, z["depth"].astype(np.float32), z["hole"].astype(np.float32) / 255,
-                        np.asarray(Image.open(plate).convert("RGB")), z["bg_depth"].astype(np.float32),
-                        json.loads(str(z["ids"])), k)
-    ls = build_planes(frozen, depth_raw, layers, seed, ldir, log, png=frozen_png, key=key)
-    review(ldir, frozen, ls)
-    np.savez(ldir / "_tmp.npz", alpha=(ls.alpha * 255 + 0.5).astype(np.uint8), depth=ls.depth.astype(np.float16),
-             hole=(ls.hole * 255 + 0.5).astype(np.uint8), bg_depth=ls.bg_depth.astype(np.float16), ids=json.dumps(ls.ids))
-    (ldir / "_tmp.npz").replace(npz)
-    Image.fromarray(ls.plate).save(plate)
-    stamp.write_text(k)
-    ls.key = k
-    return ls
-
-
-def review(ldir: Path, frozen: np.ndarray, ls: LayerSet) -> None:
-    """planes.jpg beside the planes: the frame, the plate, and each plane's alpha tinted over the frame (what to look at
-    when a subject was missed or a plate came out wrong)."""
-    from PIL import Image
-    tints = [(255, 60, 60), (60, 200, 90), (70, 120, 255), (255, 200, 40), (200, 80, 255), (40, 220, 220), (255, 130, 40), (160, 160, 160)]
-    over = frozen.astype(np.float32).copy()
-    for i, a in enumerate(ls.alpha):
-        over = over * (1 - 0.55 * a[..., None]) + np.array(tints[i % len(tints)], np.float32) * 0.55 * a[..., None]
-    h, w = frozen.shape[:2]
-    sheet = np.concatenate([frozen, np.clip(over, 0, 255).astype(np.uint8), ls.plate], axis=1)
-    im = Image.fromarray(sheet)
-    im.thumbnail((2400, 700))
-    im.save(ldir / "planes.jpg", quality=88)
+def tile_plane_depths(depth_raw: np.ndarray, hole_u8: np.ndarray, parent_plane_depth_up: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """(plane depths (P,H,W), background depth (H,W)) of a tile, float32. The subjects are cards: smooth, so a tile's are the
+    parent's enlarged. The background's depth is the tile's own raw depth with the hole filled from its surroundings (it has
+    real edges: a lamp post, a building)."""
+    return parent_plane_depth_up.astype(np.float32), background_depth(depth_raw, hole_u8.astype(np.float32) / 255).astype(np.float32)

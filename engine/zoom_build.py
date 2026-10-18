@@ -212,7 +212,8 @@ def layer_planes(parent, tile: Tile, rgb: np.ndarray, raw: np.ndarray, tsize: tu
     pa, ph, pb = parent.planes()
     rs = lambda img, sb, db: zoom.resample_box(np.ascontiguousarray(img), sb, db, tsize, "linear")
     alpha, hole, bg = L.tile_layers(pa, ph, pb, rgb, parent.box, tile.box, rs)
-    pd, bd = L.tile_plane_depths(raw, alpha, hole)
+    ppd = parent.layers.depth if hasattr(parent, "layers") else parent.pdepth                   # (P, h, w) float
+    pd, bd = L.tile_plane_depths(raw, hole, np.stack([zoom.resample_box(np.ascontiguousarray(x, dtype=np.float32), parent.box, tile.box, tsize, "linear") for x in ppd]))
     return alpha, hole, bg, pd, bd
 
 
