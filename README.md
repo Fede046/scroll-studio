@@ -942,8 +942,10 @@ transition:
 ```
 
 `shape` and `becomes` each take a prompt, a `box` ([x0, y0, x1, y1] of the picture) or a `selector`; `becomes` defaults to
-the same prompt as `shape`. Name neither and the engine looks for the best pair itself, without a model: flat regions of
-each picture, paired by outline, size and place. The shapes are stored in each picture's own coordinates and the page maps
+the same prompt as `shape`. Name neither and the engine looks for the best pair itself, without a model: circles and
+rectangles (flat regions, outlined frames and screens, Hough circles) on each picture, paired by outline, size and place. That
+is for graphic pictures (a logo, a sun, a frame); on a photograph name the shapes, and when nothing pairs convincingly the
+cut dissolves rather than match on nothing. The shapes are stored in each picture's own coordinates and the page maps
 them to the screen the way the section fits that picture, so one analysis serves every window shape; where a shape is
 cropped out of view (a phone) the cut softens into a dissolve. Each side only ever zooms in, about a point that stays on
 screen, so the picture always covers the screen. Cached in `.build/_cuts/` by the two pictures and the prompts.

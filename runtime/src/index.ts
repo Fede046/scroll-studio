@@ -305,7 +305,7 @@ document.querySelectorAll<HTMLAnchorElement>('a[href^="#"]').forEach((a) => a.ad
   const target = document.querySelector(id);
   if (!target) return;
   e.preventDefault();
-  const settled = cuts?.land(target);   // a section that follows a cut is reached once the cut is over
+  const settled = cuts?.docTop(target);   // a section in a cut is reached where it sits with no cut holding it (after the cut that leads into it)
   if (settled != null) { if (lenis) lenis.scrollTo(settled, { duration: 1.4 / pace }); else scrollTo(0, settled); }
   else if (lenis) lenis.scrollTo(target as HTMLElement, { duration: 1.4 / pace });
   else target.scrollIntoView();

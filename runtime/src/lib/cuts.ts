@@ -175,6 +175,9 @@ function write(el: HTMLElement, L: Layer, blurIdx: number, extra: Record<string,
   el.classList.toggle("ss-cut-off", L.vis === false);
 }
 
+/** An element's layout height in CSS px, fractions included, whatever transform is on it. */
+const layoutHeight = (el: HTMLElement) => parseFloat(getComputedStyle(el).height) || el.offsetHeight;
+
 export interface CutsApi { update(): void; land(el: Element): number | null; docTop(el: Element): number | null; holding(el: Element): 1 | 0 | null; cuts: Cut[] }
 export function makeCuts(): CutsApi | null {
   const raw = document.getElementById("ss-cuts");
@@ -198,12 +201,12 @@ export function makeCuts(): CutsApi | null {
   const ro = new ResizeObserver((es) => {
     for (const e of es) {
       const el = e.target as HTMLElement;
-      el.style.setProperty("--cut-h", el.offsetHeight + "px");
+      el.style.setProperty("--cut-h", layoutHeight(el) + "px");
     }
     dirty = true;
   });
   let dirty = true;
-  for (const c of cuts) { ro.observe(c.pinA); c.pinA.style.setProperty("--cut-h", c.pinA.offsetHeight + "px"); }
+  for (const c of cuts) { ro.observe(c.pinA); c.pinA.style.setProperty("--cut-h", layoutHeight(c.pinA) + "px"); }
   addEventListener("resize", () => { dirty = true; });
 
   function reset(c: Cut) {

@@ -103,9 +103,30 @@ def iou(a, b) -> float:
     return inter / union if union > 0 else 0.0
 
 
+def _finish(sh: dict, mask, a, gx, how: str) -> Optional[dict]:
+    """Add what ranks a shape (contrast against the ring around it, the strength of its edge) and drop the dull ones."""
+    import cv2
+    import numpy as np
+    ring = (cv2.dilate(mask, np.ones((15, 15), np.uint8)) > 0) & (mask == 0)
+    inside = a[mask > 0].mean(axis=0)
+    around = a[ring].mean(axis=0) if ring.any() else inside
+    sh["contrast"] = round(float(np.abs(inside - around).mean() / 255), 3)
+    edge = (cv2.dilate(mask, np.ones((5, 5), np.uint8)) > 0) & (cv2.erode(mask, np.ones((5, 5), np.uint8)) == 0)
+    sh["edge"] = round(float(np.clip(gx[edge].mean() / 40.0, 0, 1)), 3) if edge.any() else 0.0
+    x0, y0, x1, y1 = sh["box"]
+    if x0 < 0.003 and y0 < 0.003 and x1 > 0.997 and y1 > 0.997:
+        return None                    # the whole picture
+    if sh["contrast"] < 0.05 or sh["edge"] < 0.12:
+        return None                    # a patch of sky or floor, not a thing
+    sh["how"] = how
+    sh["saliency"] = round(min(1.0, sh["share"] / 0.04) * 0.5 + sh["contrast"] * 2 + sh["edge"] * 1.5 + (0.3 if sh["kind"] != "blob" else 0), 3)
+    return sh
+
+
 def candidates(im, limit: int = 12) -> list[dict]:
     """Shapes on a picture that are worth matching, found without any model: flat regions (colour clusters, split into
-    connected parts) that are big enough to read, compact, and stand out from what is around them."""
+    connected parts), outlined quadrilaterals (doors, screens, frames) and circles (suns, logos, rims), that are big enough
+    to read, have a firm edge and stand out from what is around them."""
     import cv2
     import numpy as np
     a = np.asarray(im.convert("RGB"))
@@ -114,7 +135,10 @@ def candidates(im, limit: int = 12) -> list[dict]:
     if k < 1:
         a = cv2.resize(a, (round(w0 * k), round(h0 * k)), interpolation=cv2.INTER_AREA)
     h, w = a.shape[:2]
-    lab = cv2.cvtColor(cv2.GaussianBlur(a, (0, 0), 1.6), cv2.COLOR_RGB2LAB).reshape(-1, 3).astype(np.float32)
+    blur = cv2.GaussianBlur(a, (0, 0), 1.6)
+    gray = cv2.cvtColor(blur, cv2.COLOR_RGB2GRAY)
+    gx = np.hypot(cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3), cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)) / 8.0
+    lab = cv2.cvtColor(blur, cv2.COLOR_RGB2LAB).reshape(-1, 3).astype(np.float32)
     out: list[dict] = []
     cv2.setRNGSeed(7)
     for kk in (5, 8):
@@ -127,25 +151,36 @@ def candidates(im, limit: int = 12) -> list[dict]:
             m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
             n, lab_cc, stats, _ = cv2.connectedComponentsWithStats(m, connectivity=8)
             for i in range(1, n):
-                share = stats[i, cv2.CC_STAT_AREA] / (w * h)
-                if not 0.006 <= share <= 0.45:
+                if not 0.006 <= stats[i, cv2.CC_STAT_AREA] / (w * h) <= 0.45:
                     continue
                 mask = ((lab_cc == i) * 255).astype(np.uint8)
                 mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((9, 9), np.uint8))
                 sh = mask_shape(mask)
-                if sh is None or sh["solidity"] < 0.72:
-                    continue
-                ring = (cv2.dilate(mask, np.ones((15, 15), np.uint8)) > 0) & (mask == 0)
-                inside = a[mask > 0].mean(axis=0)
-                around = a[ring].mean(axis=0) if ring.any() else inside
-                sh["contrast"] = round(float(np.abs(inside - around).mean() / 255), 3)
-                if sh["contrast"] < 0.06:
-                    continue
-                x0, y0, x1, y1 = sh["box"]
-                if x0 < 0.003 and y0 < 0.003 and x1 > 0.997 and y1 > 0.997:
-                    continue            # the whole picture
-                sh["saliency"] = round(min(1.0, sh["share"] / 0.04) * 0.5 + sh["contrast"] * 2 + (0.3 if sh["kind"] != "blob" else 0), 3)
-                out.append(sh)
+                if sh is not None and sh["solidity"] >= 0.72 and (sh := _finish(sh, mask, a, gx, "region")):
+                    out.append(sh)
+    # outlined quadrilaterals: closed contours of the edge map that are four-sided and convex
+    edges = cv2.dilate(cv2.Canny(gray, 50, 130), np.ones((3, 3), np.uint8))
+    cnts, _ = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    for cnt in cnts:
+        per = cv2.arcLength(cnt, True)
+        poly = cv2.approxPolyDP(cnt, 0.02 * per, True)
+        area = cv2.contourArea(poly)
+        if len(poly) != 4 or not cv2.isContourConvex(poly) or not 0.02 <= area / (w * h) <= 0.55:
+            continue
+        mask = np.zeros((h, w), np.uint8)
+        cv2.fillConvexPoly(mask, poly.reshape(-1, 2), 255)
+        sh = mask_shape(mask)
+        if sh is not None and sh["kind"] == "rect" and (sh := _finish(sh, mask, a, gx, "quad")):
+            out.append(sh)
+    # circles
+    circles = cv2.HoughCircles(cv2.medianBlur(gray, 5), cv2.HOUGH_GRADIENT, dp=1.2, minDist=min(h, w) * 0.15, param1=120, param2=48,
+                               minRadius=round(min(h, w) * 0.05), maxRadius=round(min(h, w) * 0.45))
+    for cx, cy, r in (circles[0] if circles is not None else [])[:6]:
+        mask = np.zeros((h, w), np.uint8)
+        cv2.circle(mask, (round(cx), round(cy)), round(r), 255, -1)
+        sh = mask_shape(mask)
+        if sh is not None and (sh := _finish(sh, mask, a, gx, "circle")):
+            out.append(sh)
     out.sort(key=lambda s: -s["saliency"])
     kept: list[dict] = []
     for s in out:            # one candidate per place: the more salient of any two that overlap almost entirely
@@ -154,26 +189,31 @@ def candidates(im, limit: int = 12) -> list[dict]:
     return kept[:limit]
 
 
-def pair_shapes(cands_a: list[dict], cands_b: list[dict]) -> Optional[tuple[dict, dict, float]]:
-    """The best pair of shapes, one from each picture: alike in outline (Hu moments of the contours, the same family),
-    alike in size, near each other, and both worth looking at. Returns (a, b, confidence 0-1)."""
+def pair_shapes(cands_a: list[dict], cands_b: list[dict], floor: float = 0.3) -> Optional[tuple[dict, dict, float]]:
+    """The best pair of shapes, one from each picture. Only clean geometry is paired (a circle with a circle, a rectangle
+    with a rectangle: an arbitrary patch of colour is not a thing the eye follows over a cut), alike in outline (Hu moments
+    of the contours), size and place, and prominent on both pictures. Returns (a, b, confidence 0-1), or None when nothing
+    pairs convincingly (below `floor`)."""
     import cv2
     import numpy as np
     best = None
     for a in cands_a:
         for b in cands_b:
+            if a["kind"] != b["kind"] or a["kind"] == "blob":
+                continue
             d = min(float(cv2.matchShapes(a["contour"], b["contour"], cv2.CONTOURS_MATCH_I1, 0.0)), 2.0)
             size = abs(np.log(max(b["share"], 1e-4) / max(a["share"], 1e-4))) / 2
             ca = ((a["box"][0] + a["box"][2]) / 2, (a["box"][1] + a["box"][3]) / 2)
             cb = ((b["box"][0] + b["box"][2]) / 2, (b["box"][1] + b["box"][3]) / 2)
             dist = float(np.hypot(ca[0] - cb[0], ca[1] - cb[1]))
-            cost = d * 1.5 + (0 if a["kind"] == b["kind"] else 0.6) + size * 0.5 + dist * 0.4 - (a["saliency"] + b["saliency"]) * 0.25
+            cost = d * 1.5 + size * 0.5 + dist * 0.4 - (a["saliency"] + b["saliency"]) * 0.25
             if best is None or cost < best[0]:
                 best = (cost, a, b)
     if best is None:
         return None
     cost, a, b = best
-    return a, b, round(float(1 / (1 + np.exp(cost))), 3)
+    conf = round(float(1 / (1 + np.exp(cost))), 3)
+    return (a, b, conf) if conf >= floor else None
 
 
 def anchor(shape: dict, pic: dict, size: tuple[int, int], how: str) -> dict:
