@@ -62,6 +62,11 @@ in `studio.toml` (copy `studio.example.toml`) or the `BLENDER` environment varia
    and without them a frozen moment falls back to a local Lanczos upscale).
 2. Download the models listed in `engine/models.yaml` into ComfyUI's model folders (or point
    `extra_model_paths.yaml` at another drive).
+   Optional: `camera.backend: uni3c` (keyed camera moves on moving beats) wants the Uni3C camera controlnet,
+   `Wan21_Uni3C_controlnet_fp16.safetensors` (about 2 GB, Apache-2.0,
+   [Kijai/WanVideo_comfy](https://huggingface.co/Kijai/WanVideo_comfy/blob/main/Wan21_Uni3C_controlnet_fp16.safetensors)),
+   in ComfyUI's `models/model_patches/`. It is not installed by default and nothing else needs it: the default backends,
+   `ltx` and `wan`, use models you already have. `studio doctor` lists it.
 3. Start it and leave it running:
    ```bash
    python main.py --listen 127.0.0.1 --port 8188 --reserve-vram 1.5

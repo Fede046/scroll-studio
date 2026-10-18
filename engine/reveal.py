@@ -151,8 +151,8 @@ def spans_of(sec: FilmScene, ctx: BuildContext) -> Optional[dict]:
         if not clip.exists():
             return None
         durs.append(float(probe(clip)["duration"]))
-    fade = min(sec.beat_fade, *(d / 3 for d in durs)) if len(durs) > 1 else 0
-    return beat_spans(sec, durs, fade)
+    from .scenes.film import join_fades
+    return beat_spans(sec, durs, join_fades(sec, durs))
 
 
 # ---------------------------------------------------------------- choosing what the prompt found

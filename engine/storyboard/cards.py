@@ -287,11 +287,13 @@ class Maker:
                 c.seconds_taken = time.time() - t0
                 cards.append(c)
                 continue
-            ref = b.image if b.image else ImageInput(generate=b.prompt, size=(W, H), seed=b.seed)
+            from ..camera_beats import start_ref
+            ref = start_ref(sec, sec.beats.index(b), (W, H))
             fp = _digest({"prompt": b.prompt, "motion": b.motion, "seconds": b.seconds, "seed": b.seed, "trim": b.trim,
                           "strength": b.strength, "res": [W, H], "image": image_key(b.image) if b.image else None,
                           "end": image_key(b.end_image) if b.end_image else None, "model": b.video_model,
-                          "motion_seed": b.motion_seed})
+                          "motion_seed": b.motion_seed,
+                          **({"camera": b.camera.model_dump(mode="json")} if b.camera is not None else {})})
             c = Card(b.id, sec.id, "beat", f"{sec.id} / {b.id}", prompt=describe(ref) if b.image else b.prompt,
                      motion=b.motion, caption=caption, seconds=b.seconds - b.trim,
                      scroll=sec.length * (b.seconds - b.trim) / total, locked=b.locked or sec.locked, fingerprint=fp,

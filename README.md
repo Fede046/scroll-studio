@@ -82,6 +82,10 @@ tiktoken (`cl100k_base`) on the files in this repo; other tokenizers differ by r
 - **Frozen moments** (`freeze:` on a beat): when time stops, stop generating. One frame, upscaled, with a 2.5D depth
   camera moving through it, rendered offline in seconds, so a crowd stands still while the camera visits a couple's
   hands and feet and every face stays the same face. `image: { beat_frame: ... }` chains the next shot onto its last frame.
+- **Camera moves on moving shots** (`camera:` on a beat): keyed camera paths for generated video, so the crowd keeps
+  walking while the camera pushes from the wide street to one girl and back out. The camera is flown through the start
+  image's depth into a guide video, with the walking people softened so they stay free, and the video model paints the
+  shot along it (measured: the view stays within 1% of the keys).
 - **Fly through a codebase** (`code` scene): live 3D, real text, diffs applied as you scroll.
 
 ### New in 1.2
@@ -555,6 +559,74 @@ The render is an inverse parallax warp in torch (a ray marched through the depth
 wins at an edge), on the GPU when there is one and the CPU otherwise; it needs no Blender session. The storyboard shows
 the camera's boxes as flat crops of the source before anything renders, and `build --plan` prices a frozen beat apart
 from a generated one.
+
+### A camera move on a moving shot (`camera:`)
+
+A video model takes camera direction only as words, and mostly ignores them, so "the crowd keeps walking while the camera
+pushes in to the girl" used to be a clip, then a cut to a still. A beat with `camera:` keys gets the camera it asks for
+by construction. The keys have the shape of a frozen moment's (`{t, box, hold}` and an `ease`), but the beat is still
+generated, so people walk, traffic moves and fog drifts:
+
+```yaml
+      - id: push
+        seconds: 5
+        prompt: A hand-drawn faceless crowd walking toward the viewer, one girl in the centre
+        motion: everyone in the crowd walks steadily toward the viewer down the foggy street
+        image: inputs/street.png
+        camera:
+          keys:
+            - { t: 0.0, box: [0, 0, 1, 1] }                  # the wide street
+            - { t: 0.5, box: [0.40, 0.38, 0.62, 0.97] }      # the camera has reached the girl
+            - { t: 1.0, box: [0, 0, 1, 1] }                  # and is back out again
+          subjects: the people                               # who is free to move (default)
+```
+
+What happens, each step cached by its own digest in the beat's folder:
+
+1. **Depth and people.** The beat's start image gets a depth map (Depth Anything V2) and the moving subjects (`subjects`)
+   are found by Florence-2 and cut out by SAM 2.1, the way `edit.region` does.
+2. **The guide.** The camera path is flown through that depth with the same renderer a frozen moment uses (parallax and
+   all), as a depth video. The subjects' depth is blurred into soft blobs (`soften`), so the guide fixes the camera and
+   the static world (street, buildings, lamps) and only hints where the people are. Two more videos come with it:
+   `guide_rgb.mp4`, the picture itself flown along the keys (a pure-camera preview you can look at before a minute of GPU
+   is spent: `studio camera <project> <beat> --guide`), and `guide_static.mp4`, where the static world is.
+3. **The shot.** LTX-2.3 (the IC-LoRA depth control a take uses) paints the beat along the guide from the start image,
+   with frames of the pure-camera render pinned along the way (`anchor`: once a second and at the end, which keeps the
+   subjects' looks and sharpens close-ups). It runs at about 1024x576 (`camera.res`; at 1536x896 the girl's black coat
+   turned white in a test) and is scaled to `beat_res`: add `beat_restore: 1088` to the film for the fine detail. `backend: wan` runs Wan 2.2 Fun Control on
+   the same guide; `backend: uni3c` is Wan's camera controlnet (needs a file that is not installed by default, see
+   docs/INSTALL.md; the engine fails with its name, URL and folder when it is missing).
+4. **The measurement.** `studio camera <project> <beat> --check` registers every generated frame against the first on the
+   static world and reports how far the camera is from the keyed view (zoom error in %, shift in view widths), how far the
+   people walked, and what a perfect camera scores on the same measurement; it writes `camera.json` and a contact sheet.
+
+Beats that **continue** one another share one camera. `camera.continues: true` makes the beat start where the previous
+camera beat ended, at the speed it ended at (a chain flows as one smooth path and rests only at its ends and on holds, so
+there is no ease to a stop at the cut), start on that beat's last frame (`beat_frame`, exactly, unless it names an
+`image`), and fly its guide through the chain's base plate (the first beat's start image: the world every beat of the
+chain looks at, so a camera that pulls back out of a close-up has the wide street to fly through). Its frames are graded
+back toward the plate's tone and grain (`match`, 0.7 when continuing), which stops a clip-to-clip drift in contrast, haze
+and grain from showing at the cut.
+
+```yaml
+      - id: in                      # pushes in and is still moving when the beat ends
+        seconds: 3
+        image: inputs/street.png
+        prompt: ...
+        motion: ...
+        camera: { keys: [{ t: 0, box: [0, 0, 1, 1] }, { t: 1, box: [0.18, 0.10, 0.82, 0.80] }] }
+      - id: out                     # carries on to the girl and back out, starting on the last frame of `in`
+        seconds: 3
+        prompt: ...
+        motion: ...
+        camera:
+          continues: true
+          keys: [{ t: 0.5, box: [0.40, 0.38, 0.62, 0.97] }, { t: 1, box: [0, 0, 1, 1] }]
+```
+
+`trim` and `end_image` do not combine with `camera` (the keys are timed over the whole clip; the path decides the last
+frame). Cost: the depth and the people mask once per start image (about a minute, mostly model loading), the guide in
+seconds, the shot as long as any LTX beat of that length (about 10 minutes for 5 s on a 4090). Changing a box re-renders the guide and the shot, not the depth.
 
 ### Edit only inside a region (`edit.region`)
 

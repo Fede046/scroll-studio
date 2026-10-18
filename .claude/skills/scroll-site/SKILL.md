@@ -34,6 +34,14 @@ storyboard, a `freeze` card shows flat crops at each camera box (the framing to 
 `parallax` 0.3-0.8 (above 1 stretches behind edges) and boxes near the aspect of `beat_res`. Look at the close-ups after
 the SeedVR2 upscale: it redraws detail, and a hand or a logo may come out different from the source.
 
+**A camera move on a moving shot: `camera:`.** When the crowd keeps walking while the camera pushes to one person and back
+out, give the generated beat `camera: { keys: [{ t, box: [x0, y0, x1, y1], hold? }...], ease?, subjects: "the people" }`
+(the same keys as a frozen moment). The engine flies that path through the start image's depth into a guide video (the
+moving subjects softened so they stay free) and the video model paints the shot along it. Preview the pure camera first:
+`studio camera <project> <beat> --guide` (read `guide_rgb.mp4`), build the beat, then `studio camera <project> <beat> --check`
+and read the contact sheet and the zoom/shift error. Beats that `continue` one another (`camera: { continues: true }`) share
+one camera across the cut, start on the previous last frame and are graded toward the base plate.
+
 ## 2. Write the spec
 - Start from the closest example: `list_projects`, then `create_project(name, example=...)`, then edit with `get_spec`/`set_spec`.
 - `spec_schema('<type>')` gives every field with descriptions. Pick a theme preset that fits the domain

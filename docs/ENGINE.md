@@ -167,6 +167,32 @@ UI (React) ◄─► engine server (FastAPI + job queue + websocket events) ◄�
   (a frozen beat is rendered first when it is not; its first and last frames are kept lossless); beats that use it carry
   the source clip in their key. Storyboard: a `freeze` card of flat crops at the camera's boxes and a flat preview clip;
   editor: `_freeze_shot` (fields per box number); plan: `film:freeze` / `film:freeze_up` units.
+- **Camera moves on moving beats** (`engine/camera_guide.py`, `engine/camera_beats.py`). A generated `film` beat with
+  `camera:` keys (the keys of a frozen moment's camera) gets its camera from a guide instead of from prompt words. In the
+  beat's folder, each step keyed by its own digest: the start image's depth (`freeze.prepare_depth` over Depth Anything V2)
+  and the moving subjects' mask (`region.find`: Florence-2 + SAM 2.1); then the guide: the camera path flown through the
+  depth with `freeze.render_frames` (the public API, three times over one geometry: the depth video, the picture itself as a
+  pure-camera render, and the static-world mask), the subjects' depth softened into blobs (`soften_subjects`) so the guide
+  constrains the camera and the static world and leaves the people free. The shot is then generated along the guide:
+  `ltx` reuses the take's machinery (`comfy.build_graph`: LTX-2.3 IC-LoRA union control, the guide as the depth video, the
+  start image as the pinned first frame and frames of the pure-camera render pinned along the way as `LTXVAddGuide`
+  anchors; generated at ~1024x576, `camera.res`, and scaled to `beat_res`: at 1536x896 a subject's colours drifted), `wan` is Wan 2.2 Fun Control (`build_wan_graph` with the guide as `control_video`), `uni3c` is the Wan i2v
+  graph with `WanUni3CControlnetApply` on both experts and the pure-camera render as its render video (it fails first with
+  the file name, URL, folder and licence when `Wan21_Uni3C_controlnet_fp16.safetensors` is not in `model_patches`). A path is
+  a `CameraPlan` (`path`, slice): alone a beat covers its own `CameraPath`; beats that `continue` one another share one
+  `flow` path over the chain (rests only at its ends and holds) and each takes its slice, so position and speed carry across
+  the cut, and the guide of every beat in a chain is flown through the chain's base plate (the first beat's still), not
+  through the previous beat's last frame (a close-up cannot zoom out). Plans reach the renderer as one key per frame under
+  linear easing, which keeps `freeze.py` untouched. Afterwards `tone_match` pulls the frames toward the plate (per-channel
+  gain and offset measured on the static world against the pure-camera render, smoothed in time, plus grain to the plate's
+  noise level). Measuring (`studio camera --check`, MCP `camera_check`): `track_views` registers every frame against the
+  first on the static world (SIFT + RANSAC similarity), `follow_error` compares the implied view with the keyed one,
+  `people_displacement` takes the camera out and reads how far the people have walked, and the same numbers for the
+  pure-camera render are the measurement's floor. Measured on the Presence street (3 s, 768x448, the keys push from the
+  wide frame to the girl and back): `ltx` follows the keys within 0.7-0.9% rms of view width (the floor is 0.15-0.2%),
+  `wan` (Fun Control, start image pinned) lags and never completes the pull-out (22.6% rms, 43% at worst), so `auto` is
+  `ltx`; `uni3c` could not be measured (its file is not installed). Stage key: a beat gets a `camera` entry only when it has `camera:`
+  (every other beat keeps its cache), including the chain it belongs to. Plan: `film:camera` units.
 - **Plans and storyboards.** `engine/plan.py` runs every builder in a dry run (`engine/fidelity.py` `planning()`):
   `BuildContext.stage` reports instead of running, a stage that would run marks its outputs dirty so stages keyed on
   them count too, and code that renders outside a stage (image inputs, product stills, model conversion) raises

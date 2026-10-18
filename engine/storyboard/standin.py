@@ -72,7 +72,8 @@ def beat_clip(project: Project, sec: FilmScene, b, out: Path, size: tuple[int, i
     from ..inputs import resolve_image
     from ..spec import ImageInput
     W, H = size
-    ref = b.image if b.image else ImageInput(generate=b.prompt, size=(W, H), seed=b.seed)
+    from ..camera_beats import start_ref
+    ref = start_ref(sec, sec.beats.index(b), (W, H))
     with previewing("sketch"):
         still = resolve_image(project, ref, log)
         end = resolve_image(project, b.end_image, log) if b.end_image else None
