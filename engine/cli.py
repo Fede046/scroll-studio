@@ -287,6 +287,51 @@ def brand(name: str, logo: str = typer.Option(..., help="Logo file inside the pr
     typer.echo("written to theme.colors" + (" (dry run)" if dry_run else ""))
 
 
+# ---- frozen beats: deep zoom + layered depth (engine/zoom.py, engine/layers.py, engine/zoom_report.py) ---------------
+
+@app.command("freeze")
+def freeze_cmd(name: str, beat: str,
+               plan: bool = typer.Option(False, "--plan", help="Print the deep-zoom tile plan (levels, tiles, boxes) and stop: "
+                                                               "no ComfyUI, no GPU"),
+               report: bool = typer.Option(False, "--report", help="After rendering, measure the clip: sharpness at each zoom "
+                                                                   "the camera reaches, a frame-difference plot (pops), a "
+                                                                   "frame strip; written beside the clip"),
+               against: Optional[str] = typer.Option(None, help="--report: another frozen beat to measure alongside (the "
+                                                                "same camera without detail, say)")):
+    """Render one frozen-moment beat (deep zoom and layers included), or print its tile plan, or measure its clip."""
+    from . import freeze_beats as fb
+    from .project import Project
+    project = Project(resolve(name))
+    sec, b = fb.find_beat(project, beat)
+    if b.freeze is None:
+        raise typer.BadParameter(f"beat '{beat}' is not a frozen moment")
+    f = b.freeze
+    if plan:
+        from .backends import upscale as up
+        from . import zoom_build
+        if f.detail is None:
+            raise typer.BadParameter("this beat has no `detail:`: there is no tile plan")
+        size = fb.beat_size(sec)
+        tiles, sizes, ratio, tsize = zoom_build.make_plan(f, b.seconds, up.target_size(size, max(1.0, f.upscale))[0], size)
+        typer.echo(f"{len(tiles)} tiles in {len(sizes)} levels, x{ratio:.2f} detail per level, tiles {tsize[0]}x{tsize[1]}")
+        for k, w in enumerate(sizes, start=1):
+            mine = [t for t in tiles if t.level == k]
+            typer.echo(f"  level {k}: tiles {w:.3f} of the frame wide ({w * size[0] * max(1.0, f.upscale):.0f} frame px), {len(mine)} tile(s)")
+            for t in mine:
+                typer.echo("    [" + ", ".join(f"{v:.3f}" for v in t.box) + "]")
+        return
+    clip = fb.render_beat(project, sec, b, typer.echo)
+    typer.echo(f"clip: {clip}")
+    if report:
+        from . import zoom_report
+        others = {}
+        if against:
+            osec, ob = fb.find_beat(project, against)
+            others[against] = fb.beat_clip_path(project, osec, ob)
+        zoom_report.report(clip, f.camera, f.ease, clip.parent / "report", name=beat, others=others, log=typer.echo)
+        typer.echo(f"report: {clip.parent / 'report'}")
+
+
 @app.command()
 def preview(name: str, port: int = 5173):
     """Serve a built project locally."""

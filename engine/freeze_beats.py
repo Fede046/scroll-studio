@@ -266,6 +266,9 @@ def beat_key(project, sec, b) -> dict:
     f = b.freeze
     W, H = beat_size(sec)
     d = f.model_dump(mode="json", by_alias=True, exclude={"image"})
+    for late in ("detail", "layers"):             # fields added later: part of a key only when set, so old renders stay valid
+        if d.get(late) is None:
+            d.pop(late, None)
     key = {"freeze": d, "res": [W, H], "seconds": b.seconds, "v": VERSION}
     if f.from_:
         try:
@@ -325,6 +328,30 @@ def _fit_np(a: np.ndarray, size) -> np.ndarray:
     return np.asarray(_fit(Image.fromarray(a), size))
 
 
+def _make_raw_depth(tmp: Path, upscaled: Path, f, size: tuple[int, int]) -> None:
+    """depth_raw.npy: the frame's depth snapped to its edges but not grown (deep zoom starts every tile's depth from it)."""
+    from PIL import Image
+    from .backends import depth as depthmod
+    from . import zoom
+    img = _fit(Image.open(upscaled), size)
+    d = depthmod.estimate(img, f.depth_model)
+    np.save(tmp, zoom.raw_depth(d, np.asarray(img), size).astype(np.float16))
+
+
+def zoom_beat_key(f, b, *, upscaled_key: str, size, depth_key: str, method: str) -> str:
+    """What a deep-zoom render is made of, without making it: the settings and every tile's key (so a moved box or
+    a changed detail setting re-renders, an unchanged one does not)."""
+    from . import zoom, zoom_build
+    from PIL import Image
+    from .backends import upscale as up
+    d = f.detail
+    base_px = up.target_size(size, f.upscale if f.upscale > 1 else 1)[0]
+    tiles, sizes, ratio, tsize = zoom_build.make_plan(f, b.seconds, base_px, size)
+    seed0 = f.seed if d.seed is None else d.seed
+    keys = zoom_build.tile_keys(tiles, upscaled_key + depth_key, tsize, d, method, seed0)
+    return digest("zoom", zoom.VERSION, zoom_build.VERSIONS, keys, d.model_dump(mode="json"))
+
+
 def render_beat(project, sec, b, log=print, preview_size: Optional[tuple[int, int]] = None) -> Path:
     """Render a frozen beat into its folder (clip.mp4, first.png, last.png). Every step is cached by its own digest, so
     this is instant when nothing changed and seconds when only the camera did."""
@@ -356,14 +383,40 @@ def render_beat(project, sec, b, log=print, preview_size: Optional[tuple[int, in
     rkey = {"up": digest(upkey), "depth": digest(dkey), "cam": f.model_dump(mode="json", by_alias=True,
             include={"camera", "parallax", "dolly", "ease", "blur", "grain", "seed"}), "seconds": b.seconds,
             "trim": trim_n, "size": size, "v": VERSION}
+    zoomed, layered = f.detail is not None, f.layers is not None
+    lkey = ""
+    if layered:                                   # layered depth: the render is keyed by the planes it is made of
+        lkey = digest("layers", f.layers.model_dump(mode="json"), f.seed)
+        rkey["layers"] = lkey
+    if zoomed:                                    # deep zoom: the render is keyed by the tiles it is made of
+        rkey["zoom"] = zoom_beat_key(f, b, upscaled_key=digest(upkey) + lkey, size=size, depth_key=digest(dkey),
+                                     method=up.resolve_method(f.upscale_method))
     stamp = clip.with_name(clip.name + ".key")
     if clip.exists() and stamp.exists() and stamp.read_text() == digest(rkey) and (bdir / "last.png").exists():
         log(f"  freeze: render is up to date")
         return clip
     rgb = read_rgb(upscaled)
     t1 = time.time()
-    frames = fz.render_frames(rgb, depth, f.camera, size=size, seconds=b.seconds, first_frame=trim_n,
-                              parallax=f.parallax, dolly=f.dolly, ease=f.ease, blur=f.blur, grain=f.grain, seed=f.seed)
+    if zoomed or layered:
+        from . import zoom_build, zoom_render
+        raw = np.load(_cached(bdir / "depth_raw.npy", {"depth": digest(dkey), "raw": 1}, lambda tmp: _make_raw_depth(
+            tmp, upscaled, f, size))).astype(np.float32)
+        ls = None
+        if layered:
+            from . import layers as L
+            ls = L.build_cached(bdir, frozen, read_rgb(frozen), raw, f.layers, f.seed if f.layers.seed is None else f.layers.seed,
+                                digest(upkey) + digest(dkey), log)
+        built = []
+        if zoomed:
+            base = zoom_build.Level0(rgb, raw, digest(upkey) + digest(dkey) + lkey, ls)
+            built = zoom_build.build_pyramid(bdir, base, f, b.seconds, size, up.resolve_method(f.upscale_method), log)
+        t1 = time.time()
+        frames = zoom_render.render_frames(rgb, depth, [x.image() for x in built], f.camera, size=size, seconds=b.seconds,
+                                           first_frame=trim_n, parallax=f.parallax, dolly=f.dolly, ease=f.ease,
+                                           blur=f.blur, grain=f.grain, seed=f.seed, layers=ls)
+    else:
+        frames = fz.render_frames(rgb, depth, f.camera, size=size, seconds=b.seconds, first_frame=trim_n,
+                                  parallax=f.parallax, dolly=f.dolly, ease=f.ease, blur=f.blur, grain=f.grain, seed=f.seed)
     tmp = bdir / "_tmp_clip.mp4"
     first, last = fz.encode_frames(frames, tmp, size, log=log)
     tmp.replace(clip)
