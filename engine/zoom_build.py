@@ -243,11 +243,11 @@ def build_pyramid(bdir: Path, base: Level0, f, seconds: float, size: tuple[int, 
             png, npz, js = zdir / f"L{level}_{key}.png", zdir / f"L{level}_{key}.npz", zdir / f"L{level}_{key}.json"
             bgp = png.with_name(png.stem + ".bg.png")
             if png.exists() and npz.exists() and js.exists() and (not layered or bgp.exists()):
-                z = np.load(npz)
-                b = Built(level, t.box, _read(png), z["raw"].astype(np.float32), z["depth"].astype(np.float32), key)
-                if layered:
-                    b.alpha, b.hole, b.bg = z["alpha"], z["hole"], _read(bgp)
-                    b.pdepth, b.bgdepth = z["pdepth"].astype(np.float32), z["bgdepth"].astype(np.float32)
+                with np.load(npz) as z:
+                    b = Built(level, t.box, _read(png), z["raw"].astype(np.float32), z["depth"].astype(np.float32), key)
+                    if layered:
+                        b.alpha, b.hole, b.bg = z["alpha"], z["hole"], _read(bgp)
+                        b.pdepth, b.bgdepth = z["pdepth"].astype(np.float32), z["bgdepth"].astype(np.float32)
                 built[i] = b
             else:
                 todo.append(prepare(i, base if t.parent < 0 else built[t.parent], t, tsize))

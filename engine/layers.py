@@ -351,9 +351,9 @@ def _subjects_cached(png: Path, layers, work: Path, log: Callable, key: str) -> 
     k = hashlib.sha1(spec.encode()).hexdigest()[:16]
     f = work / "subjects.npz"
     if f.exists():
-        z = np.load(f, allow_pickle=False)
-        if str(z["key"]) == k:
-            return [Subject(str(n), m.astype(np.float32) / 255, int(li)) for n, m, li in zip(z["names"], z["masks"], z["layer"])]
+        with np.load(f, allow_pickle=False) as z:
+            if str(z["key"]) == k:
+                return [Subject(str(n), m.astype(np.float32) / 255, int(li)) for n, m, li in zip(z["names"], z["masks"], z["layer"])]
     subs = find_subjects(png, layers, work, log)
     np.savez(work / "_subjects.npz", key=k, names=np.array([s.id for s in subs]), layer=np.array([s.layer for s in subs]),
              masks=np.stack([(s.mask * 255 + 0.5).astype(np.uint8) for s in subs]))
@@ -445,10 +445,10 @@ def build_cached(bdir: Path, frozen_png: Path, frozen: np.ndarray, depth_raw: np
     stamp, npz, plate = ldir / "planes.key", ldir / "planes.npz", ldir / "plate.png"
     k = hashlib.sha1(json.dumps([VERSION, key, layers.model_dump(mode="json"), seed], sort_keys=True).encode()).hexdigest()[:16]
     if stamp.exists() and stamp.read_text() == k and npz.exists() and plate.exists():
-        z = np.load(npz, allow_pickle=False)
-        return LayerSet(z["alpha"].astype(np.float32) / 255, z["depth"].astype(np.float32), z["hole"].astype(np.float32) / 255,
-                        np.asarray(Image.open(plate).convert("RGB")), z["bg_depth"].astype(np.float32),
-                        json.loads(str(z["ids"])), k)
+        with np.load(npz, allow_pickle=False) as z:
+            return LayerSet(z["alpha"].astype(np.float32) / 255, z["depth"].astype(np.float32), z["hole"].astype(np.float32) / 255,
+                            np.asarray(Image.open(plate).convert("RGB")), z["bg_depth"].astype(np.float32),
+                            json.loads(str(z["ids"])), k)
     ls = build_planes(frozen, depth_raw, layers, seed, ldir, log, png=frozen_png, key=key)
     review(ldir, frozen, ls)
     np.savez(ldir / "_tmp.npz", alpha=(ls.alpha * 255 + 0.5).astype(np.uint8), depth=ls.depth.astype(np.float16),
