@@ -33,7 +33,7 @@ from .zoom import Tile, TileImage
 
 GENERIC_PROMPT = ("the same style, lighting, line work and colours as the picture, extremely fine detail, crisp, sharp, "
                   "clean edges, nothing added that is not already there")
-VERSIONS = 1
+VERSIONS = 2
 
 
 @dataclass

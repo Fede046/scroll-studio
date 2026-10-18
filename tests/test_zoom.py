@@ -93,7 +93,7 @@ def test_lock_keeps_the_parents_low_frequencies_and_the_childs_detail():
     rng = np.random.default_rng(2)
     parent = cv2.GaussianBlur((rng.random((96, 128, 3)) * 255).astype(np.float32), (0, 0), 6)
     child = 255 - parent * 0.6 + (rng.random((96, 128, 3)) - 0.5) * 60                         # inverted, with its own noise
-    out = zoom.lock_low_frequencies(child, parent, 4.0)
+    out = zoom.lock_low_frequencies(child, parent, 4.0, ring=None)
     lp = lambda a: cv2.GaussianBlur(a.astype(np.float32), (0, 0), 4.0)
     assert np.abs(lp(out) - lp(parent)).mean() < 1.5                                           # coarse structure: the parent's
     hp = lambda a: a - lp(a)
@@ -135,6 +135,21 @@ def test_tile_depth_snaps_to_the_tiles_own_edges():
     # the depth edge moved to the picture's edge (it sat at 77 before)
     assert row[77:80].mean() < 0.8                                          # was 1.0 there: pulled back to the picture's edge
     assert (grown >= raw - 0.15).all()                                      # growing only adds near pixels
+
+
+def test_lock_does_not_ring_past_the_parents_tones():
+    """A child with a sharper edge than its parent has overshoots beside it (a pale rim): the result stays within the
+    parent's own range around each pixel."""
+    import cv2
+    parent = np.zeros((64, 128, 3), np.float32)
+    parent[:, 64:] = 200
+    parent = cv2.GaussianBlur(parent, (0, 0), 3)
+    child = np.zeros_like(parent)
+    child[:, 64:] = 200                                                   # a hard edge (what a sharper tile has)
+    free = zoom.lock_low_frequencies(child, parent, 3.0, ring=None)
+    held = zoom.lock_low_frequencies(child, parent, 3.0, ring=8.0)
+    assert free.max() > 200 + 8 and free.min() < -8                       # unconstrained, it overshoots
+    assert held.max() <= 200 + 8 + 1e-3 and held.min() >= -8 - 1e-3
 
 
 # ---------------------------------------------------------------- the render

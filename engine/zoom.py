@@ -219,13 +219,20 @@ def resample_box(img: np.ndarray, src_box, dst_box, out_size: tuple[int, int], i
     return cv2.remap(img, mx, my, flag, borderMode=cv2.BORDER_REPLICATE)
 
 
-def lock_low_frequencies(child: np.ndarray, parent: np.ndarray, sigma: float) -> np.ndarray:
+def lock_low_frequencies(child: np.ndarray, parent: np.ndarray, sigma: float, ring: float = 8.0) -> np.ndarray:
     """The parent's low frequencies with the child's fine detail: parent_lowpass + (child - child_lowpass), both float.
-    Everything coarser than `sigma` pixels is exactly the parent's; only what is finer is the child's."""
+    Everything coarser than `sigma` pixels is exactly the parent's; only what is finer is the child's. A sharper edge than
+    the parent's would overshoot into a pale rim, so the result is held to within `ring` grey levels of the range the
+    parent has around each pixel (a window of about `sigma` x 2): detail is free inside the parent's tones, ringing is not."""
     import cv2
     c = child.astype(np.float32)
     p = parent.astype(np.float32)
-    return cv2.GaussianBlur(p, (0, 0), sigma) + c - cv2.GaussianBlur(c, (0, 0), sigma)
+    out = cv2.GaussianBlur(p, (0, 0), sigma) + c - cv2.GaussianBlur(c, (0, 0), sigma)
+    if ring is not None:
+        r = max(2, int(round(sigma * 1.5)))
+        k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))
+        out = np.clip(out, cv2.erode(p, k) - ring, cv2.dilate(p, k) + ring)
+    return out
 
 
 def align(child: np.ndarray, ref: np.ndarray, max_shift: float = 0.04, work: int = 640) -> tuple[np.ndarray, dict]:
