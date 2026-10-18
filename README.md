@@ -593,7 +593,9 @@ Two fields on a frozen beat fix those.
   tile's own edges with the guided filter. The render takes every pixel from the finest tile that covers it and fades each
   level in by screen-space pixel density (a mip chain turned inside out), with feathered tile borders: detail arrives as
   the camera does and nothing swaps or pops. Every tile is its own cached stage, keyed by its box and its parent's key:
-  moving the deepest box rebuilds only the tiles that moved. Needs ComfyUI (SeedVR2, Z-Image Turbo); without SeedVR2 the
+  moving the deepest box rebuilds only the tiles that moved. Measured on a 14 s push from a 1920 street to a 22x close-up
+  (17 tiles, 4 levels): the sharpest edges take 5.6 output pixels at 20x against 11.3 for one upscaled frame (1.4 px at
+  1x, 1.8 at 2x), and the sharpness curve along the whole move is smooth: no level swaps. Needs ComfyUI (SeedVR2, Z-Image Turbo); without SeedVR2 the
   enlarge falls back to Lanczos. The Qwen-Image-Edit re-draw (`method: qwen`) understands the picture (it draws laces on
   a boot) but also moves and reshapes things by several percent, which a tile cannot be made to agree with (ghosting), so it is
   experimental. The pyramid sharpens and adds texture; it cannot invent an object the frame does not already contain
@@ -608,8 +610,10 @@ Two fields on a frozen beat fix those.
   are cut from the same picture, and with `detail` from the same tiles (each tile carries its planes' alphas, refined at its
   resolution, and continues the plate), so a layered deep zoom costs one attribute per plane per tile, not a pyramid per
   plane, and every level agrees by construction. `planes.jpg` in the beat's `layers/` folder shows what was found.
-  Limits: an occluded part of one person behind another is not drawn (the plate shows through instead), and a plate fill
-  leaves a faint pale ghost of the removed shape where the fog is uniform.
+  Limits: an occluded part of one person behind another is not drawn (the plate shows through instead); a plate fill
+  leaves a faint pale ghost of the removed shape where the fog is uniform; and SAM cuts a person who is nearly the colour of
+  the fog out only in part (look at `planes.jpg`): the part left behind stays in the background plane and tears off the
+  person when the camera sways. Name such a subject with `points:` on its body, or keep `parallax` low.
 - **Measuring it.** `studio freeze <project> <beat> --report [--against <other beat>]` renders and measures the clip: how
   many output pixels the sharpest edges take at each zoom the camera reaches (a crisp edge is 1-2 px), a frame-to-frame
   difference plot with its spike ratio (a pop stands out of the curve), and a frame strip, written beside the clip.
