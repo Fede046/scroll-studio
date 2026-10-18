@@ -276,7 +276,7 @@ def build_site(project: Project, log: Callable[[str], None] = print,
 
     # film grammar between sections (`transition:`): which joins get their own stretch of scroll (engine/cuts.py)
     from .. import cuts as cuts_mod
-    cut_cfgs = cuts_mod.plan(site, log)
+    cut_cfgs = cuts_mod.plan(site, log, cuts_mod.find_anchors(project, site, sections, dist, log))
     for e in sections:
         e["cut_in"] = e["cut_out"] = None
     for c in cut_cfgs:

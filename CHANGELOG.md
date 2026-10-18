@@ -9,6 +9,19 @@ Everything so far is version 1. On 2026-10-12 the releases first published as 2.
 ## Unreleased
 
 ### Added
+- Edited like a film: `transition:` on any section (scene or block) hands over to the next in film grammar instead of a plain
+  scroll: `cut` (an instant cut on a scroll position with a held beat either side), `dissolve`, `wipe`, `iris`, `whip` (a
+  fast directional blur-pan), `match` (the end of one section and the start of the next share a shape; each side scales and
+  moves until the shapes coincide and the picture swaps on the shape) and `carry` (an element travels from its place in one
+  section to its place in the next). A join gets its own stretch of scroll in which both pictures are held (the section
+  above pinned at its last screen, the one below at its first) and the scroll plays the cut on the sections' own wrappers, so
+  it works for every section type; `engine/cuts.py`, `runtime/src/lib/cuts*.ts`. Match shapes come from a prompt (Florence-2 +
+  SAM 2.1 through `engine/region.py`), a box, a page element, or, unnamed, from the pictures' own contours
+  (`engine/cuts_shapes.py`, cached in `.build/_cuts/`). `image: {match: {section, shape, becomes, prompt, how}}` designs an
+  image to match another section's last frame (Qwen-Image-Edit, or Z-Image with the shape's place written into the prompt:
+  `engine/cuts_design.py`). `studio cuts <project> [--strip]` and the MCP tool `cuts` list the cuts and write frame strips
+  around each. Reduced motion, no scripts and `layout: stack` keep today's plain flow; nothing changes without a `transition:`.
+  Example: `examples/film-cuts`.
 - `beat.restore`: SeedVR2 over one beat's clip at a given height, scaled back to `beat_res` (stage `restore_<beat>`), so a soft camera beat can be restored next to sharp frozen moments without restoring the whole film (`beat_restore`).
 - Camera ease `smoother` (freeze and camera beats): smootherstep, speed and acceleration both zero at every stop, so the camera settles into a hold instead of landing with a jolt (`studio inspect` read the jolt as judder).
 - Deep zoom for frozen moments: `freeze.detail` builds a pyramid of tiles (`engine/zoom.py`, `zoom_build.py`, `zoom_render.py`)

@@ -44,13 +44,13 @@ const FX: Record<string, Fx> = {
 
   /** A held cross-dissolve. */
   dissolve(k) {
-    const o = ease(win(k, 0.12, 0.88));
+    const o = ease(k);
     return { a: { vis: o < 1 }, b: { vis: o > 0, o }, live: o > 0.5 ? "b" : "a" };
   },
 
   /** The next picture revealed along a line. */
   wipe(k, c, m) {
-    const e = ease(win(k, 0.1, 0.9));
+    const e = ease(k);
     const soft = c.cfg.soft ?? 0;
     const dir = c.cfg.direction || "left";
     const angle = c.cfg.angle != null ? c.cfg.angle + 90 : CSS_ANGLE[dir];
@@ -61,7 +61,7 @@ const FX: Record<string, Fx> = {
 
   /** A circle opening from a point (or closing on this picture, the next behind it). */
   iris(k, c, m) {
-    const e = ease(win(k, 0.1, 0.9));
+    const e = ease(k);
     const o = c.cfg.origin || [0.5, 0.5];
     const x = o[0] * m.W, y = o[1] * m.H;
     const R = Math.hypot(Math.max(x, m.W - x), Math.max(y, m.H - y));
@@ -84,7 +84,7 @@ const FX: Record<string, Fx> = {
 
   /** A fast directional blur-pan: both pictures slide along `direction`, blurred along it by how fast they move. */
   whip(k, c, m) {
-    const t = win(k, 0.2, 0.8);
+    const t = win(k, 0.12, 0.88);
     const e = quart(t);
     const [dx, dy] = DIR[c.cfg.direction || "left"];
     const blur = (c.cfg.blur ?? 1) * 0.05 * (quartSpeed(t) / 4) * (dx ? m.W : m.H) * (m.small ? 0.6 : 1);
@@ -202,8 +202,10 @@ export function makeCuts(): { update(): void; land(el: Element): number | null; 
     for (const c of cuts) {
       const L = c.gap.offsetHeight;
       const top = c.wIn.getBoundingClientRect().top;
-      const k = L > 0 ? clamp(-top / L) : 0;
-      const state = k <= 0 ? "before" : k >= 1 ? "after" : "during";
+      const pos = L > 0 ? clamp(-top / L) : 0;                       // how far the gap has scrolled
+      const hold = c.cfg.hold ?? 0.15;                               // held still at each end
+      const k = clamp((pos - hold) / (1 - 2 * hold));                // how far the cut has played
+      const state = pos <= 0 ? "before" : pos >= 1 ? "after" : "during";
       if (state === c.state && (state !== "during" || (k === c.k && !dirty))) continue;
       const entering = c.state !== "during" && state === "during";
       c.state = state; c.k = k;

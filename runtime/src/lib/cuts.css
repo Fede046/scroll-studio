@@ -29,6 +29,6 @@ html.ss-cuts-on .ss-cutpin > section, html.ss-cuts-on .ss-cutpin > .ss-backdrop,
 .ss-cutghost > * { position: absolute; margin: 0; transform-origin: 0 0; will-change: transform, opacity; }
 .ss-cut-carried { visibility: hidden !important; }
 
-@media (prefers-reduced-motion: reduce) {
-  html.ss-cuts-on .ss-cutgap { display: none; }
-}
+
+/* a scene that hands over with a transition does not also fade itself to the page colour at its end: the cut is its ending */
+html.ss-cuts-on .ss-cutpin--out .ss-outro { opacity: 0 !important; }

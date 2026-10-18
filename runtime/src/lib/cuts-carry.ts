@@ -17,6 +17,9 @@ function bake(el: HTMLElement): HTMLElement {
       const p = cs[j];
       d.style.setProperty(p, cs.getPropertyValue(p), cs.getPropertyPriority(p));
     }
+    d.style.setProperty("transition", "none");   // the copy is moved every frame: nothing may ease it
+    d.style.setProperty("animation", "none");
+    d.style.setProperty("pointer-events", "none");
   });
   return clone;
 }
@@ -40,7 +43,7 @@ export function endCarry(c: Cut) {
 
 export function measureCarry(c: Cut, m: Metrics) {
   endCarry(c);
-  const spec = c.cfg.carry || { from: "h1, h2, .ss-display", to: "h1, h2, .ss-display", via: "dissolve" };
+  const spec = c.cfg.carry || { from: "h1, h2", to: "h1, h2", via: "dissolve" };
   const a = pick(c.pinA, spec.from, true, m.H), b = pick(c.pinB, spec.to, false, m.H);
   if (!a || !b) { c.data.carry = null; return; }
   const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
@@ -66,7 +69,7 @@ export function carryFx(fx: Record<string, Fx>, { ease, win }: Helpers): Fx {
     const base = (fx[via] || fx.dissolve)(k, c, m);
     if (!D) return base;
     D.a.classList.add("ss-cut-carried"); D.b.classList.add("ss-cut-carried");
-    const e0 = win(k, 0.12, 0.88), e = ease(e0);
+    const e0 = k, e = ease(e0);
     const { ra, rb } = D;
     const cax = ra.left + ra.width / 2, cay = ra.top + ra.height / 2, cbx = rb.left + rb.width / 2, cby = rb.top + rb.height / 2;
     const px = cax + (cbx - cax) * e, py = cay + (cby - cay) * e;
@@ -76,7 +79,7 @@ export function carryFx(fx: Record<string, Fx>, { ease, win }: Helpers): Fx {
       g.style.opacity = o.toFixed(3);
     };
     // the next copy comes in over this one, which leaves only once it is whole (the picture never dips)
-    const [i0, i1] = D.same ? [0.1, 0.4] : [0.3, 0.6];
+    const [i0, i1] = D.same ? [0.1, 0.4] : [0.35, 0.55];
     const sA = 1 + (f - 1) * e, sB = 1 / f + (1 - 1 / f) * e;
     place(D.ghostA, ra, sA, 1 - ease(win(e0, i1, i1 + 0.25)));
     place(D.ghostB, rb, sB, ease(win(e0, i0, i1)));

@@ -23,7 +23,7 @@ from typing import Callable, Optional
 from .spec import CUT_TYPES, Site, Transition, is_scene
 
 # screens of scroll each kind of cut takes when `length` is not set
-DEFAULT_LENGTH = {"cut": 0.6, "dissolve": 1.0, "wipe": 1.0, "iris": 1.1, "whip": 0.8, "match": 1.2, "carry": 1.2}
+DEFAULT_LENGTH = {"cut": 0.8, "dissolve": 1.2, "wipe": 1.3, "iris": 1.4, "whip": 1.1, "match": 1.5, "carry": 1.5}
 
 
 def length_of(t: Transition) -> float:
@@ -60,8 +60,8 @@ def plan(site: Site, log: Callable[[str], None] = print, anchors: Optional[dict]
         d = t.model_dump(mode="json", exclude_none=True, by_alias=True)
         d.update(n=n, a=a, b=b, length=length_of(t), label=f"{section_label(site, a)} -> {section_label(site, b)}")
         if t.type == "carry":
-            d["carry"] = (t.carry.model_dump(mode="json", by_alias=True) if t.carry else {"from": "h1, h2, .ss-display",
-                                                                                          "to": "h1, h2, .ss-display", "via": "dissolve"})
+            d["carry"] = (t.carry.model_dump(mode="json", by_alias=True) if t.carry else {"from": "h1, h2",
+                                                                                          "to": "h1, h2", "via": "dissolve"})
         if anchors and n in anchors:
             d["anchors"] = anchors[n]
         cfgs.append(d)
@@ -157,3 +157,28 @@ def strips(dist, out_dir, only: Optional[list[int]] = None, size=(1280, 720), fr
         proc.terminate()
         httpd.shutdown()
     return paths
+
+
+def find_anchors(project, site: Site, entries: list[dict], dist=None, log: Callable[[str], None] = print) -> dict:
+    """Where the shapes of every match cut sit (engine/cuts_shapes.py); {} when there are none."""
+    pairs = cut_pairs(site)
+    if site.layout == "stack" or not any(t.type == "match" for _, _, t in pairs):
+        return {}
+    from .cuts_shapes import analyse
+    labels = [f"{section_label(site, a)} -> {section_label(site, b)}" for a, b, _ in pairs]
+    return analyse(project, pairs, labels, entries, dist, log)
+
+
+def read_cuts(dist) -> list[dict]:
+    """The cuts a built page carries (its `#ss-cuts` block): n, label, type, length, anchors."""
+    import json
+    import re
+    from pathlib import Path
+    f = Path(dist) / "index.html"
+    if not f.exists():
+        return []
+    m = re.search(r'<script type="application/json" id="ss-cuts">(.*?)</script>', f.read_text(encoding="utf-8"), re.S)
+    if not m:
+        return []
+    import html
+    return json.loads(html.unescape(m.group(1)))

@@ -17,7 +17,7 @@ export interface Anchor {
 
 export interface CutCfg {
   n: number; a: number; b: number; type: string; length: number; label: string;
-  at?: number; direction?: "left" | "right" | "up" | "down"; angle?: number; soft?: number; origin?: [number, number];
+  at?: number; hold?: number; direction?: "left" | "right" | "up" | "down"; angle?: number; soft?: number; origin?: [number, number];
   closing?: boolean; blur?: number; zoom?: number; blend?: number;
   anchors?: { a?: Anchor; b?: Anchor };
   carry?: { from: string; to: string; via: string };

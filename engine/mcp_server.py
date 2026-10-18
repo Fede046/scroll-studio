@@ -398,6 +398,26 @@ def snapshot(project: str, at: Optional[list[str]] = None) -> dict:
 
 
 @mcp.tool()
+def cuts(project: str, strip: bool = False, only: Optional[list[int]] = None, mobile: bool = False,
+         reduced_motion: bool = False) -> dict:
+    """The film grammar between the built site's sections (`transition:` on a section: cut, dissolve, wipe, iris, whip, match,
+    carry): each cut with its length and, for a match cut, how its shapes were found (prompt, box, contour). With
+    strip=True also a frame strip around each cut (headless Chrome; read the images to judge the cut): the page before,
+    through the cut's stretch of scroll, and after. mobile: a 390 px phone. reduced_motion: what a visitor who asks for
+    less motion gets (plain cuts)."""
+    from . import cuts as cuts_mod
+    p = _find(project)
+    found = cuts_mod.read_cuts(p.dist)
+    out: dict = {"cuts": [{k: c.get(k) for k in ("n", "label", "type", "length", "anchors") if c.get(k) is not None} for c in found]}
+    if strip and found:
+        with contextlib.redirect_stdout(sys.stderr):
+            paths = cuts_mod.strips(p.dist, p.root / ".build" / "cuts", only=only, size=(390, 844) if mobile else (1280, 720),
+                                    mobile=mobile, reduced=reduced_motion, log=lambda m: None)
+        out["strips"] = [str(x) for x in paths]
+    return out
+
+
+@mcp.tool()
 def record(project: str, section: Optional[str] = None, seconds: float = 12.0) -> dict:
     """Start recording a smooth scroll-through MP4 of the built site (background job)."""
     from .record import record as rec

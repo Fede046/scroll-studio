@@ -890,6 +890,87 @@ progress numbers:
 For an edit, start each line with `+`, `-` or a space, like a diff (use `|2` so YAML keeps the leading markers).
 `tree` lists more paths to scatter around the route so it reads as a whole project.
 
+### Edited like a film (`transition:`)
+
+Sections normally follow one another and the page just scrolls from one into the next. Give a section a `transition:` and
+the join gets the editing language of film instead, driven by scroll. The picture above is held on screen at its last
+frame, the one below is held at its first, and for a stretch of scroll (`length`, in screens) the two cut into each other:
+
+```yaml
+sections:
+  - type: film
+    id: dusk
+    transition: { type: match, shape: the sun, becomes: the rim of a cup }   # the sun becomes a coffee cup
+    ...
+  - type: parallax
+    id: morning
+    transition: whip                       # a bare name is enough: a fast directional blur-pan into the next
+    ...
+  - type: product
+    transition: { type: carry }            # this section's heading travels into the next section's heading
+```
+
+| `type` | what it does | options |
+|---|---|---|
+| `cut` | an instant cut at a scroll position, a beat of hold either side, a slow push on each so the beat is alive | `at` (where it lands, 0.5) |
+| `dissolve` | a held cross-dissolve | |
+| `wipe` | the next picture revealed along a line | `direction` (left, right, up, down), `angle`, `soft` |
+| `iris` | a circle opens from a point, or closes on this picture (`closing`) | `origin` [x, y], `soft`, `closing` |
+| `whip` | both pictures slide along `direction`, motion-blurred by how fast they move | `direction`, `blur` |
+| `match` | the end of this section and the start of the next share a shape: each side scales and moves until the two shapes coincide, and the picture swaps on the shape | `shape`, `becomes`, `zoom`, `blend`, `at` |
+| `carry` | an element travels from its place here to its place in the next section (FLIP), the pictures cutting underneath (`via`) | `carry: {from, to, via}` (CSS selectors; the headings by default) |
+
+`length` is the stretch of scroll the cut takes (defaults from 0.8 screens for a cut to 1.5 for a match or carry) and
+`hold` the share of it held still at each end. Everything keeps today's behaviour unless a section sets `transition`.
+
+It works across section types because the layers it plays on are the sections' own pinned wrappers: a film, frames,
+parallax, a block, a product render, a chart. A tall section is held by its last screen, so its own content scrolls first.
+Scrolling is never intercepted (the stretch is plain scroll distance; anchor links and `?p=` jumps land after it), pages
+without scripts and visitors who ask for reduced motion get the plain flow (a clean cut), and phones get the same cuts at
+their own size (the whip's blur is lighter). `layout: stack` already hands over by sliding a panel, so transitions are
+ignored there. The default look and the styles that keep the ordinary page flow take them; styles that run the whole page
+as one object of their own play their own hand-overs and drop the cuts, with a note (`cuts: false` in their style.yaml).
+
+**Match cuts, found or designed.** The shapes are found on the last picture of this section and the first of the next:
+
+```yaml
+transition:
+  type: match
+  shape: the round logo                        # a prompt: Florence-2 finds it, SAM 2.1 cuts it out (engine/region.py)
+  becomes: { selector: ".ss-phone__screen" }   # or a page element, measured in the browser: any block, a phone screen
+  zoom: 3                                      # the most each side may be scaled to bring the shapes to one size
+```
+
+`shape` and `becomes` each take a prompt, a `box` ([x0, y0, x1, y1] of the picture) or a `selector`; `becomes` defaults to
+the same prompt as `shape`. Name neither and the engine looks for the best pair itself, without a model: flat regions of
+each picture, paired by outline, size and place. The shapes are stored in each picture's own coordinates and the page maps
+them to the screen the way the section fits that picture, so one analysis serves every window shape; where a shape is
+cropped out of view (a phone) the cut softens into a dissolve. Each side only ever zooms in, about a point that stays on
+screen, so the picture always covers the screen. Cached in `.build/_cuts/` by the two pictures and the prompts.
+
+Or design the match instead of hoping for it: an image can be made to match another section's last frame.
+
+```yaml
+  - type: hero
+    id: sun
+    image:
+      match:
+        section: mark                      # the section whose last frame to match (it is built first)
+        shape: the white ring
+        becomes: a huge glowing orange sun disc
+        prompt: a calm dark sea at dusk, the enormous sun low over the horizon in the middle of the frame
+        how: edit                          # edit: Qwen-Image-Edit redraws that frame; hint: Z-Image + the shape's place in the prompt
+```
+
+`how: edit` redraws the other frame (the shape stays where it is at its size; everything else is the new scene), `how: hint`
+generates the picture from `prompt` with the shape's place and size, found on the other frame, written into it. Both are
+ordinary cached images (an edit of an unchanged frame is never redone).
+
+`studio cuts <project> [--strip] [--only 0,2] [--mobile] [--reduced-motion]` lists the cuts of the built site and the shapes
+each match found, and with `--strip` writes a frame strip around every cut (`.build/cuts/cut_<n>.jpg`: the page before,
+through the stretch of scroll, after; headless Chrome) to look at. The MCP tool `cuts` does the same. The showcase spec is
+`examples/film-cuts`.
+
 ## Launch trailers
 
 `studio trailer my-site` cuts a launch film from what the site already rendered, in 16:9 and 9:16, with no extra

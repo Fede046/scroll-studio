@@ -150,6 +150,25 @@ class BeatFrame(Model):
                                                      "omitted)")
 
 
+class FrameMatch(Model):
+    """An image designed to match another section's last frame, so a match cut can be built rather than found: the shape
+    that ends that section becomes something else in this picture, in the same place at the same size. `edit` hands the
+    frame to Qwen-Image-Edit with an instruction made from these fields; `hint` generates this picture from `prompt` with
+    the shape's place and size written into it. The section must come before this picture's in the page (it is built
+    first); pair it with `transition: {type: match}` on that section."""
+    section: str = Field(..., description="The id of the section whose last frame to match")
+    shape: str = Field(..., description="What to match in that frame, as you would say it to a person: \"the round logo\"")
+    becomes: Optional[str] = Field(None, description="What that shape is in this picture: \"the sun\", \"the rim of a coffee cup\"")
+    prompt: Optional[str] = Field(None, description="The rest of this picture (the scene around the shape); with how: hint "
+                                                    "this is the whole prompt")
+    how: Literal["edit", "hint"] = Field("edit", description="edit: redraw that frame (Qwen-Image-Edit) keeping the shape's "
+                                                             "place, size and outline. hint: generate this picture "
+                                                             "(Z-Image) from `prompt` with the shape's place and size in it")
+    at: Literal["last", "first"] = Field("last", description="Match the section's last frame (or its first)")
+    seed: int = 7
+    steps: int = Field(30, ge=4, le=60, description="how: edit, the editor's steps")
+
+
 class ImageInput(Model):
     """An image the engine uses as input: a file in the project's inputs/, one generated locally, a gradient, or a
     still of the site's product."""
@@ -169,6 +188,8 @@ class ImageInput(Model):
     beat_frame: Optional[BeatFrame] = Field(None, description="A frame of a beat of a film (its first or last frame, "
                                                               "or the frame at a time): chain one beat onto the "
                                                               "end of another")
+    match: Optional[FrameMatch] = Field(None, description="Design this image to match another section's last frame, for a "
+                                                         "match cut (see FrameMatch)")
     credit: Optional[str] = Field(None, description="Attribution shown in the footer")
 
 
@@ -301,9 +322,9 @@ class Carry(Model):
     """An element that travels across the cut: it leaves its place in this section and settles in its place in the
     next (FLIP: the browser measures both), so the eye is led over the join."""
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
-    from_: str = Field("h1, h2, .ss-display", alias="from", description="CSS selector of the element in this section "
+    from_: str = Field("h1, h2", alias="from", description="CSS selector of the element in this section "
                                                                        "(the last match on its final screen)")
-    to: str = Field("h1, h2, .ss-display", description="CSS selector of the element in the next section (the first match "
+    to: str = Field("h1, h2", description="CSS selector of the element in the next section (the first match "
                                                          "on its first screen)")
     via: Literal["dissolve", "cut", "wipe", "iris"] = Field("dissolve", description="What the rest of the picture does "
                                                                                      "while the element travels")
@@ -323,8 +344,10 @@ class Transition(Model):
     type: Literal["cut", "dissolve", "wipe", "iris", "whip", "match", "carry"] = Field(
         ..., description="cut, dissolve, wipe, iris, whip, match or carry")
     length: Optional[float] = Field(None, ge=0.1, le=4, description="Scroll distance the cut takes, in screen heights "
-                                    "(defaults: cut 0.6, dissolve 1, wipe 1, iris 1.1, whip 0.8, match 1.2, carry 1.2)")
-    at: float = Field(0.5, ge=0.1, le=0.9, description="cut and match: where in the stretch the picture swaps (0-1)")
+                                    "(defaults: cut 0.8, dissolve 1.2, wipe 1.3, iris 1.4, whip 1.1, match 1.5, carry 1.5)")
+    hold: float = Field(0.15, ge=0, le=0.4, description="The share of the stretch held still at each end, so each picture "
+                                                         "is on screen a moment before and after the cut")
+    at: float = Field(0.5, ge=0.1, le=0.9, description="cut and match: where in the cut (between the two holds) the picture swaps, 0-1")
     direction: Optional[Literal["left", "right", "up", "down"]] = Field(
         None, description="wipe and whip: the way things travel (left: the next picture arrives from the right). "
                           "Default left")
