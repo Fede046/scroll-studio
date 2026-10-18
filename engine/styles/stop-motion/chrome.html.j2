@@ -1,0 +1,19 @@
+{# Stop-motion furniture: the set's name and the section links on masking tape across the top, the call to action as a felt
+   button, the practical lamp (a fixed light pool and vignette over the whole picture), and the animator's readout (the
+   exposure counter and the onion-skin switch). The readout and the lamp only exist once the runtime is counting
+   exposures. #}
+{% macro top(site, sections, nav_links) %}
+<header class="sm-head">
+  <a class="sm-head__mark" href="#"><span>{{ site.name }}</span></a>
+  {% if nav_links %}<nav class="sm-head__nav" aria-label="Sections">{% for l in nav_links %}<a href="{{ l.href }}"><span>{{ l.label }}</span></a>{% endfor %}</nav>{% endif %}
+  {% if site.nav.cta %}<a class="sm-head__cta" href="{{ site.nav.cta.href }}">{{ site.nav.cta.label }}</a>{% endif %}
+</header>
+<div class="sm-light" aria-hidden="true"></div>
+<div class="sm-hud" hidden>
+  <p class="sm-hud__count" aria-hidden="true"><span class="sm-hud__lbl">Exposure</span> <b data-sm="count">0000</b> <span class="sm-hud__fps" data-sm="fps">on twos</span></p>
+  <button type="button" class="sm-onion" aria-pressed="false" title="Show the previous exposure as a ghost">Onion skin</button>
+</div>
+<p class="sm-cue" aria-hidden="true" hidden>Scroll to shoot</p>
+{% endmacro %}
+
+{% macro bottom(site, sections) %}{% endmacro %}

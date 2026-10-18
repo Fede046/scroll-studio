@@ -1,0 +1,205 @@
+{# Stop-motion: every section is a SET, a miniature tableau shot front-on and symmetrical (Anderson's planimetric framing):
+   a painted-card WALL, a felt or wood FLOOR, and the CAST, set pieces made of felt, card and clay (.sm-p, each with a
+   data-sm arrival: drop, slide-l, slide-r, rise, pop, hang). Without JavaScript (and with reduced motion) each set is
+   a still tableau stacked down the page; runtime/src/styles/stop-motion.ts pins one camera on a stage, counts the
+   scroll in exposures, and moves every piece on twos with a little hand-made jitter. The headline is clay letters
+   (.sm-title), labels are masking tape (.sm-tape), copy sits on cardboard (.sm-card). #}
+{% set types = ["hero", "intro", "features", "product", "stats", "timeline", "quote", "faq", "cta", "gallery", "strip", "orbit"] %}
+{% set tones = ["fox", "mustard", "olive", "brick", "teal", "tan"] %}
+
+{% macro tape(text, anim="slide-l", cls="") %}{% if text %}<p class="sm-p sm-tape {{ cls }}" data-sm="{{ anim }}">{{ text }}</p>{% endif %}{% endmacro %}
+
+{% macro head(b, e, kicker=None, anim="drop", cls="") %}
+{% set tag = "h1" if e.first else "h2" %}
+{{ tape(kicker if kicker is not none else b.kicker) }}
+{% if b.title %}<{{ tag }} class="sm-p sm-title {{ cls }}" data-sm="{{ anim }}">{{ b.title | rich }}</{{ tag }}>{% endif %}
+{% endmacro %}
+
+{% macro btns(list, anim="rise") %}{% if list %}<div class="sm-btns">{% for l in list %}<a class="sm-p sm-btn{% if loop.first %} sm-btn--hot{% endif %}" data-sm="{{ anim }}" href="{{ l.href }}">{{ l.label }}{% if loop.first %} <span class="sm-arrow" aria-hidden="true">&rarr;</span>{% endif %}</a>{% endfor %}</div>{% endif %}{% endmacro %}
+
+{# bunting: felt pennants on a string across the wall; each one hangs and swings on its own #}
+{% macro bunting(n=9) %}<div class="sm-bunting" aria-hidden="true"><i class="sm-string"></i>{% for i in range(n) %}<i class="sm-p sm-flag sm-flag--{{ i % 4 }}" data-sm="hang" style="--i: {{ i }}; --n: {{ n }}"></i>{% endfor %}</div>{% endmacro %}
+
+{# the puppet: theme.art as a felt cut-out whose frames are replaced one exposure at a time #}
+{% macro puppet(anim="rise", cls="") %}{% if art %}<div class="sm-p sm-puppet {{ cls }}" data-sm="{{ anim }}" data-sm-art role="img" aria-label="{{ art.label }}" style="--ar: {{ art.w }} / {{ art.h }}"><canvas aria-hidden="true"></canvas></div>{% endif %}{% endmacro %}
+
+{# a section as a set: wall flat, floor flat, spike marks and the cast #}
+{% macro set(b, kind, loop, e, hold=6, extra="") %}
+<section class="sm-set sm-set--{{ kind }}{{ extra }}" data-kind="{{ kind }}" data-hold="{{ hold }}" data-tone="{{ 'fox' if loop.first else tones[loop.index0 % (tones | length)] }}"{% if b.id %} id="{{ b.id }}"{% endif %}>
+  <div class="sm-wall" aria-hidden="true"><i class="sm-wall__skirt"></i></div>
+  <div class="sm-floor" aria-hidden="true"></div>
+  <div class="sm-cast">{{ caller() }}</div>
+</section>
+{% endmacro %}
+
+{% macro render(b, e, base, loop) %}
+
+{# ---------------------------------------------------------------- hero #}
+{% if b.type == "hero" %}
+{% call set(b, "hero", loop, e, 5) %}
+  {{ bunting(9) }}
+  <div class="sm-hero__text">
+    {{ tape(b.badge, "slide-l", "sm-tape--badge") }}
+    {{ head(b, e, "", "drop", "sm-title--hero") }}
+    {% if b.body %}<p class="sm-p sm-card sm-lede" data-sm="slide-r">{{ b.body | rich }}</p>{% endif %}
+    {{ btns(b.buttons) }}
+  </div>
+  <div class="sm-hero__prop">
+    {% if e.img or e.video %}
+    <figure class="sm-p sm-frame" data-sm="hang"><i class="sm-nail" aria-hidden="true"></i><span class="sm-frame__mat">{% if e.video %}<video src="{{ e.video }}" autoplay muted loop playsinline{% if e.img %} poster="{{ e.img }}"{% endif %}></video>{% else %}<img src="{{ e.img }}" alt="" fetchpriority="high">{% endif %}</span></figure>
+    {% elif b.device %}
+    <div class="sm-p sm-stand" data-sm="rise">{{ base.phone(b.device, e.screen, e.clip) }}<i class="sm-stand__foot" aria-hidden="true"></i></div>
+    {% elif art %}{{ puppet("rise", "sm-puppet--hero") }}
+    {% else %}<span class="sm-p sm-sun" data-sm="rise" aria-hidden="true"></span>{% endif %}
+  </div>
+{% endcall %}
+
+{# ---------------------------------------------------------------- intro #}
+{% elif b.type == "intro" %}
+{% call set(b, "intro", loop, e, 4) %}
+  <div class="sm-intro__title">{{ head(b, e, b.kicker, "drop") }}</div>
+  <div class="sm-intro__copy">
+    {% if b.body %}<p class="sm-p sm-card sm-lede" data-sm="slide-r">{{ b.body | rich }}</p>{% endif %}
+    {% if b.button %}<div class="sm-btns"><a class="sm-p sm-btn sm-btn--hot" data-sm="rise" href="{{ b.button.href }}">{{ b.button.label }} <span class="sm-arrow" aria-hidden="true">&rarr;</span></a></div>{% endif %}
+  </div>
+  <i class="sm-p sm-hill sm-hill--a" data-sm="rise" aria-hidden="true"></i><i class="sm-p sm-hill sm-hill--b" data-sm="rise" aria-hidden="true"></i>
+{% endcall %}
+
+{# ---------------------------------------------------------------- features: cards on the floor; the speaker steps forward #}
+{% elif b.type == "features" %}
+{% set n = b.items | length %}
+{% call set(b, "features", loop, e, (n * 4) + 2, " sm-n" ~ n) %}
+  <div class="sm-features__head">{{ head(b, e, b.kicker, "drop") }}</div>
+  <ul class="sm-cards sm-cards--{{ n }}" style="--n: {{ n }}">
+    {% for f in b.items %}
+    <li class="sm-p sm-card sm-feature" data-sm="{{ 'slide-l' if loop.first else ('slide-r' if loop.last else 'drop') }}" data-sm-t="{{ loop.index0 * 2 }}" style="--i: {{ loop.index0 }}">
+      <span class="sm-badge" aria-hidden="true">{{ f.tag or loop.index }}</span>
+      <h3>{{ f.title | rich }}</h3>
+      {% if f.body %}<p>{{ f.body | rich }}</p>{% endif %}
+      {% if f.meter is not none %}<span class="sm-meter" aria-hidden="true"><i style="width: {{ (f.meter * 100) | round }}%"></i></span>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+{% endcall %}
+
+{# ---------------------------------------------------------------- product #}
+{% elif b.type == "product" %}
+{% set opts = (b.device.options | length) if b.device else 0 %}
+{% call set(b, "product", loop, e, ([opts, 1] | max * 3) + 2, " sm-side--" ~ b.side) %}
+  <div class="sm-product__prop">
+    {% if e.img %}<figure class="sm-p sm-easel" data-sm="rise"><span class="sm-easel__board"><img src="{{ e.img }}" alt="" loading="lazy"></span></figure>{% endif %}
+    {% if b.device %}<div class="sm-p sm-stand" data-sm="{{ 'pop' if e.img else 'rise' }}" data-sm-t="3">{{ base.phone(b.device, e.screen, e.clip) }}<i class="sm-stand__foot" aria-hidden="true"></i></div>{% endif %}
+    {% if not e.img and not b.device %}<span class="sm-p sm-sun" data-sm="rise" aria-hidden="true"></span>{% endif %}
+  </div>
+  <div class="sm-product__copy">
+    {{ head(b, e, b.kicker, "drop") }}
+    {% if b.body %}<p class="sm-p sm-card sm-lede" data-sm="slide-r">{{ b.body | rich }}</p>{% endif %}
+    {% if b.stats %}<ul class="sm-pills sm-pills--stats">{% for st in b.stats %}<li class="sm-p sm-pill" data-sm="pop" data-sm-t="{{ loop.index0 * 2 }}"><b>{{ st.value }}{% if st.unit %}<sup>{{ st.unit }}</sup>{% endif %}</b> {{ st.label }}</li>{% endfor %}</ul>
+    {% elif b.tags %}<ul class="sm-pills">{% for t in b.tags %}<li class="sm-p sm-pill" data-sm="pop" data-sm-t="{{ loop.index0 * 2 }}">{{ t }}</li>{% endfor %}</ul>{% endif %}
+    {{ btns(b.buttons) }}
+    {% if b.note %}<p class="sm-p sm-small" data-sm="slide-l">{{ b.note | rich }}</p>{% endif %}
+  </div>
+{% endcall %}
+
+{# ---------------------------------------------------------------- stats: alphabet blocks #}
+{% elif b.type == "stats" %}
+{% set n = b.items | length %}
+{% call set(b, "stats", loop, e, n * 3 + 2, " sm-n" ~ n) %}
+  <ul class="sm-blocks sm-blocks--{{ n }}" style="--n: {{ n }}">
+    {% for st in b.items %}
+    <li class="sm-block" style="--i: {{ loop.index0 }}">
+      <span class="sm-p sm-cube" data-sm="drop" data-sm-t="{{ loop.index0 * 3 }}"><b class="sm-cube__v">{{ st.value }}{% if st.unit %}<sup>{{ st.unit }}</sup>{% endif %}</b></span>
+      <span class="sm-p sm-tape sm-tape--label" data-sm="slide-l" data-sm-t="{{ loop.index0 * 3 + 2 }}">{{ st.label }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+{% endcall %}
+
+{# ---------------------------------------------------------------- timeline: a peg hops along stepping stones #}
+{% elif b.type == "timeline" %}
+{% set n = b.items | length %}
+{% call set(b, "timeline", loop, e, n * 4 + 2, " sm-n" ~ n) %}
+  <div class="sm-timeline__head">{{ head(b, e, b.kicker, "drop") }}</div>
+  <ol class="sm-steps sm-steps--{{ n }}" style="--n: {{ n }}">
+    {% for t in b.items %}
+    <li class="sm-step" style="--i: {{ loop.index0 }}">
+      <span class="sm-p sm-stone" data-sm="pop" data-sm-t="{{ loop.index0 * 2 }}" aria-hidden="true"></span>
+      <div class="sm-p sm-card sm-step__card" data-sm="drop" data-sm-t="{{ loop.index0 * 2 + 1 }}"><span class="sm-when">{{ t.when }}</span><h3>{{ t.title | rich }}</h3>{% if t.body %}<p>{{ t.body | rich }}</p>{% endif %}</div>
+    </li>
+    {% endfor %}
+  </ol>
+  <span class="sm-p sm-peg" data-sm-peg aria-hidden="true"><i></i></span>
+{% endcall %}
+
+{# ---------------------------------------------------------------- quote: a felt sign on a stick #}
+{% elif b.type == "quote" %}
+{% call set(b, "quote", loop, e, 3) %}
+  <figure class="sm-quote">
+    <div class="sm-p sm-sign" data-sm="hang"><blockquote>{{ b.text | rich }}</blockquote></div>
+    {% if b.who %}<figcaption class="sm-p sm-tape" data-sm="slide-r" data-sm-t="3">{{ b.who }}</figcaption>{% endif %}
+  </figure>
+{% endcall %}
+
+{# ---------------------------------------------------------------- faq: a cupboard of doors #}
+{% elif b.type == "faq" %}
+{% set n = b.items | length %}
+{% call set(b, "faq", loop, e, n * 4 + 2, " sm-n" ~ n) %}
+  <div class="sm-faq__head">{{ head(b, e, b.kicker, "drop") }}</div>
+  <div class="sm-cupboard sm-cupboard--{{ n }}" style="--n: {{ n }}">
+    {% for it in b.items %}
+    <details class="sm-p sm-door" data-sm="pop" data-sm-t="{{ loop.index0 * 2 }}">
+      <summary><span class="sm-door__no" aria-hidden="true">{{ loop.index }}</span><span class="sm-door__q">{{ it.q | rich }}</span><i class="sm-knob" aria-hidden="true"></i></summary>
+      <p class="sm-door__a">{{ it.a | rich }}</p>
+    </details>
+    {% endfor %}
+  </div>
+{% endcall %}
+
+{# ---------------------------------------------------------------- cta #}
+{% elif b.type == "cta" %}
+{% call set(b, "cta", loop, e, 4) %}
+  {{ bunting(7) }}
+  <div class="sm-cta__in">
+    {{ head(b, e, b.kicker, "drop", "sm-title--cta") }}
+    {% if b.button %}<div class="sm-btns"><a class="sm-p sm-btn sm-btn--hot sm-btn--big" data-sm="pop" data-sm-t="4" href="{{ b.button.href }}">{{ b.button.label }} <span class="sm-arrow" aria-hidden="true">&rarr;</span></a></div>{% endif %}
+  </div>
+  {% if art %}<div class="sm-cta__prop">{{ puppet("rise", "sm-puppet--cta") }}</div>{% endif %}
+{% endcall %}
+
+{# ---------------------------------------------------------------- gallery: pictures pegged on a washing line #}
+{% elif b.type == "gallery" %}
+{% set n = b.items | length %}
+{% call set(b, "gallery", loop, e, n * 3 + 2, " sm-n" ~ n) %}
+  <div class="sm-gallery__head">{{ head(b, e, b.kicker, "drop") }}</div>
+  <div class="sm-line sm-line--{{ n }}" style="--n: {{ n }}"><i class="sm-string" aria-hidden="true"></i>
+    {% for g in b.items %}
+    <a class="sm-p sm-snap" data-sm="hang" data-sm-t="{{ loop.index0 * 2 }}" href="{{ g.href }}" style="--i: {{ loop.index0 }}"><i class="sm-peg-clip" aria-hidden="true"></i>
+      <span class="sm-snap__img">{% if g.video %}<video src="{{ g.video }}" muted loop playsinline preload="metadata"{% if g.image %} poster="{{ g.image }}"{% endif %}></video>{% elif g.image %}<img src="{{ g.image }}" alt="" loading="lazy">{% endif %}</span>
+      <span class="sm-snap__cap">{% if g.kicker %}<small>{{ g.kicker }}</small>{% endif %}<b>{{ g.title | rich }}</b>{% if g.body %}<em>{{ g.body | rich }}</em>{% endif %}</span></a>
+    {% endfor %}
+  </div>
+{% endcall %}
+
+{# ---------------------------------------------------------------- strip: a film strip #}
+{% elif b.type == "strip" %}
+{% set n = b.items | length %}
+{% call set(b, "strip", loop, e, n * 3 + 2, " sm-n" ~ n) %}
+  <div class="sm-strip__head">{{ head(b, e, b.kicker, "drop") }}{% if b.body %}<p class="sm-p sm-card sm-lede" data-sm="slide-r">{{ b.body | rich }}</p>{% endif %}</div>
+  <div class="sm-film"><div class="sm-film__reel" style="--n: {{ n }}">
+    {% for it in b.items %}<figure class="sm-p sm-frame35" data-sm="slide-r" data-sm-t="{{ loop.index0 * 2 }}"><img src="{{ e.imgs[loop.index0] }}" alt="{{ it.caption or '' }}" loading="lazy">{% if it.caption %}<figcaption>{{ it.caption }}</figcaption>{% endif %}</figure>{% endfor %}
+  </div></div>
+{% endcall %}
+
+{# ---------------------------------------------------------------- orbit: marbles on a track #}
+{% elif b.type == "orbit" %}
+{% set n = b.items | length %}
+{% call set(b, "orbit", loop, e, n * 2 + 2, " sm-n" ~ n) %}
+  <div class="sm-orbit__copy">{{ head(b, e, b.kicker, "drop") }}{% if b.body %}<p class="sm-p sm-card sm-lede" data-sm="slide-r">{{ b.body | rich }}</p>{% endif %}</div>
+  <div class="sm-orbit__stage">
+    <span class="sm-p sm-orbit__center" data-sm="pop">{{ b.center }}</span>
+    <ul class="sm-orbit__ring" style="--n: {{ n }}">{% for it in b.items %}<li class="sm-p sm-marble" data-sm="pop" data-sm-t="{{ loop.index0 * 2 + 2 }}" style="--i: {{ loop.index0 }}"><b>{{ it.label }}</b>{% if it.status %}<small>{{ it.status }}</small>{% endif %}</li>{% endfor %}</ul>
+  </div>
+{% endcall %}
+
+{% endif %}
+{% endmacro %}
