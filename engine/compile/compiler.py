@@ -276,7 +276,9 @@ def build_site(project: Project, log: Callable[[str], None] = print,
 
     # film grammar between sections (`transition:`): which joins get their own stretch of scroll (engine/cuts.py)
     from .. import cuts as cuts_mod
-    cut_cfgs = cuts_mod.plan(site, log, cuts_mod.find_anchors(project, site, sections, dist, log))
+    style_cfg = themes.styles().get(theme["style"], {}) if theme["style"] else {}
+    blocked = f"the {theme['style']} style plays its own hand-over between sections" if style_cfg.get("cuts") is False else None
+    cut_cfgs = cuts_mod.plan(site, log, None if blocked else cuts_mod.find_anchors(project, site, sections, dist, log), blocked)
     for e in sections:
         e["cut_in"] = e["cut_out"] = None
     for c in cut_cfgs:

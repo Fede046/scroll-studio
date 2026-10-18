@@ -158,7 +158,8 @@ function write(el: HTMLElement, L: Layer, blurIdx: number, extra: Record<string,
   el.classList.toggle("ss-cut-off", L.vis === false);
 }
 
-export function makeCuts(): { update(): void; land(el: Element): number | null; docTop(el: Element): number | null; cuts: Cut[] } | null {
+export interface CutsApi { update(): void; land(el: Element): number | null; docTop(el: Element): number | null; holding(el: Element): 1 | 0 | null; cuts: Cut[] }
+export function makeCuts(): CutsApi | null {
   const raw = document.getElementById("ss-cuts");
   if (!raw || reducedMotion) return null;
   const cfgs: CutCfg[] = JSON.parse(raw.textContent || "[]");
@@ -244,6 +245,18 @@ export function makeCuts(): { update(): void; land(el: Element): number | null; 
     return w.getBoundingClientRect().top + scrollY + c.gap.offsetHeight;
   }
 
+  /** While a cut holds a section (scaled, moved or blurred by the cut), what it is held at: 1 for the end of the section above,
+   * 0 for the start of the section below, null when no cut is playing on it. Scroll-driven players read this instead of
+   * measuring the section, whose rectangle the cut has moved. */
+  function holding(el: Element): 1 | 0 | null {
+    for (const c of cuts) {
+      if (c.state !== "during") continue;
+      if (c.pinA.contains(el)) return 1;
+      if (c.pinB.contains(el)) return 0;
+    }
+    return null;
+  }
+
   /** Where an element's own top sits in the document with no cut holding it: after the cut that leads into it. */
   function docTop(el: Element): number | null {
     const w = el.closest<HTMLElement>(".ss-cutw");
@@ -259,5 +272,5 @@ export function makeCuts(): { update(): void; land(el: Element): number | null; 
     const y = c.wIn.getBoundingClientRect().top + scrollY;
     return { n: c.cfg.n, type: c.cfg.type, label: c.cfg.label, from: y, to: y + L, length: L };
   }) };
-  return { update, land, docTop, cuts };
+  return { update, land, docTop, holding, cuts };
 }

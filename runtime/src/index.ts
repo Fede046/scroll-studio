@@ -132,13 +132,15 @@ class Scene {
     if (!this.near()) return;
     const layout = this.data.layout;
     let active = -1;
+    const held = cuts?.holding(this.el) ?? null;   // a cut is playing on this section: it stays at its end (1) or start (0)
     if (layout === "overlay") {
-      this.p += (this.rawProgress() - this.p) * follow;
-      if (Math.abs(this.rawProgress() - this.p) < 1e-4) this.p = this.rawProgress();
+      const raw = held ?? this.rawProgress();
+      this.p += (raw - this.p) * follow;
+      if (Math.abs(raw - this.p) < 1e-4) this.p = raw;
     } else {
       let total = 0, done = 0;
       this.stepEls.forEach((s, i) => {
-        const target = this.stepProgress(s);
+        const target = held ?? this.stepProgress(s);
         this.stepVals[i] += (target - this.stepVals[i]) * follow;
         if (Math.abs(target - this.stepVals[i]) < 5e-4) this.stepVals[i] = target;
         const on = target > 0 && target < 1;
@@ -206,9 +208,9 @@ class Scene {
 const scenes = [...document.querySelectorAll<HTMLElement>("[data-scene]")].map((el) => new Scene(el));
 
 const nav = document.getElementById("ss-nav");
-const updateBlocks = makeBlocks();
+const updateBlocks = makeBlocks((el) => cuts?.holding(el) != null);
 // Film grammar between sections (`transition:`, lib/cuts.ts): loaded only by pages that carry cuts.
-let cuts: { update(): void; land(el: Element): number | null; docTop(el: Element): number | null } | null = null;
+let cuts: import("./lib/cuts").CutsApi | null = null;
 if (document.getElementById("ss-cuts")) import("./lib/cuts").then((m) => { cuts = m.makeCuts(); });
 // The nav reads in the colours of the section under it: a dark film on a light site gets a dark nav, and back.
 const surfaced = [...document.querySelectorAll<HTMLElement>("main [class*='ss-surface-']")]

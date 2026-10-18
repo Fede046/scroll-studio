@@ -162,6 +162,16 @@ def test_a_join_is_two_pins_and_a_gap_and_the_page_carries_the_cut(built):
         html.index('data-cut-in="1"') > html.index('data-cut-out="1"')
 
 
+def test_a_style_that_plays_its_own_handover_drops_the_cuts(built):
+    from engine.compile import themes
+    flagged = {n for n, v in themes.styles().items() if v.get("cuts") is False}
+    assert {"flipbook", "zoetrope", "pop-up-book"} <= flagged and "halftone" not in flagged and "neo-brutalism" not in flagged
+    html = built(name="T", theme={"style": "flipbook"}, sections=[block(0, transition="cut"), block(1)])
+    assert "ss-cut" not in html.replace("ss-cuts-on", "")
+    html = built(name="T", theme={"style": "halftone"}, sections=[block(0, transition="cut"), block(1)])
+    assert 'id="ss-cuts"' in html
+
+
 # ---------------------------------------------------------------- finding shapes
 
 def disc_image(w=640, h=360, cx=200, cy=180, r=70, bg=(20, 40, 90), fg=(250, 250, 250)) -> Image.Image:

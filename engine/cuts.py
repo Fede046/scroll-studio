@@ -45,16 +45,22 @@ def section_label(site: Site, i: int) -> str:
     return getattr(s, "id", None) or f"{s.type}-{i}"
 
 
-def plan(site: Site, log: Callable[[str], None] = print, anchors: Optional[dict] = None) -> list[dict]:
+def plan(site: Site, log: Callable[[str], None] = print, anchors: Optional[dict] = None,
+         blocked: Optional[str] = None) -> list[dict]:
     """The cuts the page carries, one dict per transition: `{n, a, b, type, length, ...}` where a and b are the indices
     of the two sections. Transitions that cannot work are dropped with a note (the last section has nothing to hand
-    over to; the stack layout already hands over by sliding a panel over the last)."""
+    over to; the stack layout already hands over by sliding a panel over the last; a style that runs its own hand-over
+    between sections says so with `blocked`)."""
     cfgs: list[dict] = []
     if site.sections and getattr(site.sections[-1], "transition", None) is not None:
         log(f"  note: [{section_label(site, len(site.sections) - 1)}] is the last section: its transition has nothing to hand over to")
     if site.layout == "stack":
         if cut_pairs(site):
             log("  note: transitions are not used with layout: stack (its panels already slide over one another); ignored")
+        return []
+    if blocked:
+        if cut_pairs(site):
+            log(f"  note: transitions are ignored: {blocked}")
         return []
     for n, (a, b, t) in enumerate(cut_pairs(site)):
         d = t.model_dump(mode="json", exclude_none=True, by_alias=True)
