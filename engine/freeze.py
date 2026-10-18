@@ -48,6 +48,7 @@ EASES: dict[str, Callable[[float], float]] = {
     "inOutQuad": lambda u: 2 * u * u if u < 0.5 else 1 - 2 * (1 - u) ** 2,
     "inOutCubic": lambda u: 4 * u ** 3 if u < 0.5 else 1 - 4 * (1 - u) ** 3,
     "inOutQuart": lambda u: 8 * u ** 4 if u < 0.5 else 1 - 8 * (1 - u) ** 4,
+    "smoother": lambda u: u * u * u * (u * (6 * u - 15) + 10),     # smootherstep: speed and acceleration are 0 at the stops
 }
 
 

@@ -424,6 +424,9 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
             standing.append(b.id)
             continue
         ctx.stage(f"beat_{b.id}", key, [clip], run, locked=lock)
+        # ---- restore: SeedVR2 over this beat's clip only (beat_restore does the whole film), back at beat_res
+        if b.restore:
+            clip = restore_beat(ctx, b, clip, bdir, (W, H))
         # ---- faces (engine/faces.py): this beat's clip with its faces repaired, before the join
         if b.faces:
             from .. import faces
@@ -486,6 +489,26 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
 
     set_lenient(False)
     pin_steps(sec, durs, fades)
+    return out
+
+
+def restore_beat(ctx: BuildContext, b, clip: Path, bdir: Path, size: tuple[int, int]) -> Path:
+    """`beat.restore`: SeedVR2 over one beat's clip at that height (it cleans grain and redraws fine detail, e.g. on a
+    camera beat, which the video model renders near 1024 px), scaled back to the film's size so the join still lines up."""
+    from ..animate import FPS
+    from . import film_build as fb
+    rdir = bdir / "restore"
+    out = rdir / "clip.mp4"
+
+    def run():
+        shot = {"id": f"beat-{b.id}", "fps": FPS, "duration": float(probe(clip)["duration"]), "ltx": {},
+                "upscale": {"method": "seedvr2", "resolution": int(b.restore)}}
+        rdir.mkdir(parents=True, exist_ok=True)
+        fb.stage_upscale(shot, str(rdir), _restore_args(ctx, clip))
+        W, H = size
+        ffmpeg("-i", rdir / "gen" / "gen_sr.mp4", "-vf", f"scale={W}:{H}:flags=lanczos", "-c:v", "libx264", "-crf", "13",
+               "-preset", "slow", "-pix_fmt", "yuv420p", "-r", str(FPS), out, log=ctx.log)
+    ctx.stage(f"restore_{b.id}", {"src": file_key(clip), "res": int(b.restore), "size": list(size)}, [out], run)
     return out
 
 

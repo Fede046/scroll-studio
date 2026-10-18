@@ -222,6 +222,9 @@ def units(sec, name: str) -> tuple[str, float]:
             return "film:reveal_track", frames
         if name == "reveal_pack":
             return "film:reveal_pack", frames
+        if name.startswith("restore_"):
+            b = next((b for b in sec.beats if f"restore_{b.id}" == name), None)
+            return "film:restore", float(b.seconds - b.trim) if b else dur
         if name.startswith("faces_"):
             b = next((b for b in sec.beats if f"faces_{b.id}" == name), None)
             return "film:faces", float((b.seconds - b.trim) * 24 if b else frames)
@@ -244,7 +247,7 @@ def expected(sec, beats: Optional[set] = None) -> list[str]:
         return ((["faces"] if sec.faces else []) + ["encode"] + expected_reveal(sec)) if sec.type == "film" else []
     if sec.beats:
         names = [n for b in sec.beats if beats is None or b.id in beats
-                 for n in [f"beat_{b.id}"] + ([f"faces_{b.id}"] if b.faces else [])] + ["beats_join"]
+                 for n in [f"beat_{b.id}"] + ([f"restore_{b.id}"] if b.restore else []) + ([f"faces_{b.id}"] if b.faces else [])] + ["beats_join"]
         return names + (["beats_restore"] if sec.beat_restore else []) + (["faces"] if sec.faces else []) + ["encode"] + expected_reveal(sec)
     from .animate import video_model
     shot = sec.take.model_dump(mode="json") if sec.take else sec.shot

@@ -427,7 +427,7 @@ class Take(Model):
 
 
 # ---- freeze (frozen-moment beats) ----
-FreezeEase = Literal["linear", "inOutSine", "inOutQuad", "inOutCubic", "inOutQuart", "flow"]
+FreezeEase = Literal["linear", "inOutSine", "inOutQuad", "inOutCubic", "inOutQuart", "smoother", "flow"]
 
 
 class FreezeKey(Model):
@@ -558,7 +558,9 @@ class Freeze(Model):
     dolly: Optional[float] = Field(None, ge=0, le=3, description="Extra push-in of near things as the camera closes in "
                                                                  "(default follows `parallax`)")
     ease: FreezeEase = Field("inOutSine", description="How the camera travels between boxes. inOutSine/Quad/Cubic/Quart: "
-                                                      "eased, resting at every key. flow: keeps moving through keys "
+                                                      "eased, resting at every key. smoother: eased with no jolt "
+                                                      "at the stops (it settles into each hold and leaves it gently; "
+                                                      "best with holds). flow: keeps moving through keys "
                                                       "(it rests only at keys with a hold)")
     depth_model: Literal["small", "base", "large"] = Field("small", description="Depth Anything V2 size (small is "
                                                                                   "Apache-2.0; base and large are CC-BY-NC)")
@@ -842,6 +844,10 @@ class Beat(Model):
 
 
     # ---- faces
+    restore: Optional[int] = Field(None, ge=480, le=2160, description="Run SeedVR2 over this beat's clip at this height "
+                                   "(e.g. 1088) to clean grain and redraw fine detail, then scale it back to beat_res. "
+                                   "Like the section's beat_restore but for one beat, e.g. a camera beat (rendered near "
+                                   "1024 px) next to sharp frozen moments; slow (minutes per second of film)")
     faces: Optional[Faces] = Field(None, description="`restore`: repair the faces in this beat's clip (GFPGAN), after it is "
                                                      "generated. Off by default; or a mapping with strength, min_size, smooth")
 
