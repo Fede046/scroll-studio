@@ -184,3 +184,28 @@ def test_harmonize_matches_the_plates_tone_to_the_frame_at_the_hole_edge():
     assert np.abs(plate.astype(int) - frame.astype(int))[edge].mean() > 20
     assert np.abs(fixed.astype(int) - frame.astype(int))[edge].mean() < 8
     assert np.array_equal(fixed[hole == 0][:50], plate[hole == 0][:50])           # outside the hole: untouched
+
+
+def test_planes_are_cached_and_only_the_shaping_settings_redo_the_cheap_part(tmp_path, monkeypatch):
+    """The frame's planes are kept; asking again finds them; the subjects are found once even when `grow` changes."""
+    from engine.backends import comfy
+    from engine.spec import FreezeLayers
+    monkeypatch.setattr(comfy, "alive", lambda: False)
+    frame, bg, depth, alpha = _scene(192, 96)
+    calls = []
+
+    def fake_find(png, layers, work, log):
+        calls.append(1)
+        return [L.Subject("s1", alpha)]
+    monkeypatch.setattr(L, "find_subjects", fake_find)
+    png = tmp_path / "f.png"
+    png.write_bytes(b"x")
+    spec = FreezeLayers.model_validate({"subjects": [{"box": [0.4, 0.3, 0.6, 0.9]}]})
+    a = L.build_cached(tmp_path, png, frame, depth, spec, 7, "k", lambda m: None)
+    b = L.build_cached(tmp_path, png, frame, depth, spec, 7, "k", lambda m: None)
+    assert len(calls) == 1 and np.array_equal(a.alpha > 0.5, b.alpha > 0.5) and b.ids == [["s1"]]
+    wider = FreezeLayers.model_validate({"subjects": [{"box": [0.4, 0.3, 0.6, 0.9]}], "grow": 9})
+    c = L.build_cached(tmp_path, png, frame, depth, wider, 7, "k", lambda m: None)
+    assert len(calls) == 1                                                    # the subjects were not looked for again
+    assert c.hole.sum() > a.hole.sum()
+    assert (tmp_path / "layers" / "planes.jpg").exists()
