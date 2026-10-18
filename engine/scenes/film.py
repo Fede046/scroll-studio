@@ -135,7 +135,9 @@ def world(sec: FilmScene, ctx: BuildContext, keyframes_too: bool = True) -> tupl
 
 def blockout_key(sec: FilmScene, ctx: BuildContext) -> tuple[dict, dict, Optional[dict]]:
     """(shot, blockout key, legacy key) without running anything (the storyboard's sketch reads the cache with it)."""
+    from .. import imagery
     shot = dict(take_shot(sec, ctx) if sec.take else sec.shot, id=sec.id)
+    shot = imagery.treat_shot(ctx.project, shot)      # the site's `imagery:` in the keyframe and segment prompts (if set)
     for k in ("fps", "duration", "preview_res", "ltx"):
         if k not in shot:
             raise BuildError(f"film section '{sec.id}': shot.{k} is required to generate a film (or set `video:`)")
@@ -333,6 +335,7 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
     from ..inputs import resolve_image
     from ..spec import ImageInput
     from ..camera_beats import start_ref
+    from .. import imagery
     W, H = sec.beat_res[0] // 32 * 32, sec.beat_res[1] // 32 * 32
     clips, standing = [], []
     only = ctx.options.get("only_beats")      # build --only: the beats to render (None: all)
@@ -367,10 +370,10 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
                     from ..animate import NEGATIVE
                     seed = b.camera.seed if b.camera.seed is not None else b.seed if b.motion_seed is None else b.motion_seed
                     frames = camera_frames(ctx.project, sec, bi, still, bdir,
-                                           f"{b.prompt or 'The subject of the image'}. {b.motion}. Smooth natural motion.",
+                                           f"{imagery.treat(ctx.project, b.prompt, video=True) or 'The subject of the image'}. {b.motion}. Smooth natural motion.",
                                            NEGATIVE, seed, wan_settings(ctx.options.get("site_wan")), ctx.log)
                 else:
-                    frames = animate(still, b.prompt, b.motion, b.seconds, b.seed if b.motion_seed is None else b.motion_seed,
+                    frames = animate(still, imagery.treat(ctx.project, b.prompt, video=True), b.motion, b.seconds, b.seed if b.motion_seed is None else b.motion_seed,
                                      bdir, ctx.log, size=(W, H), strength=b.strength, end_image=end, model=model, wan=wan)
                 stamp.write_text(akey)
             frames = frames[round(b.trim * FPS):]
@@ -398,6 +401,9 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
             key["camera"] = camera_key(sec, bi)
             if not b.image and b.camera.continues and bi > 0:
                 key["image"] = ref_key(start_ref(sec, bi, (W, H)))
+        look = imagery.of(ctx.project)
+        if look is not None:     # the site's `imagery:` treatment is part of the beat (only when set: other beats keep their cache)
+            key["imagery"] = look.model_dump(mode="json")
         model = video_model(b.video_model, ctx.options.get("site_video_model"))
         wan = wan_settings(ctx.options.get("site_wan")) if model == "wan" else None
         if model != "ltx":   # only when not the default, so LTX beats rendered before video_model existed stay cached

@@ -52,8 +52,14 @@ FONT_AXES = {
     "Pixelify Sans": "wght@400..700",
     "Limelight": "",
 }
+# the families `studio directions` pairs (engine/directions/typefaces.py), each with its verified css2 axis spec
+from ..directions.typefaces import AXES as _DIRECTION_AXES   # noqa: E402
+for _family, _axes in _DIRECTION_AXES.items():
+    FONT_AXES.setdefault(_family, _axes)
 FALLBACK = {"display": "system-ui, sans-serif", "body": "system-ui, sans-serif", "mono": "ui-monospace, monospace"}
 SERIFS = {"Instrument Serif", "Fraunces", "Cormorant Garamond", "Newsreader"}
+from ..directions.typefaces import CLASS as _DIRECTION_CLASS   # noqa: E402
+SERIFS |= {f for f, c in _DIRECTION_CLASS.items() if c.startswith("serif") or c == "slab"}
 
 
 @lru_cache(maxsize=1)

@@ -6,6 +6,7 @@
   studio storyboard my-site --edit [--port 8971]    edit every shot in the browser: notes, captions, regenerate one image, play it
   studio storyboard my-site --notes                 the open notes written there, with each shot's current values
   studio camera my-site beat [--guide | --check]    a beat with `camera:` keys: preview its guide (pure camera), or measure how well it follows
+  studio directions my-site [--n 6] [--seed 1] [--pick a]   art directions as side-by-side boards; pick one into site.yaml
   studio preview my-site [--port 5173]
   studio record my-site [--section hero] [--seconds 12] [--gif]
   studio inspect my-site [--section story] [--json]   polish report of a built film: pops, softness, halos, style drift, morphs
@@ -167,6 +168,73 @@ def storyboard(name: str, level: str = typer.Option("stills", help="sketch (no C
     if open_:
         import webbrowser
         webbrowser.open(Path(res["html"]).as_uri())
+
+
+@app.command()
+def directions(name: str,
+               n: Optional[int] = typer.Option(None, "--n", "--count", help="How many directions (default: the spec's `directions.count`, 6)"),
+               seed: Optional[int] = typer.Option(None, help="Another seed, another set of directions (default: the spec's, 1)"),
+               brief: Optional[str] = typer.Option(None, help="What to pitch, in your words (default: the spec's `directions.brief`)"),
+               pick: Optional[str] = typer.Option(None, "--pick", help="Write this direction (its letter, or its name) into site.yaml: "
+                                                                       "theme, style, fonts, imagery, pace; copy is never touched. The old file is kept"),
+               undo: bool = typer.Option(False, "--undo", help="Put site.yaml back as it was before the last pick"),
+               reroll: Optional[str] = typer.Option(None, "--reroll", help="Another idea in place of this direction (its letter)"),
+               stills: bool = typer.Option(False, "--stills", help="Draw the stills of the saved directions again (ComfyUI was down)"),
+               images: bool = typer.Option(True, "--images/--no-images", help="--no-images: placeholder cards instead of Z-Image stills"),
+               sheet: bool = typer.Option(True, "--sheet/--no-sheet", help="Make board.png (headless Chrome)"),
+               serve: bool = typer.Option(False, "--serve", help="Serve the boards in the browser, with a Pick button on each"),
+               port: Optional[int] = typer.Option(None, help="--serve: port (default: the first free one of 8981-8989)"),
+               browser: bool = typer.Option(True, "--browser/--no-browser", help="--serve: open the browser"),
+               show: bool = typer.Option(False, "--show", help="Print the saved directions and stop")):
+    """Art directions for the site, pitched like a studio: one brief in, several complete directions out (concept, palette,
+    type, style, imagery, motion), each a board of storyboard stills, side by side on one page. Pick one and it is written
+    into site.yaml. Outputs in <project>/directions/: board.html, board.png (contact sheet), directions.json."""
+    from .directions import run as dr
+    from .project import Project
+    project = Project(resolve(name))
+
+    def listing(state):
+        for d in state["directions"]:
+            p = d["palette"]
+            typer.echo(f"  {d['id'].upper()}  {d['name']:<16} {d['stance']:<17} style {d['style'] or 'none':<14} {p['name']} ({p['mode']})  "
+                       f"{d['fonts']['display']} / {d['fonts']['body']}")
+            typer.echo(f"       {d['concept']}")
+        dv = state["diversity"]
+        typer.echo(f"closest pair {dv['min']:.2f} apart; {dv['kinds']} kinds, {dv['styles']} experiences")
+    if undo:
+        dr.undo(project, typer.echo)
+        return
+    if show:
+        st = dr.load(project)
+        if not st:
+            raise typer.BadParameter(f"no boards yet: run studio directions {name}")
+        listing(st)
+        typer.echo(f"page: {st['files']['html']}\nsheet: {st['files']['png']}")
+        return
+    if pick and not (n or seed or brief):
+        res = dr.pick(project, pick, typer.echo, sheet=sheet)
+        if res.get("note"):
+            typer.echo(res["note"])
+        else:
+            typer.echo(res["diff"] or "(no change)")
+            typer.echo(f"backup: {res['backup']}\nnext: studio storyboard {name}   (the images redraw in this direction's imagery)")
+        return
+    if reroll:
+        st = dr.reroll(project, reroll, images=images, sheet=sheet, log=typer.echo)
+    elif stills:
+        st = dr.redraw(project, images=images, sheet=sheet, log=typer.echo)
+    elif serve and dr.load(project) and not (n or seed or brief):
+        st = dr.load(project)
+    else:
+        st = dr.make(project, n, seed, brief, images=images, sheet=sheet, log=typer.echo)
+    listing(st)
+    typer.echo(f"page: {st['files']['html']}\nsheet: {st['files']['png']}")
+    if pick:
+        res = dr.pick(project, pick, typer.echo)
+        typer.echo(res["diff"] or "(no change)")
+    if serve:
+        from .directions.api import serve as run_server
+        run_server(project, port=port, open_browser=browser, log=typer.echo)
 
 
 @app.command()
