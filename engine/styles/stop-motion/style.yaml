@@ -15,9 +15,11 @@ fonts:
   display: Fredoka
   body: Jost
   mono: Gaegu
+  counter: Special Elite
 font_axes:
   Fredoka: "wght@300..700"
   Jost: "ital,wght@0,300..800;1,300..800"
   Gaegu: "wght@400;700"
+  Special Elite: ""
 display_weight: 600
 radius: 6px

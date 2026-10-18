@@ -279,7 +279,7 @@ html.sm-live .sm-light { --lamp: 1; display: block; position: fixed; inset: 0; z
 .sm-hud[hidden] { display: none; }
 .sm-hud__count { margin: 0; display: flex; gap: 8px; align-items: baseline; padding: .15em .9em .2em; background: #ead7a1; font-size: clamp(16px, 1.3vw, 20px); filter: drop-shadow(0 2px 0 rgba(0, 0, 0, .25));
   clip-path: polygon(0 10%, 3% 0, 6% 10%, 9% 0, 94% 0, 97% 12%, 100% 0, 100% 92%, 97% 100%, 94% 88%, 91% 100%, 6% 100%, 3% 90%, 0 100%); }
-.sm-hud__count b { font-family: "Special Elite", "Courier New", monospace; font-weight: 400; font-size: 1.05em; letter-spacing: .06em; min-width: 4ch; display: inline-block; }
+.sm-hud__count b { font-family: var(--font-counter, "Special Elite"), "Courier New", monospace; font-weight: 400; font-size: 1.05em; letter-spacing: .06em; min-width: 4ch; display: inline-block; }
 .sm-hud__lbl, .sm-hud__fps { font-size: .9em; opacity: .75; }
 .sm-onion { font: inherit; font-size: clamp(16px, 1.3vw, 20px); color: #3a2a1a; background: #ead7a1; border: 0; padding: .15em .9em .2em; cursor: pointer; filter: drop-shadow(0 2px 0 rgba(0, 0, 0, .25));
   clip-path: polygon(0 10%, 3% 0, 6% 10%, 9% 0, 94% 0, 97% 12%, 100% 0, 100% 92%, 97% 100%, 94% 88%, 91% 100%, 6% 100%, 3% 90%, 0 100%); }
