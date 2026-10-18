@@ -1,0 +1,23 @@
+# Paper cut-out: tokens and fonts for theme.style: paper-cut-out. See engine/styles/README.md for the contract and
+# docs/styles/styles-28-29.md section 2 for the research.
+label: Paper cut-out
+about: "Flat paper on an animation stand, cut out and pinned. Every section is a sheet held by a brass pin; scrolling swings the top sheet aside like a card on a pin, and the pieces on the sheets hang from their own pins and swing with the speed you scroll. A jointed paper arm points at what the scroll has reached, and you can take the hand and move it."
+mode: light
+colors:
+  bg: '#efe6d2'
+  bg2: '#e4d7bb'
+  ink: '#201a17'
+  accent: '#c8372a'
+  accent2: '#2a5f8a'
+  accent_ink: '#fff7ea'
+  accent_text: '#a02a1e'
+fonts:
+  display: Rozha One
+  body: Libre Franklin
+  mono: Special Elite
+font_axes:
+  Rozha One: ""
+  Libre Franklin: "ital,wght@0,300..800;1,300..800"
+  Special Elite: ""
+display_weight: 400
+radius: 2px
