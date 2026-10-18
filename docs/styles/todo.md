@@ -15,8 +15,8 @@ Styles 22 to 33 come from classic animation techniques. Each one is a way of mov
 
 ## To do (styles 28 to 33)
 
-- [ ] `stop-motion`: everything moves on twos with a slight jitter (paper, felt, real objects nudged per frame).
-- [ ] `paper-cut-out`: flat paper layers on hinged joints, Monty Python and Lotte Reiniger silhouettes.
+- [x] `stop-motion` (shipped): everything moves on twos with a slight jitter (paper, felt, real objects nudged per frame).
+- [x] `paper-cut-out` (shipped): flat paper layers on hinged joints, Monty Python and Lotte Reiniger silhouettes.
 - [ ] `paint-on-glass`: one living painting that morphs scene to scene with visible brushstrokes (Petrov, *Loving Vincent*).
 - [ ] `multiplane`: Disney's multiplane camera, painted glass layers with real depth and focus pulls between them.
 - [ ] `scratch-film`: drawn and scratched straight onto film stock (McLaren, Len Lye), jittery, colourful, synced to sound.

@@ -9,6 +9,8 @@ Everything so far is version 1. On 2026-10-12 the releases first published as 2.
 ## Unreleased
 
 ### Added
+- Style `stop-motion`: scrolling fires the shutter. Every 26-42 px is one exposure, poses change on twos, never faster than 12 a second, and nothing moves between exposures. Between sections the set is struck and dressed (cast lifted off, a bare set with tape crosses, the new set and cast placed). Clay letters, felt cards, masking-tape labels, a felt `theme.art`; poke a piece and it hops, an onion-skin switch shows the last exposure. Research in `docs/styles/styles-28-29.md`.
+- Style `paper-cut-out`: Lotte Reiniger and Terry Gilliam. The top sheet swings off its brass brad as you scroll and uncovers the next; words on paper strips, tags and snapshots hang on hinges and sway with scroll speed; feature cards fan from one pin, a folding rule opens, a mobile of tags turns; a jointed black paper arm (two-bone IK) points at what you have reached.
 - `beat.restore`: SeedVR2 over one beat's clip at a given height, scaled back to `beat_res` (stage `restore_<beat>`), so a soft camera beat can be restored next to sharp frozen moments without restoring the whole film (`beat_restore`).
 - Camera ease `smoother` (freeze and camera beats): smootherstep, speed and acceleration both zero at every stop, so the camera settles into a hold instead of landing with a jolt (`studio inspect` read the jolt as judder).
 - Deep zoom for frozen moments: `freeze.detail` builds a pyramid of tiles (`engine/zoom.py`, `zoom_build.py`, `zoom_render.py`)

@@ -13,7 +13,7 @@ spec field, a cached builder, a runtime player where needed, CLI and MCP, docs a
   building so the camera passes them and things pass in front (depth-aware, tracked to surfaces).
 - [ ] **Edited like a film**: sections join with film grammar instead of fades: match cuts (a round logo becomes the
   sun becomes a cup), whip pans, type carried from one section into the next, hard cuts on the beat.
-- [ ] **Styles 28-29**: `stop-motion` and `paper-cut-out` (see `docs/styles/todo.md`).
+- [x] **Styles 28-29**: `stop-motion` and `paper-cut-out` (see `docs/styles/todo.md`).
 
 ## Wave 2
 
