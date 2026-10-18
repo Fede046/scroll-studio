@@ -71,6 +71,7 @@ class Scene {
   hud: Record<string, any> = {};
   scaleOverride: string | null = null;
   loaded = 0;
+  lastActive = -1;
   onProgress: () => void = () => {};
 
   constructor(el: HTMLElement) {
@@ -132,15 +133,17 @@ class Scene {
     if (!this.near()) return;
     const layout = this.data.layout;
     let active = -1;
-    const held = cuts?.holding(this.el) ?? null;   // a cut is playing on this section: it stays at its end (1) or start (0)
-    if (layout === "overlay") {
-      const raw = held ?? this.rawProgress();
+    const held = cuts?.holding(this.el) ?? null;   // a cut is playing on this section (it moves its rectangle): progress stays where it was
+    if (held != null) {
+      active = this.lastActive;
+    } else if (layout === "overlay") {
+      const raw = this.rawProgress();
       this.p += (raw - this.p) * follow;
       if (Math.abs(raw - this.p) < 1e-4) this.p = raw;
     } else {
       let total = 0, done = 0;
       this.stepEls.forEach((s, i) => {
-        const target = held ?? this.stepProgress(s);
+        const target = this.stepProgress(s);
         this.stepVals[i] += (target - this.stepVals[i]) * follow;
         if (Math.abs(target - this.stepVals[i]) < 5e-4) this.stepVals[i] = target;
         const on = target > 0 && target < 1;
@@ -152,6 +155,7 @@ class Scene {
         total += h; done += this.stepVals[i] * h;
       });
       this.p = total ? done / total : 0;
+      this.lastActive = active;
     }
     const p = this.p;
 

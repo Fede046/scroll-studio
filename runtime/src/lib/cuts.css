@@ -28,6 +28,8 @@ html.ss-cuts-on .ss-cutpin > section, html.ss-cuts-on .ss-cutpin > .ss-backdrop,
 .ss-cutghost { position: fixed; inset: 0; z-index: 40; pointer-events: none; overflow: hidden; contain: layout paint; }
 .ss-cutghost > * { position: absolute; margin: 0; transform-origin: 0 0; will-change: transform, opacity; }
 .ss-cut-carried { visibility: hidden !important; }
+/* the words of a section while a match cut scales its picture */
+.ss-cut-faded { opacity: var(--cut-fade, 1) !important; }
 
 
 /* a scene that hands over with a transition does not also fade itself to the page colour at its end: the cut is its ending */

@@ -137,6 +137,23 @@ const RESET = { transform: "", filter: "", clipPath: "", maskImage: "", webkitMa
   maskRepeat: "", webkitMaskRepeat: "", maskPosition: "", webkitMaskPosition: "", opacity: "", transformOrigin: "", zIndex: "",
   willChange: "", pointerEvents: "" };
 
+function touch(c: Cut, el: HTMLElement) { (c.touched ||= new Set()).add(el); }
+
+function writeParts(c: Cut, L: Layer) {
+  if (L.inner) {
+    touch(c, L.inner.el);
+    put(L.inner.el, { transform: L.inner.t, transformOrigin: L.inner.origin, willChange: "transform" });
+  }
+  if (L.fade) {
+    for (const el of L.fade.els) {
+      touch(c, el);
+      const on = L.fade.o < 0.999;
+      el.classList.toggle("ss-cut-faded", on);
+      if (on) el.style.setProperty("--cut-fade", L.fade.o.toFixed(3));
+    }
+  }
+}
+
 function write(el: HTMLElement, L: Layer, blurIdx: number, extra: Record<string, string> = {}) {
   const p: Record<string, string> = { ...extra };
   p.transform = L.t || "";
@@ -190,6 +207,13 @@ export function makeCuts(): CutsApi | null {
   addEventListener("resize", () => { dirty = true; });
 
   function reset(c: Cut) {
+    for (const el of c.touched || []) {
+      cache.delete(el);
+      el.style.transform = el.style.transformOrigin = el.style.willChange = "";
+      el.style.removeProperty("--cut-fade");
+      el.classList.remove("ss-cut-faded");
+    }
+    c.touched?.clear();
     for (const el of [c.pinA, c.pinB]) {
       cache.delete(el);
       for (const k in RESET) (el.style as any)[k] = "";
@@ -229,6 +253,7 @@ export function makeCuts(): CutsApi | null {
       const fx = FX[c.cfg.type] || FX.cut;
       const r = fx(k, c, m);
       const front = r.front === "a";
+      writeParts(c, r.a); writeParts(c, r.b);
       write(c.pinA, r.a, c.cfg.n * 2, { zIndex: front ? "2" : "", willChange: "transform, clip-path", pointerEvents: r.live === "a" ? "" : "none" });
       write(c.pinB, r.b, c.cfg.n * 2 + 1, { zIndex: front ? "1" : "", willChange: "transform, clip-path", pointerEvents: r.live === "b" ? "" : "none" });
       c.live = r.live;
@@ -245,12 +270,13 @@ export function makeCuts(): CutsApi | null {
     return w.getBoundingClientRect().top + scrollY + c.gap.offsetHeight;
   }
 
-  /** While a cut holds a section (scaled, moved or blurred by the cut), what it is held at: 1 for the end of the section above,
-   * 0 for the start of the section below, null when no cut is playing on it. Scroll-driven players read this instead of
-   * measuring the section, whose rectangle the cut has moved. */
+  /** While a cut is moving a section (scaled or shifted, so its rectangle is not where scrolling put it), what it is held at:
+   * 1 for the end of the section above, 0 for the start of the section below, null otherwise. Scroll-driven players keep
+   * their progress while this is set instead of measuring the section. It is null in the held beats at either end of the
+   * cut, where the section is exactly where scrolling put it, so players settle there. */
   function holding(el: Element): 1 | 0 | null {
     for (const c of cuts) {
-      if (c.state !== "during") continue;
+      if (c.state !== "during" || c.k <= 0 || c.k >= 1) continue;
       if (c.pinA.contains(el)) return 1;
       if (c.pinB.contains(el)) return 0;
     }

@@ -78,10 +78,11 @@ def plan(site: Site, log: Callable[[str], None] = print, anchors: Optional[dict]
 
 def strips(dist, out_dir, only: Optional[list[int]] = None, size=(1280, 720), frames: int = 9, pad: float = 0.2,
            mobile: bool = False, dpr: float = 1.0, wait: float = 0.45, log: Callable[[str], None] = print,
-           page: str = "index.html", reduced: bool = False):
+           page: str = "index.html", reduced: bool = False, clip: bool = False, clip_frames: int = 60):
     """A frame strip around each cut of a built site (headless Chrome): `frames` screenshots from `pad` screens before
     the cut's stretch of scroll to `pad` screens after it, laid out in a grid with the cut's progress under each.
-    Writes <out_dir>/cut_<n>.jpg and returns the paths. The picture the visitor sees, not a mock-up."""
+    Writes <out_dir>/cut_<n>.jpg and returns the paths. The picture the visitor sees, not a mock-up. clip: also a short
+    video of each cut (`cut_<n>.mp4`, `clip_frames` frames from the same stretch of scroll at 24 fps)."""
     import base64
     import subprocess
     import tempfile
@@ -137,12 +138,16 @@ def strips(dist, out_dir, only: Optional[list[int]] = None, size=(1280, 720), fr
             if only is not None and p["n"] not in only:
                 continue
             y0, L = p["from"], p["length"]
-            ys = [y0 - pad * H + (L + 2 * pad * H) * i / (frames - 1) for i in range(frames)]
-            shots = []
-            for y in ys:
+            total = max(frames, clip_frames) if clip else frames
+            ys_all = [y0 - pad * H + (L + 2 * pad * H) * i / (total - 1) for i in range(total)]
+            keep = sorted({round(i * (total - 1) / (frames - 1)) for i in range(frames)})
+            ys = [ys_all[i] for i in keep]
+            all_shots = []
+            for y in ys_all:
                 cdp.js(f"window.scrollTo(0, {max(0.0, y):.1f})")
                 time.sleep(wait)
-                shots.append(Image.open(__import__("io").BytesIO(base64.b64decode(cdp.call("Page.captureScreenshot", format="jpeg", quality=90)["data"]))).convert("RGB"))
+                all_shots.append(Image.open(__import__("io").BytesIO(base64.b64decode(cdp.call("Page.captureScreenshot", format="jpeg", quality=90)["data"]))).convert("RGB"))
+            shots = [all_shots[i] for i in keep]
             cols = min(frames, 5 if W >= H else 9)
             rows = (frames + cols - 1) // cols
             tw = 400 if W >= H else 190
@@ -157,6 +162,17 @@ def strips(dist, out_dir, only: Optional[list[int]] = None, size=(1280, 720), fr
             path = out_dir / f"cut_{p['n']}.jpg"
             sheet.save(path, quality=88)
             paths.append(path)
+            if clip:
+                from .project import ffmpeg
+                tmp = Path(tempfile.mkdtemp(prefix="cutclip_"))
+                for i, im in enumerate(all_shots):
+                    im.save(tmp / f"{i:04d}.jpg", quality=92)
+                mp4 = out_dir / f"cut_{p['n']}.mp4"
+                ffmpeg("-framerate", "24", "-i", str(tmp / "%04d.jpg"), "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2", "-c:v", "libx264", "-crf", "20",
+                       "-pix_fmt", "yuv420p", "-movflags", "+faststart", mp4)
+                import shutil
+                shutil.rmtree(tmp, ignore_errors=True)
+                paths.append(mp4)
             log(f"  [{p['label']}] {p['type']} -> {path.name}")
         cdp.ws.close()
     finally:

@@ -31,7 +31,8 @@ export interface Cut {
   /** viewport top and height of the pinned section above, measured with the cut's own styles off */
   topA: number; hA: number;
   live: string;
-  measured?: boolean;
+  /** elements a cut has styled besides the two pins, to be cleared when it ends */
+  touched?: Set<HTMLElement>;
   /** per-activation scratch: what match and carry measured */
   data: any;
 }
@@ -45,6 +46,10 @@ export interface Layer {
   /** directional blur, standard deviation in px along x and y */
   blur?: [number, number];
   origin?: string;
+  /** a part of the section that moves on its own (the picture of a match cut) */
+  inner?: { el: HTMLElement; t: string; origin: string };
+  /** parts of the section faded to this opacity (the words, while a match cut scales the picture) */
+  fade?: { els: HTMLElement[]; o: number };
 }
 
 export interface Metrics { W: number; H: number; small: boolean }
