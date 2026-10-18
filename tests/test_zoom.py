@@ -138,18 +138,17 @@ def test_tile_depth_snaps_to_the_tiles_own_edges():
 
 
 def test_lock_does_not_ring_past_the_parents_tones():
-    """A child with a sharper edge than its parent has overshoots beside it (a pale rim): the result stays within the
-    parent's own range around each pixel."""
+    """Whatever the child does, the result stays within the parent's own range around each pixel (plus `ring`): detail is
+    free inside the parent's tones, a pale rim beside a sharpened edge is not."""
     import cv2
-    parent = np.zeros((64, 128, 3), np.float32)
-    parent[:, 64:] = 200
-    parent = cv2.GaussianBlur(parent, (0, 0), 3)
-    child = np.zeros_like(parent)
-    child[:, 64:] = 200                                                   # a hard edge (what a sharper tile has)
+    rng = np.random.default_rng(6)
+    parent = cv2.GaussianBlur((rng.random((64, 96, 3)) * 255).astype(np.float32), (0, 0), 4)
+    child = (rng.random((64, 96, 3)) * 255).astype(np.float32)                 # wild: nothing like the parent
     free = zoom.lock_low_frequencies(child, parent, 3.0, ring=None)
     held = zoom.lock_low_frequencies(child, parent, 3.0, ring=8.0)
-    assert free.max() > 200 + 8 and free.min() < -8                       # unconstrained, it overshoots
-    assert held.max() <= 200 + 8 + 1e-3 and held.min() >= -8 - 1e-3
+    k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))
+    assert (free > cv2.dilate(parent, k) + 8).any()                            # unconstrained, it leaves the parent's range
+    assert (held <= cv2.dilate(parent, k) + 8 + 1e-3).all() and (held >= cv2.erode(parent, k) - 8 - 1e-3).all()
 
 
 # ---------------------------------------------------------------- the render
