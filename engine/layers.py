@@ -33,6 +33,7 @@ import numpy as np
 from .project import BuildError
 
 VERSION = 1
+SEG_VERSION = 2             # bump when the subjects of a frame would be cut out differently
 
 PLATE_INSTRUCTION = ("Remove every person from this picture. Fill the space where they stood with the empty street, "
                      "ground, fog and buildings continuing naturally behind them, in exactly the same drawing style, "
@@ -205,6 +206,15 @@ def _segment_many(png: Path, groups: list[list[dict]], work: Path) -> list[np.nd
     return masks
 
 
+def _spine(box) -> dict:
+    """Points down the middle of a subject's box (a third, a half and four fifths of the way down) for SAM to take along with
+    the box: a box alone lets a person who is nearly the colour of the fog be cut out in part (the rest then stays in the
+    background plane and tears off when it moves); points on the body make it the whole person."""
+    x0, y0, x1, y1 = box
+    cx, h = (x0 + x1) / 2, y1 - y0
+    return {"points": [[cx, y0 + 0.3 * h], [cx, y0 + 0.5 * h], [cx, y0 + 0.78 * h]], "labels": [1, 1, 1]}
+
+
 def find_subjects(png: Path, layers, work: Path, log: Callable) -> list[Subject]:
     """The subjects of a frame, one mask each. `layers.subjects == "auto"`: every person Florence-2 finds; or the named
     subjects (a prompt can match several things: they share a plane, the plane's mask is their union)."""
@@ -223,7 +233,7 @@ def find_subjects(png: Path, layers, work: Path, log: Callable) -> list[Subject]
             boxes, _all, _o = find_boxes(png, sp.prompt, "all", None, log)
             if layers.subjects == "auto":
                 boxes = [b for b in boxes if (b[2] - b[0]) * (b[3] - b[1]) < 0.4]
-        items: list[dict] = [{"box": b} for b in boxes]
+        items: list[dict] = [{"box": b, **_spine(b)} for b in boxes]
         for p in sp.points:
             items.append({"points": [list(p)], "labels": [1]})
         if not items:
@@ -336,7 +346,7 @@ class LayerSet:
 
 def _subjects_cached(png: Path, layers, work: Path, log: Callable, key: str) -> list[Subject]:
     """The subjects of a frame, found once: Florence-2 and SAM 2.1 are not asked again when only the planes' settings change."""
-    spec = json.dumps([VERSION, key, layers.subjects if layers.subjects == "auto" else [s.model_dump(mode="json") for s in layers.subjects]],
+    spec = json.dumps([SEG_VERSION, key, layers.subjects if layers.subjects == "auto" else [s.model_dump(mode="json") for s in layers.subjects]],
                       sort_keys=True)
     k = hashlib.sha1(spec.encode()).hexdigest()[:16]
     f = work / "subjects.npz"
