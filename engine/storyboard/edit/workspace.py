@@ -153,6 +153,11 @@ class Workspace:
             pass
         sp = approvals.path(self.project)
         m = max(m, notes.mtime(self.project), sp.stat().st_mtime if sp.exists() else 0.0)
+        try:                                           # a polish report written by `studio inspect` elsewhere
+            for f in (self.project.build / "inspect").glob("*.json"):
+                m = max(m, f.stat().st_mtime)
+        except OSError:
+            pass
         return f"{m:.3f}"
 
     def busy_elsewhere(self) -> list[str]:
@@ -219,6 +224,8 @@ class Workspace:
         self._busy_cache = set(self.busy_elsewhere())
         probes: dict = {}
         out_shots = []
+        from ... import polish
+        badges = polish.beat_badges(project)
         for s in board.shots:
             slots = []
             for sl in s.slots:
@@ -226,7 +233,8 @@ class Workspace:
                 slots.append({"id": sl.id, "name": sl.name, "label": sl.label, "key": sl.key, "nodes": nodes})
             out_shots.append({"id": s.id, "section": s.section, "kind": s.kind, "title": s.title, "seconds": s.seconds,
                               "locked": s.locked, "can_lock": bool(s.lock_paths), "note": s.note, "approval": ap.get(s.id, "no"),
-                              "fields": [f.public() for f in s.fields], "slots": slots})
+                              "fields": [f.public() for f in s.fields], "slots": slots,
+                              "polish": (badges.get(s.id) if (badges.get(s.id) or {}).get("section") == s.section else None)})
         shared = []
         for n in board.shared:
             nj = self.node_json(board, n, probes, False)
@@ -448,6 +456,35 @@ class Workspace:
                 finally:
                     self.active.pop(key, None)
             job = self.jobs.submit("storyboard", self.project.name, "Update the sheet", run)
+            self.active[key] = job
+            self.last.pop(key, None)
+            return job
+
+    def inspect(self) -> Job:
+        """Polish report of every built film section (`studio inspect`) as a job: the beat badges follow."""
+        if self.jobs is None:
+            raise BuildError("this workspace has no job queue")
+        key = "__inspect__"
+        with self._lock:
+            if key in self.active:
+                raise variants.Busy("the polish check is already running")
+
+            def run(job: Job):
+                from ... import polish
+                log, progress = logger(job)
+                try:
+                    reps = polish.inspect_project(self.project, log=log)
+                    worst = max((r["summary"]["worst"]["severity"] for r in reps if r["summary"]["worst"]), default=0.0)
+                    msg = (f"polish check done: {sum(r['summary']['issues'] for r in reps)} problem(s) in "
+                           f"{len(reps)} film section(s)" if reps else "nothing to check: no film has been built yet")
+                    self.last[key] = {"status": "done", "finished": time.time(), "message": msg}
+                    return {"sections": [r["section"] for r in reps], "worst": worst}
+                except Exception as e:
+                    self.last[key] = {"status": "failed", "error": str(e).splitlines()[0][:300], "finished": time.time()}
+                    raise
+                finally:
+                    self.active.pop(key, None)
+            job = self.jobs.submit("inspect", self.project.name, "Polish check", run)
             self.active[key] = job
             self.last.pop(key, None)
             return job

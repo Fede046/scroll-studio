@@ -124,6 +124,33 @@ UI (React) ◄─► engine server (FastAPI + job queue + websocket events) ◄�
   sticky stage + scrolling step cards, the players, shared HUD/caption/progress components, theme tokens,
   asset preloading by priority, and mobile and `prefers-reduced-motion` behaviour.
 - **`doctor`** checks the whole stack: Python, Node, FFmpeg, Blender, CUDA/VRAM, ComfyUI, disk space, models.
+- **Polish report** (`engine/polish/`: `metrics.py` the measurements on frames, `analyze.py` the scorers over a film, `run.py`
+  the section glue and the report, `explain.py` the sentences, `thumbs.py` the pictures, `report.py` the HTML, `embed.py`
+  the optional embedding, `api.py` cache and read-back). `studio inspect` finds a film section's finished film
+  (`gen/gen_sr.mp4` or `beats.mp4`, `take.mp4`, the `video:` file), places every beat on it from the clips' lengths and the
+  engine's own crossfade formula, and reads it once: a 384 px gray copy of every frame (optical flow, between *new* frames:
+  a 12 fps clip written at 24 repeats every frame, and a held shot repeats its frame) and edge, fine-detail and style
+  statistics of every sixth frame at full size. Each scorer returns severities 0 (fine) to 1 (clearly visible) with the
+  numbers behind them; stretches at 0.4 or more become issues (a reason, a hint, a picture), and every beat is scored 100
+  minus 100 x its worst severity per metric. Calibration (Presence landing page, `examples/feel`, `examples/one-take`):
+
+  | measure | clean | broken (Presence) | severity from, to |
+  |---|---|---|---|
+  | fine-detail index | 0.0003-0.01 (feel: lowest frame 0.00027; Presence beats 0.0006-0.006) | hands close-up median 0.00012, boots 0.00004, end of the zoom 0.00004 | 0.00025 to 0.00008 (log) |
+  | rim share / film baseline | Presence 3% baseline, others under 7%; feel baseline 10%, max 26% (2.5x gate) | hands close-up 19-20% (6.2x), boots 9-19% | 2.5x to 5x, never under 6-10% |
+  | hatch share (drawn plate only) | ink and wash 0.37 | pencil look 0.64-0.66 | 1 to 2 JND of 0.15 |
+  | unexplained change / residual | walking crowd, camera push 0.2-0.5 | crowd dissolving into rows 0.93 at 4.7 levels | 0.55 to 0.85, scaled by 1.2 to 4.5 levels |
+  | join, edges that differ at mid-fade | (continuation, same drawing) 0 | Presence stage changes 0.67-0.90, colour +1.6 to 3.1 | 0.45 to 0.85 |
+
+  Limits worth knowing: halos and softness are scored against what this film's own look makes normal (so a film that is
+  soft or haloed everywhere reads clean on halos); drift only trusts hatch against a drawn plate (in a photograph weak
+  texture is the content) and tone/line/saturation only while the picture barely moves; a morph is a morph whether the
+  story wanted the dissolve or not (`examples/feel` has a few real ones). `--embed` (OpenCLIP ViT-H/14, about 1 s a frame on
+  the CPU) is a weak extra: on Presence the distance to the scene's first second is 0.10-0.15 for clean wide frames and
+  0.19-0.22 once the turn beat goes pencil, but 0.3-0.55 for any close-up, so it measures framing as much as look; it is
+  therefore judged against each beat's own first second, only while the picture hardly moves, and agrees with the hatch
+  measure without adding to it. Reports are cached under `.build/inspect/` by the
+  content of the film and clips (size and three slices, not dates), so a copied build is the same key.
 - **Frozen moments** (`engine/freeze.py`, `engine/freeze_beats.py`, `engine/backends/upscale.py`). A `film` beat with
   `freeze:` is not generated: the beat stage renders one frame offline. Steps, each cached by its own digest in the
   beat's folder: the source frame (a beat's sharpest-of-last-N frame, or an image input, fitted to `beat_res`), the
@@ -166,6 +193,32 @@ UI (React) ◄─► engine server (FastAPI + job queue + websocket events) ◄�
   tile) rather than a pyramid per layer, because the layers would disagree where they overlap and cost a multiple of the
   generation; the only data that exists solely per plane is what is occluded (the plate, smooth, kept at one resolution and
   continued) and the alpha (a mask, refined per tile).
+- **Camera moves on moving beats** (`engine/camera_guide.py`, `engine/camera_beats.py`). A generated `film` beat with
+  `camera:` keys (the keys of a frozen moment's camera) gets its camera from a guide instead of from prompt words. In the
+  beat's folder, each step keyed by its own digest: the start image's depth (`freeze.prepare_depth` over Depth Anything V2)
+  and the moving subjects' mask (`region.find`: Florence-2 + SAM 2.1); then the guide: the camera path flown through the
+  depth with `freeze.render_frames` (the public API, three times over one geometry: the depth video, the picture itself as a
+  pure-camera render, and the static-world mask), the subjects' depth softened into blobs (`soften_subjects`) so the guide
+  constrains the camera and the static world and leaves the people free. The shot is then generated along the guide:
+  `ltx` reuses the take's machinery (`comfy.build_graph`: LTX-2.3 IC-LoRA union control, the guide as the depth video, the
+  start image as the pinned first frame and frames of the pure-camera render pinned along the way as `LTXVAddGuide`
+  anchors; generated at ~1024x576, `camera.res`, and scaled to `beat_res`: at 1536x896 a subject's colours drifted), `wan` is Wan 2.2 Fun Control (`build_wan_graph` with the guide as `control_video`), `uni3c` is the Wan i2v
+  graph with `WanUni3CControlnetApply` on both experts and the pure-camera render as its render video (it fails first with
+  the file name, URL, folder and licence when `Wan21_Uni3C_controlnet_fp16.safetensors` is not in `model_patches`). A path is
+  a `CameraPlan` (`path`, slice): alone a beat covers its own `CameraPath`; beats that `continue` one another share one
+  `flow` path over the chain (rests only at its ends and holds) and each takes its slice, so position and speed carry across
+  the cut, and the guide of every beat in a chain is flown through the chain's base plate (the first beat's still), not
+  through the previous beat's last frame (a close-up cannot zoom out). Plans reach the renderer as one key per frame under
+  linear easing, which keeps `freeze.py` untouched. Afterwards `tone_match` pulls the frames toward the plate (per-channel
+  gain and offset measured on the static world against the pure-camera render, smoothed in time, plus grain to the plate's
+  noise level). Measuring (`studio camera --check`, MCP `camera_check`): `track_views` registers every frame against the
+  first on the static world (SIFT + RANSAC similarity), `follow_error` compares the implied view with the keyed one,
+  `people_displacement` takes the camera out and reads how far the people have walked, and the same numbers for the
+  pure-camera render are the measurement's floor. Measured on the Presence street (3 s, 768x448, the keys push from the
+  wide frame to the girl and back): `ltx` follows the keys within 0.7-0.9% rms of view width (the floor is 0.15-0.2%),
+  `wan` (Fun Control, start image pinned) lags and never completes the pull-out (22.6% rms, 43% at worst), so `auto` is
+  `ltx`; `uni3c` could not be measured (its file is not installed). Stage key: a beat gets a `camera` entry only when it has `camera:`
+  (every other beat keeps its cache), including the chain it belongs to. Plan: `film:camera` units.
 - **Plans and storyboards.** `engine/plan.py` runs every builder in a dry run (`engine/fidelity.py` `planning()`):
   `BuildContext.stage` reports instead of running, a stage that would run marks its outputs dirty so stages keyed on
   them count too, and code that renders outside a stage (image inputs, product stills, model conversion) raises

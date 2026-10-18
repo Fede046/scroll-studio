@@ -332,12 +332,13 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
     from ..animate import FPS, animate, video_model, wan_settings
     from ..inputs import resolve_image
     from ..spec import ImageInput
+    from ..camera_beats import start_ref
     W, H = sec.beat_res[0] // 32 * 32, sec.beat_res[1] // 32 * 32
     clips, standing = [], []
     only = ctx.options.get("only_beats")      # build --only: the beats to render (None: all)
     from ..freeze_beats import set_lenient    # frozen moments: under --only a beat that is not rendered stands in
     set_lenient(only is not None)
-    for b in sec.beats:
+    for bi, b in enumerate(sec.beats):
         if b.freeze is not None:              # a frozen moment: rendered offline in seconds (engine/freeze_beats.py)
             from ..freeze_beats import beat_clip as freeze_clip
             clips.append(freeze_clip(ctx, sec, b, only, standing))
@@ -345,9 +346,9 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
         bdir = ctx.work / "beats" / b.id
         clip = bdir / "clip.mp4"
 
-        def run(b=b, bdir=bdir, clip=clip):
+        def run(b=b, bdir=bdir, clip=clip, bi=bi):
             bdir.mkdir(parents=True, exist_ok=True)
-            ref = b.image if b.image else ImageInput(generate=b.prompt, size=(W, H), seed=b.seed)
+            ref = start_ref(sec, bi, (W, H))
             src = resolve_image(ctx.project, ref, ctx.log)
             still = bdir / "still.png"
             ImageOps.fit(Image.open(src).convert("RGB"), (W, H), Image.LANCZOS).save(still)
@@ -361,8 +362,16 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
             stamp = bdir / "anim.json"
             frames = sorted((bdir / "frames").glob("*.png"))
             if not (frames and stamp.exists() and stamp.read_text() == akey):
-                frames = animate(still, b.prompt, b.motion, b.seconds, b.seed if b.motion_seed is None else b.motion_seed,
-                                 bdir, ctx.log, size=(W, H), strength=b.strength, end_image=end, model=model, wan=wan)
+                if b.camera is not None:     # a keyed camera move (engine/camera_beats.py): the model generates along a guide
+                    from ..camera_beats import make_frames as camera_frames
+                    from ..animate import NEGATIVE
+                    seed = b.camera.seed if b.camera.seed is not None else b.seed if b.motion_seed is None else b.motion_seed
+                    frames = camera_frames(ctx.project, sec, bi, still, bdir,
+                                           f"{b.prompt or 'The subject of the image'}. {b.motion}. Smooth natural motion.",
+                                           NEGATIVE, seed, wan_settings(ctx.options.get("site_wan")), ctx.log)
+                else:
+                    frames = animate(still, b.prompt, b.motion, b.seconds, b.seed if b.motion_seed is None else b.motion_seed,
+                                     bdir, ctx.log, size=(W, H), strength=b.strength, end_image=end, model=model, wan=wan)
                 stamp.write_text(akey)
             frames = frames[round(b.trim * FPS):]
             seq = bdir / "seq"
@@ -384,6 +393,11 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
             return {**stable_dump(r), "beat_frame_deps": deps} if deps else stable_dump(r)
         key = {"prompt": b.prompt, "motion": b.motion, "seconds": b.seconds, "seed": b.seed, "res": [W, H],
                "image": ref_key(b.image)}
+        if b.camera is not None:   # only for a camera beat, so every other beat keeps its cache
+            from ..camera_beats import key_of as camera_key
+            key["camera"] = camera_key(sec, bi)
+            if not b.image and b.camera.continues and bi > 0:
+                key["image"] = ref_key(start_ref(sec, bi, (W, H)))
         model = video_model(b.video_model, ctx.options.get("site_video_model"))
         wan = wan_settings(ctx.options.get("site_wan")) if model == "wan" else None
         if model != "ltx":   # only when not the default, so LTX beats rendered before video_model existed stay cached
@@ -416,9 +430,12 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
             clip = faces.restore_beat(ctx, b.id, clip, b.faces)
         clips.append(clip)
 
-    # join: each clip crossfades into the next
+    # join: each clip crossfades into the next, except a camera beat that continues the one before it: its first frame is
+    # that beat's last frame and the camera keeps its speed through the cut, so the two are one shot (a hard, frame-exact join)
     durs = [float(probe(c)["duration"]) for c in clips]
+    fades = join_fades(sec, durs)
     fade = min(sec.beat_fade, *(d / 3 for d in durs)) if len(clips) > 1 else 0
+    cont = [i > 0 and b.camera is not None and b.camera.continues for i, b in enumerate(sec.beats)]
     out = ctx.work / "gen" / "beats.mp4"
 
     def join():
@@ -426,17 +443,36 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
         if len(clips) == 1:
             shutil.copy(clips[0], out)
             return
+        groups: list = []                       # (file, seconds): continued beats merged into one clip
+        for i, c in enumerate(clips):
+            if cont[i] and groups:
+                prev, pd = groups[-1]
+                merged = ctx.work / "gen" / f"chain_{sec.beats[i].id}.mp4"
+                ffmpeg("-i", prev, "-i", c, "-filter_complex",
+                       "[1:v]trim=start_frame=1,setpts=PTS-STARTPTS[b];[0:v][b]concat=n=2:v=1:a=0[v]", "-map", "[v]",
+                       "-c:v", "libx264", "-crf", "13", "-preset", "slow", "-pix_fmt", "yuv420p", "-r", str(FPS), merged,
+                       log=ctx.log)
+                groups[-1] = (merged, pd + durs[i] - 1 / FPS)
+            else:
+                groups.append((c, durs[i]))
+        if len(groups) == 1:
+            shutil.copy(groups[0][0], out)
+            return
         args, graph, last, t = [], [], "[0:v]", 0.0
-        for c in clips:
+        for c, _ in groups:
             args += ["-i", c]
-        for i in range(1, len(clips)):
-            t += durs[i - 1] - fade
+        gfade = min(sec.beat_fade, *(d / 3 for _, d in groups))
+        for i in range(1, len(groups)):
+            t += groups[i - 1][1] - gfade
             tag = f"[v{i}]"
-            graph.append(f"{last}[{i}:v]xfade=transition=fade:duration={fade:.3f}:offset={t:.3f}{tag}")
+            graph.append(f"{last}[{i}:v]xfade=transition=fade:duration={gfade:.3f}:offset={t:.3f}{tag}")
             last = tag
         ffmpeg(*args, "-filter_complex", ";".join(graph), "-map", last, "-c:v", "libx264", "-crf", "14", "-preset", "slow",
                "-pix_fmt", "yuv420p", "-r", str(FPS), out, log=ctx.log)
-    ctx.stage("beats_join", {"clips": [file_key(c) for c in clips], "fade": fade}, [out], join)
+    jkey = {"clips": [file_key(c) for c in clips], "fade": fade}
+    if any(cont):
+        jkey["continued"] = cont                # only when there is one, so every other film keeps its cache
+    ctx.stage("beats_join", jkey, [out], join)
     if sec.beat_restore and standing:
         ctx.log(f"  beats_restore: skipped while {', '.join(standing)} stand in; a full build restores the film")
     elif sec.beat_restore:
@@ -449,21 +485,32 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
         out = restored
 
     set_lenient(False)
-    pin_steps(sec, durs, fade)
+    pin_steps(sec, durs, fades)
     return out
 
 
-def beat_spans(sec: FilmScene, durs: list[float], fade: float) -> dict[str, tuple[float, float]]:
-    """Each beat's span over the joined film, as fractions 0-1 of its length (steps and reveal regions are timed by it)."""
-    total = sum(durs) - fade * (len(durs) - 1)
+def join_fades(sec: FilmScene, durs: list[float]) -> list[float]:
+    """The overlap at each join of a beats film, in seconds (one per join): the crossfade, or, for a camera beat that
+    `continues` the one before it, one frame (the duplicate first frame of the continued beat, which is dropped: a hard cut)."""
+    from ..animate import FPS
+    n = len(durs)
+    fade = min(sec.beat_fade, *(d / 3 for d in durs)) if n > 1 else 0
+    return [1 / FPS if (sec.beats[i].camera is not None and sec.beats[i].camera.continues) else fade for i in range(1, n)]
+
+
+def beat_spans(sec: FilmScene, durs: list[float], fade) -> dict[str, tuple[float, float]]:
+    """Each beat's span over the joined film, as fractions 0-1 of its length (steps and reveal regions are timed by it).
+    `fade`: the crossfade, or one overlap per join (`join_fades`)."""
+    fades = list(fade) if isinstance(fade, (list, tuple)) else [fade] * (len(durs) - 1)
+    total = sum(durs) - sum(fades)
     spans, t = {}, 0.0
-    for b, d in zip(sec.beats, durs):
+    for i, (b, d) in enumerate(zip(sec.beats, durs)):
         spans[b.id] = (t / total, (t + d) / total)
-        t += d - fade
+        t += d - (fades[i] if i < len(fades) else 0)
     return spans
 
 
-def pin_steps(sec: FilmScene, durs: list[float], fade: float) -> None:
+def pin_steps(sec: FilmScene, durs: list[float], fade) -> None:
     """Time steps pinned with state: {beat: id} to their beat's span over the joined film (sets step.at)."""
     spans = beat_spans(sec, durs, fade)
     for st in sec.steps:

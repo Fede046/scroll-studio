@@ -695,6 +695,87 @@ def _faces(v):
 # ---------------------------------------------------------------------------------------------------------------
 
 
+# ---- camera moves on moving beats (engine/camera_guide.py): kept together so they merge cleanly --------------------
+
+CameraBackend = Literal["auto", "ltx", "wan", "uni3c"]
+
+
+class CameraMove(Model):
+    """A keyed camera move on a generated (moving) beat: the same keys as a frozen moment's camera, but the people keep
+    walking. The start image is given a depth map, the camera path is flown through it to make a guide video (the
+    moving subjects softened so they stay free), and the video model generates the beat along that guide, so the camera
+    does what the keys say instead of what the prompt hopes."""
+    keys: list[FreezeKey] = Field(..., min_length=1, description="Camera keys over the beat: {t, box, hold} exactly as in a "
+                                  "frozen moment (`freeze.camera`). The camera rests on the first box until its t and on "
+                                  "the last after its t")
+    ease: FreezeEase = Field("inOutSine", description="How the camera travels between boxes (as `freeze.ease`; `flow` keeps "
+                                                     "moving through keys)")
+    backend: CameraBackend = Field("auto", description="What generates the beat along the guide: ltx (LTX-2.3 IC-LoRA depth "
+                                   "control, the depth guide a take uses), wan (Wan 2.2 Fun Control, the guide as the control "
+                                   "video) or uni3c (Wan Uni3C camera controlnet; needs a model file that is not installed "
+                                   "by default). auto: the one measured to follow the keys best (see docs/ENGINE.md)")
+    subjects: str = Field("the people", description="Who is free to move, as you would say it to a person (found by "
+                          "Florence-2, cut out by SAM 2.1). The guide fixes the camera and the static world and only "
+                          "hints at where these are. Empty: nothing is freed (the guide pins everything, people included)")
+    soften: float = Field(0.045, ge=0, le=0.3, description="How far the subjects are softened in the guide, as a share of the "
+                          "frame width (a Gaussian blur of their own depth). 0 keeps their exact depth, which pins their "
+                          "silhouettes too (they only slide with the camera); larger frees them more but tells the model "
+                          "less about where they are")
+    guide_strength: float = Field(1.0, ge=0, le=2, description="How strongly the guide steers the model (LTX: the IC-LoRA "
+                                  "guide strength; Wan: Fun Control has no scale, so this is the Uni3C strength)")
+    parallax: float = Field(0.5, ge=0, le=2, description="Depth effect of the guide's camera (as `freeze.parallax`): near "
+                            "things shift against far ones as the camera moves, so the model sees a real camera move")
+    dolly: Optional[float] = Field(None, ge=0, le=3, description="Extra push-in of near things (default follows parallax)")
+    continues: bool = Field(False, description="Carry the previous beat's camera across the cut: this beat's camera starts "
+                            "where the previous camera beat ended, with the speed it ended at (no ease to a stop at the "
+                            "boundary), and it starts on that beat's last frame, graded to match")
+    res: Optional[tuple[int, int]] = Field(None, description="Size the video model runs at (the frames are scaled to beat_res; "
+                                           "ltx: multiples of 64, wan/uni3c: multiples of 16). Default: ltx about 1024x576 (more "
+                                           "pixels let the subjects drift in tests; `beat_restore` adds the detail back), wan "
+                                           "~1280x720")
+    anchor: float = Field(0.6, ge=0, le=1, description="ltx: how firmly the pure-camera render of the start image (the picture "
+                          "flown along the keys) is pinned as keyframes along the way, once a second and at the end. It keeps "
+                          "what things look like and sharpens close-ups (in tests: Laplacian variance 48-63 against 29-48 "
+                          "without, 66 in the pure render) and tightens the camera (0.8% against 1.3% zoom error). 0 = only "
+                          "the first frame is pinned")
+    match: Optional[float] = Field(None, ge=0, le=1, description="How far the generated frames are pulled back toward the base "
+                                   "plate's tone and grain (the start image of the first beat of the chain, flown along the "
+                                   "same camera): a video model drifts in contrast, haze and grain from clip to clip, and a "
+                                   "cut shows it. 0 = off. Default: 0.7 for a beat in a chain of `continues` beats, else off")
+    seed: Optional[int] = Field(None, description="Seed for the generation (default: the beat's motion_seed, then seed)")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _bare_keys(cls, v):
+        return {"keys": v} if isinstance(v, list) else v
+
+
+# ---------------------------------------------------------------------------------------------------------------
+
+
+def _check_camera(b) -> None:
+    """Validate a generated beat's `camera:` (keys inside the frame, going forward in time)."""
+    c = b.camera
+    ks = c.keys
+    for i, k in enumerate(ks):
+        x0, y0, x1, y1 = k.box
+        if not (0 <= x0 < x1 <= 1 and 0 <= y0 < y1 <= 1):
+            raise ValueError(f"beat '{b.id}': camera box {i} {list(k.box)} must be [x0, y0, x1, y1] inside 0-1 "
+                             "with x0 < x1 and y0 < y1")
+        if i and k.t <= ks[i - 1].t + ks[i - 1].hold - 1e-9:
+            raise ValueError(f"beat '{b.id}': camera keys must go forward in time (key {i} at t={k.t} comes before "
+                             f"the previous key's hold ends at {ks[i - 1].t + ks[i - 1].hold:g})")
+    if ks[-1].t + ks[-1].hold > 1 + 1e-9:
+        raise ValueError(f"beat '{b.id}': the last camera key's hold runs past the end of the beat")
+    if c.continues and ks[0].t <= 0:
+        raise ValueError(f"beat '{b.id}': with `continues` the camera starts where the previous beat's ended, so the first "
+                         "key must come after t = 0")
+    if b.trim:
+        raise ValueError(f"beat '{b.id}': `trim` cannot be combined with `camera` (the keys are timed over the whole clip)")
+    if b.end_image is not None:
+        raise ValueError(f"beat '{b.id}': `end_image` cannot be combined with `camera` (the camera path decides the last frame)")
+
+
 class Beat(Model):
     """One shot of a story film: a still generated from `prompt` (or taken from `image`), brought to life by `motion`."""
     id: str
@@ -719,6 +800,10 @@ class Beat(Model):
     freeze: Optional[Freeze] = Field(None, description="A frozen moment instead of a generated clip: one frame, upscaled, "
                                                        "with a 2.5D camera moving through it, rendered offline in seconds "
                                                        "(see Freeze). prompt, motion, image and end_image are not used")
+    camera: Optional[CameraMove] = Field(None, description="A keyed camera move on this moving beat (see CameraMove): "
+                                                         "`camera: {keys: [{t: 0, box: [0,0,1,1]}, {t: 0.5, box: [...]}, ...]}`. "
+                                                         "The crowd keeps moving, the camera does what the keys say. Needs an "
+                                                         "`image` (or a `prompt` to make one); not for a frozen moment")
 
     @model_validator(mode="after")
     def _generated_or_frozen(self):
@@ -727,7 +812,11 @@ class Beat(Model):
                 raise ValueError(f"beat '{self.id}': `prompt` and `motion` are required (or make it a frozen moment with `freeze:`)")
             if self.seconds > 10:
                 raise ValueError(f"beat '{self.id}': a generated beat is 1 to 10 seconds (a `freeze:` beat may be longer)")
+            if self.camera is not None:
+                _check_camera(self)
             return self
+        if self.camera is not None:
+            raise ValueError(f"beat '{self.id}': `camera` moves a generated beat; a frozen moment has `freeze.camera`")
         f = self.freeze
         if bool(f.from_) == (f.image is not None):
             raise ValueError(f"beat '{self.id}': freeze needs exactly one of `from` (a beat id) and `image`")

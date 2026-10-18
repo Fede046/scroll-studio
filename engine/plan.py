@@ -34,6 +34,7 @@ DEFAULTS = {
     "film:composite": 1.3,      # per frame
     "film:encode": 1.2,         # per second of film
     "film:beat": 100.0,         # per second of a beat (still + edit + animation)
+    "film:camera": 90.0,        # per second of a beat with a camera move (depth + people mask + guide, then the video model along it)
     "film:freeze": 1.5,         # per second of a frozen moment (depth + camera render, no upscale)
     "film:freeze_up": 10.0,     # per second of a frozen moment that upscales its frame (SeedVR2: ~2 min, then seconds)
     "film:freeze_zoom": 150.0,  # per tile of a deep zoom (SeedVR2 enlarge + Z-Image redraw + the agreement, model loads included)
@@ -51,7 +52,7 @@ FLAT = 10.0                     # any other stage, per run
 IMAGES = {"beat frame": 3.0, "image": 15.0, "edit": 60.0, "product still": 25.0, "scene still": 150.0, "product model": 60.0,
           "download": 5.0, "art": 240.0, "stand-in": 5.0}
 # what counts as heavy GPU work (a video model, SeedVR2, a Cycles pass over every frame): the build lists these first
-HEAVY = ("film:generate", "film:generate_wan", "film:restore", "film:product", "film:beat", "film:keyframes",
+HEAVY = ("film:generate", "film:generate_wan", "film:restore", "film:product", "film:beat", "film:camera", "film:keyframes",
          "film:freeze_up", "film:freeze_zoom", "film:freeze_layers", "sequence:render", "film:reveal_track", "film:faces")
 
 
@@ -183,6 +184,8 @@ def units(sec, name: str) -> tuple[str, float]:
                 if f.layers is not None:
                     return "film:freeze_layers", 1.0
                 return ("film:freeze_up" if f.upscale > 1 else "film:freeze"), float(b.seconds)
+            if b is not None and b.camera is not None:     # a camera move: the guide, then the video model along it
+                return "film:camera", float(b.seconds)
             return "film:beat", float(b.seconds if b else 4.0)
         if name == "blockout":
             return "film:blockout", frames

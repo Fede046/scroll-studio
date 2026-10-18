@@ -47,6 +47,7 @@ def checks() -> list[dict]:
     except Exception as e:
         add("ComfyUI", False, str(e), "film, generated images")
     res.extend(wan_checks())
+    res.extend(uni3c_checks())
     res.extend(reveal_checks())
     add("Chrome", shutil.which("chrome") or Path(r"C:\Program Files\Google\Chrome\Application\chrome.exe").exists() or s["chrome"],
         "found", "recordings")
@@ -78,6 +79,21 @@ def wan_checks() -> list[dict]:
             detail = f"{folder}/{hit}" if ok else f"missing {folder}/{want} ({m['size_gb']} GB): {m['source']}"
         out.append({"name": m["name"], "ok": ok, "detail": detail, "needed_by": ", ".join(m.get("used_by", []))})
     return out
+
+
+def uni3c_checks() -> list[dict]:
+    """The optional Uni3C camera controlnet (`camera.backend: uni3c`): found in ComfyUI's model_patches list, or noted as not
+    installed (it is not a failure: the other camera backends need nothing extra)."""
+    from .backends import comfy
+    from . import camera_guide as cg
+    have = comfy.listed("model_patches")
+    name = "Uni3C camera controlnet (optional)"
+    need = "film beats with camera.backend uni3c"
+    if have is None:
+        return [{"name": name, "ok": False, "detail": "ComfyUI not running, can't check", "needed_by": need}]
+    hit = next((h for h in have if h.replace("\\", "/").rsplit("/", 1)[-1] == cg.UNI3C_FILE), None)
+    return [{"name": name, "ok": True, "detail": f"model_patches/{hit}" if hit else
+             f"not installed (optional, ~2 GB, Apache-2.0): {cg.UNI3C_SOURCE}", "needed_by": need}]
 
 
 def reveal_checks() -> list[dict]:

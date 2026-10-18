@@ -5,8 +5,10 @@
   studio storyboard my-site [--level sketch|stills|animatic] [--only id,id] [--motion] [--open]
   studio storyboard my-site --edit [--port 8971]    edit every shot in the browser: notes, captions, regenerate one image, play it
   studio storyboard my-site --notes                 the open notes written there, with each shot's current values
+  studio camera my-site beat [--guide | --check]    a beat with `camera:` keys: preview its guide (pure camera), or measure how well it follows
   studio preview my-site [--port 5173]
   studio record my-site [--section hero] [--seconds 12] [--gif]
+  studio inspect my-site [--section story] [--json]   polish report of a built film: pops, softness, halos, style drift, morphs
   studio trailer my-site [--format 9x16] [--plan]      launch trailer from the site's renders -> dist/trailer/
   studio ui                                         the Studio app (http://localhost:5180)
   studio doctor                                     check Python, Node, FFmpeg, Blender, GPU, ComfyUI, models
@@ -352,6 +354,56 @@ def record(name: str, section: Optional[str] = None, seconds: float = 12.0, out:
 
 
 @app.command()
+def inspect(name: str, section: Optional[str] = typer.Option(None, help="Film section to inspect (default: every film section "
+                                                                        "that has a built film)"),
+            video: Optional[Path] = typer.Option(None, "--video", help="Inspect any video file as one shot instead (a screen "
+                                                                     "recording, a clip)"),
+            as_json: bool = typer.Option(False, "--json", help="Print the report as JSON and nothing else"),
+            force: bool = typer.Option(False, "--force", help="Measure again even if the film has not changed"),
+            embed: bool = typer.Option(False, "--embed", help="Also measure style drift with a local CLIP embedding "
+                                                              "(OpenCLIP ViT-H/14 from the Hugging Face cache, CPU, slow; "
+                                                              "nothing is downloaded)"),
+            open_: bool = typer.Option(False, "--open", help="Open the HTML report when done")):
+    """Polish report for a built film (beats, a take or a video): scores it second by second and beat by beat for pops
+    (jumps, flicker, judder and crossfades that do not line up), softness (looks upscaled), halos (rims and double edges),
+    style drift (the look moving away from the section's start) and morphs (shapes rebuilding instead of moving). Writes
+    <project>/.build/inspect/<section>.json and .html (the worst moments with pictures and a line saying what is wrong);
+    the storyboard editor shows each beat's worst problem. CPU only; unchanged films are answered from the saved report."""
+    import json as _json
+    import sys
+    from . import polish
+    from .project import Project
+    project = Project(resolve(name))
+    log = (lambda m: typer.echo(m, err=True)) if as_json else typer.echo
+    try:
+        reports = ([polish.inspect_video(project, str(video), force=force, embed=embed, log=log)] if video
+                   else polish.inspect_project(project, section, force=force, embed=embed, log=log))
+    except polish.Nothing as e:
+        raise typer.BadParameter(str(e))
+    if not reports:
+        raise typer.BadParameter("nothing to inspect: no film section with a built film (run `studio build` first)")
+    if as_json:
+        sys.stdout.write(_json.dumps(reports[0] if len(reports) == 1 else reports, indent=1, default=float) + "\n")
+        return
+    for r in reports:
+        _, html = polish.report_path(project, r["section"])
+        s = r["summary"]
+        typer.echo(f"\n{r['section']}: {s['verdict']}: {s['issues']} problem(s)"
+                   + (f" ({s['counts']['bad']} bad, {s['counts']['visible']} visible, {s['counts']['slight']} slight)" if s["issues"] else "")
+                   + ("  [saved report, film unchanged]" if r.get("cached") else ""))
+        for x in r["issues"][:8]:
+            typer.echo(f"  {x['level']:8} {x['metric']:8} {x['t0']:6.1f}-{x['t1']:.1f}s  {x['beat']}: {x['reason']}")
+        if len(r["issues"]) > 8:
+            typer.echo(f"  ... {len(r['issues']) - 8} more in the report")
+        typer.echo("  beat scores (100 = clean): " + "  ".join(
+            f"{b['id']}[{' '.join(str(b['scores'][m]) for m in polish.METRICS)}]" for b in r["beats"]) + f"   order: {' '.join(polish.METRICS)}")
+        typer.echo(f"  report: {html}")
+    if open_:
+        import webbrowser
+        webbrowser.open(polish.report_path(project, reports[0]["section"])[1].as_uri())
+
+
+@app.command()
 def previews(names: list[str], out: Path = typer.Option(..., help="Folder for <project>.mp4 + <project>.jpg"),
              seconds: float = 10.0, out_width: int = 1280, poster_at: float = 0.5, skip_existing: bool = True):
     """Preview video + poster for each project's first scene (for galleries and READMEs)."""
@@ -540,6 +592,36 @@ def trailer(name: str, format: Optional[str] = typer.Option(None, help="16x9 or 
     res = build_trailer(project, formats=[format] if format else None, force=force)
     for fmt, v in res["videos"].items():
         typer.echo(f"{fmt}: {v}")
+
+
+@app.command()
+def camera(name: str, beat: str,
+           guide: bool = typer.Option(False, "--guide", help="Only make the camera guide (depth, people mask, the guide videos) and print "
+                                                             "where it is: guide_rgb.mp4 is a pure-camera preview of the keyed move"),
+           check: bool = typer.Option(False, "--check", help="Measure the beat's rendered frames: does the camera follow its keys, do the "
+                                                             "people still move? Writes camera.json beside the beat's frames"),
+           section: Optional[str] = typer.Option(None, help="The film section, when the beat id is in more than one")):
+    """Keyed camera moves on a moving beat (`camera:` on a beat): preview the guide, or measure how well the render follows the keys."""
+    from . import camera_beats as cb
+    from .project import Project
+    project = Project(resolve(name))
+    if not (guide or check):
+        raise typer.BadParameter("use --guide or --check (the beat itself is made by `studio build --only <beat>`)")
+    if guide:
+        r = cb.guide_only(project, beat, section, typer.echo)
+        typer.echo(json.dumps(r, indent=1))
+    if check:
+        r = cb.check(project, beat, section, typer.echo)
+        c, f = r["camera"], r["floor"]
+        typer.echo(f"{r['beat']} ({r['backend']}, {r['frames']} frames): camera zoom error rms {c['zoom_rms']:.1f}% (max {c['zoom_max']:.1f}%), "
+                   f"shift rms {c['shift_rms']:.3f} view widths (max {c['shift_max']:.3f}), {c['lost']} frames not registered; "
+                   f"measurement floor {f['zoom_rms']:.2f}% / {f['shift_rms']:.3f}")
+        if "people" in r:
+            p, pf = r["people"], r["people_floor"]
+            typer.echo(f"  people: {p['people_end_px']:.1f} px from where they stood at the start by the end of the beat "
+                       f"(static world {p['static_end_px']:.1f} px; a frozen picture under the same camera {pf['people_end_px']:.1f} px; "
+                       f"frame is {p['width']} px wide)")
+        typer.echo(f"  sheet: {r.get('sheet')}")
 
 
 @app.command()

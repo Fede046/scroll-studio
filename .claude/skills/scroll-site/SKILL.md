@@ -34,6 +34,14 @@ storyboard, a `freeze` card shows flat crops at each camera box (the framing to 
 `parallax` 0.3-0.8 (above 1 stretches behind edges) and boxes near the aspect of `beat_res`. Look at the close-ups after
 the SeedVR2 upscale: it redraws detail, and a hand or a logo may come out different from the source.
 
+**A camera move on a moving shot: `camera:`.** When the crowd keeps walking while the camera pushes to one person and back
+out, give the generated beat `camera: { keys: [{ t, box: [x0, y0, x1, y1], hold? }...], ease?, subjects: "the people" }`
+(the same keys as a frozen moment). The engine flies that path through the start image's depth into a guide video (the
+moving subjects softened so they stay free) and the video model paints the shot along it. Preview the pure camera first:
+`studio camera <project> <beat> --guide` (read `guide_rgb.mp4`), build the beat, then `studio camera <project> <beat> --check`
+and read the contact sheet and the zoom/shift error. Beats that `continue` one another (`camera: { continues: true }`) share
+one camera across the cut, start on the previous last frame and are graded toward the base plate.
+
 ## 2. Write the spec
 - Start from the closest example: `list_projects`, then `create_project(name, example=...)`, then edit with `get_spec`/`set_spec`.
 - `spec_schema('<type>')` gives every field with descriptions. Pick a theme preset that fits the domain
@@ -110,6 +118,10 @@ the real first frames (same stages and caches), so approving them is not wasted 
 2. `snapshot(project)`, then read the sheet image. Check: text legible over the visual, the subject framed
    (not hidden behind the copy), nothing cut off, colours on brand, every stage actually visible.
 3. Fix the spec (or the engine, if it's an engine limitation) and repeat. Finish with a full `build`.
+   After a film is built, `inspect_film(project)` (`studio inspect`) scores it for pops, softness, halos, style drift and
+   morphs second by second and beat by beat: Read its worst-moment pictures (`.build/inspect/<section>/`) and fix what it
+   names (each issue says what to try) before the owner sees it. Beats that should look like one scene start on the
+   previous beat's last frame (`image: { beat_frame }`); a crossfade between two pictures that do not line up shows as a pop.
 4. `record(project)` for an MP4 scroll-through when the user wants something to share. For a launch film, add
    `trailer: {}` to the spec and run `trailer(project)` (16:9 + 9:16 in dist/trailer/); check the cut with
    `trailer(project, plan_only=True)` and look at frames of the result before handing it over.

@@ -33,6 +33,11 @@ studio doctor
 
 The built runtime is committed, so `npm run build` is only needed for the UI or after editing `runtime/src`.
 
+`studio inspect` (the polish report) needs nothing more: OpenCV, SciPy and NumPy are core dependencies and it runs on the
+CPU. Its optional `--embed` drift check also needs `pip install -e .[embed]` (open_clip_torch) and the LAION CLIP ViT-H/14
+weights (`laion/CLIP-ViT-H-14-laion2B-s32B-b79K`, 3.9 GB, MIT) already in the Hugging Face cache; it never downloads them
+(`huggingface-cli download laion/CLIP-ViT-H-14-laion2B-s32B-b79K open_clip_pytorch_model.bin` fetches them once).
+
 ## 2. GPU stages (parallax, film)
 
 Install PyTorch for your CUDA driver first, then the ML extras:
@@ -59,6 +64,11 @@ in `studio.toml` (copy `studio.example.toml`) or the `BLENDER` environment varia
    the nodes `studio setup-comfy` installs for `reveal` and region edits. No new weights.
 2. Download the models listed in `engine/models.yaml` into ComfyUI's model folders (or point
    `extra_model_paths.yaml` at another drive).
+   Optional: `camera.backend: uni3c` (keyed camera moves on moving beats) wants the Uni3C camera controlnet,
+   `Wan21_Uni3C_controlnet_fp16.safetensors` (about 2 GB, Apache-2.0,
+   [Kijai/WanVideo_comfy](https://huggingface.co/Kijai/WanVideo_comfy/blob/main/Wan21_Uni3C_controlnet_fp16.safetensors)),
+   in ComfyUI's `models/model_patches/`. It is not installed by default and nothing else needs it: the default backends,
+   `ltx` and `wan`, use models you already have. `studio doctor` lists it.
 3. Start it and leave it running:
    ```bash
    python main.py --listen 127.0.0.1 --port 8188 --reserve-vram 1.5
