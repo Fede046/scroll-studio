@@ -36,7 +36,7 @@ from . import freeze as fz
 from .freeze import FPS, CameraPath, View
 from .project import BuildError
 
-VERSION = 3
+VERSION = 5
 
 
 # ---------------------------------------------------------------- the path
@@ -203,9 +203,11 @@ def ltx_frames(seconds: float) -> int:
 
 def generate_ltx(still: Path, guide: Path, text: str, negative: str, size: tuple[int, int], frames: int, seed: int,
                  work: Path, guide_strength: float = 1.0, log: Callable = print, sampler: str = "euler_ancestral_cfg_pp",
-                 control_strength: float = 1.0, keyframe_strength: float = 1.0) -> list[Path]:
+                 control_strength: float = 1.0, keyframe_strength: float = 1.0,
+                 anchors: Optional[list[tuple[Path, int, float]]] = None) -> list[Path]:
     """The beat painted by LTX-2.3 along the depth guide: the IC-LoRA union control a take uses (`build_graph`), with
-    the start image as the pinned first frame. Returns the frames (PNG paths, 24 fps)."""
+    the start image as the pinned first frame. `anchors`: (image, frame index (-1: the last), strength) keyframes pinned along
+    the way (a take's keyframe guides: `LTXVAddGuide`), which keep what things look like. Returns the frames (PNG paths, 24 fps)."""
     from .backends import comfy
     w, h = size
     if w % 64 or h % 64:
@@ -218,8 +220,9 @@ def generate_ltx(still: Path, guide: Path, text: str, negative: str, size: tuple
     cfg = dict(comfy.LTX, prompt=text, negative_prompt=negative, keyframe_strength=keyframe_strength,
                guide_strength=guide_strength, control_strength=control_strength, seed=seed, sampler=sampler, upscale=False)
     comfy.free()
+    guides = [(comfy.upload(str(_unique(img, f"anc{n}"))), idx, st) for n, (img, idx, st) in enumerate(anchors or [])]
     g = comfy.build_graph(cfg, comfy.upload(str(_unique(guide, "ltxg"))), comfy.upload(str(_unique(still, "still"))),
-                          frames, w, h, FPS, prefix=f"studio/cam_{work.name}")
+                          frames, w, h, FPS, prefix=f"studio/cam_{work.name}", guides=guides)
     log(f"  camera move: LTX-2.3 along the depth guide ({w}x{h}, {frames} frames)")
     t0 = time.time()
     images = comfy.run(g, poll=3)

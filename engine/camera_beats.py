@@ -47,13 +47,20 @@ def start_ref(sec, i: int, size: tuple[int, int]):
 
 # ---------------------------------------------------------------- sizes
 
-def gen_size(size: tuple[int, int], backend: str, frames: int) -> tuple[int, int]:
-    """The size the video model runs at: `size` when it fits, else the largest at its aspect that does (LTX: multiples of
-    64 and <= 22k latent tokens; Wan and Uni3C: ~1280x720 pixels, multiples of 16). The frames are scaled to `size` after."""
+LTX_PIXELS = 0.62e6             # ltx renders at about this many pixels (1024x576): in tests the IC-LoRA held the subjects' looks there
+                                # and let them drift (a black coat turning white) at 1536x896; beat_restore adds the detail back
+
+
+def gen_size(size: tuple[int, int], backend: str, frames: int, res: Optional[tuple[int, int]] = None) -> tuple[int, int]:
+    """The size the video model runs at: `res` when the spec gives one, else `size` when it is small enough, else the largest
+    at its aspect that is (LTX: multiples of 64, about 0.6 megapixels and at most 22k latent tokens; Wan and Uni3C: ~1280x720
+    pixels, multiples of 16). The frames are scaled to `size` after."""
     W, H = size
     if backend == "ltx":
         steps = (frames - 1) // 8 + 1
-        budget = 21000 / steps * 1024                      # pixels: tokens = pixels / 1024 * steps
+        if res:
+            return max(256, int(res[0]) // 64 * 64), max(256, int(res[1]) // 64 * 64)
+        budget = min(21000 / steps * 1024, LTX_PIXELS)        # pixels: tokens = pixels / 1024 * steps
         scale = min(1.0, (budget / (W * H)) ** 0.5)
         w = max(256, int(W * scale) // 64 * 64)
         h = max(256, int(round(w * H / W / 64)) * 64)
@@ -61,6 +68,8 @@ def gen_size(size: tuple[int, int], backend: str, frames: int) -> tuple[int, int
             w -= 64
             h = max(256, int(round(w * H / W / 64)) * 64)
         return w, h
+    if res:
+        return max(256, int(res[0]) // 16 * 16), max(256, int(res[1]) // 16 * 16)
     scale = min(1.0, (1280 * 720 / (W * H)) ** 0.5)
     return max(256, int(W * scale) // 16 * 16), max(256, int(round(W * scale * H / W / 16)) * 16)
 
@@ -118,7 +127,7 @@ def prepare(project, sec, i: int, still: Path, bdir: Path, log: Callable = print
     backend = backend_of(move)
     beat_w, beat_h = sec.beat_res[0] // 32 * 32, sec.beat_res[1] // 32 * 32
     frames = frames_of(b.seconds, backend)
-    size = gen_size((beat_w, beat_h), backend, frames)
+    size = gen_size((beat_w, beat_h), backend, frames, move.res)
     plate = plate_of(project, sec, i, still)
     img = Image.open(plate).convert("RGB").resize(size, Image.LANCZOS)
     rgb = np.asarray(img)
@@ -188,7 +197,9 @@ def make_frames(project, sec, i: int, still: Path, bdir: Path, text: str, negati
     gstill = bdir / "_cam_gen_still.png"
     Image.open(still).convert("RGB").resize(size, Image.LANCZOS).save(gstill)
     if backend == "ltx":
-        pngs = cg.generate_ltx(gstill, guide.depth, text, negative, size, guide.frames, seed, bdir, move.guide_strength, log)
+        anchors = _anchors(guide, size, move.anchor, bdir) if move.anchor > 0 else None
+        pngs = cg.generate_ltx(gstill, guide.depth, text, negative, size, guide.frames, seed, bdir, move.guide_strength, log,
+                               anchors=anchors)
         src_fps = FPS
     elif backend == "wan":
         pngs = cg.generate_wan(gstill, guide.depth, text, negative, size, guide.frames, seed, bdir, wan_cfg, log)
@@ -231,6 +242,25 @@ def make_frames(project, sec, i: int, still: Path, bdir: Path, text: str, negati
     # before joins it with no step at all
     if out and Image.open(still).size == tuple(beat_size):
         shutil.copy(still, out[0])
+    return out
+
+
+def _anchors(guide, size: tuple[int, int], strength: float, bdir: Path) -> list[tuple[Path, int, float]]:
+    """Keyframes for LTX along the way: frames of the pure-camera render, one a second (frame indices are multiples of 8, one
+    latent frame) and the last frame, written as PNGs next to the beat."""
+    from PIL import Image
+    refs = cg.read_video(guide.rgb, size)
+    n = len(refs)
+    idxs = sorted({((k * 24) // 8) * 8 for k in range(1, (n - 1) // 24 + 1)} - {0} - {i for i in range(n - 1, n + 8)})
+    out = []
+    for k in idxs:
+        p = bdir / f"cam_anchor_{k:03d}.png"
+        Image.fromarray(refs[k]).save(p)
+        out.append((p, k, strength))
+    last = bdir / "cam_anchor_last.png"
+    Image.fromarray(refs[-1]).save(last)
+    if (n - 1) % 8 == 0:
+        out.append((last, -1, strength))
     return out
 
 

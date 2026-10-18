@@ -629,6 +629,15 @@ class CameraMove(Model):
     continues: bool = Field(False, description="Carry the previous beat's camera across the cut: this beat's camera starts "
                             "where the previous camera beat ended, with the speed it ended at (no ease to a stop at the "
                             "boundary), and it starts on that beat's last frame, graded to match")
+    res: Optional[tuple[int, int]] = Field(None, description="Size the video model runs at (the frames are scaled to beat_res; "
+                                           "ltx: multiples of 64, wan/uni3c: multiples of 16). Default: ltx about 1024x576 (more "
+                                           "pixels let the subjects drift in tests; `beat_restore` adds the detail back), wan "
+                                           "~1280x720")
+    anchor: float = Field(0.6, ge=0, le=1, description="ltx: how firmly the pure-camera render of the start image (the picture "
+                          "flown along the keys) is pinned as keyframes along the way, once a second and at the end. It keeps "
+                          "what things look like and sharpens close-ups (in tests: Laplacian variance 48-63 against 29-48 "
+                          "without, 66 in the pure render) and tightens the camera (0.8% against 1.3% zoom error). 0 = only "
+                          "the first frame is pinned")
     match: Optional[float] = Field(None, ge=0, le=1, description="How far the generated frames are pulled back toward the base "
                                    "plate's tone and grain (the start image of the first beat of the chain, flown along the "
                                    "same camera): a video model drifts in contrast, haze and grain from clip to clip, and a "

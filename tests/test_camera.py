@@ -223,7 +223,8 @@ def test_tone_match_pulls_a_drifted_clip_back_and_adds_grain():
 
 def test_generation_sizes_fit_the_models():
     w, h = cb.gen_size((1920, 1088), "ltx", 121)
-    assert w % 64 == 0 and h % 64 == 0 and (w // 32) * (h // 32) * 16 <= 22000 and abs(w / h - 1920 / 1088) < 0.1
+    assert (w, h) == (1024, 576) and (w // 32) * (h // 32) * 16 <= 22000
+    assert cb.gen_size((1920, 1088), "ltx", 121, (1536, 896)) == (1536, 896)         # the spec's own `res`
     assert cb.gen_size((768, 448), "ltx", 73) == (768, 448)
     w, h = cb.gen_size((1920, 1088), "wan", 81)
     assert w % 16 == 0 and h % 16 == 0 and w * h <= 1280 * 720 * 1.02
@@ -381,3 +382,16 @@ def test_continued_beats_join_with_a_frame_not_a_crossfade():
     assert spans["b"][0] == pytest.approx((3.0 - 1 / 24) / total) and spans["c"][1] == pytest.approx(1.0)
     # the old scalar form still works
     assert beat_spans(sec, durs, 0.4)["c"][0] == pytest.approx((6 - 0.8) / (9 - 0.8))
+
+
+@needs_ffmpeg
+def test_anchors_are_pure_camera_frames_at_latent_boundaries(tmp_path):
+    rgb = texture(128, 64)
+    depth = np.full((64, 128), 0.4, np.float32)
+    move = CameraMove(keys=KEYS, parallax=0.0)
+    plan = cg.CameraPlan(cg.camera_path(move))
+    g = cg.write_guide(tmp_path, rgb, depth, None, move, plan, size=(128, 64), n_frames=121, fps=24, soften=0, name="g")
+    anchors = cb._anchors(g, (128, 64), 0.6, tmp_path)
+    idx = [i for _, i, _ in anchors]
+    assert idx == [24, 48, 72, 96, -1] and all(s == 0.6 for _, _, s in anchors)
+    assert all(i % 8 == 0 for i in idx if i > 0) and all(p.exists() for p, _, _ in anchors)
