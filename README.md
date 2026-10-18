@@ -591,7 +591,9 @@ What happens, each step cached by its own digest in the beat's folder:
    `guide_rgb.mp4`, the picture itself flown along the keys (a pure-camera preview you can look at before a minute of GPU
    is spent: `studio camera <project> <beat> --guide`), and `guide_static.mp4`, where the static world is.
 3. **The shot.** LTX-2.3 (the IC-LoRA depth control a take uses) paints the beat along the guide from the start image,
-   at the largest size that fits (about 1536x896 for 5 s), scaled to `beat_res`. `backend: wan` runs Wan 2.2 Fun Control on
+   with frames of the pure-camera render pinned along the way (`anchor`: once a second and at the end, which keeps the
+   subjects' looks and sharpens close-ups). It runs at about 1024x576 (`camera.res`; at 1536x896 the girl's black coat
+   turned white in a test) and is scaled to `beat_res`: add `beat_restore: 1088` to the film for the fine detail. `backend: wan` runs Wan 2.2 Fun Control on
    the same guide; `backend: uni3c` is Wan's camera controlnet (needs a file that is not installed by default, see
    docs/INSTALL.md; the engine fails with its name, URL and folder when it is missing).
 4. **The measurement.** `studio camera <project> <beat> --check` registers every generated frame against the first on the
@@ -624,7 +626,7 @@ and grain from showing at the cut.
 
 `trim` and `end_image` do not combine with `camera` (the keys are timed over the whole clip; the path decides the last
 frame). Cost: the depth and the people mask once per start image (about a minute, mostly model loading), the guide in
-seconds, the shot as long as any LTX beat of that length. Changing a box re-renders the guide and the shot, not the depth.
+seconds, the shot as long as any LTX beat of that length (about 10 minutes for 5 s on a 4090). Changing a box re-renders the guide and the shot, not the depth.
 
 ### Edit only inside a region (`edit.region`)
 

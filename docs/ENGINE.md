@@ -148,8 +148,8 @@ UI (React) ◄─► engine server (FastAPI + job queue + websocket events) ◄�
   pure-camera render, and the static-world mask), the subjects' depth softened into blobs (`soften_subjects`) so the guide
   constrains the camera and the static world and leaves the people free. The shot is then generated along the guide:
   `ltx` reuses the take's machinery (`comfy.build_graph`: LTX-2.3 IC-LoRA union control, the guide as the depth video, the
-  start image as the pinned first frame; the shot is generated at the largest size that fits ~22k latent tokens and scaled
-  to `beat_res`), `wan` is Wan 2.2 Fun Control (`build_wan_graph` with the guide as `control_video`), `uni3c` is the Wan i2v
+  start image as the pinned first frame and frames of the pure-camera render pinned along the way as `LTXVAddGuide`
+  anchors; generated at ~1024x576, `camera.res`, and scaled to `beat_res`: at 1536x896 a subject's colours drifted), `wan` is Wan 2.2 Fun Control (`build_wan_graph` with the guide as `control_video`), `uni3c` is the Wan i2v
   graph with `WanUni3CControlnetApply` on both experts and the pure-camera render as its render video (it fails first with
   the file name, URL, folder and licence when `Wan21_Uni3C_controlnet_fp16.safetensors` is not in `model_patches`). A path is
   a `CameraPlan` (`path`, slice): alone a beat covers its own `CameraPath`; beats that `continue` one another share one

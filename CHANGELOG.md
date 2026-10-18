@@ -17,7 +17,7 @@ Everything so far is version 1. On 2026-10-12 the releases first published as 2.
   and a static-world mask; then LTX-2.3 (the take's IC-LoRA depth control, the default) or Wan 2.2 Fun Control paints the
   beat along the guide, or Wan Uni3C (`backend: uni3c`, which names its missing 2 GB controlnet file, URL and folder).
   `camera.continues` makes beats share one camera path (position and speed carry across the cut, no ease to a stop), start
-  on the previous beat's last frame and fly their guide through the chain's base plate; `match` grades the frames toward
+  on the previous beat's last frame (and join it as one hard, frame-exact cut instead of a crossfade) and fly their guide through the chain's base plate; `match` grades the frames toward
   the plate's tone and grain so clips do not drift. `studio camera <project> <beat> --guide` renders the pure-camera preview
   in seconds; `--check` (and MCP `camera_guide` / `camera_check`) measures the render against the keys (zoom and shift
   error per frame, how far the people walked, the measurement's floor) and writes a contact sheet. Beats without `camera`
