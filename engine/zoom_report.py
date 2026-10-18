@@ -88,6 +88,13 @@ def sharpness_table(frames: np.ndarray, widths: np.ndarray, zooms: Sequence[floa
     return rows
 
 
+def sharpness_series(frames: np.ndarray, step: int = 4) -> tuple[np.ndarray, np.ndarray]:
+    """(frame numbers, edge width in output pixels) every `step` frames: the picture's sharpness along the whole move, so a
+    dip where a level has not yet arrived (or a tile is missing) shows."""
+    idx = np.arange(0, len(frames), step)
+    return idx, np.array([edge_width(frames[i]) for i in idx])
+
+
 def frame_differences(frames: np.ndarray) -> np.ndarray:
     """Mean absolute change (grey levels) between each frame and the next."""
     f = frames.astype(np.int16)
@@ -194,6 +201,12 @@ def report(clip: Path, camera, ease: str, out_dir: Path, name: str = "after", ot
     result["spike"] = {k: spike_ratio(v) for k, v in diffs.items()}
     result["max_diff"] = {k: float(v.max()) for k, v in diffs.items()}
     plot_series(diffs, out_dir / "frame_difference.png", "mean change between consecutive frames", "grey levels")
+    edges = {}
+    for k, v in clips.items():
+        idx, e = sharpness_series(v)
+        edges[k] = np.interp(np.arange(len(v)), idx, e)
+    plot_series(edges, out_dir / "edge_width.png", "width of the sharpest edges (output pixels; lower is sharper)", "px")
+    result["edge_series"] = {k: [round(float(x), 2) for x in v[::4]] for k, v in edges.items()}
     plot_series({"1 / view width (zoom)": 1.0 / widths}, out_dir / "zoom.png", "the camera's zoom", "x")
     idx = [int(round(i)) for i in np.linspace(0, n - 1, 12)]
     contact_strip(frames, idx, out_dir / "strip.jpg", [f"{i}: {1 / widths[i]:.1f}x" for i in idx])

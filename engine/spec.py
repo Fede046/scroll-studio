@@ -466,9 +466,12 @@ class FreezeDetail(Model):
     tile: float = Field(1.25, ge=1.0, le=2.0, description="A tile's resolution as a multiple of the beat's (1.25 = 2400 px "
                                                           "across for a 1920 beat): more means fewer, sharper tiles and a "
                                                           "slower build")
-    lock: float = Field(0.7, ge=0.2, le=2.0, description="How firmly a tile agrees with its parent: the parent's detail is "
-                                                         "kept below this many parent pixels of blur. Lower lets a tile "
-                                                         "change more of what the parent drew")
+    lock: float = Field(2.5, ge=0.2, le=8.0, description="How firmly a tile agrees with its parent: the tile is made to match "
+                                                          "the parent at every scale coarser than this many parent pixels "
+                                                          "(colour, tone, where shapes are); finer than that it is its own. "
+                                                          "Lower holds the parent's soft edges and detail too, so a tile "
+                                                          "stays as soft as its parent; higher lets the tile move "
+                                                          "mid-sized shapes")
     method: Literal["zimage", "qwen"] = Field("zimage", description="The re-draw: zimage (Z-Image Turbo img2img: keeps "
                                                                     "every shape where it is, fast; adds texture and "
                                                                     "creases, and draws what the prompt names where the "
