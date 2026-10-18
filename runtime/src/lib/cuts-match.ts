@@ -45,25 +45,31 @@ interface Plan { sA: number; sB: number; fA: [number, number]; fB: [number, numb
 /** Choose the two scales and the screen point the shapes meet at. Both sides only ever zoom in (a picture scaled below
  * 1 would show its edges), the pivot of each zoom stays on screen (so the picture still covers it), and the bigger
  * ratio goes to whichever side has the smaller shape. */
-export function planMatch(A: Box, B: Box, W: number, H: number, zoom: number): Plan {
+export function planMatch(A: Box, B: Box, W: number, H: number, zoom: number): Plan | null {
   const sizeA = Math.sqrt(A.w * A.h), sizeB = Math.sqrt(B.w * B.h);
   const ratio = sizeB / sizeA;
-  const P = 1.07;   // both sides push in a little even when the shapes already agree
-  let sA = P, sB = P;
-  if (ratio >= 1) { sA = P * Math.min(zoom, ratio); sB = Math.max(1.02, sA * sizeA / sizeB); }
-  else { sB = P * Math.min(zoom, 1 / ratio); sA = Math.max(1.02, sB * sizeB / sizeA); }
   const cA = [A.x + A.w / 2, A.y + A.h / 2], cB = [B.x + B.w / 2, B.y + B.h / 2];
-  const T: [number, number] = [0, 0];
   const dim = [W, H];
-  for (let i = 0; i < 2; i++) {
-    // the pivot of a zoom by s that carries c to t is (s c - t) / (s - 1); it must stay inside [0, dim]
-    const lo = Math.max(sA * cA[i] - (sA - 1) * dim[i], sB * cB[i] - (sB - 1) * dim[i]);
-    const hi = Math.min(sA * cA[i], sB * cB[i]);
-    const mid = (cA[i] + cB[i]) / 2;
-    T[i] = lo <= hi ? Math.min(hi, Math.max(lo, mid)) : (lo + hi) / 2;
+  // Both sides push in a little even when the shapes already agree (P). Shapes far apart need more push: a picture can only
+  // travel as far as its zoom lets it (the pivot must stay on screen), so P grows until the two can meet.
+  for (let P = 1.07; P <= 2.4; P *= 1.04) {
+    let sA = P, sB = P;
+    if (ratio >= 1) { sA = P * Math.min(zoom, ratio); sB = Math.max(1.02, sA * sizeA / sizeB); }
+    else { sB = P * Math.min(zoom, 1 / ratio); sA = Math.max(1.02, sB * sizeB / sizeA); }
+    const T: [number, number] = [0, 0];
+    let feasible = true;
+    for (let i = 0; i < 2; i++) {
+      // the pivot of a zoom by s that carries c to t is (s c - t) / (s - 1); it must stay inside [0, dim]
+      const lo = Math.max(sA * cA[i] - (sA - 1) * dim[i], sB * cB[i] - (sB - 1) * dim[i]);
+      const hi = Math.min(sA * cA[i], sB * cB[i]);
+      const mid = (cA[i] + cB[i]) / 2;
+      if (lo <= hi) T[i] = Math.min(hi, Math.max(lo, mid)); else { T[i] = (lo + hi) / 2; feasible = false; }
+    }
+    const piv = (s: number, c: number[]): [number, number] => [(s * c[0] - T[0]) / (s - 1), (s * c[1] - T[1]) / (s - 1)];
+    const out: Plan = { sA, sB, fA: piv(sA, cA), fB: piv(sB, cB), mismatch: (sA * sizeA) / (sB * sizeB) };
+    if (feasible) return out;
   }
-  const piv = (s: number, c: number[]): [number, number] => [(s * c[0] - T[0]) / (s - 1), (s * c[1] - T[1]) / (s - 1)];
-  return { sA, sB, fA: piv(sA, cA), fB: piv(sB, cB), mismatch: (sA * sizeA) / (sB * sizeB) };
+  return null;   // too far apart to meet without showing the edge of a picture: the cut dissolves instead
 }
 
 export function measureMatch(c: Cut, m: Metrics) {
@@ -71,6 +77,7 @@ export function measureMatch(c: Cut, m: Metrics) {
   const seen = (b: Box | null) => !!b && b.x + b.w > 0 && b.x < m.W && b.y + b.h > 0 && b.y < m.H;
   if (!A || !B || !seen(A) || !seen(B)) { c.data.match = null; return; }
   const p = planMatch(A, B, m.W, m.H, c.cfg.zoom || 3);
+  if (!p) { c.data.match = null; return; }
   const ra = c.pinA.getBoundingClientRect(), rb = c.pinB.getBoundingClientRect();
   c.data.match = { ...p, oA: `${p.fA[0] - ra.left}px ${p.fA[1] - ra.top}px`, oB: `${p.fB[0] - rb.left}px ${p.fB[1] - rb.top}px`, A, B };
 }

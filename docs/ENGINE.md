@@ -294,6 +294,27 @@ UI (React) ◄─► engine server (FastAPI + job queue + websocket events) ◄�
   sets captions, callouts and the end card in the theme's fonts with headless Chrome (`type.html`, drawn by
   `seek(t)`, captured as transparent frames); the result is encoded once per format and the music muxed in.
 
+- **Film grammar between sections** (`transition:` on any section; `engine/cuts.py`, `cuts_shapes.py`, `cuts_design.py`,
+  `runtime/src/lib/cuts*.ts`): a join gets its own stretch of scroll. The compiler wraps the two sections of a join in
+  pins (`.ss-cutpin`) and puts a gap element (`--cut-l` screens high) between them; the runtime (switched on with
+  `html.ss-cuts-on`, never for reduced motion) makes the upper section stick by its bottom edge (`top: min(0, 100svh -
+  its height)`, measured by a ResizeObserver) and pulls the lower one up by one screen plus the gap (negative margin) and
+  sticks it at the top, so for the length of the gap both pictures are held, one over the other, and nothing scrolls but
+  the gap. `k` (how far the gap has scrolled, less the `hold` at each end) drives a pure function per transition that
+  returns what each pin looks like (`transform`, `clip-path`, `mask`, an SVG blur filter, `opacity`, `visibility`), so every
+  scene type and block takes a cut and nothing is re-rendered. Sticky pins are used instead of transforms that cancel the
+  scroll so touch scrolling (compositor-driven) never lags the held picture; scroll-driven players are told a held
+  section stays at its end or start (`holding`) because a cut moves its rectangle. Anchor links and `?p=` jumps land
+  after the cut (`land`, `docTop`). `match` maps each shape (stored in its picture's 0-1 coordinates, with how the
+  section fits the picture: `of`, `fit`, `scale`) to screen pixels, and zooms each side in about a pivot that stays on
+  screen so the picture always covers it (`planMatch`: the pivot of the zoom by s that carries c to t is (s c - t)/(s -
+  1)); shapes too far apart to meet that way dissolve. `carry` bakes a copy of each element (computed styles inline) into a
+  fixed layer and moves it between the two measured rectangles. Shapes come from `region.find` (Florence-2 + SAM 2.1),
+  a box, a selector or the pictures' own contours, cached in `.build/_cuts/`; `ImageInput.match` designs the second
+  picture from the first section's last frame (an edit through the ordinary `_edit` cache, or a generated prompt with the
+  shape's place in it). Styles that take the whole page over say `cuts: false`. `studio cuts --strip` (headless Chrome)
+  writes a frame strip around each cut.
+
 ### Repository layout
 
 ```
