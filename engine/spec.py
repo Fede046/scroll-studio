@@ -570,7 +570,7 @@ class Freeze(Model):
     detail: Optional[FreezeDetail] = Field(None, description="Deep zoom: a pyramid of re-drawn tiles so a push to a 10-20x "
                                                               "close-up stays sharp at every scale (see FreezeDetail). "
                                                               "`detail: {}` for the defaults")
-    layers: Optional[FreezeLayers] = Field(None, description="Layered depth: background plate + a plane per subject, so "
+    layers: Optional[FreezeLayers] = Field(None, description="Experimental. Layered depth: background plate + a plane per subject, so "
                                                               "depth jumps have no halos and the camera reveals real "
                                                               "background behind people (see FreezeLayers). `layers: auto` "
                                                               "or a list of subjects")
