@@ -13,13 +13,9 @@ html.style-stop-motion {
   --fibre: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.42' numOctaves='2' seed='8' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 .96 0 0 0 0 .86 3.2 0 0 0 -1.78'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23f)'/%3E%3C/svg%3E");
   --grain: var(--n0);
   --nose: var(--table);
-  --lamp: 1;
   background: var(--table);
 }
-html.style-stop-motion[data-b="1"] { --grain: var(--n1); }
-html.style-stop-motion[data-b="2"] { --grain: var(--n2); }
-html.style-stop-motion[data-b="3"] { --grain: var(--n3); }
-html.style-stop-motion body { font-family: "Jost", "Futura", sans-serif; color: var(--brown); background: var(--table); }
+html.style-stop-motion body { font-family: "Jost", "Futura", sans-serif; color: var(--ink); background: var(--table); }
 html.style-stop-motion .ss-nav { display: none; }
 html.style-stop-motion ::selection { background: var(--mustard); color: var(--brown); }
 html.style-stop-motion :focus-visible { outline: 3px dashed var(--fox); outline-offset: 4px; }
@@ -44,9 +40,9 @@ html.style-stop-motion main { position: relative; z-index: 1; }
 .sm-set[data-tone="fox"]     { --pattern: radial-gradient(circle at 50% 50%, var(--wall2) 0 13%, transparent 14%); --pattern-size: 60px 60px; }
 .sm-set[data-tone="mustard"] { --pattern: repeating-linear-gradient(90deg, var(--wall2) 0 3.2vw, transparent 3.2vw 6.4vw); --pattern-size: auto; }
 .sm-set[data-tone="olive"]   { --pattern: conic-gradient(from 45deg at 50% 50%, var(--wall2) 0 25%, transparent 0 50%, var(--wall2) 0 75%, transparent 0); --pattern-size: 64px 64px; }
-.sm-set[data-tone="brick"]   { --pattern: radial-gradient(circle at 50% 100%, transparent 0 46%, var(--wall2) 47% 52%, transparent 53%), radial-gradient(circle at 0 100%, transparent 0 46%, var(--wall2) 47% 52%, transparent 53%); --pattern-size: 56px 40px; }
-.sm-set[data-tone="teal"]    { --pattern: linear-gradient(90deg, rgba(255, 255, 255, .07) 50%, transparent 50%), linear-gradient(rgba(255, 255, 255, .07) 50%, transparent 50%); --pattern-size: 56px 56px; }
-.sm-set[data-tone="tan"]     { --pattern: repeating-linear-gradient(0deg, var(--wall2) 0 2px, transparent 2px 70px), repeating-linear-gradient(90deg, var(--wall2) 0 2px, transparent 2px 70px); --pattern-size: auto; }
+.sm-set[data-tone="brick"]   { --pattern: radial-gradient(circle at 50% 100%, transparent 0 46%, var(--wall2) 47% 52%, transparent 53%), radial-gradient(circle at 0 100%, transparent 0 46%, var(--wall2) 47% 52%, transparent 53%); --pattern-size: 56px 40px, 56px 40px; }
+.sm-set[data-tone="teal"]    { --pattern: linear-gradient(90deg, rgba(255, 255, 255, .07) 50%, transparent 50%), linear-gradient(rgba(255, 255, 255, .07) 50%, transparent 50%); --pattern-size: 56px 56px, 56px 56px; }
+.sm-set[data-tone="tan"]     { --pattern: repeating-linear-gradient(0deg, var(--wall2) 0 2px, transparent 2px 70px), repeating-linear-gradient(90deg, var(--wall2) 0 2px, transparent 2px 70px); --pattern-size: auto, auto; }
 .sm-wall__skirt { position: absolute; left: 0; right: 0; bottom: 0; height: 22px; background: linear-gradient(180deg, var(--cream) 0 70%, var(--cream-2) 70%); box-shadow: 0 -2px 0 rgba(0, 0, 0, .18), 0 6px 10px rgba(0, 0, 0, .35); }
 .sm-floor { top: var(--hz); bottom: 0; background-color: var(--floor);
   background-image:
@@ -277,7 +273,7 @@ html:not(.sm-live) .sm-peg { display: none; }
 .sm-head__cta { font-family: "Fredoka", sans-serif; font-weight: 600; font-size: clamp(14px, 1.2vw, 17px); color: #fff6e4; background: var(--fox); padding: .55em 1.2em .62em; border-radius: 999px; box-shadow: 0 3px 0 #8e3a10, 0 12px 14px -6px rgba(0, 0, 0, .5); white-space: nowrap; rotate: .8deg; }
 .sm-head__cta:hover { filter: brightness(1.08); }
 .sm-light { display: none; }
-html.sm-live .sm-light { display: block; position: fixed; inset: 0; z-index: 40; pointer-events: none;
+html.sm-live .sm-light { --lamp: 1; display: block; position: fixed; inset: 0; z-index: 40; pointer-events: none;
   background: radial-gradient(ellipse 70% 60% at 30% 22%, rgba(255, 238, 190, calc(.16 * var(--lamp))), rgba(255, 238, 190, 0) 70%), radial-gradient(ellipse 120% 100% at 50% 50%, rgba(0, 0, 0, 0) 55%, rgba(12, 6, 2, .55) 100%); }
 .sm-hud { position: fixed; left: clamp(12px, 2vw, 26px); bottom: clamp(12px, 2vw, 22px); z-index: 61; display: flex; align-items: center; gap: 12px; font-family: "Gaegu", cursive; font-weight: 700; color: #3a2a1a; }
 .sm-hud[hidden] { display: none; }
@@ -304,6 +300,11 @@ html.sm-live .sm-stage .sm-cast { min-height: 100svh; }
 html.sm-live .sm-stage .sm-p { visibility: hidden; }
 html.sm-live .sm-stage .sm-p.sm-on { visibility: inherit; }
 html.sm-live .sm-stage .sm-ch { visibility: inherit; }
+/* the boil: one overlay of felt-grain whose texture changes every exposure (the only thing that changes besides the pieces) */
+html.sm-live .sm-stage::after { content: ""; position: absolute; inset: 0; z-index: 35; pointer-events: none; background: var(--n0); background-size: 160px 160px; opacity: .55; }
+html.sm-live .sm-stage[data-b="1"]::after { background-image: var(--n1); }
+html.sm-live .sm-stage[data-b="2"]::after { background-image: var(--n2); }
+html.sm-live .sm-stage[data-b="3"]::after { background-image: var(--n3); }
 html.sm-live .sm-stage .sm-spike { opacity: .0; }
 html.sm-live .sm-stage { cursor: default; }
 html.sm-live .sm-grab { cursor: grab; } html.sm-live .sm-grab.is-held { cursor: grabbing; }

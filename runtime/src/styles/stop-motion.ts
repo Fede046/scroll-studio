@@ -68,73 +68,11 @@ interface Run { root: HTMLElement; stage: HTMLElement; sets: SetX[]; top: number
 export default function start() {
   const main = $<HTMLElement>("main");
   if (!main || !$(".sm-set", main)) return;
-  if (reduced) return;                            // the finished tableaux are the reduced-motion page
   const html = document.documentElement;
-  html.classList.add("sm-live");
-  const phoneQ = matchMedia("(max-width: 760px)");
-
-  // ------------------------------------------------------------ bind runs of sets into stages; everything else is loose
-  const blocks = [...main.children] as HTMLElement[];
-  const setOf = (el: HTMLElement) => (el.matches("section.sm-set") ? el : el.querySelector<HTMLElement>(":scope > section.sm-set"));
-  const groups: HTMLElement[][] = [];
-  let cur: HTMLElement[] | null = null;
-  for (const b of blocks) {
-    if (setOf(b) && !b.querySelector("[data-scene]")) { if (!cur) groups.push((cur = [])); cur.push(b); }
-    else { cur = null; b.classList.add("sm-loose"); }
-  }
-  let pid = 0;
-  const runs: Run[] = groups.map((g) => {
-    const root = document.createElement("div");
-    root.className = "sm-run";
-    g[0].before(root);
-    const stage = document.createElement("div");
-    stage.className = "sm-stage";
-    root.appendChild(stage);
-    const sets: SetX[] = g.map((b, idx) => {
-      const el = setOf(b)!;
-      stage.appendChild(el);
-      if (b !== el) b.remove();
-      el.style.zIndex = String(idx + 1);
-      const wall = $<HTMLElement>(".sm-wall", el), floor = $<HTMLElement>(".sm-floor", el), cast = $<HTMLElement>(".sm-cast", el)!;
-      // titles: every letter its own piece of clay
-      $$<HTMLElement>(".sm-title", el).forEach((t) => { chars(t, "sm-ch"); });
-      let order = 0;
-      const pieces: Piece[] = $$<HTMLElement>(".sm-p", el).map((p) => {
-        const anim = p.dataset.sm || "drop";
-        const isFlag = p.classList.contains("sm-flag");
-        const t = Number(p.dataset.smT) || 0;
-        const delay = isFlag ? (Number(p.style.getPropertyValue("--i")) || 0) * 0.9 : Math.min(order++ * 0.8, 6) + t;
-        const letters = p.classList.contains("sm-title") ? $$<HTMLElement>(".sm-ch", p) : [];
-        const grab = p.matches(".sm-frame, .sm-puppet, .sm-stand, .sm-easel, .sm-cube, .sm-sun, .sm-flag");
-        if (grab) p.classList.add("sm-grab");
-        return {
-          el: p, anim, delay, id: pid++, kind: isFlag ? "flag" : "", letters, grab,
-          amp: letters.length ? 0 : p.matches(".sm-card, .sm-sign, .sm-door, .sm-btn") ? 0.55 : 1, vis: false, key: "", restS: 1,
-          pokeAt: -1e9, poke: "", ux: 0, uy: 0, held: false, top: 0, late: 0, hop: null,
-        } as Piece;
-      });
-      return { el, kind: el.dataset.kind || "", idx, wall, floor, cast, pieces, S: 0, A: 0, hold0: 0, holdLen: 1, end: 0, h: 0, overflow: 0, panFrom: 0, panLen: 1,
-        mech: () => {}, shown: false, spikes: [], id: el.id || "" } as SetX;
-    });
-    return { root, stage, sets, top: 0, total: 0 } as Run;
-  });
-  if (!runs.length) return;
-
-  // ------------------------------------------------------------ the animator's readout
-  const hud = $<HTMLElement>(".sm-hud");
-  const cue = $<HTMLElement>(".sm-cue");
-  const countEl = $<HTMLElement>('[data-sm="count"]');
-  const fpsEl = $<HTMLElement>('[data-sm="fps"]');
-  const onionBtn = $<HTMLButtonElement>(".sm-onion");
-  hud?.removeAttribute("hidden");
-  cue?.removeAttribute("hidden");
-  let onion = false;
-  onionBtn?.addEventListener("click", () => { onion = !onion; onionBtn.setAttribute("aria-pressed", String(onion)); if (!onion) clearGhosts(); });
-
   // ------------------------------------------------------------ the puppet: theme.art as felt, a new frame each exposure
   const puppets = new Map<HTMLElement, HTMLCanvasElement>();
   let art: ArtFrames | null = null;
-  loadArt().then((a) => { art = a; dirty = true; });
+  loadArt().then((a) => { art = a; if (reduced) puppets.forEach((c) => drawPuppet(c, 0)); else dirty = true; });
   $$<HTMLElement>("[data-sm-art]").forEach((p) => { const c = $<HTMLCanvasElement>("canvas", p); if (c) puppets.set(p, c); });
   // The picture is cut from layers of felt: each art frame is classified once (thick regions become felt in four tones by
   // brightness, thin soft wisps become cotton wool, a dark hole the felt encloses becomes dark felt), and every exposure
@@ -231,6 +169,69 @@ export default function start() {
     ctx.strokeRect(6.5, 6.5, w - 13, h - 13);
     ctx.restore();
   }
+
+  if (reduced) return;                            // the finished tableaux are the reduced-motion page (the felt puppet is drawn once, above)
+  html.classList.add("sm-live");
+  const phoneQ = matchMedia("(max-width: 760px)");
+
+  // ------------------------------------------------------------ bind runs of sets into stages; everything else is loose
+  const blocks = [...main.children] as HTMLElement[];
+  const setOf = (el: HTMLElement) => (el.matches("section.sm-set") ? el : el.querySelector<HTMLElement>(":scope > section.sm-set"));
+  const groups: HTMLElement[][] = [];
+  let cur: HTMLElement[] | null = null;
+  for (const b of blocks) {
+    if (setOf(b) && !b.querySelector("[data-scene]")) { if (!cur) groups.push((cur = [])); cur.push(b); }
+    else { cur = null; b.classList.add("sm-loose"); }
+  }
+  let pid = 0;
+  const runs: Run[] = groups.map((g) => {
+    const root = document.createElement("div");
+    root.className = "sm-run";
+    g[0].before(root);
+    const stage = document.createElement("div");
+    stage.className = "sm-stage";
+    root.appendChild(stage);
+    const sets: SetX[] = g.map((b, idx) => {
+      const el = setOf(b)!;
+      stage.appendChild(el);
+      if (b !== el) b.remove();
+      el.style.zIndex = String(idx + 1);
+      const wall = $<HTMLElement>(".sm-wall", el), floor = $<HTMLElement>(".sm-floor", el), cast = $<HTMLElement>(".sm-cast", el)!;
+      // titles: every letter its own piece of clay
+      $$<HTMLElement>(".sm-title", el).forEach((t) => { chars(t, "sm-ch"); });
+      let order = 0;
+      const pieces: Piece[] = $$<HTMLElement>(".sm-p", el).map((p) => {
+        const anim = p.dataset.sm || "drop";
+        const isFlag = p.classList.contains("sm-flag");
+        const t = Number(p.dataset.smT) || 0;
+        const delay = isFlag ? (Number(p.style.getPropertyValue("--i")) || 0) * 0.9 : Math.min(order++ * 0.8, 6) + t;
+        const letters = p.classList.contains("sm-title") ? $$<HTMLElement>(".sm-ch", p) : [];
+        const grab = p.matches(".sm-frame, .sm-puppet, .sm-stand, .sm-easel, .sm-cube, .sm-sun, .sm-flag");
+        if (grab) p.classList.add("sm-grab");
+        return {
+          el: p, anim, delay, id: pid++, kind: isFlag ? "flag" : "", letters, grab,
+          amp: letters.length ? 0 : p.matches(".sm-card, .sm-sign, .sm-door, .sm-btn") ? 0.55 : 1, vis: false, key: "", restS: 1,
+          pokeAt: -1e9, poke: "", ux: 0, uy: 0, held: false, top: 0, late: 0, hop: null,
+        } as Piece;
+      });
+      return { el, kind: el.dataset.kind || "", idx, wall, floor, cast, pieces, S: 0, A: 0, hold0: 0, holdLen: 1, end: 0, h: 0, overflow: 0, panFrom: 0, panLen: 1,
+        mech: () => {}, shown: false, spikes: [], id: el.id || "" } as SetX;
+    });
+    return { root, stage, sets, top: 0, total: 0 } as Run;
+  });
+  if (!runs.length) return;
+
+  // ------------------------------------------------------------ the animator's readout
+  const hud = $<HTMLElement>(".sm-hud");
+  const cue = $<HTMLElement>(".sm-cue");
+  const lightEl = $<HTMLElement>(".sm-light");
+  const countEl = $<HTMLElement>('[data-sm="count"]');
+  const fpsEl = $<HTMLElement>('[data-sm="fps"]');
+  const onionBtn = $<HTMLButtonElement>(".sm-onion");
+  hud?.removeAttribute("hidden");
+  cue?.removeAttribute("hidden");
+  let onion = false;
+  onionBtn?.addEventListener("click", () => { onion = !onion; onionBtn.setAttribute("aria-pressed", String(onion)); if (!onion) clearGhosts(); });
 
   // ------------------------------------------------------------ geometry and the schedule (in exposures)
   let vw = innerWidth, vh = innerHeight, STEP = 36;
@@ -504,7 +505,7 @@ export default function start() {
         const w = poseOf(WALL, q), f = poseOf(FLOOR, q - 1);
         if (set.wall) set.wall.style.translate = q >= WALL.length - 1 ? "" : `0 ${((w.y || 0) * vh).toFixed(0)}px`;
         if (set.floor) set.floor.style.translate = q - 1 >= FLOOR.length - 1 ? "" : `${((f.x || 0) * vw).toFixed(0)}px 0`;
-        const on = q >= FLOOR.length && tw < FLATS + ARR;
+        const on = q >= FLOOR.length && tw < FLATS + 12;
         set.spikes.forEach((s) => { s.style.opacity = on ? "1" : "0"; });
       } else set.spikes.forEach((s) => { s.style.opacity = "0"; });
       // the camera: a set taller than the screen is panned down, on twos, while it is open
@@ -650,8 +651,9 @@ export default function start() {
     const run = runs[shownRun];
     const before = new Map<Piece, DOMRect>();
     if (onion) for (const set of run.sets) if (set.shown) for (const p of set.pieces) if (p.vis) before.set(p, p.el.getBoundingClientRect());
-    html.dataset.b = String(((shownE % 4) + 4) % 4);
-    html.style.setProperty("--lamp", (1 + hash(7, shownE) * 0.045).toFixed(3));
+    // the boil and the lamp are set on their own elements, never on the root: a custom property changed on <html> restyles the whole page
+    run.stage.dataset.b = String(((shownE % 4) + 4) % 4);
+    lightEl?.style.setProperty("--lamp", (1 + hash(7, shownE) * 0.045).toFixed(3));
     renderRun(run, shownE);
     for (const p of [...pokes]) if (!p.poke) pokes.delete(p);
     puppets.forEach((c, host) => { if (host.classList.contains("sm-on")) drawPuppet(c, shownE); });
