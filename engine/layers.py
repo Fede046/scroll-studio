@@ -230,18 +230,40 @@ def find_subjects(png: Path, layers, work: Path, log: Callable) -> list[Subject]
 
 # ---------------------------------------------------------------- the background plate
 
-def plate_of(frozen: np.ndarray, hole: np.ndarray, instruction: str, seed: int, work: Path, log: Callable) -> np.ndarray:
-    """The frame with the hole painted out: Qwen-Image-Edit over the whole frame, kept only inside the hole (`region.composite`:
-    outside it the pixel is the frame's, exactly), through a softened edge. Without ComfyUI the hole is filled smoothly from
-    its surroundings (push-pull): a gradient, no detail, and a say so in the log."""
+def harmonize(plate: np.ndarray, frozen: np.ndarray, hole: np.ndarray, band: int = 6) -> np.ndarray:
+    """Match the painted-out plate's tone to the frame at the edge of the hole. An image editor drifts a little in tone, and
+    the hole's edge then shows as a pale or dark ring around every subject the moment it moves. The mismatch along the inside
+    of the hole's edge (the frame continued smoothly into the hole, against the plate) is spread smoothly over the hole
+    (push-pull), and subtracted: the plate then continues its surroundings at the edge and keeps its own content inside."""
+    import cv2
+    core = (hole > 0.5).astype(np.uint8)
+    if not core.any() or core.all():
+        return plate
+    k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * band + 1, 2 * band + 1))
+    inner = core.astype(bool) & ~cv2.erode(core, k).astype(bool)
+    outside = (~cv2.dilate(core, k).astype(bool)).astype(np.float32)
+    target = push_pull(frozen.astype(np.float32), outside)                      # the frame, continued into the hole
+    smooth_plate = cv2.GaussianBlur(plate.astype(np.float32), (0, 0), 3)
+    mismatch = target - smooth_plate
+    d = push_pull(mismatch, inner.astype(np.float32))
+    out = plate.astype(np.float32) + d * cv2.GaussianBlur(hole.astype(np.float32), (0, 0), 1.0)[..., None]
+    return np.clip(out + 0.5, 0, 255).astype(np.uint8)
+
+
+def paint_out(frozen: np.ndarray, instruction: str, seed: int, work: Path, log: Callable, cache: Optional[tuple[Path, str]] = None
+              ) -> Optional[np.ndarray]:
+    """Qwen-Image-Edit over the whole frame with `instruction` (uint8, the frame's size), or None when ComfyUI is not running.
+    The raw edit does not depend on the subjects' masks (they only decide where it is used), so it is kept
+    (`cache` = (path, key)) and changing `grow`, `feather` or `planes` does not ask the editor again."""
     from PIL import Image
-    from . import region
     from .backends import comfy
-    mask8 = np.clip(hole * 255, 0, 255).astype(np.uint8)
+    if cache is not None:
+        path, key = cache
+        stamp = path.with_name(path.name + ".key")
+        if path.exists() and stamp.exists() and stamp.read_text() == key:
+            return np.asarray(Image.open(path).convert("RGB"))
     if not comfy.alive():
-        log("  layers: ComfyUI is not running: filling the background behind the subjects smoothly from its surroundings")
-        fill = np.clip(push_pull(frozen.astype(np.float32), 1.0 - hole), 0, 255).astype(np.uint8)
-        return region.composite(frozen, fill, mask8)
+        return None
     log("  layers: painting the background behind the subjects (Qwen-Image-Edit)")
     src = work / "_plate_in.png"
     Image.fromarray(frozen).save(src)
@@ -257,7 +279,27 @@ def plate_of(frozen: np.ndarray, hole: np.ndarray, instruction: str, seed: int, 
         comfy.free()
     if edited.size != (frozen.shape[1], frozen.shape[0]):
         edited = edited.resize((frozen.shape[1], frozen.shape[0]), Image.LANCZOS)
-    return region.composite(frozen, np.asarray(edited), mask8)
+    out = np.asarray(edited)
+    if cache is not None:
+        Image.fromarray(out).save(cache[0])
+        cache[0].with_name(cache[0].name + ".key").write_text(cache[1])
+    return out
+
+
+def plate_of(frozen: np.ndarray, hole: np.ndarray, instruction: str, seed: int, work: Path, log: Callable,
+             cache: Optional[tuple[Path, str]] = None) -> np.ndarray:
+    """The frame with the hole painted out: the editor's picture (`paint_out`) kept only inside the hole
+    (`region.composite`: outside it the pixel is the frame's, exactly), through a softened edge, its tone matched to the frame
+    at the edge (`harmonize`). Without ComfyUI the hole is filled smoothly from its surroundings (push-pull): a gradient, no
+    detail, and a say so in the log."""
+    from . import region
+    mask8 = np.clip(hole * 255, 0, 255).astype(np.uint8)
+    edited = paint_out(frozen, instruction, seed, work, log, cache)
+    if edited is None:
+        log("  layers: ComfyUI is not running: filling the background behind the subjects smoothly from its surroundings")
+        fill = np.clip(push_pull(frozen.astype(np.float32), 1.0 - hole), 0, 255).astype(np.uint8)
+        return region.composite(frozen, fill, mask8)
+    return harmonize(region.composite(frozen, edited, mask8), frozen, hole)
 
 
 # ---------------------------------------------------------------- the planes of a frame
@@ -276,12 +318,39 @@ class LayerSet:
     key: str = ""
 
 
+def _subjects_cached(png: Path, layers, work: Path, log: Callable, key: str) -> list[Subject]:
+    """The subjects of a frame, found once: Florence-2 and SAM 2.1 are not asked again when only the planes' settings change."""
+    spec = json.dumps([VERSION, key, layers.subjects if layers.subjects == "auto" else [s.model_dump(mode="json") for s in layers.subjects]],
+                      sort_keys=True)
+    k = hashlib.sha1(spec.encode()).hexdigest()[:16]
+    f = work / "subjects.npz"
+    if f.exists():
+        z = np.load(f, allow_pickle=False)
+        if str(z["key"]) == k:
+            return [Subject(str(n), m.astype(np.float32) / 255, int(li)) for n, m, li in zip(z["names"], z["masks"], z["layer"])]
+    subs = find_subjects(png, layers, work, log)
+    np.savez(work / "_subjects.npz", key=k, names=np.array([s.id for s in subs]), layer=np.array([s.layer for s in subs]),
+             masks=np.stack([(s.mask * 255 + 0.5).astype(np.uint8) for s in subs]))
+    (work / "_subjects.npz").replace(f)
+    return subs
+
+
+def plate_instruction(layers) -> str:
+    """What the editor is asked to remove: every person (auto), or the named subjects."""
+    base = PLATE_INSTRUCTION
+    if layers.subjects != "auto":
+        names = [s.prompt for s in layers.subjects if s.prompt]
+        if names:
+            base = base.replace("Remove every person from this picture.", "Remove " + ", ".join(names) + " from this picture.")
+    return base + (" " + layers.plate.strip() if layers.plate.strip() else "")
+
+
 def build_planes(frozen: np.ndarray, depth_raw: np.ndarray, layers, seed: int, work: Path, log: Callable,
-                 subjects: Optional[list[Subject]] = None, png: Optional[Path] = None) -> LayerSet:
+                 subjects: Optional[list[Subject]] = None, png: Optional[Path] = None, key: str = "") -> LayerSet:
     """Cut `frozen` (uint8, beat size) into planes: find the subjects, group them by depth, paint the plate."""
     H, W = frozen.shape[:2]
     if subjects is None:
-        subjects = find_subjects(png, layers, work, log)
+        subjects = _subjects_cached(png, layers, work, log, key)
     med = []
     for s in subjects:
         m = s.mask > 0.5
@@ -301,8 +370,9 @@ def build_planes(frozen: np.ndarray, depth_raw: np.ndarray, layers, seed: int, w
     hole = np.clip(grow_mask(np.max([(a > 0.02).astype(np.float32) for a in alphas], axis=0), layers.grow), 0, 1)
     import cv2
     hole = cv2.GaussianBlur(hole, (0, 0), max(1.0, layers.feather)) if layers.feather > 0 else hole
-    instruction = PLATE_INSTRUCTION + (" " + layers.plate.strip() if layers.plate.strip() else "")
-    plate = plate_of(frozen, hole, instruction, seed, work, log)
+    instruction = plate_instruction(layers)
+    plate = plate_of(frozen, hole, instruction, seed, work, log,
+                     (work / "plate_raw.png", hashlib.sha1(json.dumps([VERSION, key, instruction, seed]).encode()).hexdigest()[:16]))
     return LayerSet(np.stack(alphas).astype(np.float32), np.stack(depths).astype(np.float32), hole.astype(np.float32), plate,
                     background_depth(depth_raw, hole), ids)
 
@@ -353,7 +423,7 @@ def build_cached(bdir: Path, frozen_png: Path, frozen: np.ndarray, depth_raw: np
         return LayerSet(z["alpha"].astype(np.float32) / 255, z["depth"].astype(np.float32), z["hole"].astype(np.float32) / 255,
                         np.asarray(Image.open(plate).convert("RGB")), z["bg_depth"].astype(np.float32),
                         json.loads(str(z["ids"])), k)
-    ls = build_planes(frozen, depth_raw, layers, seed, ldir, log, png=frozen_png)
+    ls = build_planes(frozen, depth_raw, layers, seed, ldir, log, png=frozen_png, key=key)
     review(ldir, frozen, ls)
     np.savez(ldir / "_tmp.npz", alpha=(ls.alpha * 255 + 0.5).astype(np.uint8), depth=ls.depth.astype(np.float16),
              hole=(ls.hole * 255 + 0.5).astype(np.uint8), bg_depth=ls.bg_depth.astype(np.float16), ids=json.dumps(ls.ids))

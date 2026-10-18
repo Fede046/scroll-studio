@@ -510,7 +510,7 @@ class FreezeLayers(Model):
     plate: str = Field("", description="What the empty background should look like where the subjects stood (added to "
                                        "'remove the people, continue the background in the same style'), e.g. 'the empty "
                                        "foggy street'")
-    grow: int = Field(6, ge=0, le=60, description="How far (pixels of the frame at beat resolution) the hole in the "
+    grow: int = Field(3, ge=0, le=60, description="How far (pixels of the frame at beat resolution) the hole in the "
                                                    "background plate extends past a subject's edge")
     feather: float = Field(1.5, ge=0, le=12, description="Softness of a subject's alpha edge (pixels at beat resolution)")
     seed: Optional[int] = Field(None, description="Seed of the background fill (default: the freeze's seed)")

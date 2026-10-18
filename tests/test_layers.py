@@ -163,3 +163,20 @@ def test_layered_deep_zoom_builds_tiles_with_planes_and_renders(tmp_path, monkey
     frames = list(zoom_render.render_frames(frame, depth, [b.image() for b in built], spec.camera, size=(192, 96), seconds=2.0,
                                             parallax=0.8, device="cpu", layers=ls))
     assert len(frames) == 48 and all(np.isfinite(f).all() for f in frames)
+
+
+def test_harmonize_matches_the_plates_tone_to_the_frame_at_the_hole_edge():
+    import cv2
+    H, W = 120, 160
+    frame = np.tile(np.linspace(100, 200, W, dtype=np.float32), (H, 1))[..., None].repeat(3, axis=2).astype(np.uint8)
+    hole = np.zeros((H, W), np.float32)
+    hole[30:90, 60:100] = 1
+    plate = frame.copy()
+    plate[hole > 0] = np.clip(frame[hole > 0].astype(int) + 30, 0, 255)          # the editor made the hole 30 levels lighter
+    fixed = L.harmonize(plate, frame, hole)
+    edge = np.zeros_like(hole, bool)
+    edge[32:88, 62:98] = True
+    edge[40:80, 70:90] = False                                                   # the inside edge band
+    assert np.abs(plate.astype(int) - frame.astype(int))[edge].mean() > 20
+    assert np.abs(fixed.astype(int) - frame.astype(int))[edge].mean() < 8
+    assert np.array_equal(fixed[hole == 0][:50], plate[hole == 0][:50])           # outside the hole: untouched
