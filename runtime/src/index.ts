@@ -207,6 +207,9 @@ const scenes = [...document.querySelectorAll<HTMLElement>("[data-scene]")].map((
 
 const nav = document.getElementById("ss-nav");
 const updateBlocks = makeBlocks();
+// Film grammar between sections (`transition:`, lib/cuts.ts): loaded only by pages that carry cuts.
+let cuts: { update(): void; land(el: Element): number | null; docTop(el: Element): number | null } | null = null;
+if (document.getElementById("ss-cuts")) import("./lib/cuts").then((m) => { cuts = m.makeCuts(); });
 // The nav reads in the colours of the section under it: a dark film on a light site gets a dark nav, and back.
 const surfaced = [...document.querySelectorAll<HTMLElement>("main [class*='ss-surface-']")]
   .filter((el) => el.matches("section, .ss-panel, .ss-backdrop"));
@@ -215,7 +218,8 @@ function surfaceUnderNav() {
   if (!nav) return;
   const y = nav.offsetHeight / 2;
   let found = "";
-  for (const el of surfaced) {
+  for (const el of cuts ? [...surfaced].reverse() : surfaced) {   // during a cut the section on top is the later one
+    if (cuts && el.closest(".ss-cut-off")) continue;
     const r = el.getBoundingClientRect();
     if (r.top <= y && r.bottom > y) { found = (el.className.match(/ss-surface-(\w+)/) || [])[1] || ""; break; }
   }
@@ -227,6 +231,7 @@ function surfaceUnderNav() {
 }
 function frame() {
   const t = (performance.now() - t0) / 1000;
+  cuts?.update();
   for (const s of scenes) s.tick(t);
   updateReveals();
   updateBlocks();
@@ -294,7 +299,9 @@ document.querySelectorAll<HTMLAnchorElement>('a[href^="#"]').forEach((a) => a.ad
   const target = document.querySelector(id);
   if (!target) return;
   e.preventDefault();
-  if (lenis) lenis.scrollTo(target as HTMLElement, { duration: 1.4 / pace });
+  const settled = cuts?.land(target);   // a section that follows a cut is reached once the cut is over
+  if (settled != null) { if (lenis) lenis.scrollTo(settled, { duration: 1.4 / pace }); else scrollTo(0, settled); }
+  else if (lenis) lenis.scrollTo(target as HTMLElement, { duration: 1.4 / pace });
   else target.scrollIntoView();
 }));
 
@@ -306,7 +313,7 @@ if (debugP !== null) {
     const id = params.get("s");
     const sc = (id && scenes.find((s) => s.el.id === id)) || scenes[0];
     if (!sc) return;
-    const top = sc.el.getBoundingClientRect().top + scrollY;
+    const top = cuts?.docTop(sc.el) ?? sc.el.getBoundingClientRect().top + scrollY;
     if (sc.data.layout === "overlay") {
       scrollTo(0, top + (sc.track.offsetHeight - innerHeight) * target);
     } else {
