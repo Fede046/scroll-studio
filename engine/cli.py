@@ -697,13 +697,24 @@ def camera(name: str, beat: str,
 def cinemagraph_cmd(name: str,
                     only: Optional[str] = typer.Option(None, help="Only the cinemagraphs whose `moves` or spec path contains this text"),
                     force: bool = typer.Option(False, help="Ignore the cache"),
-                    list_only: bool = typer.Option(False, "--list", help="List the cinemagraphs in the spec and their cache state, build nothing")):
+                    list_only: bool = typer.Option(False, "--list", help="List the cinemagraphs in the spec and their cache state, build nothing"),
+                    check: bool = typer.Option(False, "--check", help="Instead of building, measure the BUILT page (dist/) in Chrome: is everything "
+                                                                     "but the moving part truly still, does the loop hitch, does reduced motion show the still"),
+                    mobile: bool = typer.Option(False, "--mobile", help="With --check: a 390 px phone viewport")):
     """Build the site's cinemagraphs (an image input with `cinemagraph:`: a still where only one thing moves) and report on each:
     the loop's seam, how much of the picture moves, what the page holds still, bytes. Files are in <project>/.build/_cinemagraph/.
     `studio build` makes them too, as part of the page."""
     from . import cinemagraph as cine
     from .project import Project
     project = Project(resolve(name))
+    if check:
+        from . import cinemagraph_check as chk
+        work = project.build / "_cinemagraph" / "page-check"
+        res = chk.check_page(project.dist, work, size=(390, 844) if mobile else (1440, 900), mobile=mobile, dpr=2.0 if mobile else 1.0, log=typer.echo)
+        res["reduced_motion"] = chk.check_reduced(project.dist, log=typer.echo)
+        (work / ("mobile.json" if mobile else "desktop.json")).write_text(json.dumps(res, indent=1))
+        typer.echo(f"report: {work}")
+        return
     site = project.load()
     found = [(w, r) for w, r in cine.collect(site) if not only or only in w or only in r.cinemagraph.moves]
     if not found:
