@@ -39,6 +39,7 @@ SCENE_INFO = {
     "scene3d": "Live 3D zoom journey through levels: cells → DNA, galaxy → planet, networks, lattices, your glTF.",
     "sequence": "A 3D model rendered by Blender into frames: turntable, explode and reassemble.",
     "showroom": "The site's product live in the page (three.js): scroll turns, explodes and zooms the real model.",
+    "diorama": "A miniature world (tilt-shift diorama, live 3D): scroll orbits it, dives to a place for each step, lifts out and travels on.",
     "parallax": "Photos turned into 2.5D camera moves with estimated depth, one per step.",
     "type": "Kinetic typography: reveal, stack, swap or scale.",
 }

@@ -366,3 +366,14 @@ html:not(.js) .ss-strip { overflow-x: auto; }
   .js .ss-reveal { opacity: 1; transform: none; }
   .js .ss-w > span { transition: none; }
 }
+
+/* ---- diorama (miniature worlds): the flat map shown until the live scene is up, and the pins over the orbit view */
+.ss-dio-map { object-fit: contain !important; }
+.ss-dio-pins { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.ss-dio-pin { position: absolute; left: 0; top: 0; display: flex; align-items: center; gap: 7px; padding: 4px 11px 4px 4px; border: 0; border-radius: 99px;
+  background: rgba(255, 252, 245, .92); color: #262a31; font: 600 12px/1 var(--font-body, system-ui); letter-spacing: .02em; cursor: pointer;
+  box-shadow: 0 2px 8px rgba(40, 30, 20, .22); opacity: 0; will-change: transform, opacity; white-space: nowrap; }
+.ss-dio-pin i { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--accent, #d9503a); color: #fff; font-style: normal; font-size: 11px; }
+.ss-dio-pin:hover, .ss-dio-pin:focus-visible { background: #fff; outline: 2px solid var(--accent, #d9503a); outline-offset: 1px; }
+.ss-type-diorama .ss-visual canvas { image-rendering: auto; }
+@media (max-width: 760px) { .ss-dio-pin span { display: none; } .ss-dio-pin { padding: 4px; } }

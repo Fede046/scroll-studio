@@ -84,7 +84,7 @@ def spec_schema(part: Optional[str] = None) -> dict:
     if not part:
         return sch
     names = {"film": "FilmScene", "artwork": "ArtworkScene", "scene3d": "Scene3DScene", "sequence": "SequenceScene",
-             "parallax": "ParallaxScene", "type": "TypeScene", "code": "CodeScene", "showroom": "ShowroomScene",
+             "parallax": "ParallaxScene", "type": "TypeScene", "code": "CodeScene", "showroom": "ShowroomScene", "diorama": "DioramaScene",
              "product": "Product", "parts": "PartMaterial", "shot": "ProductShot", "intro": "IntroBlock", "features": "FeaturesBlock",
              "stats": "StatsBlock", "timeline": "TimelineBlock", "quote": "QuoteBlock", "cta": "CtaBlock", "gallery": "GalleryBlock"}
     key = names.get(part, part)
