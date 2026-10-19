@@ -248,8 +248,9 @@ def build(sec: LightScene, ctx: BuildContext, theme: dict) -> dict:
             st = sec.structure
             # the limit and the retries are not part of the key: a picture that was made stays the picture (a time that
             # failed its limit is warned about on every build; give it another `seed:` to redo it)
+            strength = t.strength if t.strength is not None else st.strength
             key = {"v": RELIGHT_VERSION, "light": light.RELIGHT_VERSION, "world": base_key, "ins": instr, "seed": seed0, "steps": steps,
-                   "align": st.align, "strength": st.strength}
+                   "align": st.align, "strength": strength}
             legacy = None
             mode = "relight"
 
@@ -266,7 +267,7 @@ def build(sec: LightScene, ctx: BuildContext, theme: dict) -> dict:
                 seeds = [seed0 + 1000 * j for j in range(1 + (0 if draft else sec.structure.retries))]
                 ctx.log(f"  relighting '{tid}' (Qwen-Image-Edit, {steps} steps)")
                 img, rep = light.relight_locked(base_img, base_png, instr, seeds, steps, sec.structure.max_drift,
-                                                sec.structure.align, tdir, tid, ctx.log, sec.structure.strength)
+                                                sec.structure.align, tdir, tid, ctx.log, strength)
             if sources[i] is not None:       # relative to the world, too: a chain must not wander
                 rep["to_world"] = light.measure(world, img)["drift"]
                 rep["source"] = ids[sources[i]]

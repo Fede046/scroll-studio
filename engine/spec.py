@@ -1136,6 +1136,9 @@ class LightTime(Model):
                                                   "build finds what turned on or off between neighbouring times")
     seed: Optional[int] = Field(None, description="Seed for this time's relight (default: the scene's); try another when "
                                                   "one drifts or looks wrong")
+    strength: Optional[float] = Field(None, ge=0.4, le=1.0, description="This time's own denoise strength (default: the scene's "
+                                                                       "`structure.strength`): a time far from the world's light, "
+                                                                       "such as night, needs more freedom (0.95) than one near it")
     image: Optional[ImageRef] = Field(None, description="This time's own picture of the same place, instead of relighting "
                                                         "the world (a real photograph, a hand-fixed render). It is aligned "
                                                         "to the world like any relight")

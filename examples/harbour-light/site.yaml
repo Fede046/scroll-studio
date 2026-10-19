@@ -21,7 +21,7 @@ sections:
       size: [1920, 1088]
       seed: 3
     world_time: noon
-    times: [dawn, morning, noon, golden-hour, blue-hour, night]
+    times: [dawn, morning, noon, golden-hour, blue-hour, { preset: night, strength: 0.96 }]
     lamps:
       - prompt: the street lamps and the lit windows
     steps:
