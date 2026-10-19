@@ -31,7 +31,7 @@ from ..spec import is_scene
 from . import record
 from .cards import Card, Maker
 
-STAND_IN = ("film", "sequence")                       # scenes that render heavily: shown by their frames until rendered
+STAND_IN = ("film", "sequence", "inside")                       # scenes that render heavily: shown by their frames until rendered
 STAND_IN_SKETCH = ("artwork", "parallax", "vector")   # image scenes: at sketch their images may not exist yet
 
 

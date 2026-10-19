@@ -401,7 +401,7 @@ def wide_pose(res: Resolution, aspect: float) -> Pose:
     er = float(np.max(np.abs(corners @ right)))
     eu = float(np.max(np.abs(corners @ up)))
     ed = float(np.max(np.abs(corners @ fwd)))
-    fill = 0.7                    # the product fills this much of the frame: room for the copy beside it
+    fill = 0.86                    # the product fills this much of the frame: room for the copy beside it
     d = max(er / (math.tan(fh / 2) * fill), eu / (math.tan(fv / 2) * fill)) + ed
     target = centre
     return Pose(target + direction(yaw, pitch) * d, target, centre, WIDE_LENS, 5.6, 0.0, 0.0)
@@ -435,6 +435,7 @@ def _travel(a: Pose, b: Pose, u: float) -> Pose:
     focus = a.focus + (b.focus - a.focus) * s
     lens = math.exp(math.log(a.lens) + (math.log(b.lens) - math.log(a.lens)) * s)
     fstop = math.exp(math.log(a.fstop) + (math.log(b.fstop) - math.log(a.fstop)) * s)
+    fstop *= 1 + 0.9 * math.sin(math.pi * s)          # the aperture closes in flight: more stays sharp while things rush past
     return Pose(cam, target, focus, lens, fstop, a.roll + (b.roll - a.roll) * s, a.explode + (b.explode - a.explode) * s)
 
 

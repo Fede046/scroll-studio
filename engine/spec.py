@@ -1131,7 +1131,7 @@ class InsideScene(SceneBase):
                                                    "lower renders faster and steps more")
     size: tuple[int, int] = Field((1600, 900), description="Frame size (a second set at 960 px wide is made for phones)")
     samples: int = Field(64, ge=4, le=4096, description="Cycles samples per frame (denoised)")
-    offset: float = Field(0.14, ge=0, le=0.4, description="How far the stop's part sits off the centre of the frame, as a "
+    offset: float = Field(0.2, ge=0, le=0.4, description="How far the stop's part sits off the centre of the frame, as a "
                                                           "share of its width, towards `side` (the copy has the other "
                                                           "side). 0 centres it")
     hdri: str = Field("studio", description="Blender studio light the interior reflects: studio, city, courtyard, forest, "
