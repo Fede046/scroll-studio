@@ -886,16 +886,25 @@ section's own colours (ink, accent, the shade behind the text) follow the sky.
 ```
 
 **Build** (one cached stage per time: `world`, `depth`, `sky`, `time_<id>`, `maps`, `web`; an unchanged spec rebuilds nothing,
-and changing one time's words redoes that time only). Each time is the world relit by Qwen-Image-Edit
-with an instruction that changes only the light (`engine/light_presets.py`: dawn, sunrise, morning, noon, afternoon,
-golden-hour, sunset, blue-hour, night, overcast, storm; a time can also be free text, or `image:` a picture of your own).
-The editor redraws a little everywhere, so every relight is **measured against the world**: structure is compared in a
-light-invariant way (band-passed log luminance, locally normalised), the displacement is found with dense optical flow, and
-`drift` is how far the editor moved things in pixels at 1024 across. Small drift is warped away; a relight that moved things
-too far is redone with another seed (`structure.max_drift`, `structure.retries`), and the best attempt is kept. The report
-(`studio light <project>`) gives drift, strain of the correction and edge agreement per time. Between neighbouring times the build also
-writes the low-frequency light-change field and a map of the lights that turn on or off (small bright features that the
-change of ambient light cannot explain, each with its own delay and a halo).
+and changing one time's words redoes that time only). Each time is the world relit by Qwen-Image-Edit with an instruction that
+changes only the light (`engine/light_presets.py`: dawn, sunrise, morning, noon, afternoon, golden-hour, sunset, blue-hour, night,
+overcast, storm; a time can also be free text, or `image:` a picture of your own). The geometry lock has three parts, because an
+editor left to itself redraws the place (measured here: 11 to 16 px of drift at 1024 across, windows and houses reshaped):
+1. **Start from the world.** The edit samples from the picture's own latent (`structure.strength`, the denoise strength, 0.88
+   by default), so the layout is held: 0.75 moves things about 1 px, 0.88 a few, 1.0 (from noise) 11 to 16 px.
+2. **Measure, undo the global move, retry.** Structure is compared in a light-invariant way (band-passed log luminance,
+   locally normalised); dense optical flow gives the displacement, and `drift` is how far things are from where they were, in px at
+   1024 across. What the editor does to a place is mostly a global zoom and shift; a robust affine fit undoes it and bends nothing
+   (`structure.align: affine`; `flow` also pulls local structure in, which matches edges better but makes lines wobble; `none`
+   measures only). A relight still over `structure.max_drift` is redone with another seed (`retries`) and the best kept.
+   `structure.chain` relights each time from its neighbour nearer the world's time instead of the world, so neighbours agree more.
+3. **Glide over what is left.** Between neighbouring times the build writes a flow texture of the structure that still differs;
+   the page glides along it as the light changes, so edges slide into place instead of cross-fading doubled.
+
+Between neighbouring times the build also writes the low-frequency light-change field (edge-aware, log-encoded) and a map of the
+lights that turn on or off (small bright features that the change of ambient light cannot explain, each with its own delay and a
+halo; `lamps:` confines them to regions named with Florence-2 and SAM 2.1). `studio light <project>` reports drift, edge
+agreement and glide per time and pair.
 
 **Play** (`runtime/src/players/light.ts`, WebGL2): scroll maps to a time of day with a hold at each step (`hold`) so a headline
 reads in its own light and the change passes between headlines. Between two times the shader carries the light's low-frequency
