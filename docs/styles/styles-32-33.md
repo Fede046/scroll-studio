@@ -67,11 +67,11 @@ Drawn-on-film animation, also called direct animation or animation without a cam
 - **The strip is continuous.** The sprocket rails, the edge code and the neighbouring frames in the strip travel with the scroll 1:1, so you see the film moving at the true speed while the text steps. This is the Steenbeck look: the strip beside the screen.
 - **Run-on scratches.** Vertical scratches that belong to the strip, at fixed positions, travel with it, so at speed they streak. Scratches and dust on film run along its length (general knowledge).
 - **A new drawing on every frame.** The projection changes the picture as each frame passes the gate, up to 24 times a second; a drawing is a pure function of the frame number, so scrolling back plays the same drawings backwards. The motifs are drawn by rules (spirals, bursts, dashes, bars, dots, combs and stencilled stripes) with a random hand on top, in black-leader and dyed-leader tones. The projector also runs by itself slowly when you stop, so the film is never dead; a Hold switch stops it.
-- **Splices.** The handover between sections is a splice: a strip of tape across the film, a change of stock (black to dyed leader), and one frame of flash leader. The cut lands on the next beat.
-- **The beat.** A counter of bars and beats (120 a minute, 12 frames a beat) runs on the footage; arrivals are staggered on it. With sound on, each mark in the optical track is heard as it passes the sound head, as in McLaren's drawn sound: the picture is the score.
+- **Splices.** The handover between sections is a splice: a strip of tape across the film, a change of stock (black to dyed leader), and one frame of flash leader.
+- **The beat.** A counter of bars and beats (120 a minute, 12 frames a beat) runs on the footage; the footage counter shows it. With sound on, each frame passing the gate plays a note and every beat a drum, as in McLaren's drawn sound: the picture is the score (this is the style's own design, not a claim about his method).
 - **Camera:** none. The only moves are the pull-down and the settle.
 
-**Headline arrival:** scratched in. The letters of the title appear a few at a time on successive beats, each redrawn with a hand-wobble of a pixel or two while the film runs, like a title scratched on emulsion with a needle.
+**Headline arrival:** scratched in. The letters of the title appear two at a time as it reaches the gate, each redrawn with a hand-wobble of a pixel or two while the film runs, like a title scratched on emulsion with a needle.
 
 **Stats:** **sound-track numerals.** Each figure is large lettering over a variable-area waveform drawn from its own characters, the way a hand-drawn optical track plays: the number is printed, never counted up.
 
@@ -81,7 +81,7 @@ Drawn-on-film animation, also called direct animation or animation without a cam
 
 **Hover / pointer:** **the pointer is a needle.** Press and drag on the picture (not on text) and a white scratch is drawn into the emulsion of the frame under it; it belongs to the strip, so it travels away with the film when you scroll. Taps leave a dot, as in McLaren's *Dots* (a name, not a claim about method). It never takes a vertical gesture on touch: scratching only follows horizontal strokes, and `touch-action: pan-y` is kept.
 
-**CTA:** the **tail leader**: an end card with an iris shrinking to the button, and the last frame held.
+**CTA:** the **tail leader**: an end card with the button set in a ring like an iris, and the footage counter running out.
 
 **Real-world references:** I could not verify any web project that imitates scratch-on-film animation; searches return generic old-film overlay filters (search snippet: [jMonkeyEngine forum](https://hub.jmonkeyengine.org/t/old-film-effect-filter/25464)). A React filmstrip component is a sticky stage with a clipped gate and drawn perforation rows ([jas.it.com](https://jas.it.com/src/filmstrip.jsx), a personal site of unknown provenance). I found no verified award-listed filmstrip scroll site.
 
@@ -89,7 +89,7 @@ Drawn-on-film animation, also called direct animation or animation without a cam
 
 | Component | Treatment |
 |---|---|
-| Nav | Reel list along the top edge: numbers and names in mono; the current reel marked with a cue dot. The footage counter and a Hold and a Sound switch bottom left. |
+| Nav | Reel list along the top edge: numbers and names in mono; the current reel marked with a cue dot. The footage counter and a Run (the projector, on or off) and a Sound switch bottom left. |
 | Hero | Reel 1: the title is lettered large on the picture, with the kicker and badge on a slate strip, the body on an intertitle plate. A hero image or phone sits in a **taped-in frame** with edge code. |
 | Buttons | A frame with sprocket ticks above and below; the primary is a dye colour (cyan, magenta or yellow, never red). |
 | Intro | Title lettered on the picture, body on a plate. |
@@ -99,7 +99,7 @@ Drawn-on-film animation, also called direct animation or animation without a cam
 | Timeline | A bar sheet: rows of bars with a bar number, the step's "when" and title; the playhead is the beat counter. |
 | Quote | An intertitle card: the quote lettered large on black leader, attribution as a credit. |
 | FAQ | Reel cans: each question is a tape label; native `<details>`; the answer on a plate. |
-| CTA | Tail leader and an iris; the button in the iris. |
+| CTA | Tail leader; the button in a ring like an iris. |
 | Gallery, strip | Contact strips: frames with sprocket edges and numbers. |
 | Orbit | A reel: a hub with sprocket holes and the items around it. |
 | Scenes | Left in their own player behind a gate border. |
@@ -119,9 +119,9 @@ Drawn-on-film animation, also called direct animation or animation without a cam
 - **The pull-down** writes `translate` on the belt only; nothing animates by CSS; nothing writes a custom property on the root.
 - **Sound** is optional and off by default. It is a few Web Audio oscillators and a noise burst fired as marks pass the gate; it needs a click to start.
 - **Phones:** the rail narrows, the thumbnails stay; steps are smaller (a perforation of 9 px); plates are full width; no drawing is taken by a vertical swipe.
-- **Accessibility:** text is real, in reading order; the canvases and rails are `aria-hidden`. A Hold switch stops the projector and satisfies the pause requirement for moving content. Text never moves faster than the page scrolls.
-- **Flashing.** The criterion (WCAG 2.3.1) is no more than three flashes in any one second unless under the thresholds: a pair of opposing luminance changes of 10 % or more of maximum relative luminance, where the darker image is below 0.80, over an area larger than about 341 by 256 pixels at 1024 by 768; a red flash is any pair of opposing transitions involving saturated red ([W3C Understanding 2.3.1](https://www.w3.org/WAI/WCAG21/Understanding/three-flashes-or-below-threshold.html)). Here: scratches, dust and dots are thin and small; large dye fields change hue only, within a luminance band of 0.1, and no faster than 12 times a second; the flash frame at a splice is a single frame of a middling colour, rate-limited so that two can never fall within a third of a second; no red anywhere.
-- **Reduced motion and no JS:** no belt, no pull-down, no projection loop. Each reel is a still: a scratched background drawn once in CSS or canvas, the strip as a static rail, every plate in place, the Hold and Sound switches hidden.
+- **Accessibility:** text is real, in reading order; the canvases and rails are `aria-hidden`. A Run switch stops the projector when you are not scrolling and satisfies the pause requirement for moving content. Text never moves faster than the page scrolls.
+- **Flashing.** The criterion (WCAG 2.3.1) is no more than three flashes in any one second unless under the thresholds: a pair of opposing luminance changes of 10 % or more of maximum relative luminance, where the darker image is below 0.80, over an area larger than about 341 by 256 pixels at 1024 by 768; a red flash is any pair of opposing transitions involving saturated red ([W3C Understanding 2.3.1](https://www.w3.org/WAI/WCAG21/Understanding/three-flashes-or-below-threshold.html)). Here: scratches, dust and dots are thin and small; large dye fields change hue only, within a luminance band of 0.1, and no faster than 12 times a second; the flash frame at a splice is a single frame of a middling colour, rate-limited so that two can never fall within 450 ms; no red anywhere.
+- **Reduced motion and no JS:** no belt, no pull-down, no projection loop. Each reel is a still: a scratched background drawn once in CSS or canvas, the strip as a static rail, every plate in place, the Run and Sound switches hidden.
 
 ### 1.7 Anti-patterns
 
@@ -187,7 +187,7 @@ Drawn-on-film animation, also called direct animation or animation without a cam
 - **Multiples at speed.** When the speed passes a threshold the smear gains multiples: up to four echoes of the actor strung along its path in cyan, magenta and yellow plates, like a print with the plates slipping (the press running fast), and streak lines in the backdrop.
 - **Misregistration is depth.** At rest, every actor has a small constant offset between its colour plates (a pixel or two), the way the offset replaces focus in the film. The offset is biggest on the backdrop and smallest on the actor under the pointer or with keyboard focus, so a hover or a focus is a **rack focus by offset**, not a blur.
 - **Mixed cadence.** The actors move on twos (12 a second), the backdrop's halftone drifts on threes (8 a second), and small furniture (the corner readout, the pointer's trail) moves on ones (24 a second). It is a deliberate mix, as in the film's mix of rates; the content text is never given less than twos.
-- **Impact frames.** When a new section's sheet crosses the middle of the screen while you are scrolling fast, the picture breaks for two frames (83 ms) into one **impact frame**: a flat field of the incoming dimension's colour, black speed lines from the centre, a halftone burst, the old sheet's headline cut out of it; then the new sheet snaps in with a short shake on twos. At most one impact in any third of a second; not at slow speeds; no red; the frame's colour is chosen to stay within the thresholds below.
+- **Impact frames.** When a new section's sheet crosses the middle of the screen while you are scrolling fast, the picture breaks for two frames (83 ms) into one **impact frame**: a flat field of the incoming dimension's colour, black speed lines from the centre, a halftone burst, the old sheet's headline cut out of it; then the new sheet snaps in with a short shake on twos. At most one impact in 520 ms (two a second); not at slow speeds; no red; the frame's colour is chosen to stay within the thresholds below.
 - **Arrival:** an actor entering the view pops (a squash-and-stretch overshoot on twos) with a smear on the first frame.
 - **Camera:** none; the only camera move is the shake after an impact.
 
@@ -239,8 +239,8 @@ Drawn-on-film animation, also called direct animation or animation without a cam
 - **Actors** are marked in the templates (`data-sa`). A smear writes `scale`, `translate` and a filter of stacked `drop-shadow`s (the plates) on the actors in view only, at twelve a second, never on the root. Text gets the same effect from stacked `text-shadow`s. No `blur()` anywhere.
 - **The backdrop** is CSS gradients (dots, hatching, stripes) on a layer whose `background-position` and plate offsets are changed at eight a second.
 - **Impact frames** are one fixed overlay (an SVG data-URI of speed lines, a radial dot mask) shown for two ticks, rate-limited by time.
-- **Phones:** the smear is a stretch only (no filter stacks) below a size or speed budget; two echoes at most; the trail is off on touch.
-- **Accessibility:** real text in reading order; the overlays are `aria-hidden`; focus moves the belt to the focused element. Flashing: the impact frame is one pair of opposing changes, at most three in a second and in practice one in a third of a second at the slowest, a flat mid-luminance colour field with black lines, and no saturated red (the thresholds are as in 1.6). The smear itself changes no luminance over a large area.
+- **Phones:** the smear is a stretch only (no filter stacks) below a size or speed budget; the echoes are text only (no filter stacks on pictures); the trail is off on touch.
+- **Accessibility:** real text in reading order; the overlays are `aria-hidden`; focus moves the belt to the focused element. Flashing: the impact frame is one pair of opposing changes, at most two in a second (520 ms apart), a flat mid-luminance colour field with black lines, and no saturated red (the thresholds are as in 1.6). The smear itself changes no luminance over a large area.
 - **Reduced motion and no JS:** no belt, no sampling, no smears, no impact frames. Each sheet is a still print in its dimension, with the plates at their resting offsets; the readout is hidden.
 
 ### 2.7 Anti-patterns
@@ -267,7 +267,7 @@ Drawn-on-film animation, also called direct animation or animation without a cam
 | **Time feel** | Pull-down steps (to 24 a second); picture re-drawn each frame; runs by itself when idle | Sampled at 12 a second; backdrop on threes, furniture on ones; holds | Continuous with tracking noise | Frame steps at scroll speed | Twos, capped at 12; dead between | Stepped panel by panel | Continuous |
 | **Spatial logic** | A strip beside a projection screen | Flat printed sheets with plates | A CRT screen | A pad of paper | A miniature set | A pinned page of panels | Dot field |
 | **Persistence** | Scratches stay on the strip | Plates slip, not stay | Tape artefacts | Pages accumulate | The set stays | Pages replace | Image stays |
-| **Headline arrives by** | Scratched in on the beat | Three plates landing with smears | Glitched in | Drawn frame by frame | Clay letters placed | Caption slides | Dots form |
+| **Headline arrives by** | Scratched in, two letters at a time | Three plates landing with smears | Glitched in | Drawn frame by frame | Clay letters placed | Caption slides | Dots form |
 | **Stats as** | Numerals over a drawn optical track | Stamped numerals with multiples | Counters | (flipbook's own) | Alphabet blocks | Starburst numerals | Dot numerals |
 | **Feature list as** | Frames of a strip | Variants in three media | Menu | (flipbook's own) | Felt cards | Action panels | Dot cards |
 | **Section transition** | A splice and a flash frame | An impact frame, a new dimension | Channel change | Run of pages | Strike and dress | Zoom out, turn | Dots dissolve |
