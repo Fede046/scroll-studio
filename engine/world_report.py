@@ -10,7 +10,6 @@ Each finding that can be acted on comes with what to change. Writes `.build/<sec
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Callable, Optional
 
 import cv2

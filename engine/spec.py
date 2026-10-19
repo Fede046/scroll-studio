@@ -277,7 +277,7 @@ class WorldPlace(Model):
     align: Literal["left", "center", "right"] = Field("center", description="Alignment of a title of several lines")
     caps: bool = Field(False, description="Set the title in capitals")
     track: Optional[float] = Field(None, ge=-0.1, le=0.6, description="Letter-spacing in em (default: 0 behind, 0.05 on a "
-                                                                      "surface, 0.1 in the sky when set in capitals)")
+                                                                      "surface, 0.1 in the sky)")
     weight: Optional[int] = Field(None, ge=100, le=900, description="Font weight (default: the theme's display weight)")
     color: str = Field("auto", description="auto (light or dark ink, whichever reads on the footage under it), ink, paper, "
                                            "accent, or a hex colour")

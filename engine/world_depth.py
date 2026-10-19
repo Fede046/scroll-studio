@@ -21,7 +21,8 @@ from typing import Callable, Iterable, Optional
 import cv2
 import numpy as np
 
-VERSION = 1
+VERSION = 2
+CUT_CONFIDENCE = 0.12        # the flow explains less than this share of a frame: it is a new shot
 
 
 def flow_back(cur_gray: np.ndarray, prev_gray: np.ndarray) -> np.ndarray:
@@ -98,11 +99,8 @@ def steady_depth(frames: Iterable[np.ndarray], estimate: Callable[[np.ndarray], 
             shot_bounds.append((shot_start, i))
             shot_start = i
             prev_g = prev_s = None
-        if prev_s is None:
-            a, b = np.percentile(raw, [2, 99.5])
-            s = (raw - a) / max(b - a, 1e-6)
-            conf_mean = 0.0
-        else:
+        conf_mean = 0.0
+        if prev_s is not None:
             fl = flow_back(g, prev_g)
             carried = warp(prev_s, fl)
             back = warp(prev_g, fl)
@@ -110,10 +108,18 @@ def steady_depth(frames: Iterable[np.ndarray], estimate: Callable[[np.ndarray], 
             # confidence: the frame it came from looks like this one here, and the flow is smooth (no tearing)
             fmag = cv2.GaussianBlur(np.linalg.norm(fl - cv2.GaussianBlur(fl, (0, 0), 3), axis=2), (0, 0), 2)
             conf = np.exp(-(err / 0.06) ** 2) * np.exp(-(fmag / 1.5) ** 2)
+            conf_mean = float(conf.mean())
+            if conf_mean < CUT_CONFIDENCE:           # nothing of the last frame is in this one: a cut nobody listed
+                shot_bounds.append((shot_start, i))
+                shot_start = i
+                prev_s = None
+        if prev_s is None:
+            a, b = np.percentile(raw, [2, 99.5])
+            s = (raw - a) / max(b - a, 1e-6)
+        else:
             a, b = fit_affine(raw, carried, conf)
             aligned = a * raw + b
             s = aligned * (1 - blend * conf) + carried * (blend * conf)
-            conf_mean = float(conf.mean())
         s = snap(s, fr, radius, eps)
         prev_g, prev_s = g, s
         out.append(s)

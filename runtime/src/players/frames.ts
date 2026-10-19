@@ -9,6 +9,14 @@ import { follow, isMobile, loadBitmap } from "../lib/util";
 type Frame = ImageBitmap | HTMLImageElement;
 
 const factory: PlayerFactory = async (cfg, ctx) => {
+  // type in the world (engine/world.py): behind the product, the frames' own alpha is the silhouette; the world player draws the
+  // same frames as a film. Without WebGL2, with reduced motion or if it fails, the frames play as always, below
+  if (cfg.world && cfg.video) {
+    try {
+      const player = await (await import("./world")).default(cfg, ctx);
+      if (player) return player;
+    } catch (err) { console.warn("[scroll-studio] world failed, drawing the frames", err); }
+  }
   const set = isMobile() && cfg.mobile ? cfg.mobile : cfg.desktop;
   const count: number = cfg.count;
   const canvas = document.createElement("canvas");

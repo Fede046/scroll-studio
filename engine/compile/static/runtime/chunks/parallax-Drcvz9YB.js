@@ -1,4 +1,4 @@
-import{e as G,a as J,c as q,g as Q,s as N}from"../index.js";import{p as Z,l as ee,r as te,i as oe,c as ae,W as ne,P as re}from"./worldText-Bnb_8eyh.js";/*! Scroll Studio runtime by Edeki Okoh: https://github.com/Okohedeki/scroll-studio. GNU AGPL-3.0 with the Scroll Studio Output Exception (see NOTICE.md); keep this notice. */const ie=`#version 300 es
+import{e as G,a as J,c as q,g as Q,s as N}from"../index.js";import{p as Z,l as ee,r as te,i as oe,c as ae,W as ne,P as re}from"./worldText-B30Yi3qU.js";/*! Scroll Studio runtime by Edeki Okoh: https://github.com/Okohedeki/scroll-studio. GNU AGPL-3.0 with the Scroll Studio Output Exception (see NOTICE.md); keep this notice. */const ie=`#version 300 es
 in vec2 p; out vec2 uv;
 void main(){ uv = vec2(p.x * .5 + .5, .5 - p.y * .5); gl_Position = vec4(p, 0., 1.); }`,se=`#version 300 es
 precision highp float;

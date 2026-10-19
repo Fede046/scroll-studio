@@ -34,7 +34,7 @@ from . import reveal, world_depth as wd, world_math as wm
 from .project import BuildContext, BuildError, file_key, probe
 from .spec import FilmScene, RevealAt, RevealRegion, Step, WorldPlace
 
-VERSION = 7
+VERSION = 8
 TILE = reveal.TILE
 WORK = reveal.WORK
 SOFT = {"behind": 0.04, "sky": 0.09}            # the width of the occlusion's soft edge, depth units (the runtime reads it)
@@ -60,14 +60,23 @@ def plain(title: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", title)).strip()
 
 
+def _view(sec, silhouette: bool = False):
+    """A scene section as the film code sees it (a sequence has no beats, no depth model, no reveal): the same fields with
+    their defaults. `silhouette`: the depth comes from the frames' alpha (a product on a clear background), not a model."""
+    if sec.type == "film":
+        return sec
+    return SimpleNamespace(id=sec.id, type=sec.type, layout=sec.layout, steps=sec.steps, beats=[], depth_model=None, gop=6,
+                           reveal=None, take=None, silhouette=silhouette)
+
+
 def validate(sec) -> None:
     """Fail before anything renders when a step's placement can't work."""
-    if sec.type == "film" and sec.layout != "overlay":
-        raise BuildError(f"section '{sec.id}': in-world type (`place: {{kind: ...}}`) needs `layout: overlay` on a film "
+    if sec.type in ("film", "sequence") and sec.layout != "overlay":
+        raise BuildError(f"section '{sec.id}': in-world type (`place: {{kind: ...}}`) needs `layout: overlay` on a {sec.type} "
                          f"(the title is set in the picture; the other layouts put the copy in cards beside it)")
     for i, st, w in world_steps(sec):
         what = f"section '{sec.id}', step '{plain(st.title)[:40]}'"
-        if sec.type == "film" and st.at is None:
+        if sec.type in ("film", "sequence") and st.at is None:
             raise BuildError(f"{what}: in-world type needs `at: [from, to]` (scroll progress, 0-1) or `state: {{beat: <id>}}`")
         if w.kind == "surface" and not w.at and not w.quad:
             raise BuildError(f"{what}: a surface needs `at` (a prompt naming it, e.g. \"the wooden deck\") or a `quad`")
@@ -160,7 +169,6 @@ def depth_stage(sec: FilmScene, ctx: BuildContext, clip: Path, nframes: int, nee
 
     def run():
         from .backends import depth as depthmod
-        from . import world_depth as wd
         from PIL import Image
         res = np.zeros((nframes, wm.H, wm.W), np.uint8)
         for (a, b) in need:
@@ -231,7 +239,7 @@ def _auto_blur(gray: np.ndarray, depth: np.ndarray, dt: float) -> float:
     if here <= 0 or best <= 0:
         return 0.0
     r = min(1.0, here / best)
-    return float(np.clip((1 - r) * 5.0, 0.0, 5.0))
+    return float(np.clip((1 - r) * 8.0, 0.0, 8.0))
 
 
 def _text_stage(sec: FilmScene, ctx: BuildContext, i: int, st: Step, w: WorldPlace, clip: Path, frames: "Frames", depth_file: Optional[Path],
@@ -362,7 +370,7 @@ def _plan_text(sec, ctx, i, st, w, r, clip, frames, depth_file, mask_files, nfra
         elif w.at is not None:
             dt = float(w.at)
         elif kind == "behind":
-            dt = float(np.percentile(inbox, 70)) if inbox.size else 0.4
+            dt = 0.5 if getattr(sec, "silhouette", False) else (float(np.percentile(inbox, 70)) if inbox.size else 0.4)
         else:
             dt = 0.07
         dt = float(np.clip(dt, 0.0, 1.0))
@@ -380,13 +388,18 @@ def _plan_text(sec, ctx, i, st, w, r, clip, frames, depth_file, mask_files, nfra
             if (m0 > 0).sum() > 400 and len(wt.features(gray[fa], m0)) >= 24:
                 used, tracked = v, m0
                 break
-        if tracked is None:
-            used, tracked = 1.0, np.full((wm.H, wm.W), 255, np.uint8)
-            log(f"  note: step {i}: nothing to follow at depth {dt:.2f}; the type follows the whole picture")
+        static = tracked is None
+        if static:
+            log(f"  note: step {i}: nothing to follow at depth {dt:.2f} (a plain backdrop, clear sky): the type stays on the screen")
+            used, tracked = 1.0, np.zeros((wm.H, wm.W), np.uint8)
 
         def mask_at(f):
-            return make(f, used) if used < 1.0 else tracked
-        Hs, conf = wt.track(gray, fa, f0, f1, mask_at, model, log)
+            return make(f, used)
+        if static:
+            Hs, conf = np.full((len(gray), 3, 3), np.nan), np.ones(len(gray))
+            Hs[f0:f1 + 1] = np.eye(3)
+        else:
+            Hs, conf = wt.track(gray, fa, f0, f1, mask_at, model, log)
         # the layer followed is not always at the type's depth: a farther type moves less than a nearer layer does
         med = float(np.median(D[tracked > 0])) if (tracked > 0).any() else dt
         if w.follow is not None:
@@ -464,9 +477,11 @@ def preflight(sec, ctx: Optional[BuildContext] = None) -> None:
         reveal.preflight(ctx)
 
 
-def build(sec: FilmScene, ctx: BuildContext, src: Path, cfg: dict) -> dict:
-    """The `world` config of a film's page (depth, tracks and masks made and cached as needed), from the film's own source."""
+def build(sec: FilmScene, ctx: BuildContext, src: Path, cfg: dict, silhouette: Optional[Path] = None) -> dict:
+    """The `world` config of a film's page (depth, tracks and masks made and cached as needed), from the film's own source.
+    `silhouette`: a depth file (the `depth` array of an npz, 0 far .. 255 near) made some other way: a sequence's alpha."""
     validate(sec)
+    sec = _view(sec, silhouette is not None)
     steps = world_steps(sec)
     ctx.log(f"  world: {len(steps)} in-world title(s)")
     info = probe(src, "stream=width,height,r_frame_rate,nb_read_frames")
@@ -479,8 +494,9 @@ def build(sec: FilmScene, ctx: BuildContext, src: Path, cfg: dict) -> dict:
 
     # the shots that need a depth map: the ones holding behind / sky type
     need = sorted({shot_of(shots, _anchor(sec, st, w, nframes, fps, spans)) for _, st, w in steps if w.kind != "surface" or not w.quad})
-    depth_file = depth_stage(sec, ctx, clip, nframes, [list(s) for s in need]) if need else None
-    key_base = {"clip": fkey(clip), "fps": round(fps, 4), "model": sec.depth_model or "small", "shots": [list(s) for s in shots]}
+    depth_file = silhouette if silhouette is not None else (depth_stage(sec, ctx, clip, nframes, [list(s) for s in need]) if need else None)
+    key_base = {"clip": fkey(clip), "fps": round(fps, 4), "model": "silhouette" if silhouette is not None else (sec.depth_model or "small"),
+                "shots": [list(s) for s in shots]}
 
     texts = []
     for i, st, w in steps:
@@ -630,3 +646,54 @@ def validate_photo(sec, st: Step, w: WorldPlace) -> None:
         raise BuildError(f"{what}: for sky `at` is a depth (0 far to 1 near), not a prompt")
     if w.quad and w.kind != "surface":
         raise BuildError(f"{what}: `quad` is for a surface")
+
+
+# ---------------------------------------------------------------- a sequence: a product on a clear backdrop
+
+def sequence_film(sec, ctx: BuildContext, frames: list[Path], bg: str) -> tuple[Path, Path, dict]:
+    """A `sequence` scene (a rendered product turning on a transparent background) as a film for the world player: the RGBA
+    frames over the backdrop colour at 24 fps (stage world_film: the build's source, and the page's film.mp4 / film-mobile.mp4
+    with a short GOP), and their alpha as the silhouette that is the depth (stage world_alpha: the product is near, the
+    backdrop far, with the frames' own anti-aliased edge: exact, no model). Returns (source film, silhouette file, page urls)."""
+    from PIL import Image
+    wdir = ctx.work / "world"
+    wdir.mkdir(parents=True, exist_ok=True)
+    src, alpha = wdir / "sequence.mp4", wdir / "alpha.npz"
+    web = [ctx.web / "film.mp4", ctx.web / "film-mobile.mp4"]
+    hexc = bg.lstrip("#")
+    rgb = tuple(int(hexc[i:i + 2], 16) for i in (0, 2, 4))
+    first = Image.open(frames[0])
+    key = {"frames": [file_key(frames[0]), file_key(frames[-1]), len(frames)], "bg": bg, "size": list(first.size), "v": VERSION}
+
+    def crop(im):
+        w, h = im.size
+        cw, ch = (min(w, int(h * 16 / 9)), min(h, int(w * 9 / 16)))
+        x, y = (w - cw) // 2, (h - ch) // 2
+        return im.crop((x, y, x + cw, y + ch))
+
+    def run():
+        from .config import settings
+        cw, ch = crop(first).size
+        cmd = [settings()["ffmpeg"], "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{cw}x{ch}",
+               "-r", "24", "-i", "-", "-c:v", "libx264", "-crf", "12", "-preset", "slow", "-pix_fmt", "yuv420p", str(src)]
+        p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+        a = np.zeros((len(frames), wm.H, wm.W), np.uint8)
+        for i, f in enumerate(frames):
+            im = crop(Image.open(f).convert("RGBA"))
+            flat = Image.alpha_composite(Image.new("RGBA", im.size, rgb + (255,)), im).convert("RGB")
+            p.stdin.write(flat.tobytes())
+            a[i] = np.asarray(im.getchannel("A").resize((wm.W, wm.H), Image.LANCZOS))
+        p.stdin.close()
+        if p.wait() != 0:
+            raise BuildError("ffmpeg failed to encode the sequence as a film")
+        np.savez_compressed(alpha, depth=a)
+    ctx.stage("world_alpha", key, [src, alpha], run)
+
+    def encode():
+        from .project import ffmpeg
+        common = ["-an", "-c:v", "libx264", "-preset", "slow", "-pix_fmt", "yuv420p", "-g", "6", "-keyint_min", "6", "-sc_threshold", "0",
+                  "-movflags", "+faststart"]
+        ffmpeg("-i", src, "-vf", "scale=1920:-2:flags=lanczos", *common, "-crf", "20", web[0], log=ctx.log)
+        ffmpeg("-i", src, "-vf", "scale=1280:-2:flags=lanczos", *common, "-crf", "24", web[1], log=ctx.log)
+    ctx.stage("world_film", {"src": fkey(src), "v": VERSION}, web, encode)
+    return src, alpha, {"video": ctx.url(web[0]), "videoMobile": ctx.url(web[1])}

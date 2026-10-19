@@ -12,7 +12,7 @@ vec3 worldBehindSky(vec3 col, vec3 ink, float cov, vec3 film, vec3 near, vec3 lo
                     float on, float intro, int kind, float vy) {
   float vis = 1.0 - smoothstep(A.x - A.y, A.x + A.y, dep);
   float lumLoc = dot(locl, LW), Lf = dot(film, LW), Ln = dot(near, LW);
-  vec3 lit = ink * mix(1.0, clamp(lumLoc / max(B.w, 0.08), 0.55, 1.25), 0.55);
+  vec3 lit = ink * mix(1.0, clamp(lumLoc / max(B.w, 0.02), 0.55, 1.25), 0.55);
   float hz = clamp(A.z * (1.0 + (1.0 - intro) * 1.4), 0.0, 0.95);
   lit = mix(lit, air, hz);
   lit += (Lf - Ln) * 0.9;                                   // the grain of the picture runs through the letters
@@ -36,7 +36,7 @@ vec3 worldSurface(vec3 col, vec3 ink, float cov, vec3 film, vec3 near, vec3 locl
   float n = fbm(pl * 52.0) * 0.75 + (0.5 - (Lf - Ln) * 5.0) * 0.25;
   float th = 1.0 - B.y * 0.9;
   float worn = 1.0 - smoothstep(th - 0.1, th + 0.14, n) * step(0.001, B.y);
-  float lightK = clamp(lumLoc / max(B.w, 0.06), 0.35, 1.5);
+  float lightK = clamp(lumLoc / max(B.w, 0.03), 0.35, 1.5);
   vec3 paint = ink * mix(1.0, lightK, 0.9);
   float texK = clamp(Lf / max(Ln, 0.03), 0.55, 1.5);
   paint *= mix(1.0, texK * texK, B.z);

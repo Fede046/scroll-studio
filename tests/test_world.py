@@ -386,6 +386,24 @@ def test_a_cut_starts_a_new_range():
     assert out.max() > 230 and out.min() < 25                                         # each shot uses the whole range
 
 
+def test_a_cut_nobody_listed_is_found_by_the_flow_and_starts_a_new_range():
+    frames_a, truth_a = _moving_scene(8)
+    rng = np.random.default_rng(12)
+    frames_b = [np.ascontiguousarray(rng.integers(0, 255, f.shape, dtype=np.uint8)) for f in frames_a]      # nothing like the shot before
+    truth_b = [np.ascontiguousarray(t[::-1]) for t in truth_a]
+    frames, truth = frames_a + frames_b, truth_a + truth_b
+    calls = {"i": 0}
+
+    def estimate(fr):
+        i = calls["i"]
+        calls["i"] += 1
+        return truth[i] * (1.0 if i < 8 else 5.0)
+
+    out = world_depth.steady_depth(frames, estimate, radius=3, eps=1e-3)                  # no `cuts`
+    assert out[8:].max() > 200 and out[8:].min() < 50                                      # the second shot has its own range
+    assert abs(float(out[8:].mean()) - 127) < 60
+
+
 # ---------------------------------------------------------------- the whole build, with the models replaced
 
 W, H, NF = 960, 540, 36
