@@ -1187,12 +1187,14 @@ class LightSun(Model):
 
 class LightStructure(Model):
     """Geometry lock. The place must not move between times, only the light. Every relight is measured against the world
-    (edge and depth agreement, how far things are displaced) and small drift is warped away; a relight that still
-    drifts is redone with another seed, and the best attempt is kept."""
+    (how far the editor displaced structure, and how well edges agree) and small drift is warped away; a relight that
+    moved things too far is redone with another seed, and the best attempt is kept."""
     align: bool = Field(True, description="Warp each relight back onto the world's geometry (dense flow on structure, "
                                           "not on colour) so edges sit exactly where they were")
-    max_drift: float = Field(2.5, ge=0, le=40, description="Mean displacement in pixels (at 1024 across) that counts as "
-                                                           "good enough; above it the relight is retried")
+    max_drift: float = Field(4.0, ge=0, le=40, description="How far the editor may move the place, mean displacement in "
+                                                           "pixels at 1024 across; above it the relight is retried with "
+                                                           "another seed (the correction can bend what is only a little off, "
+                                                           "not rebuild a redrawn place)")
     retries: int = Field(2, ge=0, le=8, description="How many more seeds to try when a relight drifts too far")
 
 
@@ -1221,7 +1223,9 @@ class LightScene(SceneBase):
                                                                       "found with Florence-2 + SAM 2.1 and switched one by "
                                                                       "one in the browser. Without it the build finds what "
                                                                       "changed from the pictures themselves")
-    sun: Union[bool, LightSun] = Field(True, description="A sun (and moon) glow that travels over the sky; false for none")
+    sun: Union[bool, LightSun] = Field(False, description="A sun (and moon) glow that travels over the sky, clipped to it; "
+                                                           "`true` or a LightSun. Off by default: the relit pictures already paint "
+                                                           "a sun or a moon, so use it with prompts that leave the sky bare")
     mist: bool = Field(True, description="Draw the times' `haze` as drifting mist, thicker with distance (needs depth)")
     drift: float = Field(0.5, ge=0, le=2, description="A slow 2.5D camera drift through the depth map so the place "
                                                       "breathes (0 off; reduced motion always off)")

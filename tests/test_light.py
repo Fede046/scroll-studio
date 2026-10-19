@@ -199,7 +199,7 @@ def test_relight_locked_retries_until_the_place_holds_still(tmp_path, monkeypatc
         Image.fromarray(relit(place(seed=9) if len(tries) == 1 else world)).save(out)
         return out
     monkeypatch.setattr(light, "relight", fake)
-    img, rep = light.relight_locked(world, wp, "night", [7, 1007, 2007], 8, 2.5, True, tmp_path, "night", lambda m: None)
+    img, rep = light.relight_locked(world, wp, "night", [7, 1007, 2007], 8, 4.0, True, tmp_path, "night", lambda m: None)
     assert tries == [7, 1007] and rep["ok"] and len(rep["attempts"]) == 2
     assert rep["attempts"][0]["aligned"]["drift"] > rep["attempts"][1]["aligned"]["drift"]
     # and when no seed is good enough, the best of them is kept and reported not ok

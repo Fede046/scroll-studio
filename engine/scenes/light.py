@@ -26,7 +26,7 @@ from ..inputs import credit, image_key, resolve_image
 from ..project import BuildContext, BuildError, file_key
 from ..spec import LightScene, LightSun
 
-VERSION = 1
+VERSION = 2
 HOLD_FLOOR = 0.01
 
 
@@ -189,6 +189,8 @@ def build(sec: LightScene, ctx: BuildContext, theme: dict) -> dict:
 
     def make_sky():
         try:
+            if draft:
+                raise RuntimeError("draft build")
             m = np.asarray(Image.open(regionmod.find(ctx.project, world_png, EditRegion(prompt=skyq), ctx.log)).convert("L"),
                            np.float32) / 255
         except Exception as e:     # no ComfyUI nodes, or nothing found: a guess from depth and smoothness
@@ -197,7 +199,7 @@ def build(sec: LightScene, ctx: BuildContext, theme: dict) -> dict:
         import cv2
         m = cv2.resize(m, (480, round(480 * H / W)), interpolation=cv2.INTER_AREA)
         Image.fromarray(np.clip(m * 255, 0, 255).astype(np.uint8)).save(sky_png)
-    ctx.stage("sky", {"v": VERSION, "world": wkey, "q": skyq}, [sky_png], make_sky)
+    ctx.stage("sky", {"v": VERSION, "world": wkey, "q": skyq, "draft": draft}, [sky_png], make_sky)
     sky = np.asarray(Image.open(sky_png), np.float32) / 255
 
     # ---- the times
@@ -250,7 +252,7 @@ def build(sec: LightScene, ctx: BuildContext, theme: dict) -> dict:
         imgs.append(light.load_rgb(png))
         reports.append(json.loads(js.read_text()))
         if not reports[-1].get("ok", True):
-            ctx.log(f"  warning: '{tid}' still drifts {reports[-1]['aligned']['drift']:.2f}px from the world "
+            ctx.log(f"  warning: the editor moved '{tid}' {reports[-1]['raw']['drift']:.2f}px from the world "
                     f"(limit {sec.structure.max_drift}); try `seed:` on that time, a world with simpler structure, or raise "
                     f"structure.max_drift")
 
@@ -282,7 +284,8 @@ def build(sec: LightScene, ctx: BuildContext, theme: dict) -> dict:
                 if ms:
                     allow = np.maximum.reduce([cv2.resize(m, (W, H)) for m in ms])
             lamp = light.lamp_map(a, b, sky=sky, allow=allow, glow=max([l.glow for l in sec.lamps] or [1.0]),
-                                  grow=sec.lamps[0].grow if sec.lamps else 2, seed=5 + k)
+                                  grow=sec.lamps[0].grow if sec.lamps else 2, seed=5 + k,
+                                  turns_on=(True if times[k + 1]["lit"] and not times[k]["lit"] else False if times[k]["lit"] and not times[k + 1]["lit"] else None))
             entry = {"ratio": pair_files[k].name, "lamp": None, "color": None, "count": 0}
             if lamp is not None:
                 f = mdir / f"lamp{k}.png"

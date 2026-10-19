@@ -8,7 +8,9 @@ The pipeline (engine/scenes/light.py runs it, cached per stage):
   measure     structure, not colour: both pictures are reduced to a band-passed LOG-luminance map (a change of light is a
               multiplication, which log turns into an offset the band-pass removes), normalised by local contrast. The
               displacement between the two maps (dense optical flow, DIS) and the agreement of their edges say how far
-              the place moved. `drift` below is that displacement in pixels at 1024 across.
+              the place moved. `drift` below is that displacement in pixels at 1024 across. The residual after the warp is NOT the measure of
+              drift (a warp can match anything, bending the place into shape): the displacement itself and the strain of
+              the correction are.
   align       the flow, smoothed, is the correction: the relit picture is warped back onto the world's geometry, so a
               window is where the window was. The residual after the warp is measured again and reported.
   retry       a relight whose drift stays above the limit is redone with another seed; the best attempt is kept.
@@ -32,7 +34,7 @@ import cv2
 import numpy as np
 from PIL import Image
 
-VERSION = 1                # bump when a relight or its measurement would come out differently for the same inputs
+VERSION = 2                # bump when a relight or its measurement would come out differently for the same inputs
 MEASURE_W = 1024           # width at which structure is compared, so drift means the same on any picture
 MAX_FLOW = 28.0            # a correction larger than this (px at MEASURE_W) is not trusted: it is a different picture
 
@@ -103,6 +105,20 @@ def displacement(base_st: np.ndarray, f: np.ndarray) -> tuple[float, float]:
     return mean, float(np.percentile(sel, 90)) if sel.size else mean
 
 
+def strain(base_st: np.ndarray, f: np.ndarray, sigma: float = 5.0) -> float:
+    """How much the correction stretches and shears the picture (mean of the flow's own gradient over the structured
+    pixels; 0 is a pure shift, 0.1 means a tenth of a pixel of stretch per pixel): a high value is a place being bent
+    into shape rather than nudged back, the melted look."""
+    fs = [cv2.GaussianBlur(f[..., i], (0, 0), sigma) for i in (0, 1)]
+    g = np.zeros(fs[0].shape, np.float32)
+    for c in fs:
+        gy, gx = np.gradient(c)
+        g += gx * gx + gy * gy
+    g = np.sqrt(g)
+    w = _weights(base_st)
+    return float((g * w).sum() / w.sum()) if w.sum() > 50 else 0.0
+
+
 def edge_agreement(a_st: np.ndarray, b_st: np.ndarray, tol: int = 2, keep: float = 0.10) -> float:
     """F-score of the strongest `keep` share of structure pixels of each picture, matched within `tol` px."""
     ea, eb = np.abs(a_st), np.abs(b_st)
@@ -133,7 +149,8 @@ def measure(world: np.ndarray, cand: np.ndarray, base_st: Optional[np.ndarray] =
     st = structure(cand)
     f = flow(base_st, st)
     mean, p90 = displacement(base_st, f)
-    return {"drift": round(mean, 3), "drift_p90": round(p90, 3), "edges": round(edge_agreement(base_st, st), 4)}
+    return {"drift": round(mean, 3), "drift_p90": round(p90, 3), "edges": round(edge_agreement(base_st, st), 4),
+            "strain": round(strain(base_st, f), 4)}
 
 
 def align(world: np.ndarray, cand: np.ndarray, base_st: Optional[np.ndarray] = None, passes: int = 2) -> tuple[np.ndarray, dict]:
@@ -195,16 +212,18 @@ def relight_locked(world: np.ndarray, world_png: Path, instruction: str, seeds: 
             fixed, rep = cand, {"raw": m, "aligned": {k: m[k] for k in ("drift", "drift_p90", "edges")}}
         rep["seed"] = seed
         attempts.append(rep)
-        log(f"    seed {seed}: drift {rep['raw']['drift']:.2f}px raw -> {rep['aligned']['drift']:.2f}px aligned, "
-            f"edges {rep['raw']['edges']:.2f} -> {rep['aligned']['edges']:.2f}")
-        score = rep["aligned"]["drift"] - 2 * rep["aligned"]["edges"]
+        log(f"    seed {seed}: the editor moved the place {rep['raw']['drift']:.2f}px (strain {rep['raw'].get('strain', 0):.3f}); "
+            f"edges {rep['raw']['edges']:.2f} -> {rep['aligned']['edges']:.2f} after the correction")
+        # an honest score: how far the editor moved the place (raw), how much the correction had to bend it, how well
+        # the edges agree in the end. The residual after a warp alone says nothing: a warp can match anything.
+        score = rep["raw"]["drift"] + 40 * rep["raw"].get("strain", 0) - 4 * rep["aligned"]["edges"]
         if best is None or score < best[0]:
             best, best_img = (score, rep), fixed
-        if rep["aligned"]["drift"] <= max_drift:
+        if rep["raw"]["drift"] <= max_drift:
             break
     report = dict(best[1])
     report["attempts"] = attempts
-    report["ok"] = report["aligned"]["drift"] <= max_drift
+    report["ok"] = report["raw"]["drift"] <= max_drift
     return best_img, report
 
 
@@ -258,7 +277,7 @@ def sky_mask_fallback(world: np.ndarray, depth: np.ndarray) -> np.ndarray:
     n, lab, stats, _ = cv2.connectedComponentsWithStats(m)
     keep = np.zeros_like(m)
     for i in range(1, n):
-        if stats[i, cv2.CC_STAT_Y] < h * 0.08 and stats[i, cv2.CC_STAT_AREA] > h * w * 0.03:
+        if stats[i, cv2.CC_STAT_TOP] < h * 0.08 and stats[i, cv2.CC_STAT_AREA] > h * w * 0.03:
             keep[lab == i] = 1
     return cv2.GaussianBlur(keep.astype(np.float32), (0, 0), 3.0)
 
@@ -268,21 +287,38 @@ def _top_hat(l: np.ndarray, k: int) -> np.ndarray:
 
 
 def lamp_map(a: np.ndarray, b: np.ndarray, sky: Optional[np.ndarray] = None, allow: Optional[np.ndarray] = None,
-             glow: float = 1.0, grow: int = 2, seed: int = 5) -> Optional[dict]:
+             glow: float = 1.0, grow: int = 2, seed: int = 5, turns_on: Optional[bool] = None) -> Optional[dict]:
     """The lights that switch between pictures `a` and `b` (the same place at two times).
 
-    Small bright features (white top-hat) present in one picture and not the other are the lamps; `sky` (0-1, any size)
-    removes the stars and the sun's glare, `allow` (0-1, the picture's size) confines them to the regions the spec
-    names. Each connected light gets its own delay (0-1) so the browser turns them on one by one. Returns {"map": RGBA
-    uint8, "color": "#rrggbb", "count": n} or None when nothing switches. R is the cut-out (soft), G the delay, B the
-    halo."""
+    A lamp is a small, bright, warm feature that one picture has and the other lacks (white top-hat, which keeps
+    features smaller than a window and drops the sky and whole walls). Evidence in each direction is gathered; the
+    direction with more of it says whether lights come on (b has them) or go off (a has them) unless `turns_on` says
+    (the times' own `lit` flags), and only that direction counts, so a white sail that is brighter by day is not a lamp. `sky` (0-1, any size) keeps stars and the sun's
+    glare out; `allow` (0-1, the picture's size) confines the lights to regions the spec names. Each connected light
+    gets its own delay (0-1) so the browser turns them on one by one. Returns {"map": RGBA uint8, "color": "#rrggbb",
+    "count": n, "turns_on": bool} or None when nothing switches. R is the cut-out (soft), G the delay, B the halo."""
     A, B = _small(a, LAMP_W), _small(b, LAMP_W)
     h, w = A.shape[:2]
     la, lb = luma(A), luma(B)
     k = max(15, (w // 40) | 1)
     ta, tb = _top_hat(la, k), _top_hat(lb, k)
-    ev = np.abs(tb - ta)
-    mask = ev > 0.13
+
+    def warm(rgb):       # lit glass and bulbs are warm: red over blue
+        f = rgb.astype(np.float32)
+        return np.clip((f[..., 0] - f[..., 2] * 0.85) / 90.0 + 0.35, 0, 1)
+    # Light that is EMITTED is what the change of ambient light cannot explain: scale each picture by the low-frequency
+    # ratio between them (a window wall is darker at night; a lit window is not) and keep what is left over.
+    lin_a, lin_b = np.power(la, 2.2), np.power(lb, 2.2)
+    sig = w * 0.02
+    ratio = (cv2.GaussianBlur(lin_b, (0, 0), sig) + 1e-4) / (cv2.GaussianBlur(lin_a, (0, 0), sig) + 1e-4)
+    ratio = np.clip(ratio, 0.002, 500.0)
+    on_ev = np.clip(lin_b - lin_a * ratio - 0.05, 0, None) * (tb > 0.1) * (0.4 + warm(B))
+    off_ev = np.clip(lin_a - lin_b / ratio - 0.05, 0, None) * (ta > 0.1) * (0.4 + warm(A))
+    if turns_on is None:
+        turns_on = float(on_ev.sum()) >= float(off_ev.sum())
+    ev = on_ev if turns_on else off_ev
+    lit_rgb, lit_l = (B, lb) if turns_on else (A, la)
+    mask = ev > 0.03
     if sky is not None:
         mask &= cv2.resize(sky.astype(np.float32), (w, h), interpolation=cv2.INTER_LINEAR) < 0.5
     if allow is not None:
@@ -294,7 +330,7 @@ def lamp_map(a: np.ndarray, b: np.ndarray, sky: Optional[np.ndarray] = None, all
         m = cv2.dilate(m, kk) if grow > 0 else cv2.erode(m, kk)
     n, lab, stats, cent = cv2.connectedComponentsWithStats(m)
     keep = np.zeros(n, bool)
-    keep[1:] = stats[1:, cv2.CC_STAT_AREA] >= 5
+    keep[1:] = (stats[1:, cv2.CC_STAT_AREA] >= 6) & (stats[1:, cv2.CC_STAT_AREA] <= w * h * 0.004)   # not a wall, not a speck
     m = keep[lab].astype(np.uint8)
     if int(m.sum()) < 30:
         return None
@@ -304,16 +340,14 @@ def lamp_map(a: np.ndarray, b: np.ndarray, sky: Optional[np.ndarray] = None, all
     delay[1:] = rng.random(n - 1)
     soft = cv2.GaussianBlur(m.astype(np.float32), (0, 0), 0.8)
     strength = cv2.dilate(ev * m, np.ones((5, 5), np.uint8))
-    halo = cv2.GaussianBlur(m.astype(np.float32) * np.clip(strength * 3, 0.3, 1), (0, 0), w * 0.011)
-    halo = np.clip(halo / max(float(halo.max()), 1e-6), 0, 1) ** 0.8
-    lit_is_b = tb.sum() >= ta.sum()
-    lit = (B if lit_is_b else A)[m > 0].astype(np.float32).mean(axis=0)
+    halo = cv2.GaussianBlur(m.astype(np.float32) * np.clip(strength * 4, 0.25, 1), (0, 0), w * 0.009)
+    halo = np.clip(halo / max(float(halo.max()), 1e-6), 0, 1) ** 0.9
+    lit = lit_rgb[m > 0].astype(np.float32).mean(axis=0)
     col = lit / max(float(lit.max()), 1.0)
-    col = np.clip(0.55 * col + 0.45 * np.array([1.0, 0.7, 0.36]) * (lit.max() / 255), 0, 1)
-    out = np.dstack([np.clip(soft * 255, 0, 255), delay[lab] * 255, np.clip(halo * 255 * min(glow, 1.0), 0, 255),
-                     np.full((h, w), 255)]).astype(np.uint8)
+    col = np.clip(0.55 * col + 0.45 * np.array([1.0, 0.7, 0.36]), 0, 1)
+    out = np.dstack([np.clip(soft * 255, 0, 255), delay[lab] * 255, np.clip(halo * 255, 0, 255), np.full((h, w), 255)]).astype(np.uint8)
     return {"map": out, "color": "#" + "".join(f"{int(round(v * 255)):02x}" for v in col), "count": int(n - 1),
-            "turns_on": bool(lit_is_b)}
+            "turns_on": bool(turns_on)}
 
 
 # ---------------------------------------------------------------- the section's colours at one time of day
