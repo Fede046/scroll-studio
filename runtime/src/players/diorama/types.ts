@@ -11,6 +11,7 @@ export interface CameraPlan { fov: number; pitch: number; dive_pitch: number; ho
 export interface Plan {
   v: number; kind: string; size: number; base: "round" | "square"; table: string;
   water: { level: number; has: boolean }; grid: number; heights: number[];
+  palette?: string[]; edge?: Record<string, string> | null;
   props: PropRec[]; places: PlaceRec[]; steps: (number | null)[]; camera: CameraPlan;
 }
 export interface DioramaCfg {

@@ -131,7 +131,7 @@ const factory: PlayerFactory = async (cfgIn, ctx) => {
   const world = new THREE.Group();
   scene.add(world);
   const anims: { o: THREE.Object3D; tick: (o: any, t: number) => void }[] = [];
-  const palette = plan.kind === "harbour" ? ["#d9503a", "#2f8a9d", "#e8a23a", "#c4433a", "#3d6fa5"] : ["#c4533c", "#d98b3a", "#4f7f9a", "#8a5a8f", "#cf6f4e"];
+  const palette = plan.palette && plan.palette.length ? plan.palette : ["#d9503a", "#2f8a9d", "#e8a23a", "#c4433a", "#3d6fa5"];
 
   const M = new Mesher();
   const mesh = (m: Mesher, parent: THREE.Object3D, shadows = true) => {
@@ -168,8 +168,8 @@ const factory: PlayerFactory = async (cfgIn, ctx) => {
       add(obj, lx, ly, lz, tick) {
         const outer = new THREE.Group();
         outer.position.copy(new THREE.Vector3(lx, ly, lz).applyMatrix4(M.m)); outer.rotation.y = p.r; outer.scale.setScalar(p.s);
-        const inner = new THREE.Group(); inner.add(obj); outer.add(inner); world.add(outer);
-        if (tick) anims.push({ o: inner, tick });
+        outer.add(obj); world.add(outer);
+        if (tick) anims.push({ o: obj, tick });
       },
     };
     M.begin(p.x, p.y, p.z, p.r, p.s);
@@ -197,7 +197,7 @@ const factory: PlayerFactory = async (cfgIn, ctx) => {
 
   // ---- camera, post
   const camera = new THREE.PerspectiveCamera(plan.camera.fov, 1, 1, 420);
-  const post = new Post(renderer, { tilt: cfg.look.tilt_shift, saturation: cfg.look.saturation, vignette: cfg.look.vignette, grain: cfg.look.grain, mobile });
+  const post = new Post(renderer, { tilt: cfg.look.tilt_shift * (mobile ? 0.7 : 1), saturation: cfg.look.saturation, vignette: cfg.look.vignette, grain: cfg.look.grain, mobile });
   let W = 1, H = 1, aspect = 1;
   const fovFor = () => Math.min(62, plan.camera.fov * (aspect < 0.9 ? 1.4 : 1));
   const wideDist = () => {
@@ -207,7 +207,8 @@ const factory: PlayerFactory = async (cfgIn, ctx) => {
     const byH = (plan.camera.fit * Math.sin(THREE.MathUtils.degToRad(plan.camera.pitch)) + 4.5) / (tv * 0.8);
     return Math.max(byW, byH);
   };
-  const rig = new Rig(plan.camera, wideDist, cfg.side, () => (mobile ? 0 : 0.17), () => (mobile || aspect < 1.05 ? 0 : cfg.side * 0.11));
+  const rig = new Rig(plan.camera, wideDist, cfg.side, () => (mobile ? 0 : 0.17), () => (mobile || aspect < 1.05 ? 0 : cfg.side * 0.11),
+    () => Math.tan(THREE.MathUtils.degToRad(plan.camera.fov / 2)) / Math.tan(THREE.MathUtils.degToRad(fovFor() / 2)));
   const state: CamState = { yaw: 0, pitch: 30, dist: 40, target: new THREE.Vector3(), shift: 0, open: 1, beat: 0 };
   const drift = plan.camera.drift;
 

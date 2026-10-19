@@ -333,10 +333,10 @@ def harbour(w: World, pal, spec_world):
     bc = bay_c
     spots = [
         Spot("hill", *P(-9.6, -6.2), face_to(*P(-9.6, -6.2), *bc), ("lighthouse",)),
-        Spot("yard", *P(6.8, -5.7), yaw_of(0.0, 1.0), ("crane", "warehouse")),
+        Spot("yard", *P(7.6, -5.5), yaw_of(0.0, 1.0), ("crane", "warehouse")),
         Spot("plaza", *P(-9.4, 5.6), face_to(*P(-9.4, 5.6), *bc), ("stall", "cafe")),
         Spot("quay", *P(11.0, 0.4), face_to(*P(11.0, 0.4), *bc), ("office", "warehouse")),
-        Spot("meadow", *P(2.2, -11.4), yaw_of(0.0, 1.0), ("windmill",)),
+        Spot("meadow", *P(-2.8, -11.2), yaw_of(0.0, 1.0), ("windmill",)),
         Spot("village", *P(-11.0, -1.0), face_to(*P(-11.0, -1.0), *bc), ("shop", "cafe", "house")),
         Spot("bay", *P(0.6, 1.4), yaw_of(0.4, 1.0), ("ferry",), water=True),
         Spot("pier", *P(-1.3, 9.2), yaw_of(0.0, -1.0), ("shop", "cafe")),
@@ -385,7 +385,7 @@ def harbour_fill(w: World, pal, info, rng):
                       int(rng.integers(0, 2)), 1.5 if layer == 0 else 0.0, 1.05 * layer)
     # the windmill's wheat field
     mx, mz = w.spots["meadow"].x, w.spots["meadow"].z
-    paint_field(w, mx - 5.2 * k, mz + 0.6 * k, 3.0 * k, 1.7 * k, -6, "#d9b84a")
+    paint_field(w, mx - 4.6 * k, mz + 1.2 * k, 2.8 * k, 1.5 * k, -6, "#d9b84a")
     # plaza cobbles
     px, pz = w.spots["plaza"].x, w.spots["plaza"].z
     paint_cobbles(w, px, pz, 3.1 * k)
@@ -409,7 +409,7 @@ def harbour_fill(w: World, pal, info, rng):
         yaw = yaw_of(-gx, -gz) + rng.normal(0, 0.12)
         w.add("house", x, z, yaw, rng.uniform(0.9, 1.1), pal[int(rng.integers(0, len(pal)))], int(rng.integers(0, 4)), 1.35, wall=WALLS[int(rng.integers(0, len(WALLS)))])
     area_house = lambda x, z: 2.7 < w.dwater(x, z) < 8.0 and w.height_at(x, z) < 0.6
-    w.scatter(int(round(13 * dens)), house, 1.35, area_house, margin=0.15, tries=120)
+    w.scatter(int(round(17 * dens)), house, 1.35, area_house, margin=0.15, tries=160)
     # trees in groups, bushes
     centres = []
     for _ in range(int(round(12 * dens)) + 1):
@@ -444,14 +444,19 @@ def harbour_fill(w: World, pal, info, rng):
 def setup(kind: str, w: World, pal, spec_world):
     if kind == "harbour":
         return harbour(w, pal, spec_world)
-    raise NotImplementedError(kind)
+    from . import recipes2
+    return getattr(recipes2, kind)(w, pal, spec_world)
 
 
 def fill(kind: str, w: World, pal, info, rng):
     if kind == "harbour":
         return harbour_fill(w, pal, info, rng)
+    from . import recipes2
+    return getattr(recipes2, f"{kind}_fill")(w, pal, info, rng)
 
 
 def dress(kind: str, w: World, pl: dict, pal, rng):
     if kind == "harbour":
         return dress_harbour(w, pl, pal, rng)
+    from . import recipes2
+    return getattr(recipes2, f"dress_{kind}")(w, pl, pal, rng)

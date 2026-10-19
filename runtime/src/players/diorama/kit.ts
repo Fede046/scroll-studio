@@ -7,6 +7,7 @@
 import * as THREE from "three";
 import { Mesher, PAT, hash, shade } from "./mesher";
 import type { PropRec } from "./types";
+import { KIT2 } from "./kit2";
 
 export interface KitCtx {
   M: Mesher;
@@ -387,6 +388,7 @@ const STUB: Builder = (c) => { c.M.rbox(1.2, 1.2, 1.2, 0, 0, 0, "#c0b8ac", 0.1);
 export const KIT: Record<string, Builder> = {
   tree, pine, bush, rock, lamp, bench, fence, crate, barrel, bollard, buoy, flag,
   house, shop, cafe: shop, warehouse, office, stall, container, boat, ferry: boat, pier, lighthouse, crane, windmill,
+  ...KIT2,
 };
 
 export function builderFor(kind: string): Builder {

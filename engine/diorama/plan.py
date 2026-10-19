@@ -7,11 +7,12 @@ from typing import Optional
 
 import numpy as np
 
-from . import recipes
+from . import recipes, recipes2
 from .recipes import HERO, WATER_KINDS, dress, pal_of, resolve_where, snap_free, face_default
 from .world import GRID, World, forward, yaw_of
 
 VERSION = 1
+DEFAULT_SIZE = {"harbour": 30.0, "town": 30.0, "desk": 22.0, "factory": 26.0, "studio": 22.0}
 
 
 def _base_of(sec) -> str:
@@ -72,10 +73,18 @@ def resolve_places(w: World, sec, pal, rng) -> list[dict]:
         w.add(pl["kind"], pl["x"], pl["z"], pl["yaw"], pl["scale"], pl["color"], 0, pl["r"] * 0.9, place=placed.index(pl))
     for pl in placed:
         dress(sec.world.kind, w, pl, pal, rng)
-        sx, sz = recipes.local(pl["x"], pl["z"], pl["yaw"], -(pl["r"] + 0.8), pl["r"] * 0.55 + 0.7)
+        sx, sz = recipes.local(pl["x"], pl["z"], pl["yaw"], -(pl["r"] + 1.1), min(pl["r"] * 0.15, 0.6) + 0.3)
         if not w.inside_pt(sx, sz, 0.3) or (w.water_at(sx, sz) and pl["kind"] not in WATER_KINDS):
-            sx, sz = recipes.local(pl["x"], pl["z"], pl["yaw"], (pl["r"] + 0.8), pl["r"] * 0.55 + 0.7)
-        w.add("sign", sx, sz, pl["yaw"], 0.8 + 0.12 * min(pl["scale"], 2), None, 0, 0.4, text=pl["sign"])
+            sx, sz = recipes.local(pl["x"], pl["z"], pl["yaw"], (pl["r"] + 1.1), min(pl["r"] * 0.15, 0.6) + 0.3)
+        w.add("sign", sx, sz, pl["yaw"], 1.05 + 0.1 * min(pl["scale"], 2), None, 0, 0.4, text=pl["sign"])
+    # the view cone in front of each hero stays free of scenery, so the camera has a clear look at it
+    for pl in placed:
+        if pl["kind"] in WATER_KINDS:
+            continue
+        for off in (-20, 0, 20):
+            a = pl["yaw"] + math.radians(off)
+            for d in (pl["r"] + 2.6, pl["r"] + 5.0):
+                w.occ.append((pl["x"] + math.sin(a) * d, pl["z"] + math.cos(a) * d, 1.0))
     return placed
 
 
@@ -102,6 +111,54 @@ def assign_steps(sec, placed: list[dict]) -> list[Optional[int]]:
     return out
 
 
+# height and footprint radius of what can stand between the camera and a place (world units at scale 1)
+BLOCKERS = {"tree": (2.2, 0.7), "pine": (2.0, 0.6), "house": (3.0, 1.2), "shop": (3.6, 1.4), "cafe": (3.4, 1.4), "warehouse": (2.7, 2.3),
+            "office": (3.8, 1.6), "container": (1.1, 1.3), "lighthouse": (8.6, 1.2), "windmill": (7.0, 1.4), "crane": [(5.2, 1.9, 0, 0), (5.7, 1.4, 0, 2.0), (5.7, 1.4, 0, 4.5), (5.7, 1.4, 0, 7.0)],
+            "stall": (2.2, 1.0), "tank": (5.0, 1.8), "silo": (7.0, 1.5), "chimney": (9.0, 0.9), "clocktower": (8.0, 1.3), "ferry": (3.0, 1.8),
+            "monitor": (3.0, 1.6), "laptop": (1.5, 1.8), "sofa": (2.0, 2.0), "shelf": (4.2, 1.5), "softbox": (5.0, 1.0), "easel": (4.2, 1.3),
+            "plant": (2.6, 1.0), "deskLamp": (3.8, 0.8), "robot": (3.8, 1.4), "conveyor": (1.8, 2.2), "boat": (1.5, 0.9), "fountain": (2.2, 1.5)}
+
+
+def clear_yaw(w: World, pl: dict, target, dist: float, pitch: float, base_deg: float, prefer: float) -> float:
+    """The camera azimuth, near `base_deg` (the place's front), from which the fewest tall things stand between the camera
+    and the place: candidates are tried by distance from the preferred offset and scored by how much of the sight
+    line they block."""
+    tx, ty, tz = target
+    cp, sp = math.cos(math.radians(pitch)), math.sin(math.radians(pitch))
+    own = (pl["x"], pl["z"])
+    blockers = []
+    for p in w.props:
+        spec = BLOCKERS.get(p["k"])
+        if spec is None or (abs(p["x"] - own[0]) < 1e-6 and abs(p["z"] - own[1]) < 1e-6):
+            continue
+        for h, r, dx, dz, *ymin in (spec if isinstance(spec, list) else [(*spec, 0, 0)]):
+            bx = p["x"] + (dz * math.sin(p["r"]) + dx * math.cos(p["r"])) * p["s"]
+            bz = p["z"] + (dz * math.cos(p["r"]) - dx * math.sin(p["r"])) * p["s"]
+            lo = (ymin[0] if ymin else 0.0) * p["s"]
+            blockers.append((bx, bz, p["y"] + lo, h * p["s"], r * p["s"]))
+    nx, nz = math.cos(math.radians(base_deg)), -math.sin(math.radians(base_deg))
+    best, best_score = base_deg + prefer, 1e9
+    for off in sorted({prefer, -prefer, 0, 20, -20, 38, -38, 55, -55, 75, -75}, key=lambda o: abs(o - prefer)):
+        yaw = math.radians(base_deg + off)
+        cx, cy, cz = tx + dist * math.sin(yaw) * cp, ty + dist * sp, tz + dist * math.cos(yaw) * cp
+        blocked = 0.0
+        px, pz = -math.cos(yaw), math.sin(yaw)         # sideways, for the edges of the view cone
+        for lat in (-3.0, 0.0, 3.0):
+            for k in range(2, 38):
+                t = k / 40
+                x, y, z = tx + (cx - tx) * t + px * lat * t, ty + (cy - ty) * t, tz + (cz - tz) * t + pz * lat * t
+                for bx, bz, by, bh, br in blockers:
+                    if (x - bx) ** 2 + (z - bz) ** 2 < br * br and by <= y < by + bh:
+                        blocked += 1.0 if lat == 0 else 0.6
+                        break
+            # the camera must stay inside the base, or the world falls away behind the place
+        edge = 0.0 if w.inside_pt(cx, cz, 0.0) else 1.0
+        score = blocked + edge * 6 + 0.012 * abs(off - prefer)
+        if score < best_score - 1e-9:
+            best, best_score = base_deg + off, score
+    return best
+
+
 def camera_plan(w: World, sec, placed: list[dict], stepmap: list[Optional[int]]) -> dict:
     cam = sec.camera
     tan_half = math.tan(math.radians(cam.fov) / 2)
@@ -115,9 +172,10 @@ def camera_plan(w: World, sec, placed: list[dict], stepmap: list[Optional[int]])
             pl = placed[pi]
             gy = w.height_at(pl["x"], pl["z"])
             off = 24.0 * (1 if pi % 2 == 0 else -1)
-            yaw = math.degrees(pl["yaw"]) + off
             fr = max(2.6 * pl["r"], min(pl["h"], 9.0) + 1.6)
             dist = fr / (0.72 * 2 * tan_half) / cam.dive
+            tgt = (pl["x"], gy + min(pl["h"], 9.0) * 0.44, pl["z"])
+            yaw = clear_yaw(w, pl, tgt, dist, cam.dive_pitch, math.degrees(pl["yaw"]), off)
             side = {"left": -1, "right": 1}.get(pl["side"] or "", view_side)
             beats.append({"kind": "place", "place": pi, "yaw": yaw, "pitch": cam.dive_pitch, "dist": round(dist, 2),
                           "target": [round(pl["x"], 3), round(gy + min(pl["h"], 9.0) * 0.44, 3), round(pl["z"], 3)],
@@ -168,7 +226,8 @@ def build(sec, table: str, draft: bool = False):
     """The whole plan and the ground texture (uint8 N x N x 3) for a diorama scene."""
     wd = sec.world
     kind = wd.kind
-    w = World(wd.size, _base_of(sec), wd.seed, wd.density, draft)
+    size = wd.size or DEFAULT_SIZE[kind]
+    w = World(size, _base_of(sec), wd.seed, wd.density, draft)
     pal = pal_of(w, wd.palette, kind)
     rng = np.random.default_rng(wd.seed + 101)
     info = recipes.setup(kind, w, pal, wd)
@@ -184,9 +243,10 @@ def build(sec, table: str, draft: bool = False):
     camera = camera_plan(w, sec, placed, stepmap)
     hg = w.height_grid(GRID)
     plan = {
-        "v": VERSION, "kind": kind, "size": wd.size, "base": w.base, "table": table,
+        "v": VERSION, "kind": kind, "size": size, "base": w.base, "table": table,
         "water": {"level": w.water_level, "has": bool(w.has_water)},
         "grid": GRID, "heights": [round(float(v), 2) for v in hg.reshape(-1)],
+        "palette": pal, "edge": recipes2.EDGES.get(kind),
         "props": w.props,
         "places": [{"name": p["name"], "kind": p["kind"], "x": round(p["x"], 3), "y": p["y"], "z": round(p["z"], 3),
                     "yaw": round(p["yaw"], 3), "h": round(p["h"], 2), "r": round(p["r"], 2), "sign": p["sign"]} for p in placed],

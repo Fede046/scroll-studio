@@ -1277,7 +1277,7 @@ class DioramaWorld(Model):
     kind: Literal["harbour", "town", "desk", "factory", "studio"] = Field(
         "harbour", description="The kind of world: sets the ground plan, the scenery and the prop vocabulary")
     seed: int = Field(7, description="Seed for the layout: another seed is another arrangement of the same kind of world")
-    size: float = Field(30.0, ge=16, le=60, description="Width of the diorama in world units (a house is about 2)")
+    size: Optional[float] = Field(None, ge=16, le=60, description="Width of the diorama in world units (a house is about 2). Unset: 30 for a harbour or town, 22 for a desk or studio, 26 for a factory")
     base: Optional[Literal["round", "square"]] = Field(
         None, description="The shape of the base it stands on (default: round for harbour and town, square for the rest)")
     palette: list[str] = Field(default_factory=list, description="Hex colours for roofs, hulls and containers, replacing the world's own (2-8)")

@@ -121,7 +121,8 @@ export function buildTerrain(plan: Plan, ground: THREE.Texture, uni: TerrainUnif
   const M = new Mesher();
   M.aoOn = false;
   const rings2 = segs;
-  const col = { lip: "#7cbb4a", soil: "#8d5f3b", clay: "#6f4630", stone: "#8c8984", sea: "#2c93c9", seaDeep: "#1d6fa6", wood: "#7a5434", woodTop: "#9a7048" };
+  const e = plan.edge || {};
+  const col = { lip: e.lip ?? "#7cbb4a", soil: e.soil ?? "#8d5f3b", clay: e.clay ?? "#6f4630", stone: e.stone ?? "#8c8984", sea: "#2c93c9", seaDeep: "#1d6fa6", wood: e.plinth ?? "#7a5434", woodTop: e.plinthTop ?? "#9a7048" };
   const V = (th: number, rho: number, y: number) => new THREE.Vector3(Math.cos(th) * rho, y, Math.sin(th) * rho);
   const band = (th0: number, th1: number, r0: number, r1: number, y0: number, y1: number, color: string) => {
     if (y0 - y1 < 1e-4) return;
@@ -145,8 +146,8 @@ export function buildTerrain(plan: Plan, ground: THREE.Texture, uni: TerrainUnif
       band(th0, th1, r0, r1, -1.25, FLOOR_Y, col.stone);
     }
     // the plinth: top ring and its outer wall
-    const e = 0.38;
-    const pr0 = r0 + e, pr1 = r1 + e;
+    const ex = 0.38;
+    const pr0 = r0 + ex, pr1 = r1 + ex;
     M.quad(V(th0, r0, FLOOR_Y), V(th1, r1, FLOOR_Y), V(th1, pr1, FLOOR_Y - 0.08), V(th0, pr0, FLOOR_Y - 0.08), col.woodTop, { ao: false });
     band(th0, th1, pr0, pr1, FLOOR_Y - 0.08, TABLE_Y, col.wood);
   }

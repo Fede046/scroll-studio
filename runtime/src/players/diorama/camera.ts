@@ -24,7 +24,7 @@ export class Rig {
   beats: Beat[];
   rest: [number, number][];
   wideShift = 0;
-  constructor(private plan: CameraPlan, public wideDist: () => number, private viewSide: number, public diveShift: () => number, public wideShiftOf: () => number) {
+  constructor(private plan: CameraPlan, public wideDist: () => number, private viewSide: number, public diveShift: () => number, public wideShiftOf: () => number, private distScale: () => number = () => 1) {
     this.beats = plan.beats;
     const g = (1 - plan.hold) / 2;
     this.rest = this.beats.map((b, i) => {
@@ -36,7 +36,7 @@ export class Rig {
   private pose(b: Beat, wide: boolean) {
     if (b.kind === "wide") return { pitch: this.plan.pitch, dist: this.wideDist(), target: new THREE.Vector3(0, 0.5, 0), shift: this.wideShiftOf() };
     return {
-      pitch: b.pitch, dist: b.dist as number, target: new THREE.Vector3(...b.target),
+      pitch: b.pitch, dist: (b.dist as number) * this.distScale(), target: new THREE.Vector3(...b.target),
       shift: (b.side || this.viewSide) * this.diveShift(),
     };
   }
