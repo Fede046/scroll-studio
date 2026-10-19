@@ -897,15 +897,24 @@ image (no `cinemagraph:`) is untouched and keeps its cache; so does the still un
    last frame" (the end frame pinned to the still) does not make a loop on either model: LTX-2.3 returns a clip that hardly
    moves, a loosened pin lets the middle go wild, and Wan 2.2 invents an action to get from the still back to itself (a hand
    throws a sheet across the window). Kept lossless, so everything after it can be redone without the GPU.
-3. **Track.** SAM 2.1 follows the moving thing through the clip, so the mask keeps the whole path it sweeps (`track: false`
-   skips it).
-4. **Mask.** The region, the tracked path and where the clip really moves (temporal motion energy), grown (`grow`) and
-   feathered (`feather`): the video is kept where something moves and the still everywhere else, and the soft edge falls on
-   pixels that do not move, so no seam is cut through the motion.
-5. **Encode.** The frames are stabilised against the still (a video model drifts the whole frame a little), tone-matched
-   to the still around the mask, the loop is closed (a flow-aligned crossfade where a generated loop does not meet itself),
-   the motion is damped or exaggerated by `strength`, and the part that moves is encoded as a small H.264 video (only the
-   crop around it, never the whole picture) with the mask as a lossless WebP.
+3. **Prep.** A video model moves the camera however it is told not to (a push in, a drift, a dolly's parallax) and a
+   cinemagraph's whole point is that nothing but one thing moves. Each frame is pinned back to the still by dense optical
+   flow measured on the pixels around the moving part and carried inward across it (flow stabilisation: on a test clip
+   that pushed in by 78 px the held picture went from 61 levels away from the still to about 5). The clip is then **cut**
+   where the picture around the moving part starts to change anyway (what is left is real change), and, for a pingpong,
+   where the region has moved far enough for one swing; the kept frames are played slower (flow-interpolated, at most
+   2x) to fill the loop.
+4. **Track and mask.** SAM 2.1 follows the moving thing through the clip (`track: false` skips it). The mask is the
+   region, the path it sweeps and every part of the clip that really moves *and is joined to it* (a curtain's hem lifts,
+   steam climbs past the box it was found in), grown (`grow`) and feathered (`feather`): the video is used where
+   something moves and the still everywhere else, and the soft edge falls on pixels that do not move, so no seam is cut
+   through the motion. A patch that moves but is not joined to the thing (a car outside the window) stays the still.
+5. **Encode.** The frames are tone-matched to the still around the mask (a video model returns a picture a shade off the
+   one it was given), the loop is closed (a flow-aligned crossfade where a generated clip does not meet itself; a
+   pingpong has no seam), the motion is damped or exaggerated by `strength`, and the part that moves is encoded as a small
+   H.264 video (only the crop around it, never the whole picture) with the mask as a lossless WebP. A review sheet
+   (`cine_<id>.sheet.jpg`: the still with the mask's edge, the mask, six frames as the page composes them, and a heat map
+   of what changes) is written beside it: read it.
 
 On the page the still stays in the HTML (`<img>` or the section's background); `runtime/src/lib/cinemagraph.ts` lays the
 video over it **through the mask** (a CSS mask), so where the mask is 0 the pixels are the still's own and cannot change.
