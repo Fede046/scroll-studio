@@ -932,6 +932,26 @@ loop, the change outside the mask (must be 0), the motion under it, the video's 
 reduced motion (no video is loaded). Parallax scenes (a WebGL depth shader) show the still; a cinemagraph there is not
 built.
 
+**How it reads, honestly** (Tern House, `examples/tern-house`, measured by `studio cinemagraph --check` in Chrome on the GPU,
+and by looking). What held: in every one of the six, the pixels outside the mask never changed in the browser (the largest
+change of any pixel outside the mask was 0, and 1 level on under 0.01% of a hero's pixels with its scroll zoom); loops show no
+hitch at the wrap (the wrap frame is presented no later than the slowest frame elsewhere); reduced motion loads no video and
+shows the still; a phone keeps the moving part in view (the runtime slides the crop of a `cover` photo toward it); the whole
+page carries 1.4 MB of video. What reads as a cinemagraph: the steam above the cup (5% of the picture moves, a slow curl, the
+cup, the croissant and the window exactly as photographed) is the best of them; the curtain (18%) is a calm sway, only the
+cloth moves; the incense smoke is gentle. What does not yet: **the candle flame barely flickers** (the video models animate a
+flame by a few levels, and `strength` can only exaggerate what is there), so it reads as a still with a faint pulse; the
+pool and the estuary (18% and 29% of the picture: a whole body of water shimmering) sit nearer to a looped video than to a
+cinemagraph, which is the honest limit of the idea: the smaller the share that moves, the more it reads as a still that
+breathes. Things that do not work and are not hidden: first = last frame generation (see Clip above); a pingpong of steam
+(it would fall); `moves` that names half the picture (refused: the build stops and asks for `pick`, `box` or `points`); styles
+that repaint their images (the halftone style renders them on a canvas, so the still is shown); the page checker is only
+meaningful on pages whose own furniture does not move over the picture (a style with an animated gauge in the box moves
+pixels the cinemagraph is not responsible for). Frame pacing: the video work is off the main thread (the scroll loop spends
+about 0.3 ms a frame more with six cinemagraphs on the page), but measured on this machine while another process held the GPU at
+100% (ComfyUI rendering for other jobs) scrolling a page with playing cinemagraphs dropped about 15% of frames to 30 fps
+against 0-2% with them off; that run is a worst case and should be repeated on an idle GPU before a claim is made.
+
 ### Faces, repaired (`faces: restore`)
 
 Generated video bends faces. `faces: restore` on a film or on a beat repairs them after generation: faces above
