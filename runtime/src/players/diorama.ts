@@ -44,6 +44,7 @@ function gradientEnv(renderer: THREE.WebGLRenderer, sky: string, ground: string)
   return tex;
 }
 
+const signWidth = (text: string) => 1.2 + Math.min(1.5, text.length * 0.085);
 function signTexture(text: string, font: string, accent: string): { tex: THREE.CanvasTexture; w: number } {
   const c = document.createElement("canvas");
   c.width = 640; c.height = 200;
@@ -57,7 +58,7 @@ function signTexture(text: string, font: string, accent: string): { tex: THREE.C
   g.fillText(text, 320, 104);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
-  return { tex, w: 1.2 + Math.min(1.5, text.length * 0.085) };
+  return { tex, w: signWidth(text) };
 }
 
 const factory: PlayerFactory = async (cfgIn, ctx) => {
@@ -173,9 +174,7 @@ const factory: PlayerFactory = async (cfgIn, ctx) => {
     };
     M.begin(p.x, p.y, p.z, p.r, p.s);
     if (p.k === "sign") {
-      const w = signs.length ? 0 : 0;
-      void w;
-      const { w: bw } = signTexture(p.text || "", font, accent);
+      const bw = signWidth(p.text || "");
       M.cyl(0.045, 0.055, 1.35, -bw / 2 + 0.2, 0, 0, "#6e4b2e", 8);
       M.cyl(0.045, 0.055, 1.35, bw / 2 - 0.2, 0, 0, "#6e4b2e", 8);
       M.rbox(bw + 0.08, 0.54, 0.07, 0, 0.8, 0, "#fffaf0", 0.03);
@@ -286,6 +285,7 @@ const factory: PlayerFactory = async (cfgIn, ctx) => {
     if (first) { first = false; if (mapImg) { mapImg.remove(); mapImg = null; } }
   }
 
+  (window as any).__dio = { scene, camera, post, terrain, state, rig, plan, renderer, THREE };   // for tuning in the console
   resize();
   renderer.compile(scene, camera);
   frame(0, -1, 0, 0, 0);

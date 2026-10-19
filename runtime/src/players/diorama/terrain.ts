@@ -60,7 +60,7 @@ export function buildTerrain(plan: Plan, ground: THREE.Texture, uni: TerrainUnif
   const idx: number[] = [];
   for (let i = 0; i < rings; i++) for (let j = 0; j < segs; j++) {
     const a = i * (segs + 1) + j, b = a + 1, c = a + segs + 1, d = c + 1;
-    idx.push(a, c, b, b, c, d);
+    idx.push(a, b, c, b, d, c);
   }
   const tg = new THREE.BufferGeometry();
   tg.setAttribute("position", new THREE.BufferAttribute(pos, 3));

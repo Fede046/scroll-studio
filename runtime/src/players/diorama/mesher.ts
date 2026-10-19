@@ -142,7 +142,7 @@ export class Mesher {
   /** a faceted blob (rocks, bushes, tree crowns) */
   ico(r: number, x: number, y: number, z: number, color: ColorIn, detail = 1, squash = 1, o: Opts = {}) {
     const g = cached(`i${q(r)},${detail}`, () => {
-      const ig = new THREE.IcosahedronGeometry(r, detail).toNonIndexed();
+      const ig = new THREE.IcosahedronGeometry(r, detail);
       ig.computeVertexNormals();
       return ig;
     });
