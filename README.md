@@ -92,6 +92,7 @@ tiktoken (`cl100k_base`) on the files in this repo; other tokenizers differ by r
   image's depth into a guide video, with the walking people softened so they stay free, and the video model paints the
   shot along it (measured: the view stays within 1% of the keys).
 - **Fly through a codebase** (`code` scene): live 3D, real text, diffs applied as you scroll.
+- **The one-take page** (`journey:` on a film section): the whole landing page is one camera move through one generated world; every section is a place in it (the door, the rooms, the table, the window, the view), the page's blocks arrive at their stop set as part of the picture, and the camera rests while they are read. ([The one-take page](#the-one-take-page-journey))
 
 ### New in 1.2
 
@@ -145,6 +146,7 @@ Every example is a `site.yaml` in [`examples/`](examples/) and rebuilds with `st
 | [Hushwell](examples/hushwell/site.yaml) | Healthcare | `stack` layout | Panels slide over each other: hero, product with phone, photo strip, orbit, FAQ |
 | [Hale & Rowe](examples/hale-rowe/site.yaml) | Architecture | `artwork` | A house drawn from construction lines to finished photo (needs ComfyUI) |
 | [Stillwater](examples/one-take/site.yaml) | Consumer product | `film` + `take` | One take from a mountain ridge down to a bottle on a lakeside table; the bottle is the real 3D model |
+| [Fenmoor](examples/fenmoor/site.yaml) | Hospitality | `film` + `journey` | The whole page is one take through a farmhouse: the door, the hearth room, the library, the table, the window, the view (needs ComfyUI, Blender; about two hours on an RTX 4090) |
 | [Hollis House](examples/hollis-house/site.yaml) | Real estate | `splat` | A walk through a scanned house, room by room |
 | [Pelorus](examples/pelorus/site.yaml) | Research | `chart` (bar) | The renewables share of electricity, every figure read from Our World in Data |
 | [Halcyon](examples/halcyon/site.yaml) | Software | blocks | One product page as twenty-one experiences (`studio looks`) |
@@ -516,6 +518,61 @@ pass (checked: if the edit changed the product, the rendered product is put back
 
 A take's `product: {}` and a sequence's `model: product` use the same model, materials and credit; the credit and
 licence go in the footer automatically.
+
+## The one-take page (`journey:`)
+
+The whole landing page is one camera journey through one generated world. Each section is a place in it (the hero at the
+door, features as rooms, the product on a table, the rates at the window, the call to action at the view), the camera
+travels between the places in one unbroken move, rests at each while its content is read, and moves on. No section breaks,
+only travel. The page's blocks (hero, intro, features, stats, quote, faq, product, cta ...) arrive at their stop, set as
+part of the place instead of over it. Example: [Fenmoor](examples/fenmoor/site.yaml), a farmhouse to stay in.
+
+```yaml
+- id: stay
+  type: film
+  journey:
+    world: The inside of an old stone farmhouse on a northern moor at dawn, a long whitewashed hall ...   # described once
+    restore: 1080
+    blockout: { objects: [ ... rough shapes: walls, arches, a table, a window ... ] }                   # the world as shapes
+    stops:
+      - id: door
+        place: the view from just inside the open oak front door down the whole length of the house
+        pose: { at: [0.15, -0.4, 1.55], look: [0, 12, 1.3] }        # where the camera rests here
+        hold: 1.6                                                    # screens of scroll the page rests at this place
+        blocks:
+          - { type: hero, title: "Come in. <em>The door is open.</em>", buttons: [ { label: Reserve a night, href: "#view" } ] }
+      - id: hearth
+        place: a whitewashed room with a stone fireplace and a low fire burning
+        pose: { at: [0.9, 2.6, 1.5], look: [-1.8, 2.2, 1.0] }
+        move: { seconds: 5, path: [ { at: [0.4, 1.0, 1.55], look: [-0.8, 3.0, 1.3] } ] }   # how the camera gets here
+        blocks: [ { type: features, items: [ ... ] } ]
+```
+
+`studio journey <project>` prints the plan (every move and hold with its film seconds and scroll screens, and, once built,
+where each stop's blocks sit and the contrast they reach); `studio build --plan` prices it; the MCP tool `journey_plan` does
+the first. `studio storyboard --level sketch` shows the blockout at every stop before anything renders.
+
+**Two ways to make the film**, both from the same stops, blocks and runtime (measured: [docs/ENGINE.md](docs/ENGINE.md#the-one-take-page)):
+
+- **One take** (`blockout:` set): the world is rough shapes, the camera a real 3D path through it that rests at every stop
+  (`pose`, `move.path`). Blender renders the depth along the path, each stop's picture is painted over its depth (Z-Image
+  Turbo) and LTX-2.3 paints the world between the stops, cut at the middle of a hold where the camera is at rest. The camera
+  can go through a door into a room the first picture never showed.
+- **A chain** (no `blockout`): each move is a keyed camera move on a moving shot (`camera:`) flown through the picture the
+  last stop left, followed by a frozen moment of the frame it arrived at (`freeze:`); every picture comes out of the one
+  before, so nothing can drift in style and every join is on the same frame. The camera can only go into what the
+  picture before it shows (`move.into`: the doorway, the window, the far end of the street), so it suits a facade, a street
+  or a landscape, not a house the first picture does not show the inside of.
+
+**What the page does.** Scroll maps to the film through a piecewise map: a move plays as you scroll through it, a hold is the
+page resting at a stop, and the camera is at rest whenever the page is, so every stop lands softly without the page ever
+taking the scroll from the reader (it is an ordinary sticky stage; there is no snapping, no wheel capture and no lock). A
+rail down the edge names the places and scrolls to them (and `#hearth` in the address lands on a stop). The blocks of a stop
+are placed where the picture is calmest (least detail, so nothing important is covered, alternating sides) in lettering that
+clears WCAG AA against the picture under it, with a soft scrim raised only as far as it must be; `side`, `form`
+(`type`, `rail`, `cards`, `plaque`) and `surface` override the choice. On a phone the wide picture is cropped around each
+stop's `focus` and the blocks sit in a sheet at the bottom. With reduced motion, or no JavaScript, or a film that fails to
+load, the page is the stops as stills (taken from the film) with their blocks, in order, and no film is downloaded.
 
 ## One Take, places and data
 
