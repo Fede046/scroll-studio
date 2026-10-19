@@ -200,8 +200,10 @@ const factory: PlayerFactory = async (cfg, ctx) => {
     lastTok = tau;
     const a = Math.min(nT - 1, Math.max(0, Math.floor(tau))), b = Math.min(nT - 1, a + 1), f = clamp(tau - a);
     const A = times[a].tokens, B = times[b].tokens;
-    const bg = mixv(A.bg, B.bg, f), bg2 = mixv(A.bg2, B.bg2, f), ink = mixv(A.ink, B.ink, f), em = mixv(A.em, B.em, f), ac = mixv(A.accent, B.accent, f);
-    const a2 = lerp(A.a2, B.a2, f), a3 = lerp(A.a3, B.a3, f), st = sec.style;
+    // the veil colour follows the light; the ink does not pass through grey: it holds its own side and flips across the middle
+    const k = smooth(0.4, 0.6, f);
+    const bg = mixv(A.bg, B.bg, f), bg2 = mixv(A.bg2, B.bg2, f), ink = mixv(A.ink, B.ink, k), em = mixv(A.em, B.em, k), ac = mixv(A.accent, B.accent, k);
+    const a2 = lerp(A.a2, B.a2, k), a3 = lerp(A.a3, B.a3, k), st = sec.style;
     st.setProperty("--bg", `rgb(${rgbStr(bg)})`); st.setProperty("--bg-2", `rgb(${rgbStr(bg2)})`);
     st.setProperty("--bg-rgb", rgbStr(bg)); st.setProperty("--ink", `rgb(${rgbStr(ink)})`); st.setProperty("--ink-rgb", rgbStr(ink));
     st.setProperty("--ink-2", `rgba(${rgbStr(ink)}, ${a2.toFixed(2)})`); st.setProperty("--ink-3", `rgba(${rgbStr(ink)}, ${a3.toFixed(2)})`);

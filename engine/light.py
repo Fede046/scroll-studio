@@ -34,7 +34,7 @@ import cv2
 import numpy as np
 from PIL import Image
 
-VERSION = 2                # bump when a relight or its measurement would come out differently for the same inputs
+VERSION = 3                # bump when a relight or its measurement would come out differently for the same inputs
 MEASURE_W = 1024           # width at which structure is compared, so drift means the same on any picture
 MAX_FLOW = 28.0            # a correction larger than this (px at MEASURE_W) is not trusted: it is a different picture
 
