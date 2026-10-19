@@ -269,3 +269,10 @@ def test_the_take_timeline_is_the_plan_stretched_to_the_film():
     assert t["duration"] == pytest.approx(sum(nominal) * k, abs=1e-2)
     s = {x["id"]: x for x in t["stops"]}
     assert s["door"]["t0"] == 0 and s["hearth"]["t1"] - s["hearth"]["t0"] == pytest.approx(3 * k, abs=1e-2)
+
+
+def test_a_short_last_stretch_joins_the_one_before():
+    t = take_site(segment=9).sections[0].take
+    segs = t.ltx["segments"]
+    assert segs[-1]["range"][1] == pytest.approx(t.duration)
+    assert all(s["range"][1] - s["range"][0] >= 2.5 for s in segs)

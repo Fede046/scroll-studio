@@ -168,6 +168,8 @@ def _expand_take(sec) -> None:
     for a, z in zip(cuts, cuts[1:]):                    # a stretch longer than the video model likes is split evenly
         n = max(1, math.ceil((z - a) / b.segment - 1e-9))
         bounds += [a + (z - a) * k / n for k in range(1, n + 1)]
+    if len(bounds) > 2 and bounds[-1] - bounds[-2] < 2.5 and bounds[-1] - bounds[-3] <= b.segment + 1.5:
+        del bounds[-2]                                  # a short tail (the last hold's second half) joins the stretch before it
     segments = []
     for n, (a, z) in enumerate(zip(bounds, bounds[1:])):
         p, q = stop_at(a + 1e-3), stop_at(z - 1e-3)

@@ -40,6 +40,7 @@ sections:
       seed: 4
       restore: 1080
       blockout:
+        segment: 9
         ground: { kind: plane, at: [0, 150, -0.1], size: [600, 500, 1], color: "#6d7560" }
         sky: "#b9cde0"
         lens: 28
