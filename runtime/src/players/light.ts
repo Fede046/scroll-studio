@@ -236,6 +236,16 @@ const factory: PlayerFactory = async (cfg, ctx) => {
   capEls.forEach((el, k) => tint(el, cfg.stepTimes[order[k]] ?? 0));
   cardEls.forEach((el, k) => tint(el, cfg.stepTimes[k] ?? 0));
 
+  // the shade behind the text is there while a headline is: between headlines the picture is left bare
+  const wins: [number, number][] = steps.map((s) => (s.at ? [s.at[0], s.at[1]] : [0, 1]));
+  let lastShade = -1;
+  const shade = (p: number) => {
+    if (sec.dataset.layout === "cards" || (ctx.data as any).layout !== "overlay") return;
+    let v = 0;
+    for (const [a, b] of wins) v = Math.max(v, smooth(a - 0.05, a + 0.01, p) * (1 - smooth(b - 0.01, b + 0.05, p)));
+    if (Math.abs(v - lastShade) > 0.004) { lastShade = v; sec.style.setProperty("--shade", v.toFixed(3)); }
+  };
+
   // ---- no WebGL: the stills, one per step
   const canvas = document.createElement("canvas");
   const gl0 = canvas.getContext("webgl2", { antialias: false, preserveDrawingBuffer: true });
@@ -251,7 +261,7 @@ const factory: PlayerFactory = async (cfg, ctx) => {
       update(s) {
         const tau = Math.round(timeAt(s.p, holds));
         imgs.forEach((im, i) => { im.style.opacity = i === tau ? "1" : "0"; });
-        applyTokens(tau); setHud(tau, cfg.sun);
+        applyTokens(tau); setHud(tau, cfg.sun); shade(s.p);
       },
     };
   }
@@ -382,7 +392,7 @@ const factory: PlayerFactory = async (cfg, ctx) => {
       gl.uniform1f(U.vig, 0.3); gl.uniform1f(U.grain, 0.012);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       void c;
-      applyTokens(tau); setHud(tau, sunCfg);
+      applyTokens(tau); setHud(tau, sunCfg); shade(s.p);
     },
   };
 };

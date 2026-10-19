@@ -27,7 +27,7 @@ def progress_at(holds: list[dict], tau: float) -> float:
     lo, hi = 0.0, 1.0
     if time_at(0.0, holds) >= tau:
         return 0.0
-    if time_at(1.0, holds) <= tau:
+    if time_at(1.0, holds) < tau:
         return 1.0
     for _ in range(40):
         mid = (lo + hi) / 2
