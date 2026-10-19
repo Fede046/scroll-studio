@@ -136,10 +136,16 @@ export function wireLinks(belts: Belt[], duration = (dist: number) => Math.min(1
     const y = scrollTargetFor(belts, t, 0.3);
     if (y != null) scrollTo(0, y);
   });
+  // a link with a hash: the loading screen resets the scroll when it lifts, so wait for it
   if (location.hash.length > 1) {
-    const el = document.getElementById(decodeURIComponent(location.hash.slice(1)));
-    const y = el ? scrollTargetFor(belts, el) : null;
-    if (y != null) requestAnimationFrame(() => scrollTo(0, y));
+    const go = () => {
+      const el = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+      const y = el ? scrollTargetFor(belts, el) : null;
+      if (y != null) scrollTo(0, y);
+    };
+    let tries = 0;
+    const wait = () => { if (document.documentElement.dataset.ssReady === "1" || ++tries > 200) setTimeout(go, 60); else setTimeout(wait, 50); };
+    wait();
   }
 }
 

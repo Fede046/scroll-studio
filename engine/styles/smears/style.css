@@ -99,7 +99,7 @@ html.style-smears main { position: relative; z-index: 1; }
 .sa-variant--print { background: #fff6e0 radial-gradient(circle, var(--pink) 0 28%, transparent 32%) 0 0 / 13px 13px; background-blend-mode: normal; }
 .sa-variant--print > * { position: relative; background: #fff6e0; padding: 0 .3em; } .sa-variant--print h3 { display: inline-block; }
 .sa-variant--ink { background: #fff repeating-linear-gradient(125deg, rgba(13, 13, 16, .14) 0 2px, transparent 2px 8px); border: 3px solid #0d0d10; }
-.sa-variant--riso { background: #fffaf0; background-image: radial-gradient(circle at 100% 0, rgba(255, 106, 61, .9) 0 18%, transparent 19%), radial-gradient(circle at 0 100%, rgba(47, 75, 255, .85) 0 14%, transparent 15%); }
+.sa-variant--riso { background: #fffaf0; background-image: radial-gradient(circle at 100% 0, rgba(255, 106, 61, .9) 0 18%, transparent 19%), radial-gradient(circle at 0 100%, rgba(47, 75, 255, .85) 0 8%, transparent 9%); }
 .sa-variant h3 { margin: .45em 0 .35em; font: 400 clamp(28px, 2.8vw, 44px)/.95 "Anton", sans-serif; text-transform: uppercase; }
 .sa-variant p { margin: 0; font-size: clamp(15px, 1.1vw, 17px); line-height: 1.5; }
 .sa-tag { display: inline-block; padding: .25em .7em; background: #15102a; color: var(--yellow); font: 700 13px/1.1 "Space Mono", monospace; letter-spacing: .1em; }

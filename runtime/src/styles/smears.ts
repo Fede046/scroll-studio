@@ -142,7 +142,7 @@ export default function start() {
 
     // impact frame: a new sheet crosses the middle of the screen while you are moving fast
     const si = sheetIndexAt(y);
-    if (lastSheet >= 0 && si !== lastSheet && speed > 450 && now - impactAt > 450 && impact) {
+    if (lastSheet >= 0 && si !== lastSheet && speed > 450 && now - impactAt > 520 && impact) {
       impactAt = now; impactN = n; shakeN = n + 2;
       const incoming = sheets[Math.max(si, lastSheet)].dim;
       impact.dataset.d = incoming;

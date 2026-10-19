@@ -284,9 +284,10 @@ export default function start() {
   function applyCut(c: Cut, s: number) {
     c.s = s;
     const st = c.el.style;
-    if (s === 0) { st.visibility = "hidden"; st.clipPath = ""; }
-    else if (s >= 4) { st.visibility = ""; st.clipPath = ""; }
-    else { st.visibility = "visible"; st.clipPath = `inset(0 ${(100 - s * 25).toFixed(0)}% 0 0)`; }
+    // opacity, not visibility: a hidden plate must stay reachable by keyboard (focus cuts it in)
+    if (s === 0) { st.opacity = "0"; st.clipPath = ""; }
+    else if (s >= 4) { st.opacity = ""; st.clipPath = ""; }
+    else { st.opacity = ""; st.clipPath = `inset(0 ${(100 - s * 25).toFixed(0)}% 0 0)`; }
   }
   function lettering(t: Title, frame: number, wobble: boolean) {
     const b = t.belt;
