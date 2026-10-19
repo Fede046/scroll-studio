@@ -397,3 +397,24 @@ def describe(sec) -> list[dict]:
         rows.append({"segment": sid, "kind": kind, "stop": stop.id, "film_seconds": secs, "scroll_screens": round(w, 2),
                      "blocks": [x.type for x in stop.blocks] if kind == "hold" else []})
     return rows
+
+
+def report(project, section: Optional[str] = None) -> list[dict]:
+    """Every journey of a project (or of one section): its approach, the plan table, the totals and, once the film is built,
+    where each stop's blocks were put and the contrast they reach (`.build/<section>/journey.json`)."""
+    from .project import BuildError
+    site = project.load()
+    out = []
+    for sec in site.sections:
+        if getattr(sec, "journey", None) is None or (section and sec.id != section):
+            continue
+        rows = describe(sec)
+        built = project.build / sec.id / "journey.json"
+        placed = json.loads(built.read_text()) if built.exists() else {}
+        out.append({"section": sec.id, "approach": "take" if sec.journey.blockout else "chain",
+                    "film_seconds": round(sum(r["film_seconds"] for r in rows), 2),
+                    "scroll_screens": round(sum(r["scroll_screens"] for r in rows) + 1, 2),
+                    "segments": rows, "placed": placed})
+    if not out:
+        raise BuildError("no journey in this project" + (f" section '{section}'" if section else ""))
+    return out

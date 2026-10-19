@@ -342,6 +342,16 @@ def approve_shot(project: str, shot: str, approved: bool = True) -> dict:
 
 
 @mcp.tool()
+def journey_plan(project: str, section: Optional[str] = None) -> list[dict]:
+    """The one-take page (`journey:` on a film section): which approach it uses (a chain of camera moves between stop
+    pictures, or one take through a `blockout`), every move and hold with the film seconds and scroll screens it gets, and,
+    once built, where each stop's blocks sit on its picture (the calmest side), the lettering surface, the scrim and the
+    contrast reached. Cheap: nothing is rendered."""
+    from . import journey
+    return journey.report(_find(project), section)
+
+
+@mcp.tool()
 def camera_guide(project: str, beat: str, section: Optional[str] = None) -> dict:
     """For a beat with `camera:` keys: make its camera guide (depth, the moving people's mask, the guide videos) without
     generating anything, and return the paths. `preview` is a pure-camera video of the keyed move over the start image (no
