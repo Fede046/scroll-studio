@@ -67,7 +67,7 @@ sections:
           generate: A single lit white candle on a dark wooden table, a warm glow, a glass of red wine and an open book beside it, dark moody interior, shallow depth of field, photographed on film
           size: [1024, 1280]
           seed: 3
-          cinemagraph: { moves: the small flame on the wick, pick: smallest, motion: the flame flickers and sways softly from side to side, seconds: 3, loop: seamless }
+          cinemagraph: { moves: the small flame on the wick, pick: smallest, motion: the flame wavers and flickers noticeably, leaning left then right in a draught, growing and shrinking, seconds: 3, loop: seamless, strength: 1.4 }
         caption: The library, a candle at nine.
       - image:
           generate: A thin curl of smoke rising from a stick of incense on a small stone dish, dark background, a single warm side light, still life, shallow depth of field, photographed on film
@@ -106,6 +106,7 @@ sections:
       seed: 30
       cinemagraph:
         moves: the water of the estuary
+        box: [0.28, 0.6, 0.74, 0.88]       # a stretch of the water, not all of it: a cinemagraph moves one thing
         motion: soft ripples and shimmering reflections
         seconds: 5
         loop: pingpong

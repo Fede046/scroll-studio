@@ -39,10 +39,11 @@ from .project import BuildContext, BuildError, ffmpeg, file_key, probe
 from .spec import Cinemagraph, EditRegion, ImageInput
 
 VERSION = 1
-MASK_VERSION = 4         # bump when the mask or what follows it would come out differently for the same clip (the clip is kept)
+MASK_VERSION = 6         # bump when the mask or what follows it would come out differently for the same clip (the clip is kept)
 FPS = 24
 CONTEXT = 0.5            # how much of the surroundings the video model sees: a share of the region's size on every side
 LTX_MP = 0.5             # megapixels LTX-2.3 renders the crop at (aspect kept)
+MAX_VIDEO_BYTES = 700_000   # the encode steps its quality down (crf 23, 27, 31) until the video is no bigger than this
 MAX_VIDEO_W = 1280       # the encoded video's widest side
 MIN_SIDE = 320           # the crop is at least this big (as far as the still goes)
 CODEC_STEP = 2.5         # levels a lossy encode may add to the wrap step (an I-frame meeting a P-frame) before it counts as a seam
@@ -242,13 +243,19 @@ def final_mask(seed: np.ndarray, energy: np.ndarray, grow: float, feather: float
     base = seed > 127
     if tracked is not None:
         base = base | (tracked > 127)
-    peak = float(np.percentile(energy, 99.5))
-    tau = max(4.0, 0.35 * peak)
-    moving = energy > tau
     side = min(H, W)
+    energy = energy.copy()
+    m = max(3, int(0.02 * side))
+    energy[:m], energy[-m:], energy[:, :m], energy[:, -m:] = 0, 0, 0, 0       # the edge of a warped frame is not motion
+    ell = lambda r: cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))
+    around = cv2.dilate(base.astype(np.uint8), ell(max(6, int(0.07 * side)))) > 0
+    # the yardstick is how much the thing itself moves (a flame flickers by a few levels, a curtain by fifty): the peak of the
+    # energy around the region, not of the whole picture
+    peak = float(np.percentile(energy[around], 99.8)) if around.any() else float(np.percentile(energy, 99.5))
+    tau = max(3.0, 0.35 * peak)
+    moving = energy > tau
     # one or two pixels wide and long is not a thing that moves: it is the edge of something the registration did not hold
     moving = cv2.morphologyEx(moving.astype(np.uint8), cv2.MORPH_OPEN, np.ones((3, 3), np.uint8)) > 0
-    ell = lambda r: cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))
     # everything that moves AND is joined to the thing (or to its tracked path) is the thing: a curtain's hem lifts, a flame
     # leans, steam climbs well past the box it was found in. Pieces that move but are not joined to it (the model moving
     # something else) are left as the still.
@@ -708,6 +715,10 @@ def build(project, ref: ImageInput, log: Callable[[str], None] = print, force: b
         seq = damp(seq, cg.strength)
         vid = composite_video(seq, still_c, mask)
         encode_h264(vid, mp4)
+        for crf in (27, 31):                                       # fine texture (water, foliage) costs bytes: a page loads this
+            if mp4.stat().st_size <= MAX_VIDEO_BYTES:
+                break
+            encode_h264(vid, mp4, crf=crf)
         save_mask(mask, wp)
         dec = read_video(mp4)                                   # measure what the page will play, not what we meant
         review_sheet(still_c, dec, mask, sheet)
@@ -717,7 +728,8 @@ def build(project, ref: ImageInput, log: Callable[[str], None] = print, force: b
         report = {
             "moves": cg.moves, "model": model, "seconds": round(len(seq) / FPS, 2), "fps": FPS, "frames": int(len(seq)),
             "loop": {"mode": cg.loop, "closed_by": how, "generated": before, "closed": closed, "encoded": decoded,
-                     "seamless": decoded["seam"] <= max(SEAM_OK * decoded["ref"], decoded["ref"] + CODEC_STEP)},
+                     "seamless": decoded["seam"] <= max(SEAM_OK * max(decoded["ref"], decoded["typical_step"]),
+                                                  max(decoded["ref"], decoded["typical_step"]) + CODEC_STEP)},
             "still": [W, H], "box": [x0, y0, x1, y1], "video": [ww, wh], "bytes": mp4.stat().st_size + wp.stat().st_size,
             "mask": {"share_of_still": round(float((mask > 127).sum()) / sc / sc / (W * H), 4), **minfo},
             "motion": {"temporal_std": round(motion, 2), "camera_shift_px_removed": prep_info["camera_shift_px"], "cut_because": prep_info["cut_because"], "kept_frames": prep_info["kept"],
