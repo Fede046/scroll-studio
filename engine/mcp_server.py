@@ -587,6 +587,39 @@ def direction_undo(project: str) -> dict:
 
 
 @mcp.tool()
+def light_report(project: str, section: Optional[str] = None) -> dict:
+    """What a built `type: light` scene made (one place relit from dawn to night): per time of day the drift from the world
+    (how far the editor moved the place, px at 1024 across: raw, and after its global move is undone) and edge agreement, per
+    neighbouring pair how far apart the light is, how far structure still differs (`glide`) and how many lamps switch. Writes
+    `light/<section>/sheet.jpg` (every time with its drift: Read it) and `light.json`. Build the project first (`build`); a
+    time whose drift is over the limit says so (`ok: false`): give it another `seed:` on that time. Frame strips across the
+    transitions: `snapshot` with at=['<section>:0.3', ...]."""
+    import json
+    from . import light_report as lr
+    p = _find(project)
+    secs = lr.sections(p, section)
+    if not secs:
+        return {"error": "no light section" + (f" called '{section}'" if section else "")}
+    out = []
+    for sec in secs:
+        rf = p.build / sec.id / "report.json"
+        if not rf.exists():
+            out.append({"section": sec.id, "error": "not built yet: run build first"})
+            continue
+        d = p.root / "light" / sec.id
+        d.mkdir(parents=True, exist_ok=True)
+        sheet = lr.times_sheet(p, sec, d)
+        rep = json.loads(rf.read_text())
+        rep.update(lr.sequence_diff(p, sec))
+        (d / "light.json").write_text(json.dumps(rep, indent=1))
+        out.append({"section": sec.id, "sheet": str(sheet), "report_json": str(d / "light.json"),
+                    "times": [{"id": t["id"], "clock": t["clock"], "drift_raw": t["raw"]["drift"], "drift": t["aligned"]["drift"],
+                               "edges": t["aligned"]["edges"], "ok": t.get("ok", True)} for t in rep["times"]],
+                    "pairs": rep["pairs"]})
+    return {"sections": out}
+
+
+@mcp.tool()
 def doctor() -> list[dict]:
     """Which tools are installed (Blender, FFmpeg, GPU, ComfyUI...) and which scene types need them."""
     from .doctor import checks
