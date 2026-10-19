@@ -707,3 +707,43 @@ def test_the_depth_snap_works_without_opencv_contrib(monkeypatch):
     plain = world_depth.snap(depth, guide, 4, 1e-3)
     assert plain.shape == depth.shape and np.abs(plain - depth).mean() < 0.05
     assert np.abs(plain - with_contrib).mean() < 0.05
+
+
+# ---------------------------------------------------------------- a sequence: a product on a clear backdrop
+
+@needs_ffmpeg
+def test_a_sequences_alpha_is_the_silhouette_the_type_sits_behind(tmp_path):
+    from PIL import Image
+    from engine.spec import SequenceScene
+    proj = tmp_path / "sq"
+    proj.mkdir()
+    (proj / "site.yaml").write_text("name: t\nsections: []\n")
+    p = Project(proj)
+    ctx = BuildContext(p, "set", log=lambda m: None)
+    frames = []
+    n = 12
+    for i in range(n):                                                                  # a turning "product": a block, alpha 0 around it
+        im = np.zeros((540, 960, 4), np.uint8)
+        x0 = 380 + 6 * i
+        im[150:450, x0:x0 + 200] = (200, 120, 40, 255)
+        im[150:450, x0 + 200:x0 + 204, 3] = 128                                         # an anti-aliased edge
+        f = ctx.work / "render" / "frames" / f"{i + 1:04d}.png"
+        f.parent.mkdir(parents=True, exist_ok=True)
+        Image.fromarray(im, "RGBA").save(f)
+        frames.append(f)
+    sec = SequenceScene.model_validate({"id": "set", "type": "sequence", "layout": "overlay", "frames": n, "steps": [
+        {"title": "Thirty-two <em>pieces.</em>", "at": [0.0, 1.0], "place": {"kind": "behind", "x": 0.5, "y": 0.3, "size": 0.7}}]})
+    src, alpha, urls = world.sequence_film(sec, ctx, frames, "#0b0b0d")
+    a = np.load(alpha)["depth"]
+    assert a.shape == (n, 540, 960) and a[0, 300, 480] == 255 and a[0, 300, 100] == 0 and a[0, 20, 20] == 0
+    assert 100 < a[0, 300, 380 + 200 + 2] < 160                                       # the edge keeps its own softness
+    assert urls["video"].endswith("film.mp4") and (ctx.web / "film.mp4").exists() and (ctx.web / "film-mobile.mp4").exists()
+    cfg = world.build(sec, ctx, src, {}, silhouette=alpha)
+    t = cfg["texts"][0]
+    assert t["kind"] == "behind" and t["depth"] == 0.5                                # behind the silhouette: no model, no guess
+    assert all(np.allclose(wm.unpack_matrix(m), wm.unpack_matrix(t["m"][0]), atol=1e-6) for m in t["m"])   # a plain backdrop: the type stays on the screen
+    assert cfg["atlas"]["slots"] == ["depth"] and cfg["frames"] == n
+    # a sequence in the cards layout cannot hold in-world type
+    bad = SequenceScene.model_validate({"id": "set", "type": "sequence", "layout": "cards", "steps": sec.model_dump(mode="json")["steps"]})
+    with pytest.raises(BuildError, match="needs `layout: overlay` on a sequence"):
+        world.validate(bad)

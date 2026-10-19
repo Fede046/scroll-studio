@@ -783,8 +783,8 @@ It runs on ComfyUI with `studio setup-comfy` (below) and about 2 GB of models.
 
 A headline over a film is a caption: it floats on the glass, and the picture goes on behind it. Type in the world puts the
 headline *in* the picture, where the picture's own things can pass in front of it, light it, wear it. Any step of a film
-(`layout: overlay`, with an `at` window or pinned to a beat) or of a parallax section takes a `place` object; its `title` is
-the text, in the site's fonts, with the `<em>` words set as everywhere else:
+or a sequence (`layout: overlay`, with an `at` window or pinned to a beat) or of a parallax section takes a `place` object;
+its `title` is the text, in the site's fonts, with the `<em>` words set as everywhere else:
 
 ```yaml
     steps:
@@ -822,7 +822,10 @@ interval (a half-size copy for phones). The page draws the film itself in WebGL2
 texture and found per pixel through a matrix per frame; it shows where the scene is farther than the title (a soft step in
 depth), is lit by the light at that spot, mixed with the air there, defocused like the footage at that depth, and carries
 the picture's grain. The film and the atlas are seeked together and drawn only when both have landed. A parallax photo does
-the same from its own depth map, with no tracking (the 2.5D camera moves the picture, the type goes with it).
+the same from its own depth map, with no tracking (the 2.5D camera moves the picture, the type goes with it). A
+`sequence` (a rendered product on a clear backdrop) needs no model at all: the frames' own alpha is the silhouette, so a
+headline set `behind` the product is cut exactly along its edge, and it stays where it is on the screen while the product
+turns; the frames are also encoded as a film for the world player, and without it the frames play as always.
 
 Fallbacks: with reduced motion, without WebGL2, with `reveal` on the same film, and where a title would be cropped off a
 narrow screen (a phone held upright) or be too small to read, the title is an ordinary overlay caption; it stays in the

@@ -251,8 +251,9 @@ class RevealAt(Model):
 class WorldPlace(Model):
     """A headline that lives inside the scene. The camera moves and the type goes with the world: it is occluded by what
     is nearer, it sits on a surface in perspective, it hangs in the haze. The step's title is the text (its `<em>` words
-    take the theme's accent as everywhere); `kicker`, `body` and the button stay an ordinary caption beside it. Needs a
-    film with `layout: overlay` and an `at` window on the step (a parallax section: `place` on a step with a photo).
+    take the theme's accent as everywhere); `kicker`, `body` and the button stay an ordinary caption beside it. Works on a
+    film or a sequence with `layout: overlay` and an `at` window on the step (a sequence: the product's own alpha is the
+    silhouette, so type set behind it is cut exactly), and on a parallax section's step with a photo.
     Without WebGL, with reduced motion, and where the headline would be cropped off a narrow screen (a phone held upright),
     the title falls back to a clean overlay caption."""
     kind: Literal["behind", "surface", "sky"] = Field(

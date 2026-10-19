@@ -34,7 +34,11 @@ Everything so far is version 1. On 2026-10-12 the releases first published as 2.
   type keeps its cache and runs none of it. `depth_model` on the film section picks the Depth Anything size. `studio world
   <project>` (and MCP `world_check`) draws each title's box on the film's own frames with the depth beside them, measures
   how steady the track is and how much of the window the type is on screen, and says what to change; `build --plan` prices
-  the stages. The Studio UI's step form has an "On the picture / In the world" switch. Example: `examples/type-in-the-world`
+  the stages. A `sequence` section (a rendered product on a transparent backdrop, `layout: overlay`) takes in-world type
+  too, with no model: its frames' alpha is the silhouette the type sits behind (`world_alpha`, `world_film`: the frames
+  also become a film for the world player; the frames play as always without it). A layer with nothing to track (a plain
+  backdrop, clear sky) keeps the type on the screen, and a cut nobody listed is found by the optical flow. The Studio UI's
+  step form has an "On the picture / In the world" switch. Example: `examples/type-in-the-world`
   (the one-take world, all three placements) and `examples/type-in-the-world-stills` (Casa Alta photographs).
 - `beat.restore`: SeedVR2 over one beat's clip at a given height, scaled back to `beat_res` (stage `restore_<beat>`), so a soft camera beat can be restored next to sharp frozen moments without restoring the whole film (`beat_restore`).
 - Camera ease `smoother` (freeze and camera beats): smootherstep, speed and acceleration both zero at every stop, so the camera settles into a hold instead of landing with a jolt (`studio inspect` read the jolt as judder).
