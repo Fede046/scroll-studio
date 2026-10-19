@@ -128,26 +128,24 @@ def _warped_mask(mask: Optional[np.ndarray], Hm: np.ndarray, shape) -> Optional[
 
 # ---------------------------------------------------------------- shaping the track
 
-def smooth_poses(H: np.ndarray, conf: np.ndarray, corners: np.ndarray, sigma: float = 1.5) -> np.ndarray:
+def smooth_poses(H: np.ndarray, conf: np.ndarray, corners: np.ndarray, window: int = 11) -> np.ndarray:
     """Smooth a track without blurring it: the motion of four points (`corners`, 4x2 in anchor pixels: the box the type
-    occupies) is low-passed over time and the homography is rebuilt from them. Frames that are NaN stay NaN."""
+    occupies) is fitted with a local cubic over `window` frames (Savitzky-Golay: noise goes, a camera speeding up and slowing
+    down stays exactly as it is) and the homography is rebuilt from them. Frames that are NaN stay NaN."""
+    from scipy.signal import savgol_filter
     n = len(H)
     ok = ~np.isnan(H[:, 0, 0])
-    if ok.sum() < 3:
+    idx = np.where(ok)[0]
+    if len(idx) < 5:
         return H
     pts = np.full((n, 4, 2), np.nan)
     c = corners.reshape(-1, 1, 2).astype(np.float32)
-    for t in np.where(ok)[0]:
+    for t in idx:
         pts[t] = cv2.perspectiveTransform(c, H[t]).reshape(4, 2)
     out = pts.copy()
-    idx = np.where(ok)[0]
-    r = int(np.ceil(sigma * 3))
-    k = np.exp(-0.5 * (np.arange(-r, r + 1) / sigma) ** 2)
-    for j in range(4):
-        for ax in range(2):
-            v = pts[idx, j, ax]
-            vp = np.pad(v, r, mode="edge")
-            out[idx, j, ax] = np.convolve(vp, k / k.sum(), mode="valid")
+    w = min(window, len(idx) if len(idx) % 2 else len(idx) - 1)
+    if w >= 5:
+        out[idx] = savgol_filter(pts[idx].reshape(len(idx), 8), w, 3, axis=0, mode="interp").reshape(len(idx), 4, 2)
     res = H.copy()
     for t in idx:
         res[t] = cv2.getPerspectiveTransform(corners.astype(np.float32), out[t].astype(np.float32))

@@ -361,6 +361,17 @@ def camera_check(project: str, beat: str, section: Optional[str] = None) -> dict
 
 
 @mcp.tool()
+def world_check(project: str, section: Optional[str] = None, frames: int = 6) -> dict:
+    """Check the in-world type of a built film (steps with `place: {kind: behind | surface | sky}`, see the field docs of
+    `place`): per title, how steady the track is (jitter in pixels of a 960-wide frame), how much of its window the type is on
+    screen, the surface's slant, the depth it sits at and, where something is off, what to change (`anchor`, `follow`, `at`, `y`,
+    `quad`). Writes .build/<section>/world/sheet.jpg (the title's box on the film's own frames, with the depth map beside
+    them for behind and sky type): Read it. section: a film section id (default: every film with in-world type)."""
+    from . import world_report
+    return {"sections": world_report.check(_find(project), section, frames, lambda m: print(m, file=sys.stderr))}
+
+
+@mcp.tool()
 def job_status(job_id: str, log_lines: int = 40) -> dict:
     """Progress, status and log tail of a background job."""
     j = jobs.jobs.get(job_id)

@@ -6,6 +6,7 @@
   studio storyboard my-site --edit [--port 8971]    edit every shot in the browser: notes, captions, regenerate one image, play it
   studio storyboard my-site --notes                 the open notes written there, with each shot's current values
   studio camera my-site beat [--guide | --check]    a beat with `camera:` keys: preview its guide (pure camera), or measure how well it follows
+  studio world my-site [--section story]            check the in-world type of a built film: its track on the frames, the depth, what to change
   studio preview my-site [--port 5173]
   studio record my-site [--section hero] [--seconds 12] [--gif]
   studio inspect my-site [--section story] [--json]   polish report of a built film: pops, softness, halos, style drift, morphs
@@ -622,6 +623,19 @@ def camera(name: str, beat: str,
                        f"(static world {p['static_end_px']:.1f} px; a frozen picture under the same camera {pf['people_end_px']:.1f} px; "
                        f"frame is {p['width']} px wide)")
         typer.echo(f"  sheet: {r.get('sheet')}")
+
+
+@app.command("world")
+def world_cmd(name: str, section: Optional[str] = typer.Option(None, help="The film section (default: every film with in-world type)"),
+              frames: int = typer.Option(6, help="Frames drawn on the sheet per title")):
+    """Check the in-world type of a built film (steps with `place: {kind: behind | surface | sky}`): draws each title's box
+    through the per-frame matrices the page will use on the film's own frames (with the depth map beside them for behind and
+    sky type), measures how steady the track is and how much of the time the type is on screen, and says what to change.
+    Writes .build/<section>/world/sheet.jpg and report.json: read the sheet."""
+    from . import world_report
+    from .project import Project
+    for r in world_report.check(Project(resolve(name)), section, frames, typer.echo):
+        typer.echo(f"  sheet: {r['sheet']}")
 
 
 @app.command()

@@ -34,7 +34,7 @@ from . import reveal, world_depth as wd, world_math as wm
 from .project import BuildContext, BuildError, file_key, probe
 from .spec import FilmScene, RevealAt, RevealRegion, Step, WorldPlace
 
-VERSION = 5
+VERSION = 7
 TILE = reveal.TILE
 WORK = reveal.WORK
 SOFT = {"behind": 0.04, "sky": 0.09}            # the width of the occlusion's soft edge, depth units (the runtime reads it)
@@ -410,7 +410,7 @@ def _plan_text(sec, ctx, i, st, w, r, clip, frames, depth_file, mask_files, nfra
                     tracked_depth=round(med, 3), lines=lines,
                     blur=round(w.blur if w.blur is not None else _auto_blur(gray[fa], depth[fa], dt), 2))
 
-    Hs = wt.smooth_poses(Hs, conf, corners, sigma=1.6)
+    Hs = wt.smooth_poses(Hs, conf, corners, window={"behind": 15, "surface": 15, "sky": 21}[kind])
     mats, confs, last = [], [], None
     for t in range(f0, f1 + 1):
         if np.isnan(Hs[t, 0, 0]):
