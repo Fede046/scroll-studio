@@ -1,7 +1,7 @@
 /** film: a short-GOP video scrubbed by scroll progress. The whole file is downloaded first, so seeking is
  * instant and never waits on the network mid-scroll. */
 import type { PlayerFactory } from "../lib/types";
-import { fetchBlobURL, follow, isMobile } from "../lib/util";
+import { fetchBlobURL, follow, isMobile, reducedMotion } from "../lib/util";
 
 const factory: PlayerFactory = async (cfg, ctx) => {
   // reveal: the film drawn through a shader that brings colour into tracked regions (engine/reveal.py); without WebGL2
@@ -12,6 +12,8 @@ const factory: PlayerFactory = async (cfg, ctx) => {
       if (player) return player;
     } catch (err) { console.warn("[scroll-studio] reveal failed, playing the colour film", err); }
   }
+  // the one-take page (engine/journey.py): with reduced motion the stops are stills with their blocks (no film is fetched)
+  if (cfg.journey && reducedMotion) return { update() {} };
   const video = document.createElement("video");
   video.muted = true;
   video.playsInline = true;
@@ -34,10 +36,12 @@ const factory: PlayerFactory = async (cfg, ctx) => {
   // iOS only decodes frames for seeking after a user gesture touches the element
   addEventListener("touchstart", () => { video.play().then(() => video.pause()).catch(() => {}); }, { once: true, passive: true });
 
+  const jy = cfg.journey ? (await import("./journey")).attach(cfg.journey, ctx, video) : null;
   return {
     update(s) {
+      if (jy) jy.update(s.p);
       if (!duration) return;
-      const target = s.p * (duration - 0.05);
+      const target = jy ? Math.min(jy.time(s.p), duration - 0.05) : s.p * (duration - 0.05);
       current += (target - current) * follow;
       if (!video.seeking && Math.abs(video.currentTime - current) > 0.01) video.currentTime = current;
     },
