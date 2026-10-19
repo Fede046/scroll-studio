@@ -228,7 +228,7 @@ def analyse(rgb, side: str = "auto", surface: str = "auto", prev_side: Optional[
     for _ in range(40):
         eff = (1 - scrim) * worst + scrim * veil
         ratio = (max(ink_l, eff) + 0.05) / (min(ink_l, eff) + 0.05)
-        if ratio >= CONTRAST or scrim >= 0.78:
+        if ratio >= CONTRAST or scrim >= 0.92:
             break
         scrim += 0.03
     eff = (1 - scrim) * worst + scrim * veil

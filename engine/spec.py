@@ -900,10 +900,11 @@ class FilmScene(SceneBase):
         return self
 
     @model_serializer(mode="wrap")
-    def _journey_dump(self, handler):
+    def _journey_dump(self, handler, info):
         d = handler(self)
-        if self.journey is not None and isinstance(d, dict):
-            d.pop("beats", None)
+        if self.journey is not None and isinstance(d, dict) and info.include is None:   # a field list (the compiler's) keeps them
+            for k in ("beats", "steps", "length", "beat_fade"):
+                d.pop(k, None)
         return d
 
 
