@@ -7,7 +7,7 @@
 import { Palette, RGB, clamp, fbm, hash, lerp, mix, rgba, rng, smooth, vnoise } from "./_brush";
 
 export interface SceneSpec {
-  kind: string; pal: Palette; seed: number; w: number; h: number;
+  kind: string; pal: Palette; seed: number; /** varies the details (clouds, stars) between the items of one list while the landscape stays */ dseed: number; w: number; h: number;
   /** where the words sit, 0..1 of the screen (they get a quiet, darker ground) */
   copy: { x0: number; y0: number; x1: number; y1: number };
   /** where the light is, 0..1 */
@@ -49,7 +49,7 @@ function sky(c: Ctx, s: SceneSpec, hy: number) {
   c.fillStyle = radial(c, gx, gy, Math.max(w, h) * 0.55, [[0, p.light, 0.95], [0.12, p.glow, 0.8], [0.45, mix(p.glow, p.skyLow, 0.6), 0.32], [1, p.skyLow, 0]]);
   c.fillRect(0, 0, w, h);
   // clouds: long soft lozenges, lit on their underside by the glow
-  const r = rng(s.seed + 11);
+  const r = rng(s.dseed + 11);
   for (let i = 0; i < 7; i++) {
     const cx = r() * w, cy = r() * h * hy * 0.8, rw = w * (0.1 + r() * 0.2), rh = h * (0.015 + r() * 0.03);
     const near = clamp(1 - Math.hypot(cx - gx, cy - gy) / (w * 0.6));
@@ -59,7 +59,7 @@ function sky(c: Ctx, s: SceneSpec, hy: number) {
   }
 }
 function stars(c: Ctx, s: SceneSpec, hy: number, n: number) {
-  const r = rng(s.seed + 5);
+  const r = rng(s.dseed + 5);
   for (let i = 0; i < n; i++) {
     const x = r() * s.w, y = r() * s.h * hy * 0.8, rad = 0.7 + r() * 1.6;
     c.fillStyle = rgba(s.pal.light, 0.35 + r() * 0.5);
@@ -112,7 +112,7 @@ function swirl(c: Ctx, s: SceneSpec) {
   sky(c, s, hy);
   const cx = s.lx * w, cy = s.ly * h;
   // rings of cloud around the light
-  const r = rng(s.seed + 9);
+  const r = rng(s.dseed + 9);
   for (let ring = 0; ring < 5; ring++) {
     const rad = h * (0.12 + ring * 0.11), col = mix(p.skyLow, p.glow, 0.7 - ring * 0.13);
     for (let a = 0; a < Math.PI * 2; a += 0.09) {
@@ -229,8 +229,11 @@ export function composeImage(c: Ctx, s: SceneSpec, img: CanvasImageSource, iw: n
   c.save();
   c.fillStyle = rgba(s.pal.deep); c.fillRect(0, 0, w, h);
   try { c.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh); } catch { /* tainted or not loaded */ }
-  c.fillStyle = rgba(s.pal.deep, 0.22); c.fillRect(0, 0, w, h);
-  quiet(c, s);
+  // a bright picture is deepened until the words can sit on it
+  let mean = 0.4;
+  try { const d = c.getImageData(0, 0, w, h).data; let t = 0, n = 0; for (let i = 0; i < d.length; i += 40) { t += d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114; n++; } mean = t / n / 255; } catch { /* unreadable */ }
+  c.fillStyle = rgba(s.pal.deep, clamp(0.2 + (mean - 0.3) * 1.5, 0.2, 0.72)); c.fillRect(0, 0, w, h);
+  quiet(c, s); quiet(c, s);
   c.restore();
   return (x: number, y: number) => Math.sin(x / w * 4 + s.seed) * 0.35 + Math.sin(y / h * 3) * 0.25;
 }

@@ -52,7 +52,7 @@
   {% set k = loop.index0 + (1 if head else 0) %}
   <article class="pg-beat pg-feat" data-pg="feat" data-side="{{ side(loop, loop.index0 + 1) | trim }}" data-k="{{ k }}" data-n="{{ n }}">
     <div class="pg-copy">
-      <p class="pg-num pg-fade" aria-hidden="{{ 'false' if (f.tag and (f.tag | length) > 3) else 'true' }}">{{ f.tag if f.tag else (loop.index0 + 1) }}</p>
+      {% if f.tag and (f.tag | length) > 3 %}<p class="pg-kicker pg-fade">{{ f.tag }}</p>{% else %}<p class="pg-num pg-fade" aria-hidden="true">{{ f.tag if f.tag else (loop.index0 + 1) }}</p>{% endif %}
       <h3 class="pg-sub pg-write">{{ f.title | rich }}</h3>
       {% if f.body %}<p class="pg-body pg-fade">{{ f.body | rich }}</p>{% endif %}
       {% if f.meter is not none %}<div class="pg-swipe pg-fade" role="img" aria-label="{{ (f.meter * 100) | round | int }}%"><i style="width: {{ (f.meter * 100) | round }}%"></i></div>{% endif %}

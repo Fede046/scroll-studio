@@ -97,10 +97,10 @@ function run(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, els: HTML
     const t = tc.getContext("2d", { willReadFrequently: true })!;
     t.setTransform(1, 0, 0, 1, 0, 0); t.clearRect(0, 0, gw, gh);
     const side = b.side === "r" ? 1 : b.side === "c" ? 0 : -1;
-    const spread = b.n > 1 ? (b.k / (b.n - 1) - 0.5) * 0.22 : 0;
+    const spread = b.n > 1 ? (b.k / (b.n - 1) - 0.5) * 0.42 : 0;
     const lx = clamp((side === 1 ? 0.27 : side === -1 ? 0.7 : 0.5 + (hash(i) - 0.5) * 0.4) + spread, 0.12, 0.88);
     const ly = 0.3 + hash(i, 3) * 0.12;
-    const spec: SceneSpec = { kind: b.scene, pal: b.pal, seed: b.group * 13 + 5, w: gw, h: gh, copy: measureCopy(b), lx, ly, k: b.k, n: b.n };
+    const spec: SceneSpec = { kind: b.scene, pal: b.pal, seed: b.group * 13 + 5, dseed: b.group * 13 + 5 + b.k * 37, w: gw, h: gh, copy: measureCopy(b), lx, ly, k: b.k, n: b.n };
     let flow: Flow, fromImage = false;
     const im = b.img;
     if (im && im.complete && im.naturalWidth) {
@@ -247,17 +247,39 @@ function run(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, els: HTML
   beats.forEach((b) => io.observe(b.el));
 
   // ------------------------------------------------------------------ the finger
-  let carry: RGB | null = null, last: [number, number] | null = null, lastMove = 0;
+  let last: [number, number] | null = null, lastMove = 0;
   const queue: number[][] = [];
   const fine = matchMedia("(pointer: fine)").matches;
+  const tmpCur = new Float32Array(3 * 900);
+  /** A finger dragged through wet paint: what is under it is carried along (the canvas copied onto itself, shifted by the move). */
   function smear(x0: number, y0: number, x1: number, y1: number, press: number) {
-    const sp = Math.hypot(x1 - x0, y1 - y0);
-    const w = (mobile() ? 30 : 44) * (0.8 + Math.min(1, sp / 60) * 0.5) * press;
-    const here = curAt(x1, y1);
-    carry = carry ? mix(carry, here, 0.3) : here;
+    const dx = x1 - x0, dy = y1 - y0, sp = Math.hypot(dx, dy);
+    if (sp < 1.5) return;
+    const r = (mobile() ? 30 : 44) * (0.85 + Math.min(1, sp / 70) * 0.4) * press;
+    ctx.save();
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    brush(ctx, [[x0, y0], [(x0 + x1) / 2 + (R() - 0.5) * 2, (y0 + y1) / 2 + (R() - 0.5) * 2], [x1, y1]], w, carry, carry, { alpha: 0.6, streaks: 2, taper: false, seed: strokes++ });
-    deposit(x1, y1, w * 0.5, carry, 0.6);
+    for (const [k, a] of [[1, 0.62], [0.66, 0.5]] as const) {
+      const rr = r * k;
+      ctx.save(); ctx.beginPath(); ctx.arc(x1, y1, rr, 0, Math.PI * 2); ctx.clip(); ctx.globalAlpha = a;
+      ctx.drawImage(canvas, (x0 - rr) * dpr, (y0 - rr) * dpr, 2 * rr * dpr, 2 * rr * dpr, x1 - rr, y1 - rr, 2 * rr, 2 * rr);
+      ctx.restore();
+    }
+    ctx.restore();
+    // the colour map follows: each cell under the finger takes what was behind it
+    const gx0 = Math.max(0, Math.floor((x1 - r) / GC)), gx1 = Math.min(gw - 1, Math.ceil((x1 + r) / GC)), gy0 = Math.max(0, Math.floor((y1 - r) / GC)), gy1 = Math.min(gh - 1, Math.ceil((y1 + r) / GC));
+    let n = 0;
+    for (let gy = gy0; gy <= gy1 && n < 300; gy++) for (let gx = gx0; gx <= gx1 && n < 300; gx++) {
+      if (((gx + 0.5) * GC - x1) ** 2 + ((gy + 0.5) * GC - y1) ** 2 > r * r) continue;
+      const sx = clamp(Math.round(gx - dx / GC), 0, gw - 1), sy = clamp(Math.round(gy - dy / GC), 0, gh - 1), si = (sy * gw + sx) * 3;
+      tmpCur[n * 3] = cur[si]; tmpCur[n * 3 + 1] = cur[si + 1]; tmpCur[n * 3 + 2] = cur[si + 2]; n++;
+    }
+    n = 0;
+    for (let gy = gy0; gy <= gy1 && n < 300; gy++) for (let gx = gx0; gx <= gx1 && n < 300; gx++) {
+      if (((gx + 0.5) * GC - x1) ** 2 + ((gy + 0.5) * GC - y1) ** 2 > r * r) continue;
+      const i = (gy * gw + gx) * 3;
+      cur[i] += (tmpCur[n * 3] - cur[i]) * 0.55; cur[i + 1] += (tmpCur[n * 3 + 1] - cur[i + 1]) * 0.55; cur[i + 2] += (tmpCur[n * 3 + 2] - cur[i + 2]) * 0.55; n++;
+    }
+    strokes++;
   }
   if (!reduced) {
     addEventListener("pointermove", (e) => {
@@ -267,8 +289,8 @@ function run(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, els: HTML
       lastMove = performance.now();
     }, { passive: true });
     addEventListener("pointerdown", (e) => { if (e.pointerType !== "mouse" || e.button === 0) { last = [e.clientX, e.clientY]; queue.push([e.clientX, e.clientY, e.clientX + 1, e.clientY + 1, 1.6]); } }, { passive: true });
-    addEventListener("pointerleave", () => { last = null; carry = null; });
-    addEventListener("pointercancel", () => { last = null; carry = null; });
+    addEventListener("pointerleave", () => { last = null; });
+    addEventListener("pointercancel", () => { last = null; });
   }
 
   // ------------------------------------------------------------------ start, loop
@@ -338,7 +360,6 @@ function run(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, els: HTML
       // the finger
       let q = 6;
       while (queue.length && q-- > 0) { const m = queue.shift()!; smear(m[0], m[1], m[2], m[3], m[4]); }
-      if (performance.now() - lastMove > 400) carry = null;
     }
     // readouts at a gentle rate
     if (t - hud > 0.12) {

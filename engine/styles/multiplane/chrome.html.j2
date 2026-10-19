@@ -1,0 +1,16 @@
+{# Multiplane furniture: the world the runtime fills with painted plates (a plain container; every plate is its own fixed
+   layer so the plates and the words can be sorted by depth together), a wordmark / links / call to action, the camera
+   stand's depth gauge (the plates of the stack in front of the lens, and the focus ring), and a readout of the set-up,
+   the truck (how far the camera has run) and the focus. The default nav is hidden. #}
+{% macro top(site, sections, nav_links) %}
+<div class="mp-world" aria-hidden="true"></div>
+<header class="mp-top">
+  <a class="mp-mark" href="#">{{ site.name }}</a>
+  {% if nav_links %}<nav class="mp-links" aria-label="Sections">{% for l in nav_links %}<a href="{{ l.href }}">{{ l.label }}</a>{% endfor %}</nav>{% endif %}
+  {% if site.nav.cta %}<a class="mp-top__cta" href="{{ site.nav.cta.href }}">{{ site.nav.cta.label }}</a>{% endif %}
+</header>
+<div class="mp-gauge" aria-hidden="true"><span class="mp-gauge__cap">lens</span></div>
+<p class="mp-hud" aria-hidden="true"><span>set-up <b data-mp-set>01</b></span><span>truck <b data-mp-truck>0.00</b></span><span>focus <b data-mp-focus>1.00</b></span></p>
+{% endmacro %}
+
+{% macro bottom(site, sections) %}{% endmacro %}

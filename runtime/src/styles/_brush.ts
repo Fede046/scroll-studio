@@ -183,21 +183,23 @@ export interface Palette { skyTop: RGB; skyLow: RGB; glow: RGB; far: RGB; mid: R
  */
 export function colourScript(n: number, accent: RGB, spread = 1, day = 0.25): Palette[] {
   const [h0] = toHsl(accent);
+  /** hue a, moved toward hue b along the shorter way round the wheel (a plain lerp of 28 and 203 passes through green) */
+  const hueMix = (a: number, b: number, t: number) => { const d = ((b - a + 540) % 360) - 180; return a + d * t; };
   const out: Palette[] = [];
   for (let i = 0; i < n; i++) {
     const t = n > 1 ? i / (n - 1) : 0;
     // time of day: dusk to night to a new dawn across the page
     const tod = (day + t * 0.85) % 1;
     const night = Math.cos((tod - 0.5) * Math.PI * 2) * 0.5 + 0.5;       // 1 at midnight
-    const glowHue = h0 + Math.sin(t * Math.PI * 2 + 0.7) * 70 * spread;
-    const skyHue = (h0 + 175 + Math.sin(t * Math.PI * 1.4) * 40 * spread);
+    const glowHue = h0 + Math.sin(t * Math.PI * 2 + 0.7) * 55 * spread;
+    const skyHue = h0 + 205 + Math.sin(t * Math.PI * 1.4) * 32 * spread;
     const L = lerp(0.2, 0.08, night);
     out.push({
       hue: glowHue,
       skyTop: hsl(skyHue, 0.5, L * 0.9),
-      skyLow: hsl(lerp(skyHue, glowHue, 0.4), 0.62, lerp(0.34, 0.2, night)),
+      skyLow: hsl(hueMix(skyHue, glowHue, 0.22), 0.6, lerp(0.34, 0.2, night)),
       glow: hsl(glowHue, 0.86, lerp(0.64, 0.58, night)),
-      far: hsl(lerp(skyHue, glowHue, 0.3), 0.4, lerp(0.3, 0.17, night)),
+      far: hsl(hueMix(skyHue, glowHue, 0.12), 0.4, lerp(0.3, 0.17, night)),
       mid: hsl(skyHue + 12, 0.38, lerp(0.2, 0.11, night)),
       near: hsl(skyHue + 24, 0.34, lerp(0.1, 0.055, night)),
       deep: hsl(skyHue + 30, 0.4, 0.035),
