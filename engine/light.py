@@ -1,0 +1,373 @@
+"""light: the pieces of "light as the scroll" that are not a scene builder: relighting one place into several times of
+day with the geometry locked, measuring and correcting drift, and the maps the browser's light-aware transition reads.
+
+The pipeline (engine/scenes/light.py runs it, cached per stage):
+
+  relight     Qwen-Image-Edit gets the world picture and an instruction that changes only the light (light_presets.py).
+              The editor redraws a little everywhere, so what comes back is not yet the same place.
+  measure     structure, not colour: both pictures are reduced to a band-passed LOG-luminance map (a change of light is a
+              multiplication, which log turns into an offset the band-pass removes), normalised by local contrast. The
+              displacement between the two maps (dense optical flow, DIS) and the agreement of their edges say how far
+              the place moved. `drift` below is that displacement in pixels at 1024 across.
+  align       the flow, smoothed, is the correction: the relit picture is warped back onto the world's geometry, so a
+              window is where the window was. The residual after the warp is measured again and reported.
+  retry       a relight whose drift stays above the limit is redone with another seed; the best attempt is kept.
+  ratio       between neighbouring times, the low-frequency lighting change (an edge-aware, guided low-pass of B over A,
+              log-encoded) lets the browser carry the whole picture's light from one time to the other smoothly, so that
+              only the mid-frequency detail (shadows) is switched by the sweeping front, not the brightness.
+  lamps       what turned on (or off) between two times: small bright features present in one and not the other (white
+              top-hat), optionally confined to regions named in the spec (engine/region.py), cut into connected
+              lights each given its own delay, plus a halo. The browser switches them one by one with a glow.
+  tokens      the section's ink, accent and shade colours, measured from each time's picture.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import math
+from pathlib import Path
+from typing import Optional
+
+import cv2
+import numpy as np
+from PIL import Image
+
+VERSION = 1                # bump when a relight or its measurement would come out differently for the same inputs
+MEASURE_W = 1024           # width at which structure is compared, so drift means the same on any picture
+MAX_FLOW = 28.0            # a correction larger than this (px at MEASURE_W) is not trusted: it is a different picture
+
+
+# ---------------------------------------------------------------- small helpers
+
+def load_rgb(path: Path, size: Optional[tuple[int, int]] = None) -> np.ndarray:
+    im = Image.open(path).convert("RGB")
+    if size is not None and im.size != tuple(size):
+        im = im.resize(tuple(size), Image.LANCZOS)
+    return np.asarray(im)
+
+
+def luma(rgb: np.ndarray) -> np.ndarray:
+    """Rec. 709 luma of an 8-bit RGB array, 0-1."""
+    return (rgb[..., :3].astype(np.float32) @ np.array([0.2126, 0.7152, 0.0722], np.float32)) / 255.0
+
+
+def _small(rgb: np.ndarray, width: int = MEASURE_W) -> np.ndarray:
+    h, w = rgb.shape[:2]
+    if w == width:
+        return rgb
+    return cv2.resize(rgb, (width, max(1, round(h * width / w))), interpolation=cv2.INTER_AREA)
+
+
+# ---------------------------------------------------------------- structure: what does not change with the light
+
+def structure(rgb: np.ndarray) -> np.ndarray:
+    """A light-invariant picture of the place's structure at MEASURE_W across, float32, roughly -3..3. The log of
+    luminance makes a change of light additive; a difference of Gaussians removes the slow part of it and keeps edges; a
+    local contrast normalisation makes a dim night picture's edges as strong as a bright noon picture's."""
+    s = _small(rgb)
+    ln = np.log(luma(s) + 0.03)
+    dog = cv2.GaussianBlur(ln, (0, 0), 1.0) - cv2.GaussianBlur(ln, (0, 0), 3.2)
+    energy = cv2.GaussianBlur(np.abs(dog), (0, 0), 9.0)
+    return (dog / (energy + 0.02)).astype(np.float32)
+
+
+def _u8(st: np.ndarray) -> np.ndarray:
+    return np.clip(st * 40 + 128, 0, 255).astype(np.uint8)
+
+
+def flow(base_st: np.ndarray, cand_st: np.ndarray) -> np.ndarray:
+    """Dense displacement (dx, dy) at MEASURE_W with base(x) ~ cand(x + flow(x)), from the two structure maps."""
+    dis = cv2.DISOpticalFlow_create(cv2.DISOPTICAL_FLOW_PRESET_MEDIUM)
+    dis.setFinestScale(1)
+    dis.setPatchSize(12)
+    dis.setPatchStride(6)
+    dis.setVariationalRefinementIterations(8)
+    f = dis.calc(_u8(base_st), _u8(cand_st), None)
+    return np.clip(f, -MAX_FLOW, MAX_FLOW)
+
+
+def _weights(base_st: np.ndarray) -> np.ndarray:
+    """Where the structure is strong enough for a displacement to mean something (flat sky and water say nothing)."""
+    e = cv2.GaussianBlur(np.abs(base_st), (0, 0), 2.0)
+    return np.clip((e - 0.35) / 0.5, 0, 1)
+
+
+def displacement(base_st: np.ndarray, f: np.ndarray) -> tuple[float, float]:
+    """Mean and 90th-percentile displacement in px (at MEASURE_W) over the structured pixels."""
+    mag = np.hypot(f[..., 0], f[..., 1])
+    w = _weights(base_st)
+    if w.sum() < 50:
+        return 0.0, 0.0
+    mean = float((mag * w).sum() / w.sum())
+    sel = mag[w > 0.5]
+    return mean, float(np.percentile(sel, 90)) if sel.size else mean
+
+
+def edge_agreement(a_st: np.ndarray, b_st: np.ndarray, tol: int = 2, keep: float = 0.10) -> float:
+    """F-score of the strongest `keep` share of structure pixels of each picture, matched within `tol` px."""
+    ea, eb = np.abs(a_st), np.abs(b_st)
+    ta, tb = np.quantile(ea, 1 - keep), np.quantile(eb, 1 - keep)
+    A, B = ea >= ta, eb >= tb
+    k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * tol + 1, 2 * tol + 1))
+    Ad, Bd = cv2.dilate(A.astype(np.uint8), k) > 0, cv2.dilate(B.astype(np.uint8), k) > 0
+    prec = float((B & Ad).sum() / max(1, B.sum()))
+    rec = float((A & Bd).sum() / max(1, A.sum()))
+    return 0.0 if prec + rec == 0 else 2 * prec * rec / (prec + rec)
+
+
+def warp(rgb: np.ndarray, f: np.ndarray, sigma: float = 5.0) -> np.ndarray:
+    """Pull `rgb` (the candidate, full size) onto the world with a flow estimated at MEASURE_W (smoothed, scaled up)."""
+    h, w = rgb.shape[:2]
+    fs = np.stack([cv2.GaussianBlur(f[..., i], (0, 0), sigma) for i in (0, 1)], -1)
+    s = w / f.shape[1]
+    fx = cv2.resize(fs[..., 0], (w, h), interpolation=cv2.INTER_CUBIC) * s
+    fy = cv2.resize(fs[..., 1], (w, h), interpolation=cv2.INTER_CUBIC) * s
+    gx, gy = np.meshgrid(np.arange(w, dtype=np.float32), np.arange(h, dtype=np.float32))
+    return cv2.remap(rgb, gx + fx, gy + fy, cv2.INTER_CUBIC, borderMode=cv2.BORDER_REFLECT)
+
+
+def measure(world: np.ndarray, cand: np.ndarray, base_st: Optional[np.ndarray] = None) -> dict:
+    """How far `cand` is from being the same place as `world`: displacement (mean, p90, px at 1024 across) and edge
+    agreement (0-1), before any correction."""
+    base_st = structure(world) if base_st is None else base_st
+    st = structure(cand)
+    f = flow(base_st, st)
+    mean, p90 = displacement(base_st, f)
+    return {"drift": round(mean, 3), "drift_p90": round(p90, 3), "edges": round(edge_agreement(base_st, st), 4)}
+
+
+def align(world: np.ndarray, cand: np.ndarray, base_st: Optional[np.ndarray] = None, passes: int = 2) -> tuple[np.ndarray, dict]:
+    """Correct `cand` onto the world's geometry. Returns the warped picture and a report: the drift and edge agreement
+    before (raw) and after (aligned). Each pass re-estimates on the warped picture, so large errors are removed
+    coarsely and the remainder finely; a pass that makes the measurement worse is dropped."""
+    base_st = structure(world) if base_st is None else base_st
+    raw = measure(world, cand, base_st)
+    best, best_score, report = cand, raw["drift"] - 2 * raw["edges"], dict(raw)
+    cur = cand
+    for _ in range(passes):
+        f = flow(base_st, structure(cur))
+        nxt = warp(cur, f)
+        m = measure(world, nxt, base_st)
+        score = m["drift"] - 2 * m["edges"]
+        if score < best_score - 1e-4:
+            best, best_score, report = nxt, score, dict(m)
+            cur = nxt
+        else:
+            break
+    return best, {"raw": raw, "aligned": {k: report[k] for k in ("drift", "drift_p90", "edges")}}
+
+
+# ---------------------------------------------------------------- relighting through ComfyUI
+
+def relight(world_png: Path, instruction: str, seed: int, steps: int, out: Path, tag: str, log=print) -> Path:
+    """One Qwen-Image-Edit pass over the whole world picture; the result saved at `out` at the editor's own size."""
+    import shutil
+    from .backends import comfy
+    from .project import BuildError
+    if not comfy.alive():
+        raise BuildError(f"light: relighting needs ComfyUI (Qwen-Image-Edit), which is not running at {comfy.COMFY}.")
+    comfy.free()
+    name = comfy.upload(str(world_png))
+    images = comfy.run(comfy.build_qwen_edit_graph([name], instruction, seed, steps, prefix=f"studio/light_{tag}"), poll=2)
+    tmp = comfy.fetch(images, str(out.parent / f"_light_{tag}"))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(Path(tmp) / "0001.png"), out)
+    shutil.rmtree(tmp, ignore_errors=True)
+    comfy.free()
+    return out
+
+
+def relight_locked(world: np.ndarray, world_png: Path, instruction: str, seeds: list[int], steps: int, max_drift: float,
+                   align_on: bool, work: Path, tag: str, log=print) -> tuple[np.ndarray, dict]:
+    """Relight until the place holds still: try each seed, align, keep the first whose residual drift is within
+    `max_drift` (else the best of them). Returns the picture (at the world's size) and a report of every attempt."""
+    base_st = structure(world)
+    attempts, best, best_img = [], None, None
+    for i, seed in enumerate(seeds):
+        raw_png = work / f"_raw_{tag}_{seed}.png"
+        relight(world_png, instruction, seed, steps, raw_png, f"{tag}_{seed}", log)
+        cand = load_rgb(raw_png, (world.shape[1], world.shape[0]))
+        raw_png.unlink(missing_ok=True)
+        if align_on:
+            fixed, rep = align(world, cand, base_st)
+        else:
+            m = measure(world, cand, base_st)
+            fixed, rep = cand, {"raw": m, "aligned": {k: m[k] for k in ("drift", "drift_p90", "edges")}}
+        rep["seed"] = seed
+        attempts.append(rep)
+        log(f"    seed {seed}: drift {rep['raw']['drift']:.2f}px raw -> {rep['aligned']['drift']:.2f}px aligned, "
+            f"edges {rep['raw']['edges']:.2f} -> {rep['aligned']['edges']:.2f}")
+        score = rep["aligned"]["drift"] - 2 * rep["aligned"]["edges"]
+        if best is None or score < best[0]:
+            best, best_img = (score, rep), fixed
+        if rep["aligned"]["drift"] <= max_drift:
+            break
+    report = dict(best[1])
+    report["attempts"] = attempts
+    report["ok"] = report["aligned"]["drift"] <= max_drift
+    return best_img, report
+
+
+# ---------------------------------------------------------------- the maps the browser reads
+
+RATIO_W = 480              # the light-change field is smooth: a small texture, bilinear in the browser
+LAMP_W = 960               # lamp maps: half of a 1920 picture, windows stay crisp
+RATIO_RANGE = 6.0          # stops covered by the 8-bit log encoding of the ratio (+-3)
+
+
+def _lin(rgb: np.ndarray) -> np.ndarray:
+    return np.power(rgb.astype(np.float32) / 255.0, 2.2)
+
+
+def ratio_map(world: np.ndarray, a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    """How the low-frequency light changes from picture `a` to `b`: log2(lowpass(b) / lowpass(a)) per channel, linear
+    light, an edge-aware low-pass guided by the world's own luminance (so the horizon, a wall's edge or the water line
+    keep their own ratio instead of bleeding), encoded 0-255 over +-3 stops. RATIO_W across."""
+    from .freeze import guided_filter
+    h, w = a.shape[:2]
+    size = (RATIO_W, max(1, round(h * RATIO_W / w)))
+    guide = cv2.resize(luma(world), size, interpolation=cv2.INTER_AREA)
+    out = []
+    for c in range(3):
+        la = cv2.resize(_lin(a)[..., c], size, interpolation=cv2.INTER_AREA)
+        lb = cv2.resize(_lin(b)[..., c], size, interpolation=cv2.INTER_AREA)
+        ga = guided_filter(guide, la, 10, 0.012)
+        gb = guided_filter(guide, lb, 10, 0.012)
+        out.append(np.log2((np.maximum(gb, 0) + 0.004) / (np.maximum(ga, 0) + 0.004)))
+    r = np.stack(out, -1)
+    return np.clip((r / RATIO_RANGE + 0.5) * 255, 0, 255).astype(np.uint8)
+
+
+def depth_map(world: np.ndarray, model: str = "small", width: int = 960) -> np.ndarray:
+    """Depth Anything V2 on the world, edge-aligned and softened for parallax (engine/freeze.prepare_depth), 8-bit,
+    `width` across. 255 is near."""
+    from .backends import depth as depthmod
+    from .freeze import prepare_depth
+    d = depthmod.estimate(Image.fromarray(world), model)
+    h, w = world.shape[:2]
+    size = (width, max(1, round(h * width / w)))
+    return np.clip(prepare_depth(d, world, size) * 255, 0, 255).astype(np.uint8)
+
+
+def sky_mask_fallback(world: np.ndarray, depth: np.ndarray) -> np.ndarray:
+    """The sky without a model: the far, smooth, upper part of the picture (0-1 float at the depth map's size)."""
+    h, w = depth.shape
+    small = cv2.resize(world, (w, h), interpolation=cv2.INTER_AREA)
+    grad = cv2.GaussianBlur(np.hypot(*np.gradient(cv2.GaussianBlur(luma(small), (0, 0), 2.0))), (0, 0), 6.0)
+    m = ((depth < 40) & (grad < 0.012)).astype(np.uint8)
+    n, lab, stats, _ = cv2.connectedComponentsWithStats(m)
+    keep = np.zeros_like(m)
+    for i in range(1, n):
+        if stats[i, cv2.CC_STAT_Y] < h * 0.08 and stats[i, cv2.CC_STAT_AREA] > h * w * 0.03:
+            keep[lab == i] = 1
+    return cv2.GaussianBlur(keep.astype(np.float32), (0, 0), 3.0)
+
+
+def _top_hat(l: np.ndarray, k: int) -> np.ndarray:
+    return l - cv2.morphologyEx(l, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
+
+
+def lamp_map(a: np.ndarray, b: np.ndarray, sky: Optional[np.ndarray] = None, allow: Optional[np.ndarray] = None,
+             glow: float = 1.0, grow: int = 2, seed: int = 5) -> Optional[dict]:
+    """The lights that switch between pictures `a` and `b` (the same place at two times).
+
+    Small bright features (white top-hat) present in one picture and not the other are the lamps; `sky` (0-1, any size)
+    removes the stars and the sun's glare, `allow` (0-1, the picture's size) confines them to the regions the spec
+    names. Each connected light gets its own delay (0-1) so the browser turns them on one by one. Returns {"map": RGBA
+    uint8, "color": "#rrggbb", "count": n} or None when nothing switches. R is the cut-out (soft), G the delay, B the
+    halo."""
+    A, B = _small(a, LAMP_W), _small(b, LAMP_W)
+    h, w = A.shape[:2]
+    la, lb = luma(A), luma(B)
+    k = max(15, (w // 40) | 1)
+    ta, tb = _top_hat(la, k), _top_hat(lb, k)
+    ev = np.abs(tb - ta)
+    mask = ev > 0.13
+    if sky is not None:
+        mask &= cv2.resize(sky.astype(np.float32), (w, h), interpolation=cv2.INTER_LINEAR) < 0.5
+    if allow is not None:
+        al = cv2.resize(allow.astype(np.float32), (w, h), interpolation=cv2.INTER_AREA) > 0.2
+        mask &= cv2.dilate(al.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
+    m = mask.astype(np.uint8)
+    if grow:
+        kk = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * abs(grow) + 1, 2 * abs(grow) + 1))
+        m = cv2.dilate(m, kk) if grow > 0 else cv2.erode(m, kk)
+    n, lab, stats, cent = cv2.connectedComponentsWithStats(m)
+    keep = np.zeros(n, bool)
+    keep[1:] = stats[1:, cv2.CC_STAT_AREA] >= 5
+    m = keep[lab].astype(np.uint8)
+    if int(m.sum()) < 30:
+        return None
+    n, lab, stats, cent = cv2.connectedComponentsWithStats(m)
+    rng = np.random.default_rng(seed)
+    delay = np.zeros(n, np.float32)
+    delay[1:] = rng.random(n - 1)
+    soft = cv2.GaussianBlur(m.astype(np.float32), (0, 0), 0.8)
+    strength = cv2.dilate(ev * m, np.ones((5, 5), np.uint8))
+    halo = cv2.GaussianBlur(m.astype(np.float32) * np.clip(strength * 3, 0.3, 1), (0, 0), w * 0.011)
+    halo = np.clip(halo / max(float(halo.max()), 1e-6), 0, 1) ** 0.8
+    lit_is_b = tb.sum() >= ta.sum()
+    lit = (B if lit_is_b else A)[m > 0].astype(np.float32).mean(axis=0)
+    col = lit / max(float(lit.max()), 1.0)
+    col = np.clip(0.55 * col + 0.45 * np.array([1.0, 0.7, 0.36]) * (lit.max() / 255), 0, 1)
+    out = np.dstack([np.clip(soft * 255, 0, 255), delay[lab] * 255, np.clip(halo * 255 * min(glow, 1.0), 0, 255),
+                     np.full((h, w), 255)]).astype(np.uint8)
+    return {"map": out, "color": "#" + "".join(f"{int(round(v * 255)):02x}" for v in col), "count": int(n - 1),
+            "turns_on": bool(lit_is_b)}
+
+
+# ---------------------------------------------------------------- the section's colours at one time of day
+
+def tokens(rgb: np.ndarray) -> dict:
+    """Ink, accent and shade colours for text set over this picture, contrast-checked like any theme surface
+    (engine/compile/themes.py). Returns numbers the browser blends: bg (the shade), ink, em (the accent words), and the
+    alphas of the two quieter text tiers. Also `dark`: the picture is dark, the ink light."""
+    from .compile import themes as th
+    h, w = rgb.shape[:2]
+    zone = rgb[int(h * 0.28):int(h * 0.74), int(w * 0.03):int(w * 0.50)]
+    y = float(luma(zone).mean())
+    mean = rgb.reshape(-1, 3).astype(np.float32).mean(axis=0)
+    meant = tuple(float(v) for v in mean)
+    dark = y < 0.52
+    if dark:
+        bg = tuple(float(v) for v in np.clip(mean * 0.22 + np.array([4, 5, 9]), 0, 255))
+        ink = th._mix((246.0, 241.0, 232.0), meant, 0.9)
+    else:
+        bg = th._mix((255.0, 252.0, 246.0), th._mix(meant, (255.0, 252.0, 246.0), 0.18), 0.55)
+        ink = (24.0, 21.0, 19.0)
+    # the accent: the colour of the light itself, from the brightest pixels, pushed to a readable saturation
+    l = luma(rgb)
+    top = rgb[l >= np.quantile(l, 0.985)].astype(np.float32).mean(axis=0)
+    hsv = cv2.cvtColor(np.uint8([[np.clip(top, 0, 255)]]), cv2.COLOR_RGB2HSV)[0, 0].astype(np.float32)
+    hsv[1] = max(hsv[1], 150)
+    hsv[2] = 240 if dark else 150
+    acc = tuple(float(v) for v in cv2.cvtColor(np.uint8([[hsv]]), cv2.COLOR_HSV2RGB)[0, 0])
+    bg2 = th._mix(bg, ink, 0.06)
+    bgs = [bg, bg2]
+    a3 = th._min_alpha(ink, bgs, th.SMALL_TEXT, 0.44)
+    a2 = max(th._min_alpha(ink, bgs, th.SMALL_TEXT, 0.68), min(1.0, round(a3 + 0.14, 2)))
+    em = th._readable_accent(acc, ink, bgs, 3.0)
+    atext = th._readable_accent(acc, ink, bgs, th.SMALL_TEXT)
+    r = lambda c: [int(round(v)) for v in c]
+    return {"bg": r(bg), "bg2": r(bg2), "ink": r(ink), "em": r(em), "accent": r(atext), "a2": a2, "a3": a3, "dark": bool(dark)}
+
+
+# ---------------------------------------------------------------- reports
+
+def contact_sheet(times: list[dict], images: list[np.ndarray], out: Path, cols: int = 3) -> Path:
+    """The times side by side with their id, clock and measured drift: what `studio light` writes for a first look."""
+    from PIL import ImageDraw
+    tw = 640
+    th = round(tw * images[0].shape[0] / images[0].shape[1])
+    rows = math.ceil(len(images) / cols)
+    sheet = Image.new("RGB", (cols * tw, rows * (th + 26)), (16, 16, 18))
+    d = ImageDraw.Draw(sheet)
+    for i, (t, im) in enumerate(zip(times, images)):
+        x, y = (i % cols) * tw, (i // cols) * (th + 26)
+        sheet.paste(Image.fromarray(im).resize((tw, th), Image.LANCZOS), (x, y + 26))
+        rep = t.get("report") or {}
+        al = rep.get("aligned") or {}
+        d.text((x + 8, y + 7), f"{t['id']}  {t.get('clock', '')}  drift {al.get('drift', 0):.2f}px (raw {(rep.get('raw') or {}).get('drift', 0):.2f})  "
+                               f"edges {al.get('edges', 1):.2f}", fill=(230, 230, 230))
+    sheet.save(out, quality=90)
+    return out
