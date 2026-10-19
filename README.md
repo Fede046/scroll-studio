@@ -148,6 +148,7 @@ Every example is a `site.yaml` in [`examples/`](examples/) and rebuilds with `st
 | [Hollis House](examples/hollis-house/site.yaml) | Real estate | `splat` | A walk through a scanned house, room by room |
 | [Pelorus](examples/pelorus/site.yaml) | Research | `chart` (bar) | The renewables share of electricity, every figure read from Our World in Data |
 | [Halcyon](examples/halcyon/site.yaml) | Software | blocks | One product page as twenty-one experiences (`studio looks`) |
+| [Harbourlight](examples/little-harbour/site.yaml) | Port software | `diorama` | A tiny harbour, tilt-shift and live in the page: scroll orbits it, dives to a lighthouse, a windmill, a crane, a customs house, a market stall, and lifts out again. No video, nothing to render |
 | [Halo Coffee](examples/film-cuts/site.yaml) | Coffee | `transition:` | A page edited like a film: a logo becomes the sun becomes a cup (designed match cuts), a whip pan, an iris, a carried figure, a wipe, a dissolve and a hard cut (needs ComfyUI to build; `studio cuts --strip` shows each cut) |
 
 ## Quick start
@@ -979,6 +980,36 @@ progress numbers:
 
 For an edit, start each line with `+`, `-` or a space, like a diff (use `|2` so YAML keeps the leading markers).
 `tree` lists more paths to scatter around the route so it reads as a whole project.
+
+### Miniature worlds (`diorama`)
+
+A `diorama` scene is a tilt-shift model of a tiny world (a harbour town, a market town, a desk, a factory floor, a studio)
+drawn live in the page. The world is described once, and the engine lays it out in a couple of seconds on the CPU: ground,
+water, roads, scenery, the places and their signs, and a camera plan. Scrolling orbits the camera round the whole thing,
+dives to the place where a step's content sits, lifts back out and travels to the next. Shallow depth of field blurs the
+near and far edges like a macro lens on a model, a high soft sun throws soft shadows, and the pointer turns the view.
+Nothing is generated or rendered: no GPU job, no video, a few hundred KB of data. Phones get a wider lens and a lower pixel
+budget, reduced motion gets one still view per place, and without WebGL the page shows a flat map of the world.
+
+```yaml
+  - id: harbour
+    type: diorama
+    world: { kind: harbour, seed: 7 }          # harbour, town, desk, factory or studio
+    camera: { orbit: ccw }
+    look: { sun: golden, tilt_shift: 1.0 }
+    places:
+      - { name: Lighthouse, kind: lighthouse }
+      - { name: Container yard, kind: crane, where: yard }          # a compass point, a spot, or [x, z]
+    steps:                                     # an intro (the world whole), then one step per place, in order
+      - { intro: true, title: "A whole <em>port</em> in your hand." }
+      - { title: "See every ship.", body: "..." }
+      - { title: "Every box, where it is.", body: "..." }
+```
+
+`studio diorama <project> [--strip]` says what was laid out (places, camera azimuths, the map in `diorama/<id>-map.jpg`) and,
+with `--strip`, photographs the built site at every place and between places; the MCP tool `diorama_layout` does the same.
+Fields, the worlds' vocabularies, how it is built, what was measured instead (a generated photo, 2.5D, image-to-3D, splats)
+and its limits are in [docs/miniature.md](docs/miniature.md). The showcase is `examples/little-harbour`.
 
 ### Edited like a film (`transition:`)
 

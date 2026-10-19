@@ -9,6 +9,22 @@ Everything so far is version 1. On 2026-10-12 the releases first published as 2.
 ## Unreleased
 
 ### Added
+- Miniature worlds: scene type `diorama`, a tilt-shift diorama you orbit and dive into. `world` (kind `harbour`, `town`,
+  `desk`, `factory` or `studio`, seed, size, base, palette, density, extra props) is laid out once by the engine
+  (`engine/diorama/`: height field and water, the ground painted top-down, places with hero props, signs and dressing,
+  scenery, baked contact shadows, a camera plan whose azimuths are chosen by a Viterbi pass over sight lines); `places`
+  (name, kind, `where` as coordinates, a compass point or a spot of the world, `step`, `side`, `sign`, `scale`, `color`) are
+  where the camera dives to and where a step's content sits; `camera` (`orbit` auto/cw/ccw, `pitch`, `dive_pitch`, `fov`,
+  `dive`, `hold`, `drift`) and `look` (`tilt_shift`, `saturation`, `sun`, `table`, `grain`, `vignette`; live, never part of a
+  cache key). The player (`runtime/src/players/diorama.ts`, `diorama/`) draws it in three.js: toy props merged into a few
+  meshes with procedural surfaces, still water, a cut-edge base on a table, a thin-lens depth of field over a multisampled
+  half-float target, a camera that rests at each place and swoops between them in one arc, pointer turn, idle motion
+  (water, a lighthouse beam, a windmill, a crane, boats, steam, smoke, a conveyor, a robot arm), pins that jump to their
+  step, adaptive resolution, a wider lens and lower budget on phones, one still view per place for reduced motion, a flat
+  map when WebGL is missing. `studio diorama <project> [--strip] [--full]` and MCP `diorama_layout` report the layout and
+  write the map (and a frame strip of the built site); the storyboard card is the map. Docs: `docs/miniature.md` (fields,
+  vocabularies, method, measurements against a generated photo, 2.5D, image-to-3D and splats, limits). Example:
+  `examples/little-harbour`. Tests: `tests/test_diorama.py`.
 - Style `paint-on-glass` (Aleksandr Petrov, *Loving Vincent*): the page is one oil painting on a lit pane, never cut. Scroll distance is brush strokes laid toward the next picture, coarse to fine, each dragging the old colour into the new; scrolling back paints forward again (paint can't be unpainted); a slow boil keeps it alive at rest; the pointer smears wet paint. Research in `docs/styles/styles-30-31.md`.
 - Style `multiplane` (Disney's multiplane camera): each section is a stack of painted glass plates at real distances; scroll trucks the camera down through the stack, plates grow and pass the lens, focus pulls to the plane carrying the words, and a foreground plate sweeps past to cover changes inside a list; the pointer trucks sideways and pulls focus.
 - Style `scratch-film` (Len Lye, Norman McLaren, Stan Brakhage): scroll pulls a strip of drawn film through a gate. Text steps in perforation-sized pulls and seats with a bump; the strip runs down the edge with sprockets and a drawn soundtrack; a new scratched, dyed or pressed drawing is projected every frame; sections are spliced reels with one flash frame (flashing kept within safe limits); the pointer is a needle that scratches the emulsion; optional sound. Research in `docs/styles/styles-32-33.md`.

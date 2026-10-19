@@ -420,7 +420,7 @@ def _section(b: _B, board: Board, sec, i: int, sp: tuple) -> list[Shot]:
                      fields=_captions(b, sec.steps, sp), lock_paths=_lock_paths(sec, sp), locked=section_locked(sec),
                      note="rendered by Blender / three.js: nothing to regenerate here")
             out.append(s)
-    if not is_scene(sec) or sec.type in ("type", "chart", "code", "map", "scene3d", "splat"):
+    if not is_scene(sec) or sec.type in ("type", "chart", "code", "map", "scene3d", "splat", "diorama"):
         sh = _block(b, board, sec, i, sp)
         if sh is not None:
             out.append(sh)

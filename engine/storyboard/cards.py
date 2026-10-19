@@ -45,7 +45,7 @@ class Frame:
 class Card:
     id: str
     section: str
-    kind: str                    # beat | take | shot | video | sequence | showroom | image | art
+    kind: str                    # beat | take | shot | video | sequence | showroom | diorama | image | art
     title: str
     frames: list[Frame] = field(default_factory=list)
     prompt: str = ""
@@ -242,7 +242,7 @@ class Maker:
                     fn = getattr(self, f"scene_{sec.type}", None)
                     if fn is not None:
                         made = fn(sec)
-                if not is_scene(sec) or sec.type in ("type", "chart", "code", "map", "scene3d", "splat"):
+                if not is_scene(sec) or sec.type in ("type", "chart", "code", "map", "scene3d", "splat", "diorama"):
                     made += self.block(sec)
             except Exception as e:   # one broken shot never stops the storyboard: it shows as a card with the error
                 sid = getattr(sec, "id", None) or sec.type
@@ -639,6 +639,28 @@ class Maker:
                                                            getattr(sec, "kicker", None) or "")]
                                                          if getattr(sec, "title", None) else [])
         return c
+
+    def scene_diorama(self, sec) -> list[Card]:
+        """A miniature world: its flat map (the same picture the page shows before WebGL is up), laid out on the CPU in a
+        couple of seconds, with the places numbered. The live scene itself is drawn in the browser, so nothing renders."""
+        from .. import diorama as dio
+        from ..compile import themes
+        from ..scenes.diorama import _map_image, stage_key
+        table = sec.look.table or themes.resolve(self.site.theme)["colors"]["bg"]
+        key = _digest(stage_key(sec, table, True))
+        path = self.cache / sec.id / f"diorama_{key}.jpg"
+        if not path.exists():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            plan, tex, _ = dio.build(sec, table, True)
+            _map_image(plan, tex, table).save(path, quality=86)
+        c = Card(sec.id, sec.id, "diorama", f"{sec.id} (miniature world, live in the page)",
+                 prompt=f"a {sec.world.kind} diorama with {len(sec.places)} places: " + ", ".join(p.name for p in sec.places),
+                 caption=" / ".join(plain(st.title) for st in sec.steps), scroll=sec.length, locked=sec.locked, fingerprint=key)
+        c.frames = [Frame(path, "map", "final", 0)]
+        c.pieces = [Piece(3.0, path, None, Move(1.0, 1.04))]
+        c.captions = step_captions(sec.steps)
+        c.rendered = True
+        return [c]
 
     def scene_artwork(self, sec) -> list[Card]:
         return [self._images_card(sec, "image", [("image", sec.image, False)], f"{sec.id} (artwork)",

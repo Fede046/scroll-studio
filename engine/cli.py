@@ -724,6 +724,57 @@ def camera(name: str, beat: str,
         typer.echo(f"  sheet: {r.get('sheet')}")
 
 
+@app.command("diorama")
+def diorama_cmd(name: str, section: Optional[str] = typer.Option(None, help="The diorama section (default: the first)"),
+                strip: bool = typer.Option(False, "--strip", help="Also take a frame strip of the built site: every place at rest, "
+                                                                  "and the lift, orbit and dive between places (dioramas/<id>-strip.jpg)"),
+                full: bool = typer.Option(False, "--full", help="Lay the ground out at full resolution (default: draft)")):
+    """Miniature worlds: lay a `diorama` section out and say what was decided: the map with the places numbered
+    (diorama/<id>-map.jpg), which step lives at which place, where the camera dives from, how far it orbits. Takes a
+    couple of seconds and needs no GPU; with --strip it also photographs the built site along the whole scroll."""
+    from .compile import themes
+    from .diorama import review
+    from .project import Project
+    from .spec import DioramaScene
+    project = Project(resolve(name))
+    site = project.load()
+    secs = [s for s in site.sections if isinstance(s, DioramaScene) and (section is None or s.id == section)]
+    if not secs:
+        raise typer.BadParameter("no diorama section" + (f" '{section}'" if section else "") + " in this project")
+    sec = secs[0]
+    table = sec.look.table or themes.resolve(site.theme)["colors"]["bg"]
+    out = project.root / "diorama"
+    info = review.write_review(sec, table, out, draft=not full)
+    typer.echo(f"{info['world']} world, {info['size']:g} units, {info['props']} props ({', '.join(f'{k} {v}' for k, v in list(info['by_kind'].items())[:6])})")
+    for p in info["places"]:
+        typer.echo(f"  {p['n']}. {p['name']} ({p['kind']}) at {p['at']}: step {p['step']}, camera azimuth {p['camera_yaw']}, distance {p['camera_distance']}")
+    typer.echo(f"  the camera orbits {info['orbit_degrees']} degrees in all; map: {out / (sec.id + '-map.jpg')}")
+    if strip:
+        from PIL import Image, ImageDraw
+        from .diorama.plan import build as layout
+        from .snapshot import snapshot as snap
+        import tempfile
+        if not (project.dist / "index.html").exists():
+            raise typer.BadParameter("build the site first (studio build)")
+        plan = layout(sec, table, True)[0]
+        pts = review.strip_points(plan)
+        with tempfile.TemporaryDirectory() as tmp:
+            shots = snap(project.dist, [f"{sec.id}:{p}" for _, p in pts], Path(tmp), size=(960, 540), log=lambda m: None)
+            cols, tw = 4, 480
+            th = round(tw * 540 / 960)
+            rows = (len(shots) + cols - 1) // cols
+            sheet = Image.new("RGB", (cols * tw, rows * th), (20, 20, 20))
+            d = ImageDraw.Draw(sheet)
+            for i, ((label, p), f) in enumerate(zip(pts, shots)):
+                im = Image.open(f).convert("RGB").resize((tw, th), Image.LANCZOS)
+                sheet.paste(im, ((i % cols) * tw, (i // cols) * th))
+                d.rectangle(((i % cols) * tw, (i // cols) * th, (i % cols) * tw + 8 + 7 * len(label), (i // cols) * th + 18), fill=(0, 0, 0))
+                d.text(((i % cols) * tw + 4, (i // cols) * th + 3), f"{label}  p={p}", fill=(255, 255, 255))
+        dest = out / f"{sec.id}-strip.jpg"
+        sheet.save(dest, quality=88)
+        typer.echo(f"  strip: {dest}")
+
+
 @app.command()
 def schema():
     """Print the site.yaml JSON Schema."""

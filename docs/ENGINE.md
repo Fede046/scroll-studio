@@ -43,6 +43,7 @@ Each scene type is one engine module: a schema, a builder (inputs → assets), a
 | 9 | `chart` | Data story: charts that build, highlight and re-shape | CSV/JSON + narrative | Clean, aggregate, pre-compute states | `chart` (D3) |
 | 10 | `map` | Geographic journey: fly between places, draw routes | places/GeoJSON | Fetch/clip tiles to PMTiles (offline), route geometry | `map` (MapLibre GL) |
 | 11 | `type` | Kinetic typography: headlines that assemble, swap, scale with scroll | text only | none | `type` (GSAP) |
+| 14 | `diorama` | A tilt-shift miniature world you orbit and dive into: places on it carry the steps' content | `world` kind + seed, `places`, `camera`, `look` | `engine/diorama/` lays out ground, props, places and camera beats (CPU, cached per stage); no GPU | `diorama` (three.js, depth-of-field pass; `docs/miniature.md`) |
 | 13 | `showroom` | The site's product, live: scroll turns, explodes and zooms the real model | `site.product` (any model format) or a model file | `engine/product.py` normalised GLB (thinned for the web), Cycles poster | `showroom` (three.js, environment light, shadow) |
 
 **The product, declared once.** `site.product` names the model once; `engine/product.py` converts it (STEP via
@@ -219,6 +220,18 @@ UI (React) ◄─► engine server (FastAPI + job queue + websocket events) ◄�
   `wan` (Fun Control, start image pinned) lags and never completes the pull-out (22.6% rms, 43% at worst), so `auto` is
   `ltx`; `uni3c` could not be measured (its file is not installed). Stage key: a beat gets a `camera` entry only when it has `camera:`
   (every other beat keeps its cache), including the chain it belongs to. Plan: `film:camera` units.
+- **Miniature worlds** (`engine/diorama/`, `engine/scenes/diorama.py`, `runtime/src/players/diorama/`). The layout is a pure
+  function of the spec (numpy, seeded): `recipes.py` / `recipes2.py` give each kind of world its height field, water, ground
+  paint (top-down into a 2048 px texture), named spots, scenery and per-place dressing; `plan.py` resolves a place's `where`
+  (coordinates, compass words, spots), seats the hero, its dressing and a sign, keeps a view cone clear, assigns steps to places
+  and plans the camera: one beat per step, the azimuth of each place chosen among candidates round its front by sight-line
+  cost (tall things between lens and place, and big things close to the lens) with a Viterbi pass that also minimises
+  swinging in the direction `camera.orbit` asks, signs re-seated beside the place as that camera sees it, contact shadows
+  baked into the ground. The stage key holds the world, places, camera and the steps' timing, never `look`. The player turns
+  the plan into a few merged meshes (`mesher.ts`: base-centred primitives, vertex-colour paint with baked AO, `aPat`
+  procedural surfaces drawn in `materials.ts` from world position), a polar terrain, water, base and table (`terrain.ts`), a
+  depth-of-field pass (`post.ts`) and the camera's choreography (`camera.ts`: rest, lift, sweep, dive overlap as one arc).
+  Decision record and measurements (generated photo, 2.5D, image-to-3D, splats, this) are in `docs/miniature.md`.
 - **Plans and storyboards.** `engine/plan.py` runs every builder in a dry run (`engine/fidelity.py` `planning()`):
   `BuildContext.stage` reports instead of running, a stage that would run marks its outputs dirty so stages keyed on
   them count too, and code that renders outside a stage (image inputs, product stills, model conversion) raises

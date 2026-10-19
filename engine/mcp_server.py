@@ -351,6 +351,27 @@ def camera_guide(project: str, beat: str, section: Optional[str] = None) -> dict
 
 
 @mcp.tool()
+def diorama_layout(project: str, section: Optional[str] = None, full: bool = False) -> dict:
+    """Miniature worlds (scene type `diorama`): lay the section's world out (CPU, seconds, no GPU) and return what was
+    decided: the places and where they are, which step lives at which place, where the camera dives from, how far it
+    orbits, what the world is made of. Writes diorama/<id>-map.jpg (a flat map with the places numbered: look at it
+    before building) and <id>-plan.json in the project."""
+    from .compile import themes
+    from .diorama import review
+    from .spec import DioramaScene
+    p = _find(project)
+    site = p.load()
+    secs = [s for s in site.sections if isinstance(s, DioramaScene) and (section is None or s.id == section)]
+    if not secs:
+        raise ValueError("no diorama section" + (f" '{section}'" if section else "") + " in this project")
+    sec = secs[0]
+    table = sec.look.table or themes.resolve(site.theme)["colors"]["bg"]
+    info = review.write_review(sec, table, p.root / "diorama", draft=not full)
+    info["map"] = str(p.root / "diorama" / f"{sec.id}-map.jpg")
+    return info
+
+
+@mcp.tool()
 def camera_check(project: str, beat: str, section: Optional[str] = None) -> dict:
     """Measure a built beat with `camera:` keys: how far the camera is from the keyed view (zoom error in %, shift in view
     widths, per frame and rms), how far the people walked, against the floor of a perfect camera. Writes camera.json and a
