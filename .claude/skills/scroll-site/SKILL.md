@@ -56,6 +56,15 @@ one camera across the cut, start on the previous last frame and are graded towar
 - Quote YAML strings that contain `:` or `,` inside `{ … }` flow mappings.
 - No images? Use `image: { generate: "<a photographic prompt>" }`: generated locally (needs ComfyUI running).
 
+## 2b. Pitch the look first (optional, when the owner has no fixed look)
+Before storyboarding, show directions instead of guessing: `directions(project)` writes several complete art directions (concept,
+palette, type, an engine style, an imagery treatment, motion notes) as boards of stills, side by side. Read the returned `sheet`
+(board.png) and judge it: do the six differ in kind, do the stills look like their palette and type? Show the owner the page
+(`studio directions <project> --serve` gives a Pick button) and let them choose; `direction_pick(project, id)` then writes theme,
+`imagery` (how every image and film prompt is phrased) and pace into site.yaml with a backup, never touching copy
+(`direction_undo` reverts). `directions:` in the spec holds the brief and constraints (keep colours or fonts, avoid styles,
+brand colours). The writer is deterministic (curated vocabulary + seed, no model); `seed` and `direction_reroll` give more ideas.
+
 ## 3. Storyboard, then build
 Storyboard before any full render: a film costs an hour or more, a storyboard seconds to minutes, and its frames are
 the real first frames (same stages and caches), so approving them is not wasted work.

@@ -11,6 +11,20 @@ Everything so far is version 1. On 2026-10-12 the releases first published as 2.
 ### Added
 - Style `stop-motion`: scrolling fires the shutter. Every 26-42 px is one exposure, poses change on twos, never faster than 12 a second, and nothing moves between exposures. Between sections the set is struck and dressed (cast lifted off, a bare set with tape crosses, the new set and cast placed). Clay letters, felt cards, masking-tape labels, a felt `theme.art`; poke a piece and it hops, an onion-skin switch shows the last exposure. Research in `docs/styles/styles-28-29.md`.
 - Style `paper-cut-out`: Lotte Reiniger and Terry Gilliam. The top sheet swings off its brass brad as you scroll and uncovers the next; words on paper strips, tags and snapshots hang on hinges and sway with scroll speed; feature cards fan from one pin, a folding rule opens, a mobile of tags turns; a jointed black paper arm (two-bone IK) points at what you have reached.
+- Direction boards: `studio directions <project> [--n 6] [--seed] [--brief] [--pick K] [--undo] [--reroll K] [--serve]`, MCP tools
+  `directions`, `direction_reroll`, `direction_pick`, `direction_undo`, and an optional `directions:` block in the spec (brief,
+  count, seed, moods, `keep`, `styles` / `fonts` / `palettes` only and avoid, brand colours, stills per board). One brief in, several
+  complete art directions out (concept line, palette, type pairing, an engine style, an imagery treatment, motion notes, voice),
+  each a board of storyboard stills (hero and key sections, Z-Image Turbo, the same seeds in every direction) set in its own
+  palette and type, side by side on one page (`directions/board.html`, served like the storyboard editor, with a Pick button) plus a
+  PNG contact sheet. The writer is deterministic (no text model exists in the engine): schools of design, palettes, pairings,
+  imagery treatments and photographers' lights in `engine/directions/vocab.py`, chosen for fit and spread, then checked pairwise by
+  a distance over kind, experience, colour, type and imagery; weak pairs are regenerated. A pick writes `theme`, `imagery` and
+  `scroll.speed` into site.yaml as a minimal diff (backup in `directions/backups/`, `--undo`), and never touches copy.
+  Modules: `engine/directions/`. Example: `examples/kiln-and-kettle`.
+- `imagery:` (site-wide): medium, light, lens, mood and palette added to every generated image and film prompt
+  (`engine/imagery.py`), dropping the phrases of the original prompts it replaces (`restyle`). Unset: nothing changes and no cache
+  key moves. The Google Fonts families directions pair now load with their verified axis specs (`engine/directions/typefaces.py`).
 - `beat.restore`: SeedVR2 over one beat's clip at a given height, scaled back to `beat_res` (stage `restore_<beat>`), so a soft camera beat can be restored next to sharp frozen moments without restoring the whole film (`beat_restore`).
 - Camera ease `smoother` (freeze and camera beats): smootherstep, speed and acceleration both zero at every stop, so the camera settles into a hold instead of landing with a jolt (`studio inspect` read the jolt as judder).
 - Deep zoom for frozen moments: `freeze.detail` builds a pyramid of tiles (`engine/zoom.py`, `zoom_build.py`, `zoom_render.py`)

@@ -531,3 +531,18 @@ def undo(project: Project) -> dict:
         (history_dir(project) / last["file"]).unlink(missing_ok=True)
         (history_dir(project) / "last.json").unlink(missing_ok=True)
         return {"rev": rev_of(old), "label": last.get("label", "")}
+
+
+def save_text(project: Project, new: str, label: str = "") -> dict:
+    """Write a whole new site.yaml text that a caller composed itself (validated first, the old text kept in history like
+    any save; `studio directions --pick` lays its theme out as a readable block this way)."""
+    with lock(project):
+        text = read_text(project)
+        validate(new)
+        if new == text:
+            return {"changed": False, "rev": rev_of(text), "history": None}
+        hist = _remember(project, text, new, label)
+        _write(project, new)
+        WRITTEN.append(rev_of(new))
+        del WRITTEN[:-50]
+        return {"changed": True, "rev": rev_of(new), "history": hist}

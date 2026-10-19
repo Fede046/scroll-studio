@@ -29,7 +29,7 @@ TEXT_KEYS = {"title", "body", "kicker", "badge", "label", "text", "who", "note",
              "cue", "left", "right", "tag", "center", "status", "app", "button", "y_label", "source", "description"}
 LIST_KEYS = {"tags", "words"}
 SKIP_UNDER = {"prompt", "generate", "keyframes", "ltx", "take", "data", "state", "hud", "theme", "image", "video",
-              "backdrop", "credit", "callouts"}
+              "backdrop", "credit", "callouts", "imagery", "directions"}
 
 
 def _yaml():

@@ -88,8 +88,18 @@ def image_key(ref: ImageRef) -> dict:
 def generated_path(project: Project, ref: ImageInput) -> Path:
     """Where a `generate:` image is cached: .build/_generated/<digest of prompt, size and seed>.png."""
     w, h = (int(v) // 16 * 16 for v in ref.size)
-    digest = hashlib.sha1(json.dumps([ref.generate, w, h, ref.seed]).encode()).hexdigest()[:12]
-    return project.build / "_generated" / f"{digest}.png"
+    return project.build / "_generated" / f"{generated_digest(treated_prompt(project, ref), w, h, ref.seed)}.png"
+
+
+def treated_prompt(project: Project, ref: ImageInput) -> str:
+    """The prompt as sent to the image model: the spec's prompt with the site's `imagery:` treatment (engine/imagery.py),
+    unchanged when the site sets none (so its cache keys and files stay as they were)."""
+    from . import imagery
+    return imagery.treat(project, ref.generate)
+
+
+def generated_digest(prompt: str, w: int, h: int, seed: int) -> str:
+    return hashlib.sha1(json.dumps([prompt, w, h, seed]).encode()).hexdigest()[:12]
 
 
 def edit_path(project: Project, ref: ImageInput, srcs: list[Path]) -> Path:
@@ -140,22 +150,29 @@ def resolve_image(project: Project, ref: ImageRef, log=print, alpha: bool = Fals
     if not ref.generate:
         raise BuildError("an image input needs `file`, `generate`, `gradient` or `product`")
     w, h = (int(v) // 16 * 16 for v in ref.size)
-    out = generated_path(project, ref)
+    return generate_image(project, treated_prompt(project, ref), w, h, ref.seed, log)
+
+
+def generate_image(project: Project, prompt: str, w: int, h: int, seed: int, log=print, free: bool = True) -> Path:
+    """A Z-Image Turbo still for exactly this prompt, cached by prompt, size and seed in .build/_generated. The prompt is
+    sent as given (an `imagery:` treatment is already in it); `studio directions` renders its boards through here too."""
+    out = project.build / "_generated" / f"{generated_digest(prompt, w, h, seed)}.png"
     digest = out.stem
     if out.exists():
         return out
     from .fidelity import placeholder, preview, would_render
-    would_render("image", ref.generate)
+    would_render("image", prompt)
     pv = preview()
     if pv is not None and not pv.comfy:   # a sketch storyboard: a card for the shot to come, outside the cache
-        return placeholder(project.build / "_storyboard" / "placeholders", ref.generate, (w, h))
+        return placeholder(project.build / "_storyboard" / "placeholders", prompt, (w, h))
     from .backends import comfy
     if not comfy.alive():
         raise BuildError("this image is generated locally, but ComfyUI is not running at "
                          f"{comfy.COMFY}. Start it (docs/INSTALL.md) or replace `generate:` with a `file:`.")
-    log(f"  generating image ({w}x{h}, seed {ref.seed}): {ref.generate[:80]}…")
-    comfy.free()
-    images = comfy.run(comfy.build_txt2img_graph(ref.generate, w, h, ref.seed, prefix=f"studio/{digest}"), poll=2)
+    log(f"  generating image ({w}x{h}, seed {seed}): {prompt[:80]}…")
+    if free:         # a batch of stills (storyboard boards) frees the other models once, then keeps Z-Image loaded
+        comfy.free()
+    images = comfy.run(comfy.build_txt2img_graph(prompt, w, h, seed, prefix=f"studio/{digest}"), poll=2)
     tmp = comfy.fetch(images, str(out.parent / f"_{digest}"))
     out.parent.mkdir(parents=True, exist_ok=True)
     shutil.move(str(Path(tmp) / "0001.png"), out)

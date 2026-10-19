@@ -313,6 +313,9 @@ def job(jid: str):
 from ..storyboard.edit.api import make_router as _sb_router   # noqa: E402  /sb/<project> and /api/sb/<project>/...
 app.include_router(_sb_router(find, jobs))
 
+from ..directions.api import make_router as _dir_router   # noqa: E402  /dir/<project> and /api/dir/<project>/... (direction boards)
+app.include_router(_dir_router(find))
+
 
 # ---------------------------------------------------------------- UI
 

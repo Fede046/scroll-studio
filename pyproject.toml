@@ -62,4 +62,4 @@ build-backend = "setuptools.build_meta"
 include = ["engine*"]
 
 [tool.setuptools.package-data]
-engine = ["compile/templates/*", "compile/static/**/*", "storyboard/edit/*.html", "backends/blender_scripts/**/*.py", "models.yaml", "themes.yaml"]
+engine = ["compile/templates/*", "compile/static/**/*", "storyboard/edit/*.html", "directions/*.j2", "backends/blender_scripts/**/*.py", "models.yaml", "themes.yaml"]

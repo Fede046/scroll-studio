@@ -505,6 +505,86 @@ def product_still(project: str, view: str = "three-quarter", width: int = 1600, 
     return {"image": str(path)}
 
 
+def _directions_summary(state: dict) -> dict:
+    return {"page": state["files"]["html"], "sheet": state["files"]["png"], "seed": state["seed"],
+            "diversity": state["diversity"], "warnings": state.get("warnings", []), "picked": state.get("picked"),
+            "directions": [{"id": d["id"], "name": d["name"], "stance": d["stance"], "kind": d["kind"], "concept": d["concept"],
+                            "style": d["style"], "palette": d["palette"], "fonts": {k: d["fonts"][k] for k in ("display", "body", "mono")},
+                            "imagery": d["imagery"], "motion": d["motion"], "voice": d["voice"], "stills": [s["image"] for s in d["stills"]]}
+                           for d in state["directions"]]}
+
+
+@mcp.tool()
+def directions(project: str, count: Optional[int] = None, seed: Optional[int] = None, brief: Optional[str] = None,
+               images: bool = True, show_only: bool = False, timeout_s: int = 1800) -> dict:
+    """Art directions for a site, pitched like a studio (`studio directions`): several complete directions (a concept line, palette,
+    type pairing, one of the engine's styles, an imagery treatment that phrases every generated image and film prompt, motion
+    notes), each drawn as a board of storyboard stills (the hero and key sections in Z-Image Turbo), side by side on one page.
+    Returns `sheet` (board.png, one image: Read it and judge: do the directions differ in kind, do the stills look like the
+    palette and type, would a client pick between them?), `page` (board.html), and every direction with its stills.
+    The writer is deterministic (curated design vocabularies combined by seed; no model): the same brief and seed give the
+    same directions, another `seed` gives another set. The site's `directions:` block (brief, moods, keep, styles/fonts/
+    palettes only/avoid/brand colours, count, seed, stills) steers it; `brief` and `count` here override it. images=False
+    draws placeholder cards (no ComfyUI). show_only=True returns the saved boards without writing new ones. Then call
+    direction_pick. Runs as a job; waits up to timeout_s, else returns the job to poll with job_status."""
+    from .directions import run as dr
+    p = _find(project)
+    if show_only:
+        st = dr.load(p)
+        if not st:
+            raise ValueError(f"no boards yet for '{project}': call directions without show_only")
+        return _directions_summary(st)
+
+    def run(job):
+        log, progress = logger(job)
+        return _directions_summary(dr.make(p, count, seed, brief, images=images, log=log, progress=progress))
+    job = jobs.submit("directions", p.name, "direction boards", run)
+    t0 = time.time()
+    while time.time() - t0 < timeout_s and job.status not in ("done", "failed"):
+        time.sleep(1.0)
+    return job.result if job.status == "done" else job.public(tail=20)
+
+
+@mcp.tool()
+def direction_reroll(project: str, id: str, images: bool = True, timeout_s: int = 900) -> dict:
+    """Another idea in place of one direction on the boards (by its letter), keeping the others: the best other school that
+    fits the brief and differs from the rest. Returns the new boards as `directions` does."""
+    from .directions import run as dr
+    p = _find(project)
+
+    def run(job):
+        log, _progress = logger(job)
+        return _directions_summary(dr.reroll(p, id, images=images, log=log))
+    job = jobs.submit("directions", p.name, f"reroll {id}", run)
+    t0 = time.time()
+    while time.time() - t0 < timeout_s and job.status not in ("done", "failed"):
+        time.sleep(1.0)
+    return job.result if job.status == "done" else job.public(tail=20)
+
+
+@mcp.tool()
+def direction_pick(project: str, id: str) -> dict:
+    """Write one direction (its letter, or its name) into site.yaml: theme (style, colours, fonts, weights), `imagery` (how every
+    image and film prompt is phrased) and scroll pace, as the smallest readable diff, keeping the old file in
+    directions/backups/. Copy is never touched. Returns the changed paths and the diff. Next: `storyboard` redraws the images in
+    that direction's imagery. Ask the owner before picking unless they chose."""
+    from .directions import run as dr
+    p = _find(project)
+    with contextlib.redirect_stdout(sys.stderr):
+        res = dr.pick(p, id, lambda m: None)
+    return {"direction": res["direction"]["name"], "changed": res["changed"], "backup": res["backup"], "diff": res["diff"],
+            "note": res.get("note")}
+
+
+@mcp.tool()
+def direction_undo(project: str) -> dict:
+    """Put site.yaml back as it was before the last direction_pick (only if nothing has changed it since)."""
+    from .directions import run as dr
+    p = _find(project)
+    with contextlib.redirect_stdout(sys.stderr):
+        return dr.undo(p, lambda m: None)
+
+
 @mcp.tool()
 def doctor() -> list[dict]:
     """Which tools are installed (Blender, FFmpeg, GPU, ComfyUI...) and which scene types need them."""

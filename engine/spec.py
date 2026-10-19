@@ -1476,6 +1476,59 @@ class Trailer(Model):
     embed_label: str = Field("Watch the launch film", description="Label of the embed button")
 
 
+# ---------------------------------------------------------------- imagery + directions (engine/imagery.py, engine/directions/)
+
+class Imagery(Model):
+    """How every image and film this site generates is phrased, so the whole page looks like one shoot. Each part is
+    added to every prompt the engine sends to the image and video models (a `generate:` image, a beat's frame and clip,
+    a take's keyframes and segments); the prompt itself stays about the subject. Unset, nothing is added. A direction
+    from `studio directions` writes this block when you pick it."""
+    medium: str = Field(..., description="What the picture is made of, said first: '35mm film photograph, Kodak Portra "
+                                         "400, fine grain', 'gouache illustration on textured paper, flat shapes'")
+    light: Optional[str] = Field(None, description="The light: 'low golden-hour sun, long soft shadows', 'single window "
+                                                   "light from the left, Vermeer'")
+    lens: Optional[str] = Field(None, description="Lens and framing: '35mm, eye level, shallow depth of field'")
+    mood: Optional[str] = Field(None, description="The feeling in a few words: 'unhurried, sun-warmed, quiet'")
+    palette: Optional[str] = Field(None, description="Colour in words: 'muted terracotta, bone and sage'")
+    restyle: bool = Field(True, description="Drop the medium, lens and light phrases already in a prompt ('photorealistic', "
+                                            "'shot on 35mm', 'golden hour') for the parts set here, so the prompt does not "
+                                            "contradict the shoot. Off: the parts are only added")
+
+
+class Pool(Model):
+    """What a direction may draw on: only these (empty: everything), never these."""
+    only: list[str] = Field(default_factory=list, description="Consider only these (empty: all)")
+    avoid: list[str] = Field(default_factory=list, description="Never use these")
+
+
+class PalettePool(Pool):
+    """only/avoid take palette names (`studio directions --list palettes`) or colour words (avoid: [red, green])."""
+    brand: list[str] = Field(default_factory=list, description="Hex colours every direction must carry as its accent: "
+                                                               "the palettes keep their grounds and take these")
+
+
+class Directions(Model):
+    """Art directions for this site (`studio directions <project>`): the studio's pitch. One brief in, several complete
+    directions out (concept, palette, type, style, imagery, motion), each a board of storyboard stills side by side; pick
+    one and it is written into this file. The writer is deterministic (curated design vocabularies combined by seed), so
+    the same brief and seed give the same boards. Copy is never changed."""
+    brief: Optional[str] = Field(None, description="What to pitch, in your words: 'calmer, more editorial; for people who "
+                                                   "travel slowly'. Mood words in it steer the directions")
+    count: int = Field(6, ge=2, le=12, description="How many directions")
+    seed: int = Field(1, description="Another seed, another set of directions")
+    moods: list[str] = Field(default_factory=list, description="Mood words to lean toward (calm, warm, bold, playful, "
+                                                               "technical, raw, nostalgic, futuristic, handmade, luxurious...)")
+    keep: list[Literal["style", "colors", "fonts", "imagery"]] = Field(
+        default_factory=list, description="Parts of the site's current look every direction must keep, varying the rest. "
+                                          "The name and copy are always kept")
+    styles: Pool = Field(default_factory=Pool, description="Which styles (engine/styles/) to consider or avoid; "
+                                                             "'none' is the default editorial layout")
+    fonts: Pool = Field(default_factory=Pool, description="Google Fonts families to consider or avoid")
+    palettes: PalettePool = Field(default_factory=PalettePool, description="Palettes to consider or avoid, and brand "
+                                                                           "colours to carry")
+    stills: int = Field(4, ge=1, le=6, description="Storyboard stills per board: the hero, then key sections")
+
+
 class Site(Model):
     name: str
     description: str = ""
@@ -1498,6 +1551,11 @@ class Site(Model):
     video_model: Optional[VideoModel] = Field(None, description="Default video model for film beats, takes and "
                                               "theme.art: ltx (LTX-2.3) or wan (Wan 2.2). Unset = studio.toml's, then ltx")
     wan: Wan = Field(default_factory=Wan, description="Wan 2.2 settings used wherever video_model is wan")
+    imagery: Optional[Imagery] = Field(None, description="How every generated image and film is phrased (medium, light, "
+                                                         "lens, mood, palette), so the page looks like one shoot; "
+                                                         "written by picking a direction (`studio directions`)")
+    directions: Optional[Directions] = Field(None, description="Brief and constraints for `studio directions`: several "
+                                                               "complete art directions as side-by-side boards")
 
 
 def is_scene(section) -> bool:
