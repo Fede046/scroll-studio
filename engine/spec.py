@@ -1123,7 +1123,7 @@ class InsideScene(SceneBase):
     outro: Literal["wide", "stay"] = Field("wide", description="wide: pull back to the whole product after the last stop "
                                                                "(room for a closing step); stay: end at the last stop")
     lens: float = Field(60.0, gt=4, description="Focal length in mm at the stops (the opening shot uses a wider lens)")
-    fstop: float = Field(2.8, gt=0.5, description="Aperture at the stops: low numbers give the shallow macro focus")
+    fstop: float = Field(11.0, gt=0.5, description="Aperture at the stops, for the real product: this is macro, where f/2.8 leaves only a sliver in focus and f/11 keeps a part sharp with the rest falling softly away; f/16 keeps most in focus")
     explode: float = Field(0.0, ge=0, le=1.5, description="Spread of the parts at every stop unless it sets its own")
     cutaway: bool = Field(True, description="Parts between the camera and the stop's part dissolve while the camera is "
                                             "behind them, so it can see (and fly) inside a closed product")
@@ -1131,6 +1131,9 @@ class InsideScene(SceneBase):
                                                    "lower renders faster and steps more")
     size: tuple[int, int] = Field((1600, 900), description="Frame size (a second set at 960 px wide is made for phones)")
     samples: int = Field(64, ge=4, le=4096, description="Cycles samples per frame (denoised)")
+    offset: float = Field(0.14, ge=0, le=0.4, description="How far the stop's part sits off the centre of the frame, as a "
+                                                          "share of its width, towards `side` (the copy has the other "
+                                                          "side). 0 centres it")
     hdri: str = Field("studio", description="Blender studio light the interior reflects: studio, city, courtyard, forest, "
                                             "interior, night, sunrise, sunset")
     ambient: float = Field(0.25, ge=0, le=4, description="Strength of that light on the scene (low: the camera's own lamp "

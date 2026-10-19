@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
 from pathlib import Path
 from typing import Optional
@@ -61,12 +62,13 @@ def route(sec: InsideScene, project: Project, log=print):
 
 def look(sec: InsideScene, theme: dict) -> dict:
     return {"hdri": sec.hdri, "ambient": sec.ambient, "lamp": sec.lamp, "lamp_color": sec.lamp_color, "rim": sec.rim,
-            "exposure": sec.exposure, "background": sec.background or theme["colors"]["bg"], "cutaway": sec.cutaway}
+            "exposure": sec.exposure, "background": sec.background or theme["colors"]["bg"], "cutaway": sec.cutaway,
+            "offset": sec.offset * (1 if sec.side == "right" else -1)}
 
 
 def job_stops(res) -> list[dict]:
     return [{"match": [s.spec.part] if s.spec.part else [], "focus": [s.spec.focus] if s.spec.focus else
-             ([s.spec.part] if s.spec.part else []), "extent": float(max(s.hi - s.lo)) if s.parts else 0.02}
+             ([s.spec.part] if s.spec.part else []), "box": [[float(v) for v in s.lo], [float(v) for v in s.hi]] if s.parts else None}
             for s in res.stops]
 
 
@@ -90,7 +92,8 @@ def render_frames(project: Project, sec: InsideScene, glb: Path, res, plan, hash
     would_render("inside", f"{sec.id}: {len(todo)} frames")
     frames_dir.mkdir(parents=True, exist_ok=True)
     job = {"glb": str(glb), "size": list(size), "samples": samples, **lk, "stops": job_stops(res), "frames": plan.frames,
-           "render": [{"k": k, "out": str(frames_dir / f"{hashes[k]}.tmp.png")} for k in todo]}
+           "render": [{"k": k, "out": str(frames_dir / f"{hashes[k]}.tmp.png")} for k in todo],
+           "debug": int(os.environ["SS_INSIDE_DEBUG"]) if os.environ.get("SS_INSIDE_DEBUG") else None}
     jf = frames_dir / "job.json"
     jf.write_text(json.dumps(job), encoding="utf-8")
     cmd = [settings()["blender"], "-b", "--factory-startup", "--python-exit-code", "1", "-P", str(SCRIPT), "--", "--job", str(jf)]
@@ -105,7 +108,7 @@ def render_frames(project: Project, sec: InsideScene, glb: Path, res, plan, hash
         if line.startswith("FRAME "):
             n = int(line.split()[1].split("/")[0])
             progress(0.9 * n / len(todo), f"rendering frame {n}/{len(todo)}")
-        elif line.startswith(("STOP ", "DISSOLVE ")):
+        elif line.startswith(("STOP ", "DISSOLVE", "RAY ")):
             log("  " + line.strip())
     if p.wait() != 0:
         raise BuildError("Blender render failed:\n" + "".join(tail))

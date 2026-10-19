@@ -1,10 +1,14 @@
-/** sequence: pre-rendered frames drawn to a canvas (Apple-style product scrolls).
+/** sequence and inside: pre-rendered frames drawn to a canvas (Apple-style product scrolls, flights inside a product).
  *
  * Every frame is downloaded and decoded to an ImageBitmap before the page unlocks, so drawing never stalls.
  * Between two rendered frames the canvas cross-fades by the fractional scroll position, which turns a
- * 96-frame render into continuous motion instead of visible steps. */
+ * 96-frame render into continuous motion instead of visible steps.
+ *
+ * With reduced motion, a scene that has stops (`inside`) shows one still per stop instead of the flight: the opening
+ * frame, each stop's resting frame (switched when its copy arrives), and the closing frame, with no cross-fade, so
+ * only those frames are downloaded. */
 import type { PlayerFactory } from "../lib/types";
-import { follow, isMobile, loadBitmap } from "../lib/util";
+import { follow, isMobile, loadBitmap, reducedMotion } from "../lib/util";
 
 type Frame = ImageBitmap | HTMLImageElement;
 
@@ -19,9 +23,16 @@ const factory: PlayerFactory = async (cfg, ctx) => {
   const url = (i: number) => `${set.base}${String(i + 1).padStart(4, "0")}.${set.ext}`;
   const frames: (Frame | null)[] = new Array(count).fill(null);
 
+  // Reduced motion: one still per stop (the stop's copy window starts at `at[0]`), the opening and the closing frame.
+  const stops: { frame: number; at: [number, number] }[] = Array.isArray(cfg.stops) ? cfg.stops : [];
+  const stills = reducedMotion && stops.length > 0
+    ? [{ frame: 0, from: 0 }, ...stops.map((st) => ({ frame: st.frame, from: st.at[0] })), { frame: count - 1, from: Math.max(...stops.map((st) => st.at[1])) }]
+    : null;
+
   // Load everything, 8 at a time, in an order that fills the timeline evenly (every 16th, then 8th, ...).
   const order: number[] = [];
-  for (let step = 16; step >= 1; step /= 2) for (let i = 0; i < count; i += step) if (!order.includes(i)) order.push(i);
+  if (stills) { for (const st of stills) if (!order.includes(st.frame)) order.push(st.frame); }
+  else for (let step = 16; step >= 1; step /= 2) for (let i = 0; i < count; i += step) if (!order.includes(i)) order.push(i);
   let done = 0;
   await new Promise<void>((resolve) => {
     let next = 0, active = 0;
@@ -31,8 +42,8 @@ const factory: PlayerFactory = async (cfg, ctx) => {
         active++;
         loadBitmap(url(i)).then((b) => { frames[i] = b; }).catch(() => {}).finally(() => {
           active--; done++;
-          ctx.progress(done / count);
-          if (done === count) resolve(); else pump();
+          ctx.progress(done / order.length);
+          if (done === order.length) resolve(); else pump();
         });
       }
     };
@@ -62,6 +73,16 @@ const factory: PlayerFactory = async (cfg, ctx) => {
   return {
     resize,
     update(s) {
+      if (stills) {
+        let pick = stills[0];
+        for (const st of stills) if (s.p >= st.from) pick = st;
+        const f = frames[pick.frame];
+        if (!f || pick.frame === last) return;
+        last = pick.frame;
+        g.clearRect(0, 0, canvas.width, canvas.height);
+        draw(f, 1);
+        return;
+      }
       cur += (s.p * (count - 1) - cur) * follow;
       if (Math.abs(cur - last) < 0.002) return;
       last = cur;

@@ -61,7 +61,8 @@ class Part:
     def names(self) -> list[str]:
         """What a glob can match: the part, its mesh, every assembly above it and the whole path (lower case)."""
         segs = [s for s in self.path.split("/") if s]
-        return [n.lower() for n in [self.name, self.mesh, *segs, self.path] if n]
+        tails = ["/".join(segs[i:]) for i in range(len(segs))]      # 'Driver/Cone' as well as 'Speaker/Driver/Cone'
+        return [n.lower() for n in [self.name, self.mesh, *segs, *tails] if n]
 
     def box(self, explode: float = 0.0) -> tuple[np.ndarray, np.ndarray]:
         c = self.centre + self.explode * explode
@@ -87,7 +88,10 @@ def matches(part: Part, pattern: str) -> bool:
 
 
 def find(parts: list[Part], pattern: str, what: str = "stop") -> list[Part]:
-    hit = [p for p in parts if matches(p, pattern)]
+    """The parts a glob names. A match on part names wins; only when none matches is the mesh, assembly or path
+    searched (so `Housing/*` finds every part inside an assembly, and a part's own name never drags in a neighbour)."""
+    pat = pattern.lower()
+    hit = [p for p in parts if fnmatch.fnmatchcase(p.name.lower(), pat)] or [p for p in parts if matches(p, pattern)]
     if hit:
         return hit
     names = sorted({p.name for p in parts})
@@ -275,7 +279,7 @@ def resolve(sec: InsideScene, info: dict, stops: Optional[list[InsideStop]] = No
             slo = shi = aim
             label = st.label or f"point {i + 1}"
         focus_parts = find(parts, st.focus, what + " focus") if st.focus else hit
-        if focus_parts:
+        if st.focus and focus_parts:
             flo, fhi = bounds(focus_parts, explode)
             focus = (flo + fhi) / 2
         else:
@@ -320,7 +324,7 @@ def _choose_side(parts: list[Part], target: list[Part], aim: np.ndarray, dist: f
                 plo, phi = p.box()
                 if _segment_hits_box(aim + direction(yw, pt) * dist * 0.05, cam, plo, phi):
                     block += min(1.0, (p.extent / max(dist, 1e-6)) * 0.5 + 0.05) * (1.0 if p.extent > 0.1 * diag else 0.4)
-            turn = (_wrap(yw - prev_yaw) / 180.0) ** 2
+            turn = ((abs(_wrap(yw - prev_yaw)) - 28.0) / 120.0) ** 2
             height = ((pt - 28.0) / 40.0) ** 2
             cost = 1.0 * min(block, 3.0) + 1.6 * turn + 0.5 * height
             if cost < best_cost:
@@ -386,11 +390,21 @@ class Plan:
 def wide_pose(res: Resolution, aspect: float) -> Pose:
     lo, hi = res.lo, res.hi
     centre = (lo + hi) / 2
-    radius = float(np.linalg.norm(hi - lo)) / 2
+    size = hi - lo
+    flat = size[2] < 0.15 * float(np.linalg.norm(size))
+    yaw, pitch = (-30.0, 38.0) if flat else WIDE_VIEW
     fh, fv = _fov(WIDE_LENS, aspect)
-    d = radius / math.sin(min(fh, fv) / 2) * 1.04
-    target = centre + np.array([0, 0, -0.08 * (hi[2] - lo[2])])
-    return Pose(target + direction(*WIDE_VIEW) * d, target, centre, WIDE_LENS, 5.6, 0.0, 0.0)
+    fwd = -direction(yaw, pitch)
+    right = _unit(np.cross(fwd, [0, 0, 1.0]))
+    up = np.cross(right, fwd)
+    corners = np.array([[x, y, z] for x in (lo[0], hi[0]) for y in (lo[1], hi[1]) for z in (lo[2], hi[2])]) - centre
+    er = float(np.max(np.abs(corners @ right)))
+    eu = float(np.max(np.abs(corners @ up)))
+    ed = float(np.max(np.abs(corners @ fwd)))
+    fill = 0.7                    # the product fills this much of the frame: room for the copy beside it
+    d = max(er / (math.tan(fh / 2) * fill), eu / (math.tan(fv / 2) * fill)) + ed
+    target = centre
+    return Pose(target + direction(yaw, pitch) * d, target, centre, WIDE_LENS, 5.6, 0.0, 0.0)
 
 
 def stop_pose(r: Resolved) -> Pose:

@@ -77,13 +77,15 @@ def names_of(o):
         out.append(p.name)
         path.insert(0, p.name)
         p = p.parent
-    out.append("/".join(path))
+    out += ["/".join(path[i:]) for i in range(len(path))]          # 'Driver/Cone' as well as 'Speaker/Driver/Cone'
     return [n.lower() for n in out]
 
 
 def select(patterns):
+    """Objects a glob names: by object name first (as the planner does), else by mesh, assembly or path."""
     pats = [p.lower() for p in patterns]
-    return {o.name for o in meshes if any(fnmatch.fnmatchcase(n, p) for n in names_of(o) for p in pats)}
+    hit = {o.name for o in meshes if any(fnmatch.fnmatchcase(o.name.lower(), p) for p in pats)}
+    return hit or {o.name for o in meshes if any(fnmatch.fnmatchcase(n, p) for n in names_of(o) for p in pats)}
 
 
 STOP_OBJ = []
@@ -120,10 +122,13 @@ if J.get("cutaway", True) and len(FR) > 0:
         up = right.cross(fwd).normalized()
         st = STOP_OBJ[fr["stop"]] if fr["stop"] >= 0 else None
         exempt = (st["match"] | st["focus"]) if st else set()
-        ext = (STOPS[fr["stop"]].get("extent", 0.05) * S * 0.5) if st else 0.2
-        slack = max(ext * 0.9, 0.01 * d)
-        r = max(ext * 0.8, 0.1 * d)
-        goals = [tgt, tgt + right * r, tgt - right * r, tgt + up * r * 0.7, tgt - up * r * 0.7]
+        box = STOPS[fr["stop"]].get("box") if st else None
+        if box:
+            pad = 0.05 * max(bhi_ - blo_ for blo_, bhi_ in zip(box[0], box[1])) * S + 0.0004
+            blo, bhi = vec(box[0]) - Vector((pad,) * 3), vec(box[1]) + Vector((pad,) * 3)
+        inside_box = lambda p: bool(box) and all(blo[i] <= p[i] <= bhi[i] for i in range(3))
+        r = 0.09 * d
+        goals = [tgt, tgt + up * r]
         hits = set()
         for g in goals:
             ray = (g - cam)
@@ -137,16 +142,42 @@ if J.get("cutaway", True) and len(FR) > 0:
                 step = (loc - origin).length
                 travelled += step
                 nm = obj.original.name if hasattr(obj, "original") else obj.name
-                if nm not in exempt and travelled < L - slack:
+                if J.get("debug") == fr["k"]:
+                    print(f"RAY k={fr['k']} goal={tuple(round(x, 3) for x in g)} hit {nm} at {step:.4f}/{L:.4f} exempt={nm in exempt} box={inside_box(loc)}", flush=True)
+                if nm not in exempt and travelled < L - 0.0008 * d:
                     hits.add(nm)
                 origin = loc + ray * 1e-4 * max(1.0, d)
                 travelled += 1e-4 * max(1.0, d)
+        # what fills the frame in front of the stop (not the floor it stands on): big near pieces are in the way too
+        if st:
+            th = 18.0 / max(fr["lens"], 1.0)
+            tv = th * H / W
+            floor_z = (vec(box[0])[2] + 0.25 * (vec(box[1])[2] - vec(box[0])[2])) if box else -1e9
+            count, near = {}, {}
+            for gx in (-0.8, -0.55, -0.25, 0.0, 0.25, 0.55, 0.8):
+                for gy in (-0.65, -0.2, 0.2, 0.65):
+                    ray = (fwd + right * (gx * th) + up * (gy * tv)).normalized()
+                    ok, loc, nor, idx, obj, mat = scene.ray_cast(deps, cam, ray, distance=d * 3)
+                    if not ok:
+                        continue
+                    nm = obj.original.name if hasattr(obj, "original") else obj.name
+                    dist = (loc - cam).dot(fwd)        # depth in front of the lens: the focal plane is at d
+                    if nm in exempt or dist > 0.995 * d or loc.z <= floor_z:
+                        continue
+                    count[nm] = count.get(nm, 0) + 1
+                    if dist < 0.8 * d:
+                        near[nm] = near.get(nm, 0) + 1
+            for nm, c in count.items():
+                if c >= 3 or near.get(nm, 0) >= 2:
+                    hits.add(nm)
         # a camera standing inside a part: the part around it is in the way too
         ok, loc, nor, idx, obj, mat = scene.ray_cast(deps, cam, fwd, distance=0.02 * d)
         if ok:
             nm = obj.original.name if hasattr(obj, "original") else obj.name
             if nm not in exempt:
                 hits.add(nm)
+        if J.get('debug') == fr['k']:
+            print('RAY dissolved at this frame:', sorted(hits), flush=True)
         occ.append(hits)
     set_explode(0.0)
     names = set().union(*occ) if occ else set()
@@ -165,6 +196,8 @@ if J.get("cutaway", True) and len(FR) > 0:
             sm.append(min(1.0, acc / ksum * 1.15))
         FADE[nm] = sm
     print(f"DISSOLVE {len(names)} parts ever stand in the way", flush=True)
+    for nm in sorted(names):
+        print(f"DISSOLVE   {nm}: in the way on {sum(1 for h in occ if nm in h)} of {len(occ)} frames", flush=True)
 
 # every material mixes in a transparent shader by the object's ss_fade (all ray types, so light passes too)
 for o in meshes:
@@ -288,6 +321,7 @@ scene.collection.objects.link(cam)
 scene.camera = cam
 cam_data.clip_start, cam_data.clip_end = 0.002, 200
 cam_data.dof.use_dof = True
+cam_data.shift_x = -float(J.get('offset', 0.0))     # the subject sits off-centre: the copy has the other side
 cam.rotation_mode = "QUATERNION"
 
 
@@ -312,8 +346,8 @@ def place(fr, k):
     d = max((fp - c).length, 0.01)
     k2 = (d / 3.2) ** 2          # the lamps keep the exposure of a subject at any distance
     aim_light(lamp, c + right * 0.34 * d + up * 0.3 * d - fwd * 0.05 * d, fp)
-    lamp.data.size = 0.35 * d
-    lamp.data.energy = 330 * k2 * float(J.get("lamp", 1.0))
+    lamp.data.size = 0.55 * d
+    lamp.data.energy = 170 * k2 * float(J.get("lamp", 1.0))
     aim_light(rim, t + fwd * 0.9 * d + up * 0.55 * d - right * 0.35 * d, t)
     rim.data.size = 0.5 * d
     rim.data.energy = 520 * k2 * float(J.get("rim", 1.0))
