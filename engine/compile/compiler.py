@@ -14,7 +14,7 @@ from markupsafe import Markup
 from ..config import STATIC
 from ..inputs import credit as image_credit, resolve_image
 from ..project import BuildContext, BuildError, Project
-from ..spec import Site, is_scene
+from ..spec import ImageInput, Site, is_scene
 from . import fonts, themes
 
 TEMPLATES = Path(__file__).resolve().parent / "templates"
@@ -77,6 +77,21 @@ def favicon(site: Site, theme: dict) -> str:
                 f'font-weight="700" fill="{ink}">{letter}</text>')
     svg = f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="{acc}"/>{body}</svg>'
     return "data:image/svg+xml," + quote(svg)
+
+
+def wire_cinemagraphs(html: str, cines: dict[str, dict]) -> str:
+    """Mark where a cinemagraph's still is shown: every <img> with that poster, and every element that has it as a CSS
+    background (a section backdrop), gets `data-cine` (the video, the mask, where the video sits on the still); the runtime
+    (runtime/src/lib/cinemagraph.ts) lays the video over it. Nothing else changes: without the script the still is the page.
+    Works on the finished markup, so every style's own templates take part."""
+    import html as htmllib
+
+    for poster, entry in cines.items():
+        attr = ' data-cine="%s"' % htmllib.escape(json.dumps(entry, separators=(",", ":")), quote=True)
+        q = re.escape(poster)
+        html = re.sub(r'(<img\b[^>]*?\bsrc="%s"[^>]*?)(\s*/?>)' % q, lambda m: m.group(1) + attr + m.group(2), html)
+        html = re.sub(r'(<(?!img\b)[a-z][a-z0-9-]*\b[^>]*?url\(%s\)[^>]*?)(>)' % q, lambda m: m.group(1) + attr + m.group(2), html)
+    return html
 
 
 def runtime_ready() -> bool:
@@ -193,13 +208,30 @@ def build_site(project: Project, log: Callable[[str], None] = print,
         media.mkdir(parents=True, exist_ok=True)
         shutil.copy(src, media / src.name)
         return f"assets/_media/{src.name}"
-    for e in sections:
-        if e["s"].type == "gallery":
-            e["s"] = e["s"].model_copy(update={"items": [it.model_copy(update={"image": publish(it.image), "video": publish(it.video)})
-                                                         for it in e["s"].items]})
-
     # Images inside blocks (hero, product, strip) can be files, URLs or generated; each is resized once to the
     # width it is shown at and written as WebP.
+    cines: dict[str, dict] = {}     # poster url -> what the page needs to play its cinemagraph (data-cine)
+
+    def cinemagraph_of(ref, poster: str) -> None:
+        """An image input with `cinemagraph:` plays: its video and mask are built (cached) and copied in beside the poster.
+        A storyboard (a preview level) uses only what is already built."""
+        from .. import cinemagraph as cine
+        from ..fidelity import is_planning
+        if not isinstance(ref, ImageInput) or ref.cinemagraph is None or is_planning():
+            return
+        built = cine.build(project, ref, log, force=force, options=options, site_video_model=site.video_model,
+                           site_wan=site.wan.model_dump(mode="json"), only_cached=preview() is not None)
+        if built is None:
+            log("  note: a cinemagraph is not built yet; the still is shown (build it with `studio cinemagraph` or a full build)")
+            return
+        media.mkdir(parents=True, exist_ok=True)
+
+        def url(p: Path) -> str:
+            shutil.copy(p, media / p.name)
+            return f"assets/_media/{p.name}"
+        cines[poster] = cine.page_entry(built, url)
+        log(f"  cinemagraph: {cine.summary(built['data'])}")
+
     def block_image(ref, width: int, knockout: bool = False) -> Optional[str]:
         if ref is None:
             return None
@@ -223,7 +255,15 @@ def build_site(project: Project, log: Callable[[str], None] = print,
             im.save(out, "WEBP", quality=86, method=6)
         if image_credit(ref):
             credits.append(image_credit(ref))
-        return f"assets/_media/{out.name}"
+        poster = f"assets/_media/{out.name}"
+        cinemagraph_of(ref, poster)
+        return poster
+    for e in sections:
+        if e["s"].type == "gallery":
+            def tile(img):
+                return block_image(img, 900) if isinstance(img, ImageInput) else publish(img)
+            e["s"] = e["s"].model_copy(update={"items": [it.model_copy(update={"image": tile(it.image), "video": publish(it.video)})
+                                                         for it in e["s"].items]})
     for i, e in enumerate(sections):
         s = e["s"]
         e["first"] = i == 0   # only the opening section gets the page's h1
@@ -329,6 +369,8 @@ def build_site(project: Project, log: Callable[[str], None] = print,
         style_scenes=bool(sdir and (sdir / "scenes.html.j2").exists()),
         runtime=runtime_href or "runtime/", looks=looks, icon=favicon(site, theme), trailer=trailer,
     )
+    if cines:
+        html = wire_cinemagraphs(html, cines)
     if badge:   # the storyboard marks its pages: never mistaken for the finished site
         mark = (f'<div class="ss-storyboard-badge" style="position:fixed;left:14px;bottom:14px;z-index:2147483000;'
                 f'font:600 12px/1 system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#111;'
