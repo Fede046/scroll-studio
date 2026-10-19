@@ -17,6 +17,7 @@ MODULES = {
     "splat": "splat",
     "code": "code",
     "showroom": "showroom",
+    "inside": "inside",
 }
 
 
