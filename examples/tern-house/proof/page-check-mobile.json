@@ -1,0 +1,177 @@
+{
+ "viewport": [
+  390,
+  844
+ ],
+ "mobile": true,
+ "items": [
+  {
+   "index": 0,
+   "playing": true,
+   "box": {
+    "x": 0,
+    "y": 0,
+    "w": 390,
+    "h": 844
+   },
+   "mask_zero_share": 0.55,
+   "held": {
+    "max_change_outside_mask": 1,
+    "share_of_pixels_changed": 0.00295,
+    "max_change_beyond_3px_of_the_mask": 1
+   },
+   "moving": {
+    "temporal_std_under_mask": 5.84
+   },
+   "loop_hitch": {
+    "usual_ms": 49.9,
+    "worst_elsewhere_ms": 66.8,
+    "wraps": 2,
+    "wrap_gap_ms": 50.0,
+    "hitch": false
+   },
+   "sheet": "H:\\ss-wt\\cinemagraph\\projects\\tern-house\\.build\\_cinemagraph\\page-check\\page_0.png"
+  },
+  {
+   "index": 1,
+   "playing": true,
+   "box": {
+    "x": 20,
+    "y": 264,
+    "w": 351,
+    "h": 239
+   },
+   "mask_zero_share": 0.915,
+   "held": {
+    "max_change_outside_mask": 0,
+    "share_of_pixels_changed": 0.0,
+    "max_change_beyond_3px_of_the_mask": 0
+   },
+   "moving": {
+    "temporal_std_under_mask": 9.34
+   },
+   "loop_hitch": {
+    "usual_ms": 49.9,
+    "worst_elsewhere_ms": 66.8,
+    "wraps": 2,
+    "wrap_gap_ms": 66.7,
+    "hitch": false
+   },
+   "sheet": "H:\\ss-wt\\cinemagraph\\projects\\tern-house\\.build\\_cinemagraph\\page-check\\page_1.png"
+  },
+  {
+   "index": 2,
+   "playing": true,
+   "box": {
+    "x": 0,
+    "y": 290,
+    "w": 99,
+    "h": 264
+   },
+   "mask_zero_share": 0.995,
+   "held": {
+    "max_change_outside_mask": 0,
+    "share_of_pixels_changed": 0.0,
+    "max_change_beyond_3px_of_the_mask": 0
+   },
+   "moving": {
+    "temporal_std_under_mask": 0.0
+   },
+   "loop_hitch": {
+    "usual_ms": 66.7,
+    "worst_elsewhere_ms": 133.3,
+    "wraps": 2,
+    "wrap_gap_ms": 66.7,
+    "hitch": false
+   },
+   "sheet": "H:\\ss-wt\\cinemagraph\\projects\\tern-house\\.build\\_cinemagraph\\page-check\\page_2.png"
+  },
+  {
+   "index": 3,
+   "playing": true,
+   "box": {
+    "x": 114,
+    "y": 290,
+    "w": 211,
+    "h": 264
+   },
+   "mask_zero_share": 0.856,
+   "held": {
+    "max_change_outside_mask": 0,
+    "share_of_pixels_changed": 0.0,
+    "max_change_beyond_3px_of_the_mask": 0
+   },
+   "moving": {
+    "temporal_std_under_mask": 1.82
+   },
+   "loop_hitch": {
+    "usual_ms": 33.4,
+    "worst_elsewhere_ms": 283.4,
+    "wraps": 2,
+    "wrap_gap_ms": 116.7,
+    "hitch": false
+   },
+   "sheet": "H:\\ss-wt\\cinemagraph\\projects\\tern-house\\.build\\_cinemagraph\\page-check\\page_3.png"
+  },
+  {
+   "index": 4,
+   "playing": true,
+   "box": {
+    "x": 179,
+    "y": 290,
+    "w": 211,
+    "h": 264
+   },
+   "mask_zero_share": 0.75,
+   "held": {
+    "max_change_outside_mask": 0,
+    "share_of_pixels_changed": 0.0,
+    "max_change_beyond_3px_of_the_mask": 0
+   },
+   "moving": {
+    "temporal_std_under_mask": 18.97
+   },
+   "loop_hitch": {
+    "usual_ms": 66.6,
+    "worst_elsewhere_ms": 116.6,
+    "wraps": 2,
+    "wrap_gap_ms": 66.8,
+    "hitch": false
+   },
+   "sheet": "H:\\ss-wt\\cinemagraph\\projects\\tern-house\\.build\\_cinemagraph\\page-check\\page_4.png"
+  },
+  {
+   "index": 5,
+   "playing": true,
+   "box": {
+    "x": 0,
+    "y": 84,
+    "w": 390,
+    "h": 676
+   },
+   "mask_zero_share": 0.981,
+   "held": {
+    "max_change_outside_mask": 0,
+    "share_of_pixels_changed": 0.0,
+    "max_change_beyond_3px_of_the_mask": 0
+   },
+   "moving": {
+    "temporal_std_under_mask": 3.78
+   },
+   "loop_hitch": {
+    "usual_ms": 41.7,
+    "worst_elsewhere_ms": 66.8,
+    "wraps": 3,
+    "wrap_gap_ms": 100.0,
+    "hitch": true
+   },
+   "sheet": "H:\\ss-wt\\cinemagraph\\projects\\tern-house\\.build\\_cinemagraph\\page-check\\page_5.png"
+  }
+ ],
+ "reduced_motion": {
+  "cinemagraph_elements": 6,
+  "started": 0,
+  "videos_loaded": 0,
+  "still_only": true
+ }
+}

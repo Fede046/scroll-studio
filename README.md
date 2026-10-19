@@ -142,6 +142,7 @@ Every example is a `site.yaml` in [`examples/`](examples/) and rebuilds with `st
 | [Daybreak Institute](examples/daybreak-institute/site.yaml) | Research | `chart` | Real solar data (IRENA) told as a scrolling data story |
 | [Tidewater Lines](examples/tidewater-lines/site.yaml) | Logistics | `map` | Shanghai to Rotterdam, port by port, on a live map |
 | [Casa Alta](examples/casa-alta/site.yaml) | Hospitality | `parallax` | Generated photos of a cliff hotel in 2.5D (needs ComfyUI to build) |
+| [Tern House](examples/tern-house/site.yaml) | Hospitality | `cinemagraph:` | Stills in which one thing moves: a curtain, steam, a flame, smoke, water; everything else held still (needs ComfyUI) |
 | [Hushwell](examples/hushwell/site.yaml) | Healthcare | `stack` layout | Panels slide over each other: hero, product with phone, photo strip, orbit, FAQ |
 | [Hale & Rowe](examples/hale-rowe/site.yaml) | Architecture | `artwork` | A house drawn from construction lines to finished photo (needs ComfyUI) |
 | [Stillwater](examples/one-take/site.yaml) | Consumer product | `film` + `take` | One take from a mountain ridge down to a bottle on a lakeside table; the bottle is the real 3D model |
@@ -864,6 +865,98 @@ Everything is cached per region: the film, the prompt, its frame and the model a
 `feather` or `base` re-packs in seconds and re-tracks nothing. The storyboard draws every shot the way the page will
 show it (base look; with masks from a full build, the colour at that moment), and the animatic is cut from those frames.
 It runs on ComfyUI with `studio setup-comfy` (below) and about 2 GB of models.
+
+### Cinemagraphs: one thing moves (`cinemagraph:`)
+
+A still where only one thing moves (steam above a cup, a curtain in a breeze, light on water, a candle flame, smoke) and
+everything else is held perfectly still. Calm, premium, and very hard to do by hand: the moving part has to loop without
+a seam and the rest must not move at all. Put `cinemagraph:` on **any image input**, wherever the page shows an image
+(`hero.image`, a `product` or `strip` image, a `gallery` tile, a section's `backdrop`):
+
+```yaml
+image:
+  generate: A white cup of black coffee by a window, a thin plume of steam rising, soft morning light
+  cinemagraph:
+    moves: the steam rising from the coffee cup     # what moves, as you would say it; it must be visible in the still
+    motion: slowly curling upward and thinning out  # how (optional)
+    seconds: 4
+    loop: seamless                                  # or pingpong
+    strength: 1.0                                   # 0.2-1.5: how far it moves
+```
+
+`studio build` makes them with the page; `studio cinemagraph <project>` builds just those and prints a measured report for
+each (`--list` shows what is built, `--check` measures the built page in Chrome); the MCP tool is `cinemagraphs`. A plain
+image (no `cinemagraph:`) is untouched and keeps its cache; so does the still under a cinemagraph, which stays the picture
+(its own cache keys never change, films that use it do not re-render). Stages, each cached by its own key, in
+`.build/_cinemagraph/<id>/`:
+
+1. **Region.** `moves` is found on the still (Florence-2 grounding, SAM 2.1: the same cached stage `edit.region` uses; or give
+   `box`, `points`, `negative_points`, `pick`). The video model is shown a **crop** around it (plus half again its size of
+   surroundings, the way `edit.region` shows the editor a crop), so the moving part gets the model's full resolution.
+2. **Clip.** LTX-2.3 or Wan 2.2 image-to-video (`model:`, else the site's `video_model`) of that crop, told that only
+   `moves` moves and the camera is locked. `loop: seamless` asks for the whole loop's length and closes it afterwards with
+   a flow-aligned crossfade, which is right for what flows (steam, smoke, water, a flame: the same thing a moment later).
+   `pingpong` asks for half, keeps the way out, and plays it forward then back (a loop with no seam by construction; for
+   sways and shimmer that read the same both ways, not for steam, which would fall). The way out is cut where the region
+   has moved a set distance from its first frame (a video model's motion grows: the first second is a gentle sway, the
+   third a curtain flying across the room) and played slower to fill the loop. *Tried and dropped:* generating "first =
+   last frame" (the end frame pinned to the still) does not make a loop on either model: LTX-2.3 returns a clip that hardly
+   moves, a loosened pin lets the middle go wild, and Wan 2.2 invents an action to get from the still back to itself (a hand
+   throws a sheet across the window). Kept lossless, so everything after it can be redone without the GPU.
+3. **Prep.** A video model moves the camera however it is told not to (a push in, a drift, a dolly's parallax) and a
+   cinemagraph's whole point is that nothing but one thing moves. Each frame is pinned back to the still by dense optical
+   flow measured on the pixels around the moving part and carried inward across it (flow stabilisation: on a test clip
+   that pushed in by 78 px the held picture went from 61 levels away from the still to about 5). The clip is then **cut**
+   where the picture around the moving part starts to change anyway (what is left is real change), and, for a pingpong,
+   where the region has moved far enough for one swing; the kept frames are played slower (flow-interpolated, at most
+   2x) to fill the loop.
+4. **Track and mask.** SAM 2.1 follows the moving thing through the clip (`track: false` skips it). The mask is the
+   region, the path it sweeps and every part of the clip that really moves *and is joined to it* (a curtain's hem lifts,
+   steam climbs past the box it was found in), grown (`grow`) and feathered (`feather`): the video is used where
+   something moves and the still everywhere else, and the soft edge falls on pixels that do not move, so no seam is cut
+   through the motion. A patch that moves but is not joined to the thing (a car outside the window) stays the still.
+5. **Encode.** The frames are tone-matched to the still around the mask (a video model returns a picture a shade off the
+   one it was given), the loop is closed (a flow-aligned crossfade where a generated clip does not meet itself; a
+   pingpong has no seam), the motion is damped or exaggerated by `strength`, and the part that moves is encoded as a small
+   H.264 video (only the crop around it, never the whole picture) with the mask as a lossless WebP. A review sheet
+   (`cine_<id>.sheet.jpg`: the still with the mask's edge, the mask, six frames as the page composes them, and a heat map
+   of what changes) is written beside it: read it.
+
+On the page the still stays in the HTML (`<img>` or the section's background); `runtime/src/lib/cinemagraph.ts` lays the
+video over it **through the mask** (a CSS mask), so where the mask is 0 the pixels are the still's own and cannot change.
+It loads a screen before it is needed, plays only while in view and in a visible tab, and never starts under
+`prefers-reduced-motion`, data saver or a 2G connection (the still is the page), or where CSS masks are unsupported. It
+never touches layout (an absolutely positioned layer beside the image) and follows the image's own transform (a hero's slow
+zoom). It works in every style whose markup shows the image as an `<img>` or a backdrop; a style that repaints images
+itself (a halftone, a canvas) shows the still.
+
+The report (`cine_<id>.json`, and printed) measures what matters: the loop's **seam** (the step from last frame to first
+against the steps beside it: about 1.0 is a continuous loop, over about 1.5 is a visible jump), **how much of the picture
+moves**, **what is held** (the largest change of any pixel where the mask is zero, in what the page composes: 0), and
+bytes. `studio cinemagraph --check` does the same on the built page in Chrome on the GPU: screenshots of the box over a
+loop, the change outside the mask (must be 0), the motion under it, the video's frame times across the loop's wrap, and
+reduced motion (no video is loaded). Parallax scenes (a WebGL depth shader) show the still; a cinemagraph there is not
+built.
+
+**How it reads, honestly** (Tern House, `examples/tern-house`, measured by `studio cinemagraph --check` in Chrome on the GPU,
+and by looking). What held: in every one of the six, the pixels outside the mask never changed in the browser (the largest
+change of any pixel outside the mask was 0, and 1 level on under 0.01% of a hero's pixels with its scroll zoom); loops show no
+hitch at the wrap (the wrap frame is presented no later than the slowest frame elsewhere); reduced motion loads no video and
+shows the still; a phone keeps the moving part in view (the runtime slides the crop of a `cover` photo toward it); the whole
+page carries 1.4 MB of video. What reads as a cinemagraph: the steam above the cup (5% of the picture moves, a slow curl, the
+cup, the croissant and the window exactly as photographed) is the best of them; the curtain (18%) is a calm sway, only the
+cloth moves; the incense smoke is gentle. What does not yet: **the candle flame barely flickers** (the video models animate a
+flame by a few levels, and `strength` can only exaggerate what is there), so it reads as a still with a faint pulse; the
+pool and the estuary (18% and 29% of the picture: a whole body of water shimmering) sit nearer to a looped video than to a
+cinemagraph, which is the honest limit of the idea: the smaller the share that moves, the more it reads as a still that
+breathes. Things that do not work and are not hidden: first = last frame generation (see Clip above); a pingpong of steam
+(it would fall); `moves` that names half the picture (refused: the build stops and asks for `pick`, `box` or `points`); styles
+that repaint their images (the halftone style renders them on a canvas, so the still is shown); the page checker is only
+meaningful on pages whose own furniture does not move over the picture (a style with an animated gauge in the box moves
+pixels the cinemagraph is not responsible for). Frame pacing: the video work is off the main thread (the scroll loop spends
+about 0.3 ms a frame more with six cinemagraphs on the page), but measured on this machine while another process held the GPU at
+100% (ComfyUI rendering for other jobs) scrolling a page with playing cinemagraphs dropped about 15% of frames to 30 fps
+against 0-2% with them off; that run is a worst case and should be repeated on an idle GPU before a claim is made.
 
 ### Faces, repaired (`faces: restore`)
 

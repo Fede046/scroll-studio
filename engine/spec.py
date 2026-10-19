@@ -169,6 +169,50 @@ class FrameMatch(Model):
     steps: int = Field(30, ge=4, le=60, description="how: edit, the editor's steps")
 
 
+class Cinemagraph(Model):
+    """Make a picture a cinemagraph: a still where only one thing moves (steam from a cup, a curtain in a breeze, light
+    on water, a candle flame), and everything else is held perfectly still. Put it on any image input (`hero.image`,
+    a product or strip image, a gallery tile, a section `backdrop`):
+
+        image: { generate: "a cup of coffee, steam rising ...", cinemagraph: { moves: "the steam above the cup" } }
+
+    The still stays the picture. The engine finds what moves (Florence-2 + SAM 2.1 from `moves`), has a local video
+    model (LTX-2.3 or Wan 2.2) bring a crop around it to life, keeps only the moving part, closes the loop and encodes
+    a small video of that part; the page lays it over the still through a soft mask, so outside the mask the pixels are
+    the still's and never change. Plain images (no `cinemagraph`) are untouched and keep their cache."""
+    moves: str = Field(..., description="What moves, as you would say it to a person: \"the steam above the cup\", "
+                                        "\"the sheer curtains\", \"the light on the water\", \"the candle flame\". Found on "
+                                        "the still by Florence-2 grounding; it must be visible in the picture")
+    motion: Optional[str] = Field(None, description="How it moves, for the video model: \"slow, curling upward\", "
+                                                    "\"swaying a little in a soft breeze\". Default: gentle motion of `moves`")
+    seconds: float = Field(4.0, ge=1.0, le=8.0, description="Length of the loop in seconds (a pingpong loop is "
+                                                            "generated at half this and played forward then back)")
+    loop: Literal["seamless", "pingpong"] = Field(
+        "seamless", description="seamless: the clip is made to end where it began (first = last frame generation) and any "
+                                "seam left is closed by a flow-aligned crossfade; the motion keeps one direction (steam "
+                                "keeps rising). pingpong: forward then backward, a seam by construction; for sways and "
+                                "shimmer that read the same both ways")
+    strength: float = Field(1.0, ge=0.2, le=1.5, description="How far it moves: 1 is the motion as generated, lower "
+                                                             "damps it toward its resting look, higher exaggerates it")
+    seed: int = 7
+    model: Optional[Literal["ltx", "wan"]] = Field(None, description="Video model: ltx (LTX-2.3) or wan (Wan 2.2). "
+                                                                      "Default: the site's video_model, then ltx")
+    box: Optional[tuple[float, float, float, float]] = Field(None, description="x0, y0, x1, y1 around what moves, 0-1 of "
+                                                                              "the still (skips the search by name)")
+    points: list[tuple[float, float]] = Field(default_factory=list, description="Points ON what moves, 0-1 across and "
+                                                                              "down the still")
+    negative_points: list[tuple[float, float]] = Field(default_factory=list, description="Points on what must NOT move")
+    pick: Union[Literal["all", "first", "largest", "smallest", "left", "right", "top", "bottom", "center"], int] = Field(
+        "all", description="When `moves` matches several things: all of them, or one by rank or index")
+    grow: int = Field(10, ge=-60, le=200, description="Widen (+) or shrink (-) the moving region by this many pixels of "
+                                                      "the still (the video is free to move this much beyond it)")
+    feather: int = Field(28, ge=0, le=120, description="Softness of the region's edge in pixels of the still: the motion "
+                                                       "fades into the held-still picture over about this distance")
+    track: bool = Field(True, description="Follow the moving thing through the clip (SAM 2.1 video tracking) and keep "
+                                          "the whole path it sweeps, so a flame or a curtain that leaves its first "
+                                          "outline is not cut off at the edge of the region")
+
+
 class ImageInput(Model):
     """An image the engine uses as input: a file in the project's inputs/, one generated locally, a gradient, or a
     still of the site's product."""
@@ -191,6 +235,10 @@ class ImageInput(Model):
     match: Optional[FrameMatch] = Field(None, description="Design this image to match another section's last frame, for a "
                                                          "match cut (see FrameMatch)")
     credit: Optional[str] = Field(None, description="Attribution shown in the footer")
+    cinemagraph: Optional[Cinemagraph] = Field(
+        None, description="Make this picture a cinemagraph: only the thing named by `moves` moves (a video laid over the "
+                          "still through a soft mask), everything else is held perfectly still. Works wherever the page "
+                          "shows the image (hero, product, strip, gallery, a section backdrop)")
 
 
 ImageRef = Union[str, ImageInput]   # a bare string is a file path
@@ -1428,7 +1476,8 @@ class GalleryItem(Model):
     href: str
     kicker: Optional[str] = None
     body: Optional[str] = None
-    image: Optional[str] = None
+    image: Optional[ImageRef] = Field(None, description="The tile's picture: a file or URL, or an image input (generate:, "
+                                                        "edit:, cinemagraph: ...)")
     video: Optional[str] = None
 
 

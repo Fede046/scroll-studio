@@ -382,6 +382,31 @@ def camera_check(project: str, beat: str, section: Optional[str] = None) -> dict
 
 
 @mcp.tool()
+def cinemagraphs(project: str, only: Optional[str] = None, force: bool = False, list_only: bool = False) -> dict:
+    """Build the site's cinemagraphs (any image input with `cinemagraph: {moves: "the steam above the cup", ...}`: a still where
+    only that moves) and return a measured report for each: the loop's seam ratio (about 1 is seamless), how much of the
+    picture moves, the largest change of any pixel held still, bytes, and the files (cine_*.mp4, its mask, report json under
+    .build/_cinemagraph/). Runs in the background (a video model per cinemagraph; minutes each): returns a job id for
+    job_status. only: text matched against `moves` or the spec path. list_only: just what is built and what is not."""
+    from . import cinemagraph as cine
+    p = _find(project)
+    site = p.load()
+
+    def run(job):
+        log, _ = logger(job)
+        out = []
+        for where, ref in cine.collect(site):
+            if only and only not in where and only not in ref.cinemagraph.moves:
+                continue
+            b = cine.build(p, ref, log, force=force, site_video_model=site.video_model,
+                           site_wan=site.wan.model_dump(mode="json"), only_cached=list_only)
+            out.append({"where": where, "moves": ref.cinemagraph.moves, "built": b is not None,
+                        **({"summary": cine.summary(b["data"]), "video": str(b["video"]), "report": b["data"]} if b else {})})
+        return {"cinemagraphs": out}
+    return jobs.submit("cinemagraph", p.name, "cinemagraph", run).public(tail=5)
+
+
+@mcp.tool()
 def job_status(job_id: str, log_lines: int = 40) -> dict:
     """Progress, status and log tail of a background job."""
     j = jobs.jobs.get(job_id)

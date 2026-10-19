@@ -10,6 +10,7 @@
   studio preview my-site [--port 5173]
   studio record my-site [--section hero] [--seconds 12] [--gif]
   studio cuts my-site [--strip] [--only 0,2] [--mobile]   the film grammar between sections: each cut, the shapes a match found, frame strips
+  studio cinemagraph my-site [--only steam] [--force]   build (or list) every `cinemagraph:` image: video + mask + a measured report
   studio inspect my-site [--section story] [--json]   polish report of a built film: pops, softness, halos, style drift, morphs
   studio trailer my-site [--format 9x16] [--plan]      launch trailer from the site's renders -> dist/trailer/
   studio ui                                         the Studio app (http://localhost:5180)
@@ -773,6 +774,44 @@ def diorama_cmd(name: str, section: Optional[str] = typer.Option(None, help="The
         dest = out / f"{sec.id}-strip.jpg"
         sheet.save(dest, quality=88)
         typer.echo(f"  strip: {dest}")
+
+
+@app.command("cinemagraph")
+def cinemagraph_cmd(name: str,
+                    only: Optional[str] = typer.Option(None, help="Only the cinemagraphs whose `moves` or spec path contains this text"),
+                    force: bool = typer.Option(False, help="Ignore the cache"),
+                    list_only: bool = typer.Option(False, "--list", help="List the cinemagraphs in the spec and their cache state, build nothing"),
+                    check: bool = typer.Option(False, "--check", help="Instead of building, measure the BUILT page (dist/) in Chrome: is everything "
+                                                                     "but the moving part truly still, does the loop hitch, does reduced motion show the still"),
+                    mobile: bool = typer.Option(False, "--mobile", help="With --check: a 390 px phone viewport")):
+    """Build the site's cinemagraphs (an image input with `cinemagraph:`: a still where only one thing moves) and report on each:
+    the loop's seam, how much of the picture moves, what the page holds still, bytes. Files are in <project>/.build/_cinemagraph/.
+    `studio build` makes them too, as part of the page."""
+    from . import cinemagraph as cine
+    from .project import Project
+    project = Project(resolve(name))
+    if check:
+        from . import cinemagraph_check as chk
+        work = project.build / "_cinemagraph" / "page-check"
+        res = chk.check_page(project.dist, work, size=(390, 844) if mobile else (1440, 900), mobile=mobile, dpr=1.0, log=typer.echo)
+        res["reduced_motion"] = chk.check_reduced(project.dist, log=typer.echo)
+        (work / ("mobile.json" if mobile else "desktop.json")).write_text(json.dumps(res, indent=1))
+        typer.echo(f"report: {work}")
+        return
+    site = project.load()
+    found = [(w, r) for w, r in cine.collect(site) if not only or only in w or only in r.cinemagraph.moves]
+    if not found:
+        typer.echo("no image input with `cinemagraph:` in this spec" + (f" matching '{only}'" if only else ""))
+        raise typer.Exit(1)
+    for where, ref in found:
+        typer.echo(f"{where}: {ref.cinemagraph.moves}")
+        built = cine.build(project, ref, typer.echo, force=force, site_video_model=site.video_model,
+                           site_wan=site.wan.model_dump(mode="json"), only_cached=list_only)
+        if built is None:
+            typer.echo("  not built yet")
+            continue
+        typer.echo("  " + cine.summary(built["data"]))
+        typer.echo(f"  {built['video']}")
 
 
 @app.command()

@@ -372,3 +372,6 @@ document.querySelectorAll<HTMLVideoElement>(".ss-tile video").forEach((v) => {
   tile.addEventListener("mouseenter", () => v.play().catch(() => {}));
   tile.addEventListener("mouseleave", () => v.pause());
 });
+
+// ---------------------------------------------------------------- cinemagraphs (image inputs with `cinemagraph:`)
+if (document.querySelector("[data-cine]")) import("./lib/cinemagraph").then((m) => m.start());
