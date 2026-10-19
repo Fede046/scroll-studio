@@ -808,7 +808,8 @@ its `title` is the text, in the site's fonts, with the `<em>` words set as every
 `x`, `y` and `size` place it on the frame (the width of the type as a fraction of the frame's width); `lines`, `align`,
 `caps`, `track`, `weight` and `color` (`auto` reads the footage and takes the theme's lighter or darker ink; or `ink`,
 `paper`, `accent`, a hex) set the typography; `anchor:` picks the frame the thing is found on (default: the middle of
-the step's window); `follow:` how much of the camera's motion the type follows. The JSON schema carries a description
+the step's window); `follow:` how much of the camera's motion the type follows; `slant:` how much of a surface's estimated slant
+is used (the estimate is a guess from relative depth: 1 as estimated, 0 flat to the screen). The JSON schema carries a description
 of every field, so the Studio UI and Claude's MCP tools show them.
 
 How it works, in short. Per film the engine makes a **depth video**: Depth Anything V2 on every frame is sharp but

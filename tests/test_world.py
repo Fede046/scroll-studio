@@ -77,7 +77,7 @@ def test_defaults_and_the_schema_document_the_fields():
     schema = Site.model_json_schema()
     wp = schema["$defs"]["WorldPlace"]
     assert set(wp["properties"]) >= {"kind", "at", "x", "y", "size", "lines", "align", "caps", "track", "weight", "color", "anchor", "gap",
-                                     "follow", "haze", "fog", "blur", "wear", "relief", "quad", "angle", "track_model"}
+                                     "follow", "haze", "fog", "blur", "wear", "relief", "quad", "angle", "slant", "track_model"}
     assert wp["properties"]["kind"]["enum"] == ["behind", "surface", "sky"]
     assert all(p.get("description") for p in wp["properties"].values())             # the schema is the contract for the UI and MCP
     assert "WorldPlace" in json.dumps(schema["$defs"]["Step"]["properties"]["place"])

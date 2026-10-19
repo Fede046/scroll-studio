@@ -87,7 +87,8 @@ def check_film(project: Project, section: str, n: int = 6, log: Callable[[str], 
         picks = sorted({int(round(v)) for v in np.linspace(f0, f1, n)})
         frames = {i: f.copy() for i, f in W.read_frames(work, nframes, only=set(picks))}
         centres, inside = [], []
-        for f in range(f0, f1 + 1):
+        w0, w1 = t.get("window", [f0, f1])
+        for f in range(max(f0, w0), min(f1, w1) + 1):                     # the frames the title is shown on (not the lead-in)
             c = _box_corners(t, f, bh)
             if c is None:
                 inside.append(False)
@@ -98,7 +99,7 @@ def check_film(project: Project, section: str, n: int = 6, log: Callable[[str], 
         cs = np.array(centres) if centres else np.zeros((0, 2))
         jitter = _jitter(cs)
         conf = np.asarray(t["c"], dtype=float)
-        lost = int((conf < 0.3).sum()) if t["kind"] == "surface" else 0
+        lost = int((conf[max(0, w0 - f0):max(0, w1 - f0) + 1] < 0.3).sum()) if t["kind"] == "surface" else 0
         share_in = float(np.mean(inside)) if inside else 0.0
         info = {"step": t["i"], "kind": t["kind"], "title": t.get("title"), "frames": [f0, f1], "anchor": t["anchor"],
                 "jitter_px_p95": round(jitter, 2), "on_screen": round(share_in, 2), "lost_frames": lost, "advice": []}
@@ -108,14 +109,14 @@ def check_film(project: Project, section: str, n: int = 6, log: Callable[[str], 
         adv = info["advice"]
         if jitter > 0.8:
             adv.append("the track jitters (the box centre strays more than 0.8 px from its own smoothed path): lower `follow`, move `anchor` to a frame with more to track, or choose another `at`")
-        if lost > 0.2 * (f1 - f0 + 1):
-            adv.append(f"the surface was lost for {lost} of {f1 - f0 + 1} frames: reword the prompt, move `anchor`, or give `quad`")
+        if lost > 0.2 * (w1 - w0 + 1):
+            adv.append(f"the surface was lost for {lost} of {w1 - w0 + 1} frames: reword the prompt, move `anchor`, or give `quad`")
         if share_in < 0.5:
             adv.append("the type is on screen for less than half of its window: move `anchor`, or shorten/shift the step's `at`")
         if t["kind"] == "surface" and t.get("tilt", 0) > 80:
             adv.append(f"the surface is seen almost edge-on ({t['tilt']} degrees): the letters are slivers; put the type lower in the frame (`y`), or paint a more frontal surface")
-        if t["kind"] == "behind" and t.get("band", 0) >= 0.3:
-            adv.append("little to follow at the type's depth: it follows the nearest layer instead, so it may slide; set `follow` by hand")
+        if t["kind"] == "behind" and t.get("band", 0) >= 0.5:
+            adv.append("little to follow at or behind the type's depth: it follows what it found, so it may slide; set `follow` by hand")
         texts.append(info)
         log(f"  step {t['i']} ({t['kind']}): jitter {jitter:.2f} px, on screen {share_in:.0%}" + (f", lost {lost}" if lost else "")
             + "".join(f"\n    - {a}" for a in adv))

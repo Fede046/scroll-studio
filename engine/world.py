@@ -34,7 +34,7 @@ from . import reveal, world_depth as wd, world_math as wm
 from .project import BuildContext, BuildError, file_key, probe
 from .spec import FilmScene, RevealAt, RevealRegion, Step, WorldPlace
 
-VERSION = 8
+VERSION = 10
 TILE = reveal.TILE
 WORK = reveal.WORK
 SOFT = {"behind": 0.04, "sky": 0.09}            # the width of the occlusion's soft edge, depth units (the runtime reads it)
@@ -209,15 +209,6 @@ def _thing_mask(ctx: BuildContext, clip: Path, frame: int, prompt: str, log) -> 
     return np.asarray(Image.open(raw).convert("L"))
 
 
-def _band_mask(depth: np.ndarray, dt: float, band: float) -> np.ndarray:
-    m = (np.abs(depth.astype(np.float32) / 255 - dt) < band).astype(np.uint8) * 255
-    m[:12] = 0
-    m[-12:] = 0
-    m[:, :12] = 0
-    m[:, -12:] = 0
-    return cv2.erode(m, np.ones((5, 5), np.uint8))
-
-
 def _sharpness(gray: np.ndarray, sel: np.ndarray) -> float:
     g = cv2.GaussianBlur(gray, (0, 0), 0.8).astype(np.float32)
     gx, gy = cv2.Sobel(g, cv2.CV_32F, 1, 0), cv2.Sobel(g, cv2.CV_32F, 0, 1)
@@ -285,6 +276,17 @@ def _quad_box(quad) -> Optional[tuple[float, float, float, float]]:
     return (min(xs), min(ys), max(xs), max(ys))
 
 
+def _behind_mask(depth: np.ndarray, dt: float, span: float) -> np.ndarray:
+    """What is at the type's depth or up to `span` of depth behind it, away from the frame's edge."""
+    d = depth.astype(np.float32) / 255
+    m = ((d >= dt - span) & (d <= dt + 0.03)).astype(np.uint8) * 255
+    m[:12] = 0
+    m[-12:] = 0
+    m[:, :12] = 0
+    m[:, -12:] = 0
+    return cv2.erode(m, np.ones((5, 5), np.uint8))
+
+
 def _far_mask(depth: np.ndarray, limit: float) -> np.ndarray:
     """The far layers (sky type follows them): everything below `limit` in depth, away from the frame's edge."""
     m = (depth.astype(np.float32) / 255 < limit).astype(np.uint8) * 255
@@ -304,7 +306,8 @@ def _plan_text(sec, ctx, i, st, w, r, clip, frames, depth_file, mask_files, nfra
     kind = w.kind
     cx, cy = r["x"] * wm.W, r["y"] * wm.H
     model = w.track_model or ("homography" if kind == "surface" else "similarity")
-    info: dict = {"i": i, "kind": kind, "f0": f0, "f1": f1, "anchor": fa, "shot": list(shot), "title": plain(st.title)}
+    info: dict = {"i": i, "kind": kind, "f0": f0, "f1": f1, "anchor": fa, "shot": list(shot), "title": plain(st.title),
+                  "window": list(window_frames(st, nframes))}
 
     if kind == "surface":
         masks = None
@@ -329,8 +332,16 @@ def _plan_text(sec, ctx, i, st, w, r, clip, frames, depth_file, mask_files, nfra
             # the surface's orientation from the depth map: a plane's disparity is linear in the image, so a fit over the
             # mask is its normal; the type is laid out on that plane at x, y of the frame (see world_math.plane_frame)
             depth = np.load(depth_file)["depth"]
-            sol = wm.fit_disparity_plane(depth[fa].astype(np.float32) / 255, masks[fa])
-            n = sol if sol is not None else np.array([0.0, 0.0, 1.0])
+            sol, ratio = wm.fit_disparity_plane(depth[fa].astype(np.float32) / 255, masks[fa], want_ratio=True)
+            if sol is None or ratio < 0.55:
+                log(f"  note: step {i}: the mask is not one plane in the depth map (only {ratio:.0%} of it agrees): the type "
+                    f"is laid flat to the screen; give `quad` for a surface seen at an angle")
+                sol = np.array([0.0, 0.0, 1.0])
+            n = np.asarray(sol, dtype=np.float64) / max(np.linalg.norm(sol), 1e-9)
+            if n[2] < 0:
+                n = -n
+            n = np.array([n[0] * w.slant, n[1] * w.slant, n[2]])       # `slant`: how much of the estimated slant to use
+            info["plane_fit"] = round(float(ratio), 2)
             P = wm.plane_frame(n, (cx, cy))
             R = np.linalg.inv(P)
             box_cx, box_cy = 0.0, 0.0
@@ -377,15 +388,16 @@ def _plan_text(sec, ctx, i, st, w, r, clip, frames, depth_file, mask_files, nfra
         # what the type follows: the layer at its own depth (a wider band until there is something to track); sky follows
         # whatever is far
         if kind == "behind":
-            steps = (0.06, 0.12, 0.2, 0.32)
-            make = lambda f, v: _band_mask(depth[f], dt, v)
+            # what the type belongs to is what is at or behind it, never what passes in front (a crowd would drag it about)
+            steps = (0.15, 0.3, 0.5, 0.8)
+            make = lambda f, v: _behind_mask(depth[f], dt, v)
         else:
             steps = (0.18, 0.3, 0.45)
             make = lambda f, v: _far_mask(depth[f], v)
         used, tracked = None, None
         for v in steps:
             m0 = make(fa, v)
-            if (m0 > 0).sum() > 400 and len(wt.features(gray[fa], m0)) >= 24:
+            if (m0 > 0).sum() > 400 and len(wt.features(gray[fa], m0)) >= (80 if kind == "behind" else 24):
                 used, tracked = v, m0
                 break
         static = tracked is None

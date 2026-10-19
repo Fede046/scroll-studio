@@ -170,31 +170,42 @@ FOCAL = 0.85            # the focal length as a fraction of the picture's width:
                         # Generated footage has no calibration; this is the guess
 
 
-def fit_disparity_plane(D: np.ndarray, mask: np.ndarray, size: tuple[int, int] = (W, H), iters: int = 4) -> np.ndarray | None:
+def fit_disparity_plane(D: np.ndarray, mask: np.ndarray, size: tuple[int, int] = (W, H), tol: float = 0.03,
+                        want_ratio: bool = False):
     """Fit d = a*x + b*y + c to the depth map `D` (0 far .. 1 near, Depth Anything's relative disparity) over the mask's
     pixels, in calibrated image coordinates x = (px - cx) / f. A plane's disparity is linear in the image, and zero on its
     vanishing line (the horizon, for a floor), so (a, b, c) is the plane's normal (in camera coordinates, up to scale) when
-    the map's zero is the far distance, which the per-shot normalisation makes it. `D`, `mask` and `size` are at one
-    resolution. Returns (a, b, c) or None."""
+    the map's zero is the far distance, which the per-shot normalisation makes it. A mask is rarely only the surface (a
+    person leans on the wall), so the fit is RANSAC: the plane most of the pixels agree with to `tol`, refined over them.
+    `D`, `mask` and `size` are at one resolution. Returns (a, b, c) or None; with `want_ratio` also the share of the mask's
+    pixels that agree (a low share means the mask is not one plane: the caller should not trust the slant)."""
     w, h = size
     f = FOCAL * w
     ys, xs = np.nonzero(np.asarray(mask) > 127)
     if len(xs) < 200:
-        return None
-    if len(xs) > 30000:
-        idx = np.random.default_rng(3).choice(len(xs), 30000, replace=False)
+        return (None, 0.0) if want_ratio else None
+    if len(xs) > 20000:
+        idx = np.random.default_rng(3).choice(len(xs), 20000, replace=False)
         xs, ys = xs[idx], ys[idx]
-    x = (xs - w / 2) / f
-    y = (ys - h / 2) / f
+    A = np.stack([(xs - w / 2) / f, (ys - h / 2) / f, np.ones(len(xs))], axis=1)
     d = D[ys, xs].astype(np.float64)
-    A = np.stack([x, y, np.ones_like(x)], axis=1)
-    wt = np.ones(len(x))
-    sol = None
-    for _ in range(iters):
-        sol, *_ = np.linalg.lstsq(A * wt[:, None], d * wt, rcond=None)
-        r = np.abs(A @ sol - d)
-        wt = 1.0 / (1.0 + (r / 0.03) ** 2)
-    return sol
+    rng = np.random.default_rng(5)
+    best, best_n = None, 0
+    for _ in range(120):
+        pick = rng.choice(len(xs), 3, replace=False)
+        try:
+            sol = np.linalg.solve(A[pick], d[pick])
+        except np.linalg.LinAlgError:
+            continue
+        n = int((np.abs(A @ sol - d) < tol).sum())
+        if n > best_n:
+            best, best_n = sol, n
+    if best is None:
+        return (None, 0.0) if want_ratio else None
+    inl = np.abs(A @ best - d) < tol
+    sol, *_ = np.linalg.lstsq(A[inl], d[inl], rcond=None)
+    ratio = float((np.abs(A @ sol - d) < tol).mean())
+    return (sol, ratio) if want_ratio else sol
 
 
 def plane_frame(n: np.ndarray, center_px: tuple[float, float], size: tuple[int, int] = (W, H)) -> np.ndarray:

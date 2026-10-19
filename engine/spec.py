@@ -304,6 +304,10 @@ class WorldPlace(Model):
                                                       "clockwise from the top left, instead of finding it by prompt (the "
                                                       "type is then tracked from these corners)")
     angle: float = Field(0.0, ge=-180, le=180, description="surface: turn the type on the surface, degrees")
+    slant: float = Field(1.0, ge=0, le=1.5, description="surface: how much of the slant the depth map gives the surface is used "
+                                                        "(1: as estimated, 0: the type lies flat to the screen). The estimate "
+                                                        "is a guess from relative depth; lower it when the letters look "
+                                                        "over-foreshortened")
     track_model: Optional[Literal["homography", "similarity"]] = Field(
         None, description="How the footage is followed: a surface is tracked as a plane seen in perspective (homography); "
                           "behind and sky as a layer that shifts, turns and zooms (similarity)")
