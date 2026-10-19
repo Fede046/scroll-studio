@@ -15,6 +15,7 @@ Scroll Studio runs entirely on your machine. What you need depends on which scen
 | `film` with `take.product` | + the product's 3D model (.glb/.gltf/.obj/.fbx/.stl/.ply). `from_photo:` instead needs TRELLIS (below). |
 | `site.product`, `showroom`, product stills | + Blender. STEP/STP models need `cascadio` (OpenCascade) and 3MF needs `trimesh` + `lxml`: `pip install -e .[cad]` (in `.[all]`). `scene:` stills need ComfyUI (Z-Image, Qwen-Image-Edit). |
 | `splat` | A scan as a 3DGS `.ply` (any) or a gsplat `.pt` checkpoint (needs PyTorch to read). No GPU at build time. |
+| `diorama` | Nothing beyond the package (NumPy, OpenCV, Pillow lay the world out on the CPU in seconds; no models, no GPU, no Blender). Visitors need WebGL 2. `studio diorama --strip` photographs the built site and needs Chrome. |
 
 `studio doctor` (or the Toolchain page in the UI) shows what this machine has.
 

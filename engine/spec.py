@@ -1232,6 +1232,112 @@ class CodeScene(SceneBase):
     length: float = 14.0
 
 
+# ---------------------------------------------------------------- miniature worlds (scene type `diorama`, engine/diorama/)
+
+DIORAMA_KINDS = ("harbour", "town", "desk", "factory", "studio")
+
+
+class DioramaProp(Model):
+    """One extra thing set on the diorama by hand, beside what the world generates."""
+    kind: str = Field(..., description="A prop of the kit: tree, pine, bush, rock, house, shop, cafe, warehouse, "
+                                       "lamp, bench, fence, crate, barrel, flag, container, boat, windmill ... (the "
+                                       "full vocabulary is in docs/miniature.md)")
+    at: tuple[float, float] = Field(..., description="Where, in world units from the middle (x to the right, z towards the viewer)")
+    turn: float = Field(0.0, description="Degrees the front is turned (0 faces the viewer)")
+    scale: float = 1.0
+    color: Optional[str] = Field(None, description="Main colour (roof, hull, body), hex")
+
+
+class DioramaPlace(Model):
+    """A place on the diorama: where the camera dives to and where one step's content sits. The place gets a hero
+    prop, a sign with its name, a little set dressing around it and a pin in the orbit view."""
+    name: str = Field(..., description="The name on the sign and the pin")
+    kind: Optional[str] = Field(None, description="The hero prop. harbour: lighthouse, crane, warehouse, stall, office, "
+                                "ferry, windmill, shop, cafe. town: clocktower, shop, cafe, windmill, stall, office, "
+                                "fountain. desk: laptop, mug, books, plant, lamp, monitor, notebook. factory: tank, "
+                                "chimney, conveyor, robot, warehouse, office, silo. studio: easel, softbox, camera, "
+                                "monitor, speaker, sofa, shelf, plant. Unset: the next one the world suggests")
+    where: Optional[Union[str, tuple[float, float]]] = Field(
+        None, description="Where on the world: coordinates [x, z] in world units from the middle, or words: a compass "
+                          "point (north is the back, south the front: 'north-east', 'south'), 'centre', 'edge', or one "
+                          "of the world's own spots (harbour: hill, yard, plaza, pier, bay, village, quay; the "
+                          "others in docs/miniature.md). Unset: the world's own spot for this kind")
+    step: Optional[int] = Field(None, ge=0, description="Which of the scene's steps (0-based) lives here. Unset: the "
+                                "places take the steps in order, skipping a leading intro step")
+    side: Optional[Literal["left", "right"]] = Field(None, description="Which side of the screen the place sits on once "
+                                                     "the camera has dived to it (the copy takes the other). Unset: opposite the card column")
+    sign: Optional[str] = Field(None, description="Text on the little sign at the place (default: the name)")
+    scale: float = Field(1.0, gt=0, description="Size of the hero prop")
+    color: Optional[str] = Field(None, description="Main colour of the hero prop, hex")
+
+
+class DioramaWorld(Model):
+    """The world, described once. The engine lays out the ground (water, roads, hills, paving), the scenery and the
+    places' dressing from this and the seed; the same spec always gives the same world."""
+    kind: Literal["harbour", "town", "desk", "factory", "studio"] = Field(
+        "harbour", description="The kind of world: sets the ground plan, the scenery and the prop vocabulary")
+    seed: int = Field(7, description="Seed for the layout: another seed is another arrangement of the same kind of world")
+    size: Optional[float] = Field(None, ge=16, le=60, description="Width of the diorama in world units (a house is about 2). Unset: 30 for a harbour or town, 22 for a desk or studio, 26 for a factory")
+    base: Optional[Literal["round", "square"]] = Field(
+        None, description="The shape of the base it stands on (default: round for harbour and town, square for the rest)")
+    palette: list[str] = Field(default_factory=list, description="Hex colours for roofs, hulls and containers, replacing the world's own (2-8)")
+    density: float = Field(1.0, ge=0, le=2.0, description="How much scenery fills the world: trees, houses, boats, lamps")
+    props: list[DioramaProp] = Field(default_factory=list, description="Extra props set by hand")
+
+
+class DioramaCamera(Model):
+    """How the camera moves: it orbits the whole diorama, dives to each place, and lifts back out."""
+    orbit: Literal["auto", "cw", "ccw"] = Field(
+        "auto", description="Which way it travels round the world between places: the short way, or always "
+                            "clockwise / counter-clockwise (seen from above)")
+    pitch: float = Field(36.0, ge=10, le=80, description="Degrees above the horizon in the orbit view")
+    dive_pitch: float = Field(21.0, ge=6, le=60, description="Degrees above the horizon once it has dived to a place")
+    fov: float = Field(30.0, ge=14, le=60, description="Lens in degrees: narrow flattens the world into a macro photograph")
+    dive: float = Field(1.0, ge=0.4, le=2.0, description="How close the dive lands (above 1 is closer)")
+    hold: float = Field(0.5, ge=0.1, le=0.9, description="Share of each step's scroll the camera rests at its place; the rest is travel")
+    drift: float = Field(1.0, ge=0, le=3, description="The camera's idle breathing, and how far the pointer can turn it (0: still)")
+
+
+class DioramaLook(Model):
+    """The miniature look: shallow tilt-shift depth of field, high soft sun, toy saturation."""
+    tilt_shift: float = Field(1.0, ge=0, le=2.5, description="Depth-of-field strength: 0 is sharp everywhere; 1 reads "
+                                                             "as a macro lens on a model; above 1 is extreme")
+    saturation: float = Field(1.15, ge=0.5, le=2.0, description="Colour boost (toys are a little too colourful)")
+    sun: Literal["morning", "noon", "golden", "dusk"] = Field(
+        "golden", description="Time of day: the sun's height and warmth, the length of the shadows")
+    table: Optional[str] = Field(None, description="Colour of the surface the diorama stands on (default: the theme background)")
+    grain: float = Field(0.03, ge=0, le=0.2, description="Film grain")
+    vignette: float = Field(0.25, ge=0, le=1.0, description="Darkening towards the corners")
+
+
+class DioramaScene(SceneBase):
+    """A miniature world: a tilt-shift diorama (a tiny harbour town, a desk, a factory floor, a studio) rendered live in
+    the page. Scrolling orbits the camera round the whole thing, dives to a place where that step's content sits,
+    lifts back out and travels to the next. Steps are the places' content: the first step may be an `intro` (the
+    world seen whole), the rest take the places in order (or a place names its own with `step`)."""
+    type: Literal["diorama"] = "diorama"
+    layout: Literal["overlay", "split", "cards"] = "cards"
+    world: DioramaWorld = Field(default_factory=DioramaWorld)
+    places: list[DioramaPlace] = Field(..., min_length=1)
+    camera: DioramaCamera = Field(default_factory=DioramaCamera)
+    look: DioramaLook = Field(default_factory=DioramaLook)
+    length: float = 10.0
+
+    @model_validator(mode="after")
+    def _windows(self):
+        # overlay layout: a step's caption is on screen while the camera rests at its place (and a little around it)
+        if self.layout == "overlay" and self.steps and any(s.at is None for s in self.steps):
+            total = sum(s.length for s in self.steps) or 1.0
+            acc = 0.0
+            for s in self.steps:
+                a, b = acc / total, (acc + s.length) / total
+                acc += s.length
+                if s.at is None:
+                    w = b - a
+                    s.at = (round(a + w * 0.12, 4), round(b - w * 0.12, 4))
+        return self
+
+
 # ---------------------------------------------------------------- content blocks
 
 class BlockBase(Model):
@@ -1435,13 +1541,13 @@ class FaqBlock(BlockBase):
 
 Section = Annotated[Union[
     FilmScene, ArtworkScene, Scene3DScene, SequenceScene, ParallaxScene, TypeScene, VectorScene, ChartScene, MapScene,
-    SplatScene, CodeScene, ShowroomScene,
+    SplatScene, CodeScene, ShowroomScene, DioramaScene,
     IntroBlock, FeaturesBlock, StatsBlock, TimelineBlock, QuoteBlock, CtaBlock, GalleryBlock,
     HeroBlock, ProductBlock, StripBlock, OrbitBlock, FaqBlock,
 ], Field(discriminator="type")]
 
 SCENE_TYPES = ("film", "artwork", "scene3d", "sequence", "parallax", "type", "vector", "chart", "map", "splat", "code",
-               "showroom")
+               "showroom", "diorama")
 
 
 # ---------------------------------------------------------------- site
