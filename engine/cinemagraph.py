@@ -185,8 +185,12 @@ def tone_match(frames: np.ndarray, ref: np.ndarray, mask: np.ndarray, ring: int)
     refb = ref[band].astype(np.float32)                       # (n, 3)
     out = np.empty_like(frames)
     sig = max(6.0, min(H, W) / 8)
-    wmap = band.astype(np.float32)
-    wblur = cv2.GaussianBlur(wmap, (0, 0), sig) + 1e-4
+    q = max(1, int(sig // 6))                                 # the residual is smooth: work on a 1/q-size copy of it
+    sw, sh = max(2, W // q), max(2, H // q)
+    wsmall = cv2.resize(band.astype(np.float32), (sw, sh), interpolation=cv2.INTER_AREA)
+    wblur = cv2.GaussianBlur(wsmall, (0, 0), sig / q) + 1e-4
+    msmall = cv2.resize((m > 0).astype(np.float32), (W, H), interpolation=cv2.INTER_NEAREST)[..., None]
+    refs = ref.astype(np.float32)
     for t in range(T):
         f = frames[t].astype(np.float32)
         fb = f[band]
@@ -199,9 +203,10 @@ def tone_match(frames: np.ndarray, ref: np.ndarray, mask: np.ndarray, ring: int)
             o[c] = y.mean() - g[c] * x.mean()
         f = f * g + o
         # what is left, smooth, from the ring inward
-        resid = (ref.astype(np.float32) - f) * wmap[..., None]
-        resid = np.stack([cv2.GaussianBlur(resid[..., c], (0, 0), sig) for c in range(3)], axis=-1) / wblur[..., None]
-        f = f + resid * (m[..., None] > 0)
+        resid = cv2.resize((refs - f) * band[..., None], (sw, sh), interpolation=cv2.INTER_AREA)
+        resid = cv2.GaussianBlur(resid, (0, 0), sig / q) / wblur[..., None]
+        resid = cv2.resize(resid, (W, H), interpolation=cv2.INTER_LINEAR)
+        f = f + resid * msmall
         out[t] = np.clip(f + 0.5, 0, 255).astype(np.uint8)
     return out
 
