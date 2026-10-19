@@ -6,7 +6,7 @@
 #               pictures are *designed* to match: `image: {match: ...}` redraws the previous section's last frame
 #               (Qwen-Image-Edit) with the shape becoming something else in the same place at the same size
 #   whip pan    a fast directional blur-pan from the cup into the roastery
-#   iris        the roastery irises open from where the phone will be
+#   iris        the roastery irises open from where the phone is
 #   carry       a figure travels from its place in the app section into its place in the numbers
 #   wipe        a soft diagonal wipe into the quote
 #   dissolve    a held cross-dissolve into the steps
@@ -34,7 +34,7 @@ sections:
     buttons:
       - { label: Scroll slowly, href: "#sun" }
     image:
-      generate: "A single flat graphic logo emblem on a deep navy blue background: one large perfect white circle ring with a thick clean outline, placed on the right side of the frame with its centre two thirds of the way across, the left half of the frame empty navy blue, minimalist graphic design, flat colours"
+      generate: "A single flat graphic logo emblem on a deep navy blue background: one small perfect white circle ring with a thick clean outline, exactly in the centre of the frame, its diameter about one quarter of the image width, lots of empty navy blue space all around it, minimalist graphic design, flat colours"
       seed: 3
     transition:
       type: match
@@ -51,8 +51,8 @@ sections:
       match:
         section: mark
         shape: the white ring
-        becomes: a huge glowing orange sun disc
-        prompt: a calm dark sea at dusk under a deep orange and purple sky, the enormous sun low over the horizon on the right side of the frame
+        becomes: a glowing orange sun disc
+        prompt: a calm dark sea at dusk under a deep orange and purple sky, a big sun low over the horizon in the middle of the frame
     transition:
       type: match
       shape: the sun disc
@@ -69,10 +69,10 @@ sections:
         section: sun
         shape: the sun disc
         becomes: the round white rim of a coffee cup seen from directly above, full of black coffee
-        prompt: a wooden table in warm morning light, the cup on the right side of the table with a saucer and a spoon
+        prompt: a wooden table in warm morning light, the cup in the middle of the table with a saucer and a spoon
     transition: { type: whip, direction: left }
 
-  # 4. the roastery: photos with a slow camera through depth. An iris opens from the right, where the phone comes next.
+  # 4. the roastery: photos with a slow camera through depth. An iris opens from the left, where the phone comes next.
   - type: parallax
     id: roastery
     nav_label: The roastery
@@ -94,7 +94,7 @@ sections:
           generate: "Close photograph of freshly roasted coffee beans pouring from a copper cooling tray, warm backlight, shallow depth of field, steam, photorealistic"
           size: [1920, 1088]
           seed: 8
-    transition: { type: iris, origin: [0.74, 0.5], soft: 0.03 }
+    transition: { type: iris, origin: [0.2, 0.5], soft: 0.03 }
 
   # 5. the app. One of its figures travels into the numbers section.
   - type: product

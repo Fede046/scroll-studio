@@ -145,6 +145,7 @@ Every example is a `site.yaml` in [`examples/`](examples/) and rebuilds with `st
 | [Hollis House](examples/hollis-house/site.yaml) | Real estate | `splat` | A walk through a scanned house, room by room |
 | [Pelorus](examples/pelorus/site.yaml) | Research | `chart` (bar) | The renewables share of electricity, every figure read from Our World in Data |
 | [Halcyon](examples/halcyon/site.yaml) | Software | blocks | One product page as twenty-one experiences (`studio looks`) |
+| [Halo Coffee](examples/film-cuts/site.yaml) | Coffee | `transition:` | A page edited like a film: a logo becomes the sun becomes a cup (designed match cuts), a whip pan, an iris, a carried figure, a wipe, a dissolve and a hard cut (needs ComfyUI to build; `studio cuts --strip` shows each cut) |
 
 ## Quick start
 
