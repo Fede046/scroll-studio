@@ -5,7 +5,7 @@
   <figcaption>
     {%- if d.board == 'grid' %}<span class="n">{{ '%02d'|format(n + 1) }}</span>{% endif %}
     {%- if d.board == 'terminal' %}<span class="t">$ open {{ s.slug }}</span>
-    {%- else %}<div><div class="k">{% if d.board == 'plate' %}Plate {{ n + 1 }}{% else %}{{ s.kicker or s.role }}{% endif %}</div><div class="t">{{ (s.title_html if n == 0 else s.title_short)|safe }}</div></div>{% endif -%}
+    {%- else %}<div><div class="k">{% if d.board == 'plate' %}{{ d.unit }} {{ n + 1 }}{% else %}{{ s.kicker or s.role }}{% endif %}</div><div class="t">{{ (s.title_html if n == 0 else s.title_short)|safe }}</div></div>{% endif -%}
   </figcaption>
 </figure>
 {%- endmacro -%}

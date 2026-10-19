@@ -212,7 +212,8 @@ def compose(school: vocab.School, brief: Brief, rules: Rules, seed, used_styles=
     return Direction(
         id="", school=school.key, name=school.name, kind=school.kind, concept=concept, palette=pal, fonts=fonts, style=style,
         style_label=label, style_about=about, imagery=imagery, imagery_family=family, light_name=light_name,
-        motion=list(school.motion), voice=school.voice, pace=school.pace, radius=school.radius, board=school.board)
+        motion=list(school.motion), voice=school.voice, pace=school.pace, radius=school.radius, board=school.board,
+        unit=school.unit)
 
 
 # ---------------------------------------------------------------- fit

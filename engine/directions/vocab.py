@@ -68,6 +68,7 @@ class School:
     pace: float = 1.0           # scroll.speed
     radius: str = ""
     board: str = "overlay"      # how the board sets a still: overlay | split | poster | plate | grid | terminal
+    unit: str = "Plate"         # what a still is called under the plate layout: Plate, Spread, Layer, Sheet
 
 
 def P(name, mode, bg, bg2, ink, accent, accent2, accent_ink=""):
@@ -270,7 +271,7 @@ SCHOOLS: tuple[School, ...] = (
         motion=("Page: sections open like spreads, a small fold and settle; pull-tabs and flaps for details",
                 "Camera on film: gentle parallax between painted planes, no live-action camera shake",
                 "Type: hand-set feel, headlines bounce once and stop"),
-        voice="Warm and a little playful, short sentences you could read aloud.", pace=0.9, radius="14px", board="plate"),
+        voice="Warm and a little playful, short sentences you could read aloud.", pace=0.9, radius="14px", board="plate", unit="Spread"),
 
     School(
         key="clay", name="Soft Clay", kind="dimensional",
@@ -370,7 +371,7 @@ SCHOOLS: tuple[School, ...] = (
         motion=("Page: sheets slide in on parallel folds and stay; shadows deepen as layers separate",
                 "Camera on film: stepped moves at 8 fps, like a stop-motion table; no smooth glide",
                 "Type: headline pieces snap in one word at a time, slightly rotated"),
-        voice="Direct and warm, a craftsperson explaining how it is made.", pace=1.0, radius="6px", board="plate"),
+        voice="Direct and warm, a craftsperson explaining how it is made.", pace=1.0, radius="6px", board="plate", unit="Layer"),
 
     School(
         key="travel-poster", name="Departure Poster", kind="illustration",
@@ -438,7 +439,7 @@ SCHOOLS: tuple[School, ...] = (
         looks=(Look("glossy 3D render, liquid chrome and iridescent gradients, Y2K futurism, soft bloom",
                     "wide 24mm, floating objects, a slight fisheye", "optimistic, digital, translucent",
                     "chrome, lilac and aqua", light="studio reflections with rainbow caustic highlights", family="render-gloss"),
-               Look("translucent frosted-plastic objects and glass orbs on a gradient void, product-render polish",
+               Look("frosted translucent plastic and glass materials on a gradient void, product-render polish",
                     "centred hero object, shallow depth of field, clean negative space", "smooth, weightless, a little dreamy",
                     "ice blue, pearl and magenta", light="large soft area lights with coloured rim light", family="render-gloss")),
         styles={"holographic": 3, "glassmorphism": 3, "liquid-morph": 2, "gradient-mesh": 1},
@@ -485,10 +486,10 @@ SCHOOLS: tuple[School, ...] = (
         pairings=(Pairing("JetBrains Mono", "JetBrains Mono", "JetBrains Mono", 500, "accent", False, "plain", "one monospace everywhere, because the page is a terminal"),
                   Pairing("IBM Plex Mono", "IBM Plex Sans", "IBM Plex Mono", 500, "accent", False, "plain", "mono headlines, sans for long reading"),
                   Pairing("Martian Mono", "Space Mono", "Martian Mono", 600, "accent", False, "caps", "a wide mono display with a lighter mono body")),
-        looks=(Look("photograph of a green-phosphor CRT monitor in a dark room, scanlines, screen glow and bloom",
-                    "close macro on the screen, slight curvature", "focused, nocturnal, patient",
+        looks=(Look("image as shown on a green-phosphor CRT monitor in a dark room, scanlines, screen glow and bloom",
+                    "close on the screen, slight curvature", "focused, nocturnal, patient",
                     "phosphor green on black", light="screen glow is the only light", family="crt"),
-               Look("macro photograph of mechanical keyboards, cables and a lit terminal window on a dark desk",
+               Look("dark photograph lit only by a terminal window glow, cables and a desk lamp in the shadows",
                     "50mm, shallow depth of field, desk-level", "focused, workmanlike, late",
                     "amber, graphite and black", lights=("candle", "neon"), family="crt")),
         styles={"ascii-art": 3, "retro-vhs": 2, "wireframe-3d": 1},
@@ -560,10 +561,10 @@ SCHOOLS: tuple[School, ...] = (
         pairings=(Pairing("Shippori Mincho", "Karla", "DM Mono", 500, "accent", False, "plain", "a Japanese-influenced mincho with a quiet grotesque"),
                   Pairing("Cormorant", "Hanken Grotesk", "DM Mono", 400, "accent", True, "plain", "airy serif, wide spacing, light text"),
                   Pairing("Noto Serif Display", "Albert Sans", "DM Mono", 300, "accent", True, "plain", "a hairline serif display with a geometric sans")),
-        looks=(Look("wabi-sabi still life photograph, handmade ceramics, raw linen and weathered wood, matte textures",
+        looks=(Look("wabi-sabi photograph, matte textures in raw linen, weathered wood and unglazed clay, quiet and uneven",
                     "50mm, quiet asymmetric composition, lots of empty space", "still, humble, breathing",
                     "stone, bone and charcoal with a thread of vermilion", lights=("window", "overcast", "fog"), family="still-photo"),
-               Look("minimal architectural photograph of a raked sand garden and a timber room open to the air",
+               Look("quiet minimal photograph in the manner of Japanese architectural photography, matte and muted",
                     "35mm, low and level, a single horizontal line", "serene, spare, ancient",
                     "sand, cedar and moss grey", lights=("fog", "overcast", "dappled"), family="still-photo")),
         styles={"sand": 3, "none": 3, "pinscreen": 1, "particles": 1},
@@ -595,7 +596,7 @@ SCHOOLS: tuple[School, ...] = (
         motion=("Page: the camera glides diagonally across one big map from district to district",
                 "Camera on film: slow aerial drifts and a route drawing itself in red",
                 "Type: place-name labels fade in as the view reaches them"),
-        voice="Expedition-journal voice: dated entries, distances, what lies beyond.", pace=0.9, radius="2px", board="plate"),
+        voice="Expedition-journal voice: dated entries, distances, what lies beyond.", pace=0.9, radius="2px", board="plate", unit="Sheet"),
 
     School(
         key="cel", name="Cel Animation", kind="illustration",

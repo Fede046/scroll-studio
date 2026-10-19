@@ -25,6 +25,7 @@ class Direction:
     pace: float = 1.0               # scroll.speed
     radius: str = ""
     board: str = "overlay"
+    unit: str = "Plate"
     stance: str = ""                # closest to today | a step away | a different site
     distance_from_current: float = 0.0
     fit: float = 0.0
