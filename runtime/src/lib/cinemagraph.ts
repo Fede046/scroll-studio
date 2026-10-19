@@ -176,12 +176,12 @@ export function start(): void {
   const seenIO = new IntersectionObserver((es) => {
     for (const en of es) {
       const it = items.find((i) => i.host === en.target)!;
-      it.seen = en.isIntersecting;
-      if (it.seen) load(it);
+      it.seen = en.isIntersecting && en.intersectionRatio >= 0.15;      // a sliver at the edge of the screen is not worth a decode
+      if (en.isIntersecting) load(it);
       sync(it);
     }
     kick();
-  }, { rootMargin: "0px" });
+  }, { rootMargin: "0px", threshold: [0, 0.15] });
   for (const it of items) { nearIO.observe(it.host); seenIO.observe(it.host); }
 
   const relayout = () => items.forEach(layout);
