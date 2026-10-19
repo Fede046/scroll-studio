@@ -294,6 +294,52 @@ UI (React) ◄─► engine server (FastAPI + job queue + websocket events) ◄�
   sets captions, callouts and the end card in the theme's fonts with headless Chrome (`type.html`, drawn by
   `seek(t)`, captured as transparent frames); the result is encoded once per format and the music muxed in.
 
+### The one-take page
+
+`journey:` on a `film` section (`engine/journey.py`, `runtime/src/players/journey.ts`, `engine/compile/templates/journey.html.j2`).
+The spec is a `world` and ordered `stops`; `FilmScene` expands it when the spec is validated (`journey.expand`), so every
+other part of the engine (`build --plan`, the storyboard, `studio inspect`, `studio freeze`, `studio camera`, the cache) sees
+an ordinary film made of beats (the chain) or a `take` (a blockout), and a saved spec keeps only what was written (the
+derived `beats`/`take`, `steps`, `length` and `beat_fade` are left out of `model_dump` unless the compiler asks for a field
+list). `journey.plan` is the one list of segments (a move to a stop, the hold at it) with film seconds and scroll; everything
+else derives from it.
+
+**Two generation approaches, one spec.** Measured on this machine (RTX 4090, LTX-2.3 at 1024x576):
+
+- *A chain of camera moves between stop pictures* (no `blockout`): each move is a `camera:` beat starting on the last frame of
+  the hold before it, each hold a frozen moment (`freeze.from`, `pick: last`, camera from the whole picture to a slow push and
+  back, `smoother` ease, so both joins are on the same frame). Cheap to iterate: a stop is one cached beat (about 8 minutes
+  for a 3 s move, the hold in seconds), and the pictures come out of each other, so the style cannot drift. Its limit is the
+  premise of a keyed camera move: the camera is flown through the *depth of the picture it starts from*, so it can only go into
+  what that picture shows. Tested on a stone farmhouse (door, then the hall behind it): a 3 s push to the open door
+  with the default `anchor` 0.6 arrives as a sharp, plausible close-up of the door, and a second 4 s move through the doorway
+  ends as a larger close-up of the same door and the same flat warm wall behind it (the picture never showed the hall); with
+  `anchor` 0.2, to let the model paint more, it does not go through either: the shot loses focus and stays on the door. So the
+  chain suits a facade, a street, a landscape, a table seen from above, any place whose next stop is in view of the last;
+  it cannot take the camera through a door.
+- *One continuous take through a blockout* (`blockout:` set): the world is rough shapes, the camera is a real 3D path that
+  rests at every stop. Blender renders the depth along the path (the take pipeline), each stop's picture is painted over its
+  depth (Z-Image Turbo, depth ControlNet) and LTX-2.3 paints between them, in stretches cut at the middle of a hold, where the
+  camera is at rest (the one place a seam cannot show) and split evenly if longer than `blockout.segment`. The camera can go
+  through a door into a room the first picture never showed, and every stop's picture is designed (the depth makes it agree with
+  the geometry, the shared `world` and `imagery:` make the stops one place). The price is the blockout, and the render
+  is one stage (segments resume: a segment is kept when its prompt, settings, guide, first frame and keyframes are
+  unchanged, `film_build.stage_generate`).
+  Blockout poses need depth: a view straight at a wall gives the depth ControlNet a flat plane to paint and it makes a collage
+  (seen: a fireplace seen head-on); looking *along* the hall at an angle, so arches recede behind a foreground piece, gives it
+  something to follow (the door, library and table pictures of `examples/fenmoor` came out as photographs of one house).
+
+**The page.** `timeline()` turns the segments' rendered lengths into `map` (scroll progress to film time, piecewise linear) and
+each stop's window (`in`: the camera is slowing into the stop, `out`: it moves on); the player sets `--in`/`--out` per stop
+every frame, so blocks arrive and leave as a function of scroll position and never trail a fast scroll. There is no scroll
+capture: the stage is `position: sticky` in a tall track like any `overlay` scene, and the camera is at rest during a hold
+because the camera path is (chain: the hold's `smoother` ease; take: duplicate keys), not because the page stops the reader.
+`analyse()` places the blocks: of left, right and bottom, the region of the stop's own picture (taken from the film at the
+middle of the hold) with the least gradient energy and tonal spread, nudged off the previous stop's side, away from `focus`;
+light or dark lettering by the region's luminance (the theme's ink and background, whichever is lighter); a scrim raised in
+steps until the lettering clears WCAG AA against the 90th-percentile brightest (or darkest) pixel under it. The result is
+cached as the stage `journey` and written to `.build/<section>/journey.json` (`studio journey` prints it).
+
 ### Repository layout
 
 ```
