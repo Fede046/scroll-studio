@@ -655,6 +655,14 @@ class Maker:
         return [self._images_card(sec, "image", refs, f"{sec.id} (parallax)",
                                   " / ".join(plain(st.title) for st in sec.steps))] if refs else []
 
+    def scene_light(self, sec) -> list[Card]:
+        """The world: the one picture every time of day is a relighting of (a `scene:<id>` world is another card's)."""
+        if isinstance(sec.world, str) and sec.world.startswith("scene:"):
+            return []
+        return [self._images_card(sec, "image", [("world", sec.world, False)],
+                                  f"{sec.id} (light: {', '.join(t.id for t in sec.times)})",
+                                  " / ".join(plain(st.title) for st in sec.steps))]
+
     def block(self, sec) -> list[Card]:
         refs = image_refs(sec)
         if not refs:

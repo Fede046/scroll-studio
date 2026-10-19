@@ -41,6 +41,7 @@ SCENE_INFO = {
     "showroom": "The site's product live in the page (three.js): scroll turns, explodes and zooms the real model.",
     "parallax": "Photos turned into 2.5D camera moves with estimated depth, one per step.",
     "type": "Kinetic typography: reveal, stack, swap or scale.",
+    "light": "One place relit from dawn to night as you scroll: each step a time of day, windows and lamps coming on.",
 }
 BLOCK_TYPES = ["intro", "features", "stats", "timeline", "quote", "cta", "gallery"]
 PRESETS_3D = ["cell-field", "cell", "nucleus", "helix", "galaxy", "star-system", "planet", "network", "lattice", "particles", "gltf"]

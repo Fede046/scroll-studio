@@ -4,10 +4,10 @@ import type { Info } from "../App";
 import { Fields, Fieldset, type Ctx } from "./SchemaForm";
 
 const DEFS: Record<string, string> = {
-  film: "FilmScene", artwork: "ArtworkScene", scene3d: "Scene3DScene", sequence: "SequenceScene", parallax: "ParallaxScene", type: "TypeScene", showroom: "ShowroomScene",
+  film: "FilmScene", artwork: "ArtworkScene", scene3d: "Scene3DScene", sequence: "SequenceScene", parallax: "ParallaxScene", type: "TypeScene", showroom: "ShowroomScene", light: "LightScene",
   intro: "IntroBlock", features: "FeaturesBlock", stats: "StatsBlock", timeline: "TimelineBlock", quote: "QuoteBlock", cta: "CtaBlock", gallery: "GalleryBlock",
 };
-const SCENES = ["film", "artwork", "scene3d", "sequence", "showroom", "parallax", "type"];
+const SCENES = ["film", "artwork", "scene3d", "sequence", "showroom", "parallax", "light", "type"];
 
 function starter(type: string, n: number): any {
   const id = `${type}-${n}`;
@@ -21,6 +21,9 @@ function starter(type: string, n: number): any {
     case "showroom": return { id, type, model: "product", steps: [{ intro: true, title: "The real <em>thing.</em>" }, { title: "Every part" }, { title: "Back together" }] };
     case "parallax": return { id, type, steps: [{ intro: true, title: "A place worth <em>the trip.</em>" },
       { title: "Morning", image: { generate: "A sunlit terrace above the sea at morning, photoreal" } }, { title: "Evening", image: { generate: "The same terrace at dusk with lanterns, photoreal" } }] };
+    case "light": return { id, type, world: { generate: "A small stone harbour town around a calm bay, terracotta roofs, moored boats, iron street lamps, clear sky, even daylight, photoreal, no people" },
+      world_time: "noon", times: ["dawn", "morning", "noon", "golden-hour", "blue-hour", "night"],
+      steps: [{ intro: true, title: "The harbour <em>wakes first.</em>" }, { title: "Morning" }, { title: "Noon" }, { title: "Golden hour" }, { title: "Lamps <em>come on.</em>" }, { title: "Night" }] };
     case "type": return { id, type, mode: "reveal", text: "Say the one thing that <em>matters</em>, and let the page take its time." };
     case "intro": return { type, title: "One line about <em>what you do.</em>", body: "A short paragraph." };
     case "features": return { type, items: [{ title: "First" }, { title: "Second" }, { title: "Third" }] };
