@@ -8,6 +8,7 @@ intro, features, stats, timeline, quote, cta, gallery).
 """
 from __future__ import annotations
 
+import re
 from typing import Annotated, Any, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -1113,6 +1114,158 @@ class CodeScene(SceneBase):
     length: float = 14.0
 
 
+# ---- light as the scroll (engine/scenes/light.py, engine/light.py, runtime/src/players/light.ts): kept together ------
+
+class LightTime(Model):
+    """One time of day of a `light` scene. A bare string is a named preset (`dawn`, `morning`, `noon`, `afternoon`,
+    `golden-hour`, `sunset`, `blue-hour`, `night`, `overcast`, `storm`; `engine/light_presets.py`) or, when it is not
+    one, free text describing the light."""
+    id: Optional[str] = Field(None, description="Name to pin steps to (`state: {time: <id>}`); default: the preset's "
+                                                "name, else the first words of the prompt")
+    preset: Optional[str] = Field(None, description="A named time of day: dawn, sunrise, morning, noon, afternoon, "
+                                                    "golden-hour, sunset, blue-hour, night, overcast, storm. It supplies the "
+                                                    "light's wording, the clock, the mist and whether lamps are on")
+    prompt: Optional[str] = Field(None, description="Free text describing this light ('low green storm light, the sun "
+                                                    "breaking through on the left, wet stone'). With a preset it is added "
+                                                    "to the preset's wording")
+    clock: Optional[str] = Field(None, description="The hour shown beside the picture, e.g. '18:40' (default: the preset's)")
+    haze: Optional[float] = Field(None, ge=0, le=1, description="Mist lying in the distance at this time, 0-1; the page "
+                                                                "draws it with the depth map and lets it drift "
+                                                                "(default: the preset's)")
+    lit: Optional[bool] = Field(None, description="Lamps and windows are lit at this time (default: the preset's). The "
+                                                  "build finds what turned on or off between neighbouring times")
+    seed: Optional[int] = Field(None, description="Seed for this time's relight (default: the scene's); try another when "
+                                                  "one drifts or looks wrong")
+    image: Optional[ImageRef] = Field(None, description="This time's own picture of the same place, instead of relighting "
+                                                        "the world (a real photograph, a hand-fixed render). It is aligned "
+                                                        "to the world like any relight")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _bare(cls, v):
+        if isinstance(v, str):
+            from .light_presets import PRESETS
+            key = v.strip().lower().replace(" ", "-").replace("_", "-")
+            return {"preset": key} if key in PRESETS else {"prompt": v}
+        return v
+
+    @model_validator(mode="after")
+    def _known(self):
+        from .light_presets import PRESETS
+        if self.preset is not None:
+            self.preset = self.preset.strip().lower().replace(" ", "-").replace("_", "-")
+            if self.preset not in PRESETS:
+                raise ValueError(f"unknown time of day '{self.preset}' (known: {', '.join(PRESETS)})")
+        if not (self.preset or self.prompt or self.image):
+            raise ValueError("a time needs a preset, a prompt or an image")
+        return self
+
+
+class LightLamps(Model):
+    """Lights that switch on (or off) between two times: windows, street lamps, a lit cabin. Name them and the build cuts
+    them out of the lit picture (Florence-2 + SAM 2.1, `engine/region.py`); the page then turns each one on at its own
+    moment as the light changes, with a glow, instead of fading the whole picture."""
+    prompt: str = Field(..., description="What turns on, as you would say it to a person: 'the street lamps and the lit "
+                                         "windows'. Found on the picture where it is lit")
+    color: Optional[str] = Field(None, description="Glow colour, hex (default: measured from the lit pixels)")
+    glow: float = Field(1.0, ge=0, le=3, description="Strength of the halo around a light as it comes on")
+    grow: int = Field(2, ge=-20, le=60, description="Widen (+) or shrink (-) each cut-out by this many pixels")
+
+
+class LightSun(Model):
+    """A sun (by day) and a moon (by night) that travel over the sky as the scroll goes through the day: a soft glow
+    drawn in the browser over the sky only, behind the buildings. The relit pictures are asked for a sky without a
+    sun disc so the two never double up."""
+    rise: tuple[float, float] = Field((0.1, 0.5), description="Where it comes up, 0-1 across and down the picture")
+    noon: tuple[float, float] = Field((0.5, 0.06), description="Where it is highest")
+    set: tuple[float, float] = Field((0.92, 0.5), description="Where it goes down")
+    size: float = Field(1.0, ge=0.1, le=4, description="Size of the glow")
+    strength: float = Field(1.0, ge=0, le=3, description="Brightness of the glow")
+    moon: bool = Field(True, description="A cool glow takes its place after dark, crossing the same way")
+    sky: Optional[str] = Field(None, description="What the sky is called for the cut-out (default: 'the sky')")
+
+
+class LightStructure(Model):
+    """Geometry lock. The place must not move between times, only the light. Every relight is measured against the world
+    (edge and depth agreement, how far things are displaced) and small drift is warped away; a relight that still
+    drifts is redone with another seed, and the best attempt is kept."""
+    align: bool = Field(True, description="Warp each relight back onto the world's geometry (dense flow on structure, "
+                                          "not on colour) so edges sit exactly where they were")
+    max_drift: float = Field(2.5, ge=0, le=40, description="Mean displacement in pixels (at 1024 across) that counts as "
+                                                           "good enough; above it the relight is retried")
+    retries: int = Field(2, ge=0, le=8, description="How many more seeds to try when a relight drifts too far")
+
+
+class LightScene(SceneBase):
+    """Light as the scroll: one place, relit from dawn to night as the page scrolls. The world is one picture (a file, a
+    generated image, or another scene's still); each time of day is that same picture relit with the geometry locked
+    (Qwen-Image-Edit, measured and aligned to the world), cached per time. In the browser the scroll moves continuously
+    through the day: a WebGL shader blends neighbouring times with the light itself (a front of new light spreads from
+    the sun, shadows sweep, windows and lamps come on one by one with a glow), a slow 2.5D drift lets the place
+    breathe, and the section's colours (captions, shade) follow the sky. Steps are the sections of the day: each sits at
+    a time (`state: {time: <id>}`, or in order). Reduced motion shows one still per step."""
+    type: Literal["light"] = "light"
+    layout: Literal["overlay", "split", "cards"] = "overlay"
+    length: float = Field(0.0, description="overlay layout: scroll distance in screen heights (0: 2.6 per time of day)")
+    world: ImageRef = Field(..., description="The place: a file, a generated image, an edit, or `scene:<id>` for the "
+                                             "first frame of another scene (built first). Neutral daylight with the lamps "
+                                             "off relights best; everything in it stays where it is")
+    world_time: Optional[str] = Field(None, description="The id of the time the world picture already shows (it is used as "
+                                                        "it is, not relit): the cleanest anchor, e.g. `noon`")
+    times: Union[Literal["day"], list[LightTime]] = Field(
+        "day", description="The times of day in order, as presets or free text: [dawn, morning, noon, golden-hour, "
+                           "blue-hour, night]. `day` is that list. At least two")
+    hold: float = Field(0.3, ge=0, le=0.9, description="Share of each step the light holds still at its time (so a "
+                                                        "headline reads in its own light) before the next change begins")
+    lamps: list[LightLamps] = Field(default_factory=list, description="Lights that come on and go off (windows, lamps); "
+                                                                      "found with Florence-2 + SAM 2.1 and switched one by "
+                                                                      "one in the browser. Without it the build finds what "
+                                                                      "changed from the pictures themselves")
+    sun: Union[bool, LightSun] = Field(True, description="A sun (and moon) glow that travels over the sky; false for none")
+    mist: bool = Field(True, description="Draw the times' `haze` as drifting mist, thicker with distance (needs depth)")
+    drift: float = Field(0.5, ge=0, le=2, description="A slow 2.5D camera drift through the depth map so the place "
+                                                      "breathes (0 off; reduced motion always off)")
+    follow: bool = Field(True, description="The section's colours follow the sky: caption ink, accent and the shade "
+                                           "behind the text are measured from each time's picture and blended with the light")
+    clock: bool = Field(True, description="Show the time of day (a clock and a sun arc) in a corner")
+    blend: Literal["light", "fade"] = Field("light", description="light: the light-aware transition; fade: a plain "
+                                                                 "crossfade (for comparison, or a quieter page)")
+    structure: LightStructure = Field(default_factory=LightStructure)
+    depth_model: Literal["small", "base", "large"] = Field("small", description="Depth Anything V2 size for the drift and "
+                                                                                 "the mist (small is Apache-2.0)")
+    seed: int = Field(7, description="Seed for the relights")
+    edit_steps: int = Field(24, ge=4, le=60, description="Qwen-Image-Edit sampling steps per relight")
+    width: int = Field(1920, ge=640, le=3840, description="Width of the pictures served to desktop browsers (phones get "
+                                                          "two thirds)")
+
+    @model_validator(mode="after")
+    def _times(self):
+        from .light_presets import SEQUENCES
+        if self.times == "day":
+            self.times = [LightTime(preset=p) for p in SEQUENCES["day"]]
+        used: set[str] = set()
+        for i, t in enumerate(self.times):
+            if not t.id:
+                base = t.preset or "-".join(re.findall(r"[a-z0-9]+", (t.prompt or "").lower())[:3]) or f"t{i}"
+                t.id = base
+                n = 2
+                while t.id in used:
+                    t.id, n = f"{base}-{n}", n + 1
+            elif t.id in used:
+                raise ValueError(f"light '{self.id}': two times are called '{t.id}'")
+            used.add(t.id)
+        if len(self.times) < 2:
+            raise ValueError(f"light '{self.id}': a day needs at least two times")
+        if self.world_time is not None and self.world_time not in used:
+            raise ValueError(f"light '{self.id}': world_time '{self.world_time}' is not one of the times ({', '.join(sorted(used))})")
+        for st in self.steps:
+            tid = (st.state or {}).get("time")
+            if tid is not None and tid not in used:
+                raise ValueError(f"light '{self.id}': step '{st.title}' sits at time '{tid}', which is not one of the times "
+                                 f"({', '.join(sorted(used))})")
+        return self
+
+
 # ---------------------------------------------------------------- content blocks
 
 class BlockBase(Model):
@@ -1316,12 +1469,14 @@ class FaqBlock(BlockBase):
 Section = Annotated[Union[
     FilmScene, ArtworkScene, Scene3DScene, SequenceScene, ParallaxScene, TypeScene, VectorScene, ChartScene, MapScene,
     SplatScene, CodeScene, ShowroomScene,
+    LightScene,
     IntroBlock, FeaturesBlock, StatsBlock, TimelineBlock, QuoteBlock, CtaBlock, GalleryBlock,
     HeroBlock, ProductBlock, StripBlock, OrbitBlock, FaqBlock,
 ], Field(discriminator="type")]
 
 SCENE_TYPES = ("film", "artwork", "scene3d", "sequence", "parallax", "type", "vector", "chart", "map", "splat", "code",
-               "showroom")
+               "showroom",
+               "light")
 
 
 # ---------------------------------------------------------------- site
