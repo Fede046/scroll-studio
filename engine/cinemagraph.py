@@ -39,7 +39,7 @@ from .project import BuildContext, BuildError, ffmpeg, file_key, probe
 from .spec import Cinemagraph, EditRegion, ImageInput
 
 VERSION = 1
-MASK_VERSION = 3         # bump when the mask or what follows it would come out differently for the same clip (the clip is kept)
+MASK_VERSION = 4         # bump when the mask or what follows it would come out differently for the same clip (the clip is kept)
 FPS = 24
 CONTEXT = 0.5            # how much of the surroundings the video model sees: a share of the region's size on every side
 LTX_MP = 0.5             # megapixels LTX-2.3 renders the crop at (aspect kept)
@@ -243,9 +243,11 @@ def final_mask(seed: np.ndarray, energy: np.ndarray, grow: float, feather: float
     if tracked is not None:
         base = base | (tracked > 127)
     peak = float(np.percentile(energy, 99.5))
-    tau = max(4.0, 0.30 * peak)
+    tau = max(4.0, 0.35 * peak)
     moving = energy > tau
     side = min(H, W)
+    # one or two pixels wide and long is not a thing that moves: it is the edge of something the registration did not hold
+    moving = cv2.morphologyEx(moving.astype(np.uint8), cv2.MORPH_OPEN, np.ones((3, 3), np.uint8)) > 0
     ell = lambda r: cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))
     # everything that moves AND is joined to the thing (or to its tracked path) is the thing: a curtain's hem lifts, a flame
     # leans, steam climbs well past the box it was found in. Pieces that move but are not joined to it (the model moving
@@ -575,6 +577,10 @@ def build(project, ref: ImageInput, log: Callable[[str], None] = print, force: b
     if raw.shape != (H, W):
         raw = np.asarray(Image.fromarray(raw).resize((W, H), Image.BILINEAR))
     seed_full = region_mod.shape(raw, 0, 0)               # the region as found (binary, despeckled), at the still's size
+    if (seed_full > 127).mean() > 0.4:
+        raise BuildError(f"cinemagraph `moves: {cg.moves}` matched {(seed_full > 127).mean():.0%} of the picture, which is not one "
+                         "moving thing. Name the part that moves (\"the flame\", not \"the candle\"), or give `pick: smallest` "
+                         "(Florence-2 also returns a box around the whole scene), `box` or `points`")
     box = crop_around(seed_full, (W, H))
     x0, y0, x1, y1 = box
     cw, ch = x1 - x0, y1 - y0
