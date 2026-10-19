@@ -1,0 +1,23 @@
+{# Scratch film furniture: the reel list along the top edge, the projection (a canvas fixed behind the page that shows the
+   frame in the gate), the film itself down the left edge (a canvas strip with sprocket holes, neighbouring frames and a drawn
+   soundtrack), a layer for the needle's scratches, the lamp, and the readout (footage counter, Run/Hold, Sound). Without
+   JavaScript the strip is a CSS rail and each reel carries a still scratched background; the canvases and the readout only
+   exist once the runtime is running. #}
+{% macro top(site, sections, nav_links) %}
+<header class="sf-head">
+  <a class="sf-head__mark" href="#"><span>{{ site.name }}</span></a>
+  {% if nav_links %}<nav class="sf-head__nav" aria-label="Reels">{% for l in nav_links %}<a href="{{ l.href }}"><i aria-hidden="true">{{ '%02d' % loop.index }}</i><span>{{ l.label }}</span></a>{% endfor %}</nav>{% endif %}
+  {% if site.nav.cta %}<a class="sf-head__cta" href="{{ site.nav.cta.href }}">{{ site.nav.cta.label }}</a>{% endif %}
+</header>
+<canvas class="sf-gate" aria-hidden="true"></canvas>
+<canvas class="sf-scratch" aria-hidden="true"></canvas>
+<div class="sf-lamp" aria-hidden="true"></div>
+<aside class="sf-strip" aria-hidden="true"><canvas></canvas></aside>
+<div class="sf-hud" hidden>
+  <p class="sf-hud__count" aria-hidden="true"><b data-sf="count">FT 0000+00</b> <span data-sf="beat">1.1</span></p>
+  <button type="button" class="sf-sw" data-sf="run" aria-pressed="true" title="Stop or run the projector when you are not scrolling">Run</button>
+  <button type="button" class="sf-sw" data-sf="sound" aria-pressed="false" title="Play the drawn soundtrack as the film moves">Sound</button>
+</div>
+{% endmacro %}
+
+{% macro bottom(site, sections) %}{% endmacro %}
