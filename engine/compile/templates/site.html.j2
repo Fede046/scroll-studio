@@ -168,7 +168,7 @@
 {% set surface = (" ss-surface-" ~ e.s.surface) if e.s.surface else "" %}
 {% if stack %}<div class="ss-panel{{ surface }}{% if e.s.type == 'hero' %} ss-panel--hero{% endif %}{% if e.backdrop %} ss-backdrop{% endif %}"{% if e.backdrop %} style="background-image: url({{ e.backdrop }})"{% endif %}>
 {% elif e.backdrop %}<div class="ss-backdrop{{ surface }}" style="background-image: url({{ e.backdrop }})">{% endif %}
-{% if e.scene %}{% if e.s.type in stypes %}{{ sscenes.render(e.s, e.config, e.sdata, scene) }}{% else %}{{ scene.render(e.s, e.config, e.sdata) }}{% endif %}{% elif e.s.type in btypes %}{{ sblocks.render(e.s, e, blocks, loop) }}{% else %}{{ blocks.render(e.s, e) }}{% endif %}
+{% if e.scene %}{% if e.s.type in stypes %}{{ sscenes.render(e.s, e.config, e.sdata, scene) }}{% else %}{{ scene.render(e.s, e.config, e.sdata, e) }}{% endif %}{% elif e.s.type in btypes %}{{ sblocks.render(e.s, e, blocks, loop) }}{% else %}{{ blocks.render(e.s, e) }}{% endif %}
 {% if stack or e.backdrop %}</div>{% endif %}
 {% endfor %}
 </main>

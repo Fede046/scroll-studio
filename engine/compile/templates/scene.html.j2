@@ -36,7 +36,9 @@
 {% endif %}
 {% endmacro %}
 
-{% macro render(s, cfg, sdata) %}
+{% import "journey.html.j2" as jy %}
+{% macro render(s, cfg, sdata, ex=none) %}
+{% if s.journey %}{{ jy.render(s, cfg, sdata, ex, ex.first if ex else false) }}{% else %}
 <section class="ss-scene ss-{{ s.layout }} ss-side-{{ s.side }} ss-type-{{ s.type }} ss-shade-{{ s.shade }}{% if s.surface %} ss-surface-{{ s.surface }}{% endif %}{% if s.type == "type" and s.size == "display" %} ss-type--display{% endif %}" id="{{ s.id }}" data-scene="{{ s.type }}">
 {% if s.layout == "overlay" %}
   <div class="ss-track" style="height: {{ s.length | vh }}">
@@ -77,4 +79,5 @@
   <script type="application/json" class="ss-config">{{ cfg | tojson }}</script>
   <script type="application/json" class="ss-section">{{ sdata | tojson }}</script>
 </section>
+{% endif %}
 {% endmacro %}

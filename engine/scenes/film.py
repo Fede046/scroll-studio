@@ -574,6 +574,9 @@ def build(sec: FilmScene, ctx: BuildContext, theme: dict) -> dict:
     if sec.reveal:
         from .. import reveal
         cfg["reveal"] = reveal.build(sec, ctx, src, cfg)
+    if sec.journey is not None:    # the one-take page (engine/journey.py): stop stills, scroll-to-film map, block placement
+        from .. import journey
+        journey.build(sec, ctx, src, cfg, theme)
     if sec.take and sec.take.product and sec.take.product.credit:   # site.product's own credit is added site-wide
         cfg["credits"] = [sec.take.product.credit]
     return cfg
