@@ -150,9 +150,13 @@ def check_page(dist: Path, work: Path, size=(1440, 900), mobile: bool = False, d
                 frames.append(_shot(cdp, rect))
                 time.sleep(max(0.0, (k + 1) * dur * 1.5 / shots - (time.time() - t0)))
             fr = np.stack(frames).astype(np.int16)
+            import cv2
             z = mask == 0
             d_out = np.abs(fr[:, z] - fr[0:1, z])
             changed = float((d_out.max(axis=(0, 2)) > 0).mean()) if z.any() else 0.0
+            # pixels within 3 px of the mask's edge are resampled differently by the browser than by this check: report them apart
+            deep = cv2.dilate((mask > 0).astype(np.uint8), np.ones((7, 7), np.uint8)) == 0
+            d_deep = np.abs(fr[:, deep] - fr[0:1, deep])
             live = mask > 200
             std_in = float(np.std(fr[:, live].astype(np.float32), axis=0).mean()) if live.any() else 0.0
             log_ = cdp.js(f"({HITCH})({i}, {dur * 2.2:.2f})")
@@ -160,22 +164,25 @@ def check_page(dist: Path, work: Path, size=(1440, 900), mobile: bool = False, d
             if log_ and len(log_) > 8:
                 a = np.array(log_, dtype=np.float64)
                 dt = np.diff(a[:, 0])
-                wraps = np.where(np.diff(a[:, 1]) < -0.2 * dur)[0]
-                usual = float(np.median(dt))
-                at_wrap = [float(dt[w]) for w in wraps if w < len(dt)]
-                hitch = {"usual_ms": round(usual, 1), "worst_ms": round(float(dt.max()), 1),
-                         "wraps": int(len(wraps)), "wrap_gap_ms": round(max(at_wrap), 1) if at_wrap else None,
-                         "dropped_vs_expected": round(float(a[-1, 2] - a[0, 2]) / (dur * 2.2 * 24) - 1, 3)}
+                wr = np.where(np.diff(a[:, 1]) < -0.2 * dur)[0]
+                others = np.delete(dt, wr) if len(wr) else dt
+                at_wrap = [float(dt[w]) for w in wr if w < len(dt)]
+                # a 24 fps video on a 60 Hz display presents frames 33 and 50 (sometimes 67) ms apart; the wrap is a hitch only if
+                # it takes longer than the longest gap anywhere else
+                hitch = {"usual_ms": round(float(np.median(dt)), 1), "worst_elsewhere_ms": round(float(others.max()), 1),
+                         "wraps": int(len(wr)), "wrap_gap_ms": round(max(at_wrap), 1) if at_wrap else None,
+                         "hitch": bool(at_wrap and max(at_wrap) > float(others.max()) + 20)}
             sheet = work / f"page_{i}.png"
             tiles = [fr[j].astype(np.uint8) for j in np.linspace(0, len(fr) - 1, 6).astype(int)]
             Image.fromarray(np.concatenate([np.concatenate(tiles[:3], axis=1), np.concatenate(tiles[3:], axis=1)], axis=0)).save(sheet)
             res = {"index": i, "playing": True, "box": rect, "mask_zero_share": round(float(z.mean()), 3),
-                   "held": {"max_change_outside_mask": int(d_out.max()) if z.any() else 0, "share_of_pixels_changed": round(changed, 5)},
+                   "held": {"max_change_outside_mask": int(d_out.max()) if z.any() else 0, "share_of_pixels_changed": round(changed, 5),
+                            "max_change_beyond_3px_of_the_mask": int(d_deep.max()) if deep.any() else 0},
                    "moving": {"temporal_std_under_mask": round(std_in, 2)}, "loop_hitch": hitch, "sheet": str(sheet)}
             out["items"].append(res)
             log(f"  cinemagraph {i}: outside the mask max change {res['held']['max_change_outside_mask']} "
-                f"({changed:.4%} of pixels), under it std {std_in:.1f}, loop wrap gap {hitch and hitch['wrap_gap_ms']} ms "
-                f"(usual {hitch and hitch['usual_ms']} ms)")
+                f"({changed:.4%} of pixels), {res['held']['max_change_beyond_3px_of_the_mask']} beyond 3 px of it; under it std {std_in:.1f}; "
+                f"loop wrap gap {hitch and hitch['wrap_gap_ms']} ms (longest elsewhere {hitch and hitch['worst_elsewhere_ms']} ms)")
     finally:
         close()
     return out

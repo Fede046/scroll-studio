@@ -45,6 +45,7 @@ CONTEXT = 0.5            # how much of the surroundings the video model sees: a 
 LTX_MP = 0.5             # megapixels LTX-2.3 renders the crop at (aspect kept)
 MAX_VIDEO_W = 1280       # the encoded video's widest side
 MIN_SIDE = 320           # the crop is at least this big (as far as the still goes)
+CODEC_STEP = 1.5         # levels a lossy encode may add to the wrap step (an I-frame meeting a P-frame) before it counts as a seam
 SEAM_OK = 1.5            # a loop whose closing step is at most this many typical steps is seamless
 NEGATIVE = ("camera movement, camera shake, zoom, pan, tilt, cuts, flicker, morphing, warping, new objects appearing, "
             "people, text, watermark, blur, motion in the background, changing light")
@@ -120,7 +121,7 @@ def seam_report(frames: np.ndarray, mask: Optional[np.ndarray] = None) -> dict:
     local = float(np.mean(steps[-2:] + steps[:2])) if len(steps) >= 4 else typical
     ref = max(local, 0.5 * typical, 1e-3)
     return {"typical_step": round(typical, 3), "max_step": round(max(steps), 3) if steps else 0.0,
-            "seam": round(seam, 3), "ratio": round(seam / ref, 2), "frames": int(len(f))}
+            "seam": round(seam, 3), "ref": round(ref, 3), "ratio": round(seam / ref, 2), "frames": int(len(f))}
 
 
 def stabilise(frames: np.ndarray, ref: np.ndarray, keep: np.ndarray, log=print) -> tuple[np.ndarray, float]:
@@ -157,7 +158,7 @@ def stabilise(frames: np.ndarray, ref: np.ndarray, keep: np.ndarray, log=print) 
         # how far the frame moved, at the corners and the centre
         pts = np.array([[0, 0, 1], [W, 0, 1], [0, H, 1], [W, H, 1], [W / 2, H / 2, 1]], dtype=np.float32)
         drift = float(np.abs(pts @ warp.T - pts[:, :2]).max())
-        if drift > 0.05 * max(H, W) or abs(np.linalg.det(warp[:, :2]) - 1) > 0.10:    # a registration gone wrong, not a drift
+        if drift > 0.03 * max(H, W) or abs(np.linalg.det(warp[:, :2]) - 1) > 0.10:    # a registration gone wrong, not a drift
             continue
         worst = max(worst, drift)
         if drift < 0.33:
@@ -554,7 +555,7 @@ def build(project, ref: ImageInput, log: Callable[[str], None] = print, force: b
         report = {
             "moves": cg.moves, "model": model, "seconds": round(len(seq) / FPS, 2), "fps": FPS, "frames": int(len(seq)),
             "loop": {"mode": cg.loop, "closed_by": how, "generated": before, "closed": closed, "encoded": decoded,
-                     "seamless": decoded["ratio"] <= SEAM_OK},
+                     "seamless": decoded["seam"] <= max(SEAM_OK * decoded["ref"], decoded["ref"] + CODEC_STEP)},
             "still": [W, H], "box": [x0, y0, x1, y1], "video": [ww, wh], "bytes": mp4.stat().st_size + wp.stat().st_size,
             "mask": {"share_of_still": round(float((mask > 127).sum()) / sc / sc / (W * H), 4), **minfo,
                      "tracked": tracked is not None},
