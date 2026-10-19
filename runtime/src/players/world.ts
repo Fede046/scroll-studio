@@ -53,7 +53,6 @@ uniform int uKind[N];
 uniform mat3 uM[N];
 uniform vec4 uBox[N], uCell[N], uA[N], uB[N];
 uniform vec2 uSlot[N];
-uniform float uHasAtlas;
 
 float atlasAt(vec2 slot, vec2 uv) {
   vec2 t = clamp(uv, uInset, 1.0 - uInset);

@@ -556,7 +556,10 @@ def build(sec: FilmScene, ctx: BuildContext, theme: dict) -> dict:
     if sec.reveal:      # reveal: fail now, before a film renders, if ComfyUI lacks the nodes that mask it
         from .. import reveal
         reveal.preflight(ctx)
-    if typeworld.active(sec):   # type in the world: fail now, before a film renders, if a placement can't work
+    in_world = typeworld.active(sec) and not sec.reveal
+    if typeworld.active(sec) and sec.reveal:
+        ctx.log("  note: type in the world is not drawn through `reveal`'s shader yet: the titles stay ordinary captions on this film")
+    if in_world:           # type in the world: fail now, before a film renders, if a placement can't work
         typeworld.preflight(sec, ctx)
     src = ctx.project.path(sec.video) if sec.video else beats_film(sec, ctx) if sec.beats else generate(sec, ctx)
     if not src.exists():
@@ -572,7 +575,7 @@ def build(sec: FilmScene, ctx: BuildContext, theme: dict) -> dict:
         from .. import reveal
         cfg["reveal"] = reveal.build(sec, ctx, src, cfg)
     # ---- type in the world (engine/world.py): depth, tracks and masks for the titles set inside the film
-    if typeworld.active(sec):
+    if in_world:
         cfg["world"] = typeworld.build(sec, ctx, src, cfg)
     if sec.take and sec.take.product and sec.take.product.credit:   # site.product's own credit is added site-wide
         cfg["credits"] = [sec.take.product.credit]

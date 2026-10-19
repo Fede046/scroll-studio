@@ -289,7 +289,7 @@ def expected_world(sec) -> list[str]:
     """The type-in-the-world stages of a film section (engine/world.py), after its encode."""
     from . import world
     steps = world.world_steps(sec)
-    if not steps:
+    if not steps or getattr(sec, "reveal", None):         # (a film with `reveal` keeps its titles as captions)
         return []
     names = ["reveal_work"] + ([] if sec.beats else ["reveal_cuts"])
     if any(w.kind != "surface" or not w.quad for _, _, w in steps):
