@@ -10,8 +10,8 @@
 </div>
 {% endmacro %}
 
-{% macro ocap(st) %}
-<div class="ss-caption{% if st.surface %} ss-surface-{{ st.surface }}{% endif %}" data-from="{{ (st.at or [0, 1])[0] }}" data-to="{{ (st.at or [0, 1])[1] }}">
+{% macro ocap(st, i) %}
+<div class="ss-caption{% if st.surface %} ss-surface-{{ st.surface }}{% endif %}{% if st.world %} ss-has-world{% endif %}" data-from="{{ (st.at or [0, 1])[0] }}" data-to="{{ (st.at or [0, 1])[1] }}"{% if st.world %} data-world="{{ i }}"{% endif %}>
   {% if st.kicker %}<div class="ss-eyebrow"><i></i><span>{{ st.kicker | rich }}</span></div>{% endif %}
   {% if st.intro %}<h1 class="ss-h1 ss-split-words">{{ st.title | rich }}</h1>{% else %}<h2 class="ss-display ss-split-words">{{ st.title | rich }}</h2>{% endif %}
   {% if st.body %}<p class="ss-body">{{ st.body | rich }}</p>{% endif %}
@@ -44,10 +44,10 @@
       <div class="ss-visual">{% if cfg.poster %}<img class="ss-poster" src="{{ cfg.poster }}" alt="">{% endif %}</div>
       <div class="ss-shade"></div>
       <div class="ss-captions">
-        {% for st in s.steps if not st.place %}{{ ocap(st) }}{% endfor %}
+        {% for st in s.steps %}{% if not st.corner %}{{ ocap(st, loop.index0) }}{% endif %}{% endfor %}
       </div>
-      {% for st in s.steps if st.place %}<div class="ss-captions ss-captions--{{ st.place }}">{{ ocap(st) }}</div>
-      {% endfor %}
+      {% for st in s.steps %}{% if st.corner %}<div class="ss-captions ss-captions--{{ st.corner }}">{{ ocap(st, loop.index0) }}</div>
+      {% endif %}{% endfor %}
       {{ hud(s.hud) }}
       {% if s.cue %}<div class="ss-cue">{{ s.cue }}</div>{% endif %}
       <div class="ss-outro"></div>

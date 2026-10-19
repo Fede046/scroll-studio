@@ -366,3 +366,9 @@ html:not(.js) .ss-strip { overflow-x: auto; }
   .js .ss-reveal { opacity: 1; transform: none; }
   .js .ss-w > span { transition: none; }
 }
+
+/* type in the world (engine/world.py): the title is drawn inside the film by the world player; its words stay in the page,
+   visually hidden, for readers and search. Without the player (no WebGL, reduced motion, a narrow screen) the caption is an
+   ordinary overlay caption. */
+.ss-caption.ss-world-on > .ss-display, .ss-caption.ss-world-on > .ss-h1 {
+  position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }

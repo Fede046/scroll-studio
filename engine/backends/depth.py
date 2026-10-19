@@ -39,3 +39,15 @@ def estimate(img: Image.Image, size: str = "small") -> np.ndarray:
     d = d.float().cpu().numpy()
     lo, hi = np.percentile(d, [1, 99.5])
     return np.clip((d - lo) / max(hi - lo, 1e-6), 0, 1)
+
+
+def estimate_raw(img: Image.Image, size: str = "small") -> np.ndarray:
+    """The model's own relative inverse depth (larger = nearer), at the image's resolution and NOT normalised: the
+    scale differs from frame to frame, which is what engine/world_depth.py aligns for a film."""
+    import torch
+    proc, model, dev = _load(size)
+    inputs = proc(images=img.convert("RGB"), return_tensors="pt").to(dev)
+    with torch.inference_mode():
+        pred = model(**inputs).predicted_depth
+    d = torch.nn.functional.interpolate(pred[:, None], size=(img.height, img.width), mode="bicubic", align_corners=False)[0, 0]
+    return d.float().cpu().numpy()

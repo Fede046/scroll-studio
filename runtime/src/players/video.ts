@@ -12,6 +12,14 @@ const factory: PlayerFactory = async (cfg, ctx) => {
       if (player) return player;
     } catch (err) { console.warn("[scroll-studio] reveal failed, playing the colour film", err); }
   }
+  // world: titles set inside the film (engine/world.py): the film drawn through a shader that occludes, tracks and paints type;
+  // without WebGL2, with reduced motion or if anything fails the film plays as it is and the titles are ordinary captions
+  if (cfg.world && !cfg.reveal) {
+    try {
+      const player = await (await import("./world")).default(cfg, ctx);
+      if (player) return player;
+    } catch (err) { console.warn("[scroll-studio] world failed, playing the plain film", err); }
+  }
   const video = document.createElement("video");
   video.muted = true;
   video.playsInline = true;
