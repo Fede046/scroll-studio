@@ -45,6 +45,9 @@ DEFAULTS = {
     "film:reveal_track": 0.35,  # per frame of film per region (SAM 2.1, forward and backward)
     "film:reveal_pack": 0.12,   # per frame of film (feathered masks into videos, poster)
     "film:faces": 0.25,         # per frame of film (GFPGAN over every face)
+    "film:world_depth": 0.22,   # per frame of film (type in the world: Depth Anything V2, steadied over time, snapped to edges)
+    "film:world_text": 3.0,     # per in-world title (planar tracking through its shot; a prompt adds Florence-2 + SAM 2.1)
+    "film:world_pack": 0.1,     # per frame of film (depth and surface masks into the atlas video)
     "sequence:render": 0.13,    # per frame at 96 samples, 1920x1080
     "sequence:encode": 1.0,     # per frame
     "inside:render": 0.55,      # per frame at 64 samples, 1600x900 (macro Cycles with a shared GPU)
@@ -224,6 +227,12 @@ def units(sec, name: str) -> tuple[str, float]:
             return "film:reveal_track", frames
         if name == "reveal_pack":
             return "film:reveal_pack", frames
+        if name == "world_depth":
+            return "film:world_depth", frames
+        if name.startswith("world_text_"):
+            return "film:world_text", 1.0
+        if name == "world_pack":
+            return "film:world_pack", frames
         if name.startswith("restore_"):
             b = next((b for b in sec.beats if f"restore_{b.id}" == name), None)
             return "film:restore", float(b.seconds - b.trim) if b else dur
@@ -255,11 +264,11 @@ def units(sec, name: str) -> tuple[str, float]:
 def expected(sec, beats: Optional[set] = None) -> list[str]:
     """The stages a scene section runs, in order (films only; other builders report what they reach)."""
     if sec.type != "film" or sec.video:
-        return ((["faces"] if sec.faces else []) + ["encode"] + expected_reveal(sec)) if sec.type == "film" else []
+        return ((["faces"] if sec.faces else []) + ["encode"] + expected_reveal(sec) + expected_world(sec)) if sec.type == "film" else []
     if sec.beats:
         names = [n for b in sec.beats if beats is None or b.id in beats
                  for n in [f"beat_{b.id}"] + ([f"restore_{b.id}"] if b.restore else []) + ([f"faces_{b.id}"] if b.faces else [])] + ["beats_join"]
-        return names + (["beats_restore"] if sec.beat_restore else []) + (["faces"] if sec.faces else []) + ["encode"] + expected_reveal(sec)
+        return names + (["beats_restore"] if sec.beat_restore else []) + (["faces"] if sec.faces else []) + ["encode"] + expected_reveal(sec) + expected_world(sec)
     from .animate import video_model
     shot = sec.take.model_dump(mode="json") if sec.take else sec.shot
     model = video_model(shot.get("video_model"))
@@ -272,7 +281,7 @@ def expected(sec, beats: Optional[set] = None) -> list[str]:
         names.append("restore")
     if sec.take and sec.take.product:
         names += ["track"] + ([] if sec.take.product.hdri else ["plate_env"]) + ["product", "composite"]
-    return names + (["faces"] if sec.faces else []) + ["encode"] + expected_reveal(sec)
+    return names + (["faces"] if sec.faces else []) + ["encode"] + expected_reveal(sec) + expected_world(sec)
 
 
 def expected_reveal(sec) -> list[str]:
@@ -285,6 +294,23 @@ def expected_reveal(sec) -> list[str]:
             sfx = f"_{k}" if len(r.seeds) > 1 else ""
             names += ([f"reveal_ground_{r.id}{sfx}"] if r.prompt and not r.box else []) + [f"reveal_track_{r.id}{sfx}"]
     return names + ["reveal_pack"]
+
+
+def expected_world(sec) -> list[str]:
+    """The type-in-the-world stages of a film section (engine/world.py), after its encode."""
+    from . import world
+    steps = world.world_steps(sec)
+    if not steps or getattr(sec, "reveal", None):         # (a film with `reveal` keeps its titles as captions)
+        return []
+    names = ["reveal_work"] + ([] if sec.beats else ["reveal_cuts"])
+    if any(w.kind != "surface" or not w.quad for _, _, w in steps):
+        names.append("world_depth")
+    for i, _, w in steps:
+        if w.kind == "surface":
+            names += [f"reveal_ground_world{i}"] if w.at and not w.quad else []
+            names.append(f"reveal_track_world{i}")
+        names.append(f"world_text_{i}")
+    return names + ["world_pack"]
 
 
 _RATES: Optional[dict] = None

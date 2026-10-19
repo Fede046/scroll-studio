@@ -305,6 +305,90 @@ class ImageEdit(Model):
 ImageInput.model_rebuild()
 
 
+class RevealAt(Model):
+    """The frame a region is first found on (before it is tracked through the whole film): a moment in a beat
+    (`beat` + `t`, 0 = its first frame, 1 = its last), or in the whole film (`t` alone, 0-1), or an exact `frame` /
+    `seconds` of the joined film. Pick a frame where the thing is plainly in view."""
+    beat: Optional[str] = Field(None, description="beats film: the beat's id")
+    t: float = Field(0.5, ge=0, le=1, description="0-1 through the beat (or through the film without `beat`)")
+    frame: Optional[int] = Field(None, ge=0, description="An exact frame of the film (overrides beat/t)")
+    seconds: Optional[float] = Field(None, ge=0, description="An exact time in the film, seconds (overrides beat/t)")
+
+
+# ---- type in the world (engine/world.py): a headline placed inside the scene instead of floating over it ------------
+
+class WorldPlace(Model):
+    """A headline that lives inside the scene. The camera moves and the type goes with the world: it is occluded by what
+    is nearer, it sits on a surface in perspective, it hangs in the haze. The step's title is the text (its `<em>` words
+    take the theme's accent as everywhere); `kicker`, `body` and the button stay an ordinary caption beside it. Works on a
+    film or a sequence with `layout: overlay` and an `at` window on the step (a sequence: the product's own alpha is the
+    silhouette, so type set behind it is cut exactly), and on a parallax section's step with a photo.
+    Without WebGL, with reduced motion, and where the headline would be cropped off a narrow screen (a phone held upright),
+    the title falls back to a clean overlay caption."""
+    kind: Literal["behind", "surface", "sky"] = Field(
+        ..., description="behind: set at a depth in the scene, so what is nearer (a pine, a railing, a building, a person) "
+                         "passes in front of it as the camera moves; surface: painted on a wall, a sign or a floor, tracked "
+                         "to it in perspective, with the surface's light and texture showing through; sky: large type in "
+                         "the haze at far depth, with fog in front")
+    at: Optional[Union[float, str]] = Field(
+        None, description="behind: what the type sits just behind, as a prompt (\"the spruce\", \"the railing\"; found on the "
+                          "anchor frame by Florence-2 + SAM 2.1, so it needs ComfyUI the first time) or a depth, 0 far to 1 "
+                          "near, in the shot's own range (default: behind the nearest third of what is in its box). "
+                          "surface: what it is painted on, as a prompt (\"the wooden deck\", \"the white wall\"; required "
+                          "unless `quad` is given). sky: a depth (default 0.07, just in front of the farthest thing)")
+    x: Optional[float] = Field(None, description="Centre across, 0-1 of the frame (behind, sky) or of the surface (surface). "
+                                                 "Default 0.5")
+    y: Optional[float] = Field(None, description="Centre down, 0-1 of the frame or of the surface. Default 0.5 (sky: 0.3)")
+    size: Optional[float] = Field(None, gt=0.05, le=1.5, description="Width of the type, as a fraction of the frame (behind, "
+                                                                     "sky) or of the surface (surface). Default 0.5 behind, "
+                                                                     "0.72 sky, 0.8 surface")
+    lines: Optional[int] = Field(None, ge=1, le=5, description="Break the title into this many lines (default: the layout "
+                                                               "that fills the width best)")
+    align: Literal["left", "center", "right"] = Field("center", description="Alignment of a title of several lines")
+    caps: bool = Field(False, description="Set the title in capitals")
+    track: Optional[float] = Field(None, ge=-0.1, le=0.6, description="Letter-spacing in em (default: 0 behind, 0.05 on a "
+                                                                      "surface, 0.1 in the sky)")
+    weight: Optional[int] = Field(None, ge=100, le=900, description="Font weight (default: the theme's display weight)")
+    color: str = Field("auto", description="auto (light or dark ink, whichever reads on the footage under it), ink, paper, "
+                                           "accent, or a hex colour")
+    anchor: Optional[RevealAt] = Field(None, description="The frame the thing is found on and the type is laid out on "
+                                                           "(default: the middle of the step's `at` window). Pick a frame "
+                                                           "where it is plainly in view")
+    gap: float = Field(0.05, ge=0, le=0.5, description="behind (named thing): how far behind it the type sits, in depth units")
+    follow: Optional[float] = Field(None, ge=0, le=1.5, description="How much of the camera's motion the type follows "
+                                                                   "(behind, sky): 1 moves with the layer it sits in, 0 stays "
+                                                                   "on the screen. Default: what its depth says")
+    haze: Optional[float] = Field(None, ge=0, le=1, description="How much of the scene's air is mixed into the type (behind: "
+                                                                "0.12, sky: 0.5): colour and contrast of distance")
+    fog: float = Field(0.55, ge=0, le=1, description="sky: fog in front of the type, thicker low in the picture and where "
+                                                     "something far passes in front of it")
+    blur: Optional[float] = Field(None, ge=0, le=30, description="Softness of the type in pixels of a 1920-wide frame "
+                                                                 "(behind, sky: default matches how sharp the footage is at "
+                                                                 "that depth)")
+    wear: float = Field(0.35, ge=0, le=1, description="surface: how much of the paint has worn off (the surface's own texture "
+                                                      "breaks the letters up)")
+    relief: float = Field(0.8, ge=0, le=1, description="surface: how much of the surface's grain and light shows through the paint")
+    quad: Optional[list[tuple[float, float]]] = Field(
+        None, min_length=4, max_length=4, description="surface: the four corners of the surface on the anchor frame, 0-1, "
+                                                      "clockwise from the top left, instead of finding it by prompt (the "
+                                                      "type is then tracked from these corners)")
+    angle: float = Field(0.0, ge=-180, le=180, description="surface: turn the type on the surface, degrees")
+    slant: float = Field(1.0, ge=0, le=1.5, description="surface: how much of the slant the depth map gives the surface is used "
+                                                        "(1: as estimated, 0: the type lies flat to the screen). The estimate "
+                                                        "is a guess from relative depth; lower it when the letters look "
+                                                        "over-foreshortened")
+    track_model: Optional[Literal["homography", "similarity"]] = Field(
+        None, description="How the footage is followed: a surface is tracked as a plane seen in perspective (homography); "
+                          "behind and sky as a layer that shifts, turns and zooms (similarity)")
+
+
+def _place(v):
+    """`place: sky` is shorthand for `place: {kind: sky}`; the caption positions keep working as they were."""
+    if isinstance(v, str) and v in ("behind", "surface", "sky"):
+        return {"kind": v}
+    return v
+
+
 class Step(Model):
     """One beat of copy that scrolls past the scene."""
     kicker: Optional[str] = None
@@ -315,8 +399,25 @@ class Step(Model):
     length: float = Field(1.2, description="split/cards layouts: scroll distance of this step, in screen heights")
     intro: bool = Field(False, description="Render as the section's opening headline (h1)")
     hint: Optional[str] = Field(None, description="Small 'scroll to begin' line under an intro step")
-    place: Optional[Literal["left", "right", "center", "top-left", "top-right", "bottom-left", "bottom-right"]] = Field(
-        None, description="overlay layout: where this caption sits on the shot (default: left, centred vertically)")
+    place: Optional[Union[Literal["left", "right", "center", "top-left", "top-right", "bottom-left", "bottom-right"], WorldPlace]] = Field(
+        None, description="overlay layout: where this caption sits on the shot (default: left, centred vertically). Or an "
+                          "object, `{kind: behind | surface | sky, ...}`: the title is set inside the scene instead of over "
+                          "it (type in the world; see WorldPlace). `place: sky` is shorthand")
+
+    @field_validator("place", mode="before")
+    @classmethod
+    def _place_in(cls, v):
+        return _place(v)
+
+    @property
+    def world(self) -> Optional[WorldPlace]:
+        """The in-world placement of the title, if it has one."""
+        return self.place if isinstance(self.place, WorldPlace) else None
+
+    @property
+    def corner(self) -> Optional[str]:
+        """Where the caption sits when it is an ordinary overlay (`place: left`...)."""
+        return self.place if isinstance(self.place, str) else None
     surface: Optional[Literal["light", "dark"]] = Field(
         None, description="overlay layout: this caption's colours, when the shot under it is lighter or darker than the "
                           "rest of the scene (dark words on a bright sky: light), with a soft glow behind them")
@@ -754,16 +855,6 @@ class Freeze(Model):
 
 # ---- reveal + faces (engine/reveal.py, engine/faces.py): kept together so they merge cleanly ----------------------
 
-class RevealAt(Model):
-    """The frame a region is first found on (before it is tracked through the whole film): a moment in a beat
-    (`beat` + `t`, 0 = its first frame, 1 = its last), or in the whole film (`t` alone, 0-1), or an exact `frame` /
-    `seconds` of the joined film. Pick a frame where the thing is plainly in view."""
-    beat: Optional[str] = Field(None, description="beats film: the beat's id")
-    t: float = Field(0.5, ge=0, le=1, description="0-1 through the beat (or through the film without `beat`)")
-    frame: Optional[int] = Field(None, ge=0, description="An exact frame of the film (overrides beat/t)")
-    seconds: Optional[float] = Field(None, ge=0, description="An exact time in the film, seconds (overrides beat/t)")
-
-
 class RevealRegion(Model):
     """One part of the picture that comes into colour. Describe it (`prompt`: found on the `at` frame by Florence-2),
     or point at it (`points` / `box` in 0-1 picture coordinates on the `at` frame); SAM 2.1 then follows it through
@@ -1044,6 +1135,10 @@ class FilmScene(SceneBase):
                                                        "`base` look and brings colour into tracked regions as you scroll")
     faces: Optional[Faces] = Field(None, description="`restore`: repair the faces in the whole film (GFPGAN) before it is "
                                                      "encoded; beats can set it per beat. Off by default")
+    # ---- type in the world (steps with `place: {kind: behind | surface | sky}`)
+    depth_model: Optional[Literal["small", "base", "large"]] = Field(
+        None, description="Steps with in-world type (`place: {kind: ...}`): the Depth Anything V2 size that measures the film's "
+                          "depth per frame. small is Apache-2.0 (default); base/large are sharper but CC-BY-NC (non-commercial)")
 
     @field_validator("faces", mode="before")
     @classmethod

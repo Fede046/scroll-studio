@@ -76,6 +76,9 @@ tiktoken (`cl100k_base`) on the files in this repo; other tokenizers differ by r
   it black and white (or dimmed, blurred, tinted) and brings colour into tracked regions as you scroll.
   ([Colour that follows the camera](#colour-that-follows-the-camera-reveal))
 - **Face repair** for generated video (`faces: restore`, GFPGAN v1.4).
+- **Type in the world** (`place: { kind: behind | surface | sky }` on a step): headlines that live inside the scene:
+  set behind a pine so the camera passes them, painted on a deck in perspective, written in the haze with fog in front.
+  ([Type in the world](#type-in-the-world-place))
 - **Five styles from classic animation.** `zoetrope`: the landing page is one wheel of cards you spin, land on and
   open to read. `pop-up-book`: scenes fold up out of the gutter as the book opens. `flipbook`: one scroll notch, one
   pencil page. `pinscreen`: a lamp-lit wall of pins rolling from picture to picture. `sand`: a backlit sand table swept
@@ -146,6 +149,8 @@ Every example is a `site.yaml` in [`examples/`](examples/) and rebuilds with `st
 | [Hushwell](examples/hushwell/site.yaml) | Healthcare | `stack` layout | Panels slide over each other: hero, product with phone, photo strip, orbit, FAQ |
 | [Hale & Rowe](examples/hale-rowe/site.yaml) | Architecture | `artwork` | A house drawn from construction lines to finished photo (needs ComfyUI) |
 | [Stillwater](examples/one-take/site.yaml) | Consumer product | `film` + `take` | One take from a mountain ridge down to a bottle on a lakeside table; the bottle is the real 3D model |
+| [Type in the world](examples/type-in-the-world/site.yaml) | Consumer product | `film` + `take` | The Stillwater world with every headline set in the scene: behind a spruce, painted on the deck, written in the haze |
+| [Type in the world, on photographs](examples/type-in-the-world-stills/site.yaml) | Hospitality | `parallax` | Casa Alta with its headlines behind the house and the olive tree, on a limewashed wall and in the dusk sky (needs ComfyUI to build) |
 | [Hollis House](examples/hollis-house/site.yaml) | Real estate | `splat` | A walk through a scanned house, room by room |
 | [Pelorus](examples/pelorus/site.yaml) | Research | `chart` (bar) | The renewables share of electricity, every figure read from Our World in Data |
 | [Halcyon](examples/halcyon/site.yaml) | Software | blocks | One product page as twenty-one experiences (`studio looks`) |
@@ -1013,6 +1018,83 @@ pixels the cinemagraph is not responsible for). Frame pacing: the video work is 
 about 0.3 ms a frame more with six cinemagraphs on the page), but measured on this machine while another process held the GPU at
 100% (ComfyUI rendering for other jobs) scrolling a page with playing cinemagraphs dropped about 15% of frames to 30 fps
 against 0-2% with them off; that run is a worst case and should be repeated on an idle GPU before a claim is made.
+### Type in the world (`place:`)
+
+A headline over a film is a caption: it floats on the glass, and the picture goes on behind it. Type in the world puts the
+headline *in* the picture, where the picture's own things can pass in front of it, light it, wear it. Any step of a film
+or a sequence (`layout: overlay`, with an `at` window or pinned to a beat) or of a parallax section takes a `place` object;
+its `title` is the text, in the site's fonts, with the `<em>` words set as everywhere else:
+
+```yaml
+    steps:
+      - title: Down to <em>the water.</em>
+        at: [0.44, 0.58]
+        place: { kind: behind, at: "the spruce tree", x: 0.5, y: 0.3, size: 0.62 }     # set just behind the spruce
+      - title: Stay <em>cold.</em>
+        at: [0.58, 0.7]
+        place: { kind: surface, at: "the wooden deck floor", x: 0.34, y: 0.84, size: 0.44 }   # painted on the deck
+      - title: Still cold <em>at noon.</em>
+        at: [0.86, 0.99]
+        place: { kind: sky, y: 0.24, size: 0.7, caps: true, track: 0.12 }              # in the haze, fog in front
+```
+
+| `kind` | What it is | `at` |
+|---|---|---|
+| `behind` | The title has a depth. Whatever is nearer (a pine, a railing, a building, a person) passes in front of it as the camera moves; the title follows the layer it sits in, so it moves less than a nearer one, and it is as soft as the footage is at that depth. | a prompt for the thing it sits just behind (found on the anchor frame by Florence-2 + SAM 2.1; `gap:` is how far behind), or a depth from 0 (far) to 1 (near) in the shot's own range; default: behind the nearest third of what is in its box |
+| `surface` | Painted on a wall, a sign or a floor. The surface is found by prompt and followed through its shot (SAM 2.1, the same stages as `reveal`), the plane's slant comes from the depth map, and the letters are carried with it in perspective. The surface's light, grain and relief show through the paint (`relief`), the grain ragged-edges each letter, it wears (`wear`), and it is laid on from left to right as the step arrives. Whatever stands in front of the surface covers the paint. | a prompt naming the surface (`quad:` gives its four corners instead) |
+| `sky` | Large type at far depth, mixed with the air (`haze`) with a fog in front (`fog`, thicker low in the picture and over far things that stand in front of it): a far ridge covers the bottom of the letters. | a depth (default 0.07) |
+
+`x`, `y` and `size` place it on the frame (the width of the type as a fraction of the frame's width); `lines`, `align`,
+`caps`, `track`, `weight` and `color` (`auto` reads the footage and takes the theme's lighter or darker ink; or `ink`,
+`paper`, `accent`, a hex) set the typography; `anchor:` picks the frame the thing is found on (default: the middle of
+the step's window); `follow:` how much of the camera's motion the type follows; `slant:` how much of a surface's estimated slant
+is used (the estimate is a guess from relative depth: 1 as estimated, 0 flat to the screen). The JSON schema carries a description
+of every field, so the Studio UI and Claude's MCP tools show them.
+
+How it works, in short. Per film the engine makes a **depth video**: Depth Anything V2 on every frame is sharp but
+breathes (each frame is normalised alone) and its edges shimmer, so each frame's map is fitted to the one before it
+(carried by optical flow, a robust scale and shift), blended where the flow is trustworthy, snapped to the picture's edges
+with a guided filter, and restarted at every cut. Each title is **tracked**: pyramidal Lucas-Kanade from keyframes inside
+the patch it follows (the layer at its depth; the far layers; the surface's mask), a similarity for a layer and a
+homography for a surface, smoothed with a local cubic so the camera's speed-ups survive and the noise does not. The depth
+and the surfaces' masks are packed into one grayscale atlas video with the film's frame rate, frame count and keyframe
+interval (a half-size copy for phones). The page draws the film itself in WebGL2: the title is typeset onto an atlas
+texture and found per pixel through a matrix per frame; it shows where the scene is farther than the title (a soft step in
+depth), is lit by the light at that spot, mixed with the air there, defocused like the footage at that depth, and carries
+the picture's grain. The film and the atlas are seeked together and drawn only when both have landed. A parallax photo does
+the same from its own depth map, with no tracking (the 2.5D camera moves the picture, the type goes with it). A
+`sequence` (a rendered product on a clear backdrop) needs no model at all: the frames' own alpha is the silhouette, so a
+headline set `behind` the product is cut exactly along its edge, and it stays where it is on the screen while the product
+turns; the frames are also encoded as a film for the world player, and without it the frames play as always.
+
+Fallbacks: with reduced motion, without WebGL2, with `reveal` on the same film, and where a title would be cropped off a
+narrow screen (a phone held upright) or be too small to read, the title is an ordinary overlay caption; it stays in the
+page as text, visually hidden, while the world draws it. Cached per stage (`world_depth` once per film, `world_text_<i>`
+per title, `world_pack`); a film with no in-world type keeps its cache. `depth_model` on the section picks the Depth
+Anything size (`small` is Apache-2.0; `base` and `large` are sharper but CC-BY-NC).
+
+```bash
+studio world my-site [--section story]     # each title's box on the film's own frames, the depth beside them, what to change
+```
+
+`studio world` writes `.build/<section>/world/sheet.jpg` and `report.json` for a built film: the box is carried through
+the same per-frame matrices the page reads, from the first frame the title is shown to the last, and the report says how
+steady the track is (the box's distance from its own smoothed path, in pixels of the 960-wide working frame), how much of
+the window the type is on screen, how steeply a surface slants and, where something is off, what to change (`anchor`,
+`follow`, `at`, `y`, `quad`). Examples: [type in the world](examples/type-in-the-world/site.yaml) (the one-take world with
+all three placements) and [on photographs](examples/type-in-the-world-stills/site.yaml) (Casa Alta).
+
+Honest limits. The depth is relative, so `at: 0.4` means 40% of that shot's own range; naming the thing
+(`at: "the spruce"`) is more reliable. A surface seen almost edge-on (a floor under a level camera) gives slivers of
+letters; put the type lower in the frame or on a more frontal surface, and `studio world` says so above 80 degrees.
+Generated depth is soft where the footage is soft (hair, mist, thin branches) and the occlusion follows it. A layer with
+nothing to track (clear sky, a plain backdrop) holds still. The type follows what is at or behind its depth, so people
+walking in front of it do not drag it, but a billboard that plays video or a crowd that fills the layer makes the track
+wander: `studio world` measures it, and `follow: 0` pins the type to the screen. A surface mask that is not one plane in
+the depth map (a person leaning on the wall) falls back to type laid flat to the screen, with a note in the build log; `slant`
+tames the estimate and `quad` replaces it. A surface type is only as long-lived as the surface is on screen: a floor the
+camera flies over carries its paint out of the bottom of the frame in about a second and a half. In-world type is not
+drawn through `reveal`'s shader yet (such a film keeps its titles as captions, and says so in the build log).
 
 ### Faces, repaired (`faces: restore`)
 

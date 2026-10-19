@@ -48,6 +48,9 @@ def build(sec: ParallaxScene, ctx: BuildContext, theme: dict) -> dict:
         focus = float(np.percentile(d, 40))
         chapters.append({"step": idx[i], "image": ctx.url(img_out), "depth": ctx.url(dep_out), "focus": round(focus, 3),
                          "move": sec.moves[i] if i < len(sec.moves) else sec.move})
+        if st.world is not None:      # type in the world (engine/world.py): this step's title set inside its photograph
+            from .. import world
+            chapters[-1]["world"] = world.build_photo(sec, ctx, i, idx[i], st, img_out, dep_out)
         if credit(st.image):
             credits.append(credit(st.image))
     return {"chapters": chapters, "move": sec.move, "strength": sec.strength, "end": chapters[-1]["image"],

@@ -9,7 +9,7 @@ spec field, a cached builder, a runtime player where needed, CLI and MCP, docs a
 
 - [x] **Direction boards** (`studio directions`): one brief in, six complete art directions out, side by side as
   storyboards (palette, type, imagery, motion, style). Pick one and it becomes the spec. How a studio pitches.
-- [ ] **Type in the world**: headlines placed inside the scene, painted on a wall, written in the sky, set behind a
+- [x] **Type in the world**: headlines placed inside the scene, painted on a wall, written in the sky, set behind a
   building so the camera passes them and things pass in front (depth-aware, tracked to surfaces).
 - [x] **Edited like a film**: sections join with film grammar instead of fades: match cuts (a round logo becomes the
   sun becomes a cup), whip pans, type carried from one section into the next, hard cuts on the beat.

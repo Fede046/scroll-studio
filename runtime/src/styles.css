@@ -377,3 +377,8 @@ html:not(.js) .ss-strip { overflow-x: auto; }
 .ss-dio-pin:hover, .ss-dio-pin:focus-visible { background: #fff; outline: 2px solid var(--accent, #d9503a); outline-offset: 1px; }
 .ss-type-diorama .ss-visual canvas { image-rendering: auto; }
 @media (max-width: 760px) { .ss-dio-pin span { display: none; } .ss-dio-pin { padding: 4px; } }
+/* type in the world (engine/world.py): the title is drawn inside the film by the world player; its words stay in the page,
+   visually hidden, for readers and search. Without the player (no WebGL, reduced motion, a narrow screen) the caption is an
+   ordinary overlay caption. */
+.ss-caption.ss-world-on > .ss-display, .ss-caption.ss-world-on > .ss-h1, .ss-step.ss-world-on .ss-card > .ss-h1, .ss-step.ss-world-on .ss-card > .ss-h2 {
+  position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
