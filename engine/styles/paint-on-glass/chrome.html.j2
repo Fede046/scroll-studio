@@ -1,0 +1,15 @@
+{# Paint on glass furniture: the pane (a fixed canvas the runtime paints, a lamp glow behind it and a wet sheen over it),
+   a wordmark / links / call to action, the colour script (one swatch per scene, built by the runtime), and a small
+   counter of strokes. The default nav is hidden. #}
+{% macro top(site, sections, nav_links) %}
+<div class="pg-glass" aria-hidden="true"><canvas class="pg-canvas"></canvas><i class="pg-lamp"></i><i class="pg-sheen"></i></div>
+<header class="pg-top">
+  <a class="pg-mark" href="#">{{ site.name }}</a>
+  {% if nav_links %}<nav class="pg-links" aria-label="Scenes">{% for l in nav_links %}<a href="{{ l.href }}">{{ l.label }}</a>{% endfor %}</nav>{% endif %}
+  {% if site.nav.cta %}<a class="pg-top__cta" href="{{ site.nav.cta.href }}">{{ site.nav.cta.label }}</a>{% endif %}
+</header>
+<nav class="pg-script" aria-label="Colour script"></nav>
+<p class="pg-hud" aria-hidden="true"><span>scene <b data-pg-scene>01</b></span><span>stroke <b data-pg-count>00000</b></span><span data-pg-state>set</span></p>
+{% endmacro %}
+
+{% macro bottom(site, sections) %}{% endmacro %}

@@ -1,0 +1,189 @@
+{# Paint on glass: the page is one wet painting on lit glass (a fixed canvas under every section). Every section is made
+   of BEATS (.pg-beat, data-pg): a section, or one item of a list. A beat has a painting it wants to be; scrolling is
+   the painter's hand moving the glass from one beat's painting to the next (runtime/src/styles/paint-on-glass.ts).
+   data-side is where the words sit (the painting is composed around them), data-k / data-n an item's place in its list.
+   .pg-copy is the measured box of words; .pg-write is a heading that is painted in with a sweep of the brush.
+   img.pg-src is a picture the page supplies: the painting for that beat is made from it instead of a landscape.
+   Without JavaScript every beat is an ordinary section in reading order on a dark, painted-looking ground. #}
+{% set types = ["hero", "intro", "features", "product", "stats", "timeline", "quote", "faq", "cta", "gallery", "strip", "orbit"] %}
+
+{% macro btns(list) %}{% if list %}<div class="pg-btns pg-fade">{% for l in list %}<a class="pg-btn{% if loop.first %} pg-btn--hot{% endif %}" href="{{ l.href }}">{{ l.label }}</a>{% endfor %}</div>{% endif %}{% endmacro %}
+{% macro kicker(text) %}{% if text %}<p class="pg-kicker pg-fade">{{ text }}</p>{% endif %}{% endmacro %}
+{% macro side(loop, k=0) %}{{ "l" if (loop.index0 + k) % 2 == 0 else "r" }}{% endmacro %}
+
+{% macro render(b, e, base, loop) %}
+{% set idattr %}{% if b.id %} id="{{ b.id }}"{% endif %}{% endset %}
+{% set sd = side(loop) | trim %}
+
+{# ---------------------------------------------------------------- hero #}
+{% if b.type == "hero" %}
+<section class="pg-beat pg-hero" data-pg="hero" data-side="l"{{ idattr }}>
+  {% if e.img %}<img class="pg-src" src="{{ e.img }}" alt="" fetchpriority="high" decoding="async">{% endif %}
+  <div class="pg-copy">
+    {% if b.badge %}<p class="pg-badge pg-fade">{{ b.badge }}</p>{% endif %}
+    {% if e.first %}<h1 class="pg-title pg-write">{{ b.title | rich }}</h1>{% else %}<h2 class="pg-title pg-write">{{ b.title | rich }}</h2>{% endif %}
+    {% if b.body %}<p class="pg-lede pg-fade">{{ b.body | rich }}</p>{% endif %}
+    {{ btns(b.buttons) }}
+  </div>
+  {% if b.device %}<div class="pg-device pg-fade">{{ base.phone(b.device, e.screen, e.clip) }}</div>
+  {% elif e.video %}<figure class="pg-plate pg-fade"><video src="{{ e.video }}" autoplay muted loop playsinline{% if e.img %} poster="{{ e.img }}"{% endif %}></video></figure>{% endif %}
+</section>
+
+{# ---------------------------------------------------------------- intro #}
+{% elif b.type == "intro" %}
+<section class="pg-beat pg-intro" data-pg="intro" data-side="{{ sd }}"{{ idattr }}>
+  <div class="pg-copy">
+    {{ kicker(b.kicker) }}
+    <h2 class="pg-title pg-write">{{ b.title | rich }}</h2>
+    {% if b.body %}<p class="pg-lede pg-fade">{{ b.body | rich }}</p>{% endif %}
+    {% if b.button %}<div class="pg-btns pg-fade"><a class="pg-btn pg-btn--hot" href="{{ b.button.href }}">{{ b.button.label }}</a></div>{% endif %}
+  </div>
+</section>
+
+{# ---------------------------------------------------------------- features: a head beat, then one beat per feature #}
+{% elif b.type == "features" %}
+{% set head = (b.title or b.kicker) %}
+{% set n = (b.items | length) + (1 if head else 0) %}
+<section class="pg-sec pg-features"{{ idattr }}>
+  {% if head %}<div class="pg-beat pg-head" data-pg="features" data-side="{{ sd }}" data-k="0" data-n="{{ n }}">
+    <div class="pg-copy">{{ kicker(b.kicker) }}{% if b.title %}<h2 class="pg-title pg-write">{{ b.title | rich }}</h2>{% endif %}</div>
+  </div>{% endif %}
+  {% for f in b.items %}
+  {% set k = loop.index0 + (1 if head else 0) %}
+  <article class="pg-beat pg-feat" data-pg="feat" data-side="{{ side(loop, loop.index0 + 1) | trim }}" data-k="{{ k }}" data-n="{{ n }}">
+    <div class="pg-copy">
+      {% if f.tag and (f.tag | length) > 3 %}<p class="pg-kicker pg-fade">{{ f.tag }}</p>{% else %}<p class="pg-num pg-fade" aria-hidden="true">{{ f.tag if f.tag else (loop.index0 + 1) }}</p>{% endif %}
+      <h3 class="pg-sub pg-write">{{ f.title | rich }}</h3>
+      {% if f.body %}<p class="pg-body pg-fade">{{ f.body | rich }}</p>{% endif %}
+      {% if f.meter is not none %}<div class="pg-swipe pg-fade" role="img" aria-label="{{ (f.meter * 100) | round | int }}%"><i style="width: {{ (f.meter * 100) | round }}%"></i></div>{% endif %}
+    </div>
+  </article>
+  {% endfor %}
+</section>
+
+{# ---------------------------------------------------------------- product #}
+{% elif b.type == "product" %}
+<section class="pg-beat pg-product" data-pg="product" data-side="{{ 'l' if b.side == 'right' else 'r' }}"{{ idattr }}>
+  {% if e.img %}<img class="pg-src" src="{{ e.img }}" alt="" loading="lazy" decoding="async">{% endif %}
+  <div class="pg-copy">
+    {{ kicker(b.kicker) }}
+    <h2 class="pg-title pg-write">{{ b.title | rich }}</h2>
+    {% if b.body %}<p class="pg-lede pg-fade">{{ b.body | rich }}</p>{% endif %}
+    {% if b.stats %}<ul class="pg-dabs pg-fade">{% for st in b.stats %}<li><b>{{ st.value }}{% if st.unit %}<sup>{{ st.unit }}</sup>{% endif %}</b> {{ st.label }}</li>{% endfor %}</ul>
+    {% elif b.tags %}<ul class="pg-dabs pg-fade">{% for t in b.tags %}<li>{{ t }}</li>{% endfor %}</ul>{% endif %}
+    {{ btns(b.buttons) }}
+    {% if b.note %}<p class="pg-note pg-fade">{{ b.note | rich }}</p>{% endif %}
+  </div>
+  {% if b.device or b.behind %}<div class="pg-device pg-device--{{ 'l' if b.side == 'right' else 'r' }} pg-fade">
+    {% if b.behind %}<div class="pg-device__behind">{{ base.phone(b.behind, e.behind, e.behind_clip) }}</div>{% endif %}
+    {% if b.device %}{{ base.phone(b.device, e.screen, e.clip) }}{% endif %}
+  </div>{% endif %}
+</section>
+
+{# ---------------------------------------------------------------- stats: figures painted thick, with the paint running #}
+{% elif b.type == "stats" %}
+<section class="pg-beat pg-stats" data-pg="stats" data-side="c"{{ idattr }}>
+  <div class="pg-copy">
+    <ul class="pg-figs">
+      {% for st in b.items %}
+      <li class="pg-fig pg-fade" style="--i: {{ loop.index0 }}"><b class="pg-fig__v">{{ st.value }}{% if st.unit %}<sup>{{ st.unit }}</sup>{% endif %}</b><i class="pg-drip" aria-hidden="true"></i><span class="pg-fig__l">{{ st.label }}</span></li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+
+{# ---------------------------------------------------------------- timeline: a head beat, then a title card per step #}
+{% elif b.type == "timeline" %}
+{% set head = (b.title or b.kicker) %}
+{% set n = (b.items | length) + (1 if head else 0) %}
+<section class="pg-sec pg-timeline"{{ idattr }}>
+  {% if head %}<div class="pg-beat pg-head" data-pg="timeline" data-side="{{ sd }}" data-k="0" data-n="{{ n }}">
+    <div class="pg-copy">{{ kicker(b.kicker) }}{% if b.title %}<h2 class="pg-title pg-write">{{ b.title | rich }}</h2>{% endif %}</div>
+  </div>{% endif %}
+  {% for t in b.items %}
+  {% set k = loop.index0 + (1 if head else 0) %}
+  <article class="pg-beat pg-tl" data-pg="tl" data-side="c" data-k="{{ k }}" data-n="{{ n }}">
+    <div class="pg-copy">
+      <p class="pg-when pg-fade">{{ t.when }}</p>
+      <h3 class="pg-sub pg-write">{{ t.title | rich }}</h3>
+      {% if t.body %}<p class="pg-body pg-fade">{{ t.body | rich }}</p>{% endif %}
+    </div>
+  </article>
+  {% endfor %}
+</section>
+
+{# ---------------------------------------------------------------- quote: the painter's signature for the attribution #}
+{% elif b.type == "quote" %}
+<section class="pg-beat pg-quote" data-pg="quote" data-side="c"{{ idattr }}>
+  <figure class="pg-copy">
+    <blockquote class="pg-saying pg-write">{{ b.text | rich }}</blockquote>
+    {% if b.who %}<figcaption class="pg-sign pg-fade">{{ b.who }}</figcaption>{% endif %}
+  </figure>
+</section>
+
+{# ---------------------------------------------------------------- faq: a head beat, then one question wiped clear per beat #}
+{% elif b.type == "faq" %}
+{% set n = (b.items | length) + 1 %}
+<section class="pg-sec pg-faq"{{ idattr }}>
+  <div class="pg-beat pg-head" data-pg="faq" data-side="{{ sd }}" data-k="0" data-n="{{ n }}">
+    <div class="pg-copy">{{ kicker(b.kicker) }}<h2 class="pg-title pg-write">{{ b.title | rich }}</h2></div>
+  </div>
+  {% for it in b.items %}
+  <div class="pg-beat pg-qa" data-pg="qa" data-side="{{ side(loop, loop.index0 + 1) | trim }}" data-k="{{ loop.index }}" data-n="{{ n }}">
+    <div class="pg-copy"><details class="pg-q" open><summary>{{ it.q | rich }}</summary><p>{{ it.a | rich }}</p></details></div>
+  </div>
+  {% endfor %}
+</section>
+
+{# ---------------------------------------------------------------- cta #}
+{% elif b.type == "cta" %}
+<section class="pg-beat pg-cta" data-pg="cta" data-side="c"{{ idattr }}>
+  <div class="pg-copy">
+    {{ kicker(b.kicker) }}
+    <h2 class="pg-title pg-write">{{ b.title | rich }}</h2>
+    {% if b.button %}<div class="pg-btns pg-fade"><a class="pg-btn pg-btn--hot pg-btn--dab" href="{{ b.button.href }}"><span>{{ b.button.label }}</span></a></div>{% endif %}
+  </div>
+</section>
+
+{# ---------------------------------------------------------------- gallery: slides on the glass #}
+{% elif b.type == "gallery" %}
+<section class="pg-beat pg-gallery" data-pg="gallery" data-side="{{ sd }}"{{ idattr }}>
+  <div class="pg-copy">
+    {{ kicker(b.kicker) }}{% if b.title %}<h2 class="pg-title pg-write">{{ b.title | rich }}</h2>{% endif %}
+    <div class="pg-slides pg-fade">
+      {% for g in b.items %}
+      <a class="pg-slide" href="{{ g.href }}">
+        <span class="pg-slide__media">{% if g.video %}<video src="{{ g.video }}" muted loop playsinline preload="metadata"{% if g.image %} poster="{{ g.image }}"{% endif %}></video>{% elif g.image %}<img src="{{ g.image }}" alt="" loading="lazy">{% endif %}</span>
+        <span class="pg-slide__text">{% if g.kicker %}<small>{{ g.kicker }}</small>{% endif %}<b>{{ g.title | rich }}</b>{% if g.body %}<em>{{ g.body | rich }}</em>{% endif %}</span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{# ---------------------------------------------------------------- strip: a roll of plates #}
+{% elif b.type == "strip" %}
+<section class="pg-beat pg-strip" data-pg="strip" data-side="{{ sd }}"{{ idattr }}>
+  <div class="pg-copy">
+    {{ kicker(b.kicker) }}{% if b.title %}<h2 class="pg-title pg-write">{{ b.title | rich }}</h2>{% endif %}
+    {% if b.body %}<p class="pg-lede pg-fade">{{ b.body | rich }}</p>{% endif %}
+  </div>
+  <div class="pg-roll pg-fade">
+    {% for it in b.items %}<figure><img src="{{ e.imgs[loop.index0] }}" alt="{{ it.caption or '' }}" loading="lazy">{% if it.caption %}<figcaption>{{ it.caption }}</figcaption>{% endif %}</figure>{% endfor %}
+  </div>
+</section>
+
+{# ---------------------------------------------------------------- orbit: daubs of paint round a hub #}
+{% elif b.type == "orbit" %}
+<section class="pg-beat pg-orbit" data-pg="orbit" data-side="{{ sd }}"{{ idattr }}>
+  <div class="pg-copy">
+    {{ kicker(b.kicker) }}<h2 class="pg-title pg-write">{{ b.title | rich }}</h2>
+    {% if b.body %}<p class="pg-lede pg-fade">{{ b.body | rich }}</p>{% endif %}
+  </div>
+  <div class="pg-ring pg-fade" style="--n: {{ b.items | length }}">
+    <div class="pg-hub">{{ b.center }}</div>
+    {% for it in b.items %}<div class="pg-moon" style="--i: {{ loop.index0 }}"><b>{{ it.label }}</b>{% if it.status %}<small>{{ it.status }}</small>{% endif %}</div>{% endfor %}
+  </div>
+</section>
+{% endif %}
+{% endmacro %}

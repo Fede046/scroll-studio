@@ -446,6 +446,8 @@ as a departures board, a comic, a terminal session, a game level or an anime ope
 | `paper-cut-out` | Paper sheets swing off brass brads; hinged pieces sway, a jointed paper arm points |
 | `scratch-film` | Scroll pulls a hand-scratched strip of film through the gate, frame by frame |
 | `smears` | Spider-Verse timing: on twos, smear frames and multiples, impact frames between sheets |
+| `paint-on-glass` | One living oil painting on lit glass, repainted stroke by stroke as you scroll; a finger smears it |
+| `multiplane` | Painted glass plates at real depth; the camera trucks down through them with focus pulls |
 
 ```bash
 studio looks examples/halcyon            # dist/looks/<style>/ for every style, plus a gallery at dist/looks/

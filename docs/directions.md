@@ -25,4 +25,4 @@ spec field, a cached builder, a runtime player where needed, CLI and MCP, docs a
 - [ ] **The product as the set**: fly into the product (inside a speaker, between the layers of a board, macro around a
   bottle); each feature is a stop inside it.
 - [ ] **Miniature worlds**: a tilt-shift diorama you orbit and dive into; sections are places on it.
-- [ ] **Styles 30-33**: `paint-on-glass`, `multiplane`, `scratch-film`, `smears`.
+- [x] **Styles 30-33**: `paint-on-glass`, `multiplane`, `scratch-film`, `smears`.
