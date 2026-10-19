@@ -470,7 +470,7 @@ def contact_sheet(times: list[dict], images: list[np.ndarray], out: Path, cols: 
     for i, (t, im) in enumerate(zip(times, images)):
         x, y = (i % cols) * tw, (i // cols) * (th + 26)
         sheet.paste(Image.fromarray(im).resize((tw, th), Image.LANCZOS), (x, y + 26))
-        rep = t.get("report") or {}
+        rep = t.get("report") or t
         al = rep.get("aligned") or {}
         d.text((x + 8, y + 7), f"{t['id']}  {t.get('clock', '')}  drift {al.get('drift', 0):.2f}px (raw {(rep.get('raw') or {}).get('drift', 0):.2f})  "
                                f"edges {al.get('edges', 1):.2f}", fill=(230, 230, 230))
