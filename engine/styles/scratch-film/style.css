@@ -108,6 +108,7 @@ html.sf-live .sf-reel { background: none; }
 .sf-hero__prop { display: grid; justify-items: center; }
 .sf-hero__prop .sf-fr { width: min(100%, 420px); rotate: 1.2deg; }
 .sf-art { width: min(100%, 380px); aspect-ratio: var(--ar, 1); background: #050505; box-shadow: 0 0 0 1px rgba(255, 246, 223, .4); } .sf-art canvas { display: block; width: 100%; height: 100%; }
+.sf-art:not(.sf-drawn) { display: none; }
 
 .sf-reel--intro .sf-in { grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); align-items: end; }
 .sf-intro__copy { display: grid; gap: 22px; }

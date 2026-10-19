@@ -35,28 +35,38 @@ export default function start() {
   const arts = $$<HTMLElement>("[data-sf-art]").map((host) => ({ host, c: $<HTMLCanvasElement>("canvas", host)! })).filter((a) => a.c);
   let art: ArtFrames | null = null;
   function engrave(c: HTMLCanvasElement, frame: number) {
-    if (!art) return;
-    const cw = 320, ch = Math.round(cw * art.h / art.w);
+    const A = art;
+    if (!A) return;
+    const cw = 320, ch = Math.round(cw * A.h / A.w);
     if (c.width !== cw) { c.width = cw; c.height = ch; }
     const ctx = c.getContext("2d")!;
     ctx.fillStyle = "#050505"; ctx.fillRect(0, 0, cw, ch);
     ctx.strokeStyle = LAMP; ctx.lineWidth = 1.1; ctx.lineCap = "round";
-    const m = art.mask[((Math.floor(frame / 2) % art.n) + art.n) % art.n], sx = art.w / cw, sy = art.h / ch;
-    for (let y = 2; y < ch - 2; y += 3) {
-      let x0 = -1;
-      const jy = (hash(y, frame, 4) - 0.5) * 2.2;
-      for (let x = 0; x <= cw; x++) {
-        const on = x < cw && m[Math.min(art.h - 1, Math.floor(y * sy)) * art.w + Math.min(art.w - 1, Math.floor(x * sx))] > 0.3;
-        if (on && x0 < 0) x0 = x;
-        if ((!on || x === cw) && x0 >= 0) {
-          if (x - x0 > 1) { ctx.globalAlpha = 0.55 + hash(y, x0, frame) * 0.45; ctx.beginPath(); ctx.moveTo(x0 + (hash(x0, y, frame) - 0.5) * 2, y + jy); ctx.lineTo(x + (hash(x, y, frame + 1) - 0.5) * 2, y + jy + (hash(y, x, frame) - 0.5) * 1.5); ctx.stroke(); }
-          x0 = -1;
+    const m = A.mask[((Math.floor(frame / 2) % A.n) + A.n) % A.n], sx = A.w / cw, sy = A.h / ch;
+    const at = (x: number, y: number) => (x < 0 || y < 0 || x >= cw || y >= ch ? 0 : m[Math.floor(y * sy) * A.w + Math.floor(x * sx)]);
+    // needle hatching at two angles, thicker where the picture is brighter; every frame is hatched again by a new hand
+    const hatch = (ang: number, gap: number, thr: number, alpha: number, seed: number) => {
+      const c = Math.cos(ang), sn = Math.sin(ang), diag = Math.hypot(cw, ch);
+      ctx.globalAlpha = alpha;
+      for (let o = -diag / 2; o < diag / 2; o += gap) {
+        const jo = (hash(Math.round(o), frame, seed) - 0.5) * gap * 0.7;
+        let x0 = 0, y0 = 0, on = false;
+        for (let t = -diag / 2; t <= diag / 2; t += 2) {
+          const x = cw / 2 + c * t - sn * (o + jo), y = ch / 2 + sn * t + c * (o + jo);
+          const v = at(x, y) > thr;
+          if (v && !on) { on = true; x0 = x; y0 = y; }
+          if ((!v || t + 2 > diag / 2) && on) {
+            on = false;
+            if (Math.hypot(x - x0, y - y0) > 3) { ctx.beginPath(); ctx.moveTo(x0 + (hash(Math.round(x0), Math.round(y0), frame) - 0.5) * 1.6, y0); ctx.lineTo(x + (hash(Math.round(x), Math.round(y), frame + 3) - 0.5) * 1.6, y + (hash(Math.round(y), Math.round(x), frame) - 0.5) * 1.4); ctx.stroke(); }
+          }
         }
       }
-    }
+    };
+    hatch(0.62, 3.6, 0.3, 0.8, 11);
+    hatch(-0.5, 6.2, 0.7, 0.9, 12);
     ctx.globalAlpha = 1;
   }
-  loadArt().then((a) => { art = a; arts.forEach((x) => engrave(x.c, 7)); });
+  loadArt().then((a) => { art = a; arts.forEach((x) => { engrave(x.c, 7); x.host.classList.add("sf-drawn"); }); });
 
   // ------------------------------------------------------------ reduced motion: one still frame of each stock behind each reel
   if (reduced) {
