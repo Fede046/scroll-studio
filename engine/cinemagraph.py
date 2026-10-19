@@ -45,6 +45,7 @@ LTX_MP = 0.5             # megapixels LTX-2.3 renders the crop at (aspect kept)
 MAX_VIDEO_W = 1280       # the encoded video's widest side
 MIN_SIDE = 320           # the crop is at least this big (as far as the still goes)
 CODEC_STEP = 2.5         # levels a lossy encode may add to the wrap step (an I-frame meeting a P-frame) before it counts as a seam
+HELD_BUDGET = 3.0        # levels the picture around the moving part may change beyond what its first frame already differs by
 BUDGET = 12.0            # pingpong: how far (mean levels) the region may move from its first frame before the clip is cut there
 MAX_SLOW = 2.0           # a clip cut short is played slower to fill the loop, by at most this much (beyond it flow interpolation smears)
 SEAM_OK = 1.5            # a loop whose closing step is at most this many typical steps is seamless
@@ -125,48 +126,47 @@ def seam_report(frames: np.ndarray, mask: Optional[np.ndarray] = None) -> dict:
             "seam": round(seam, 3), "ref": round(ref, 3), "ratio": round(seam / ref, 2), "frames": int(len(f))}
 
 
-def stabilise(frames: np.ndarray, ref: np.ndarray, keep: np.ndarray, log=print) -> tuple[np.ndarray, np.ndarray]:
-    """Undo the drift of the whole frame. A video model moves the picture a little as it renders (a slow push, a sway of
-    a pixel or two), which would show as the moving part sliding against the still around it. Each frame is registered
-    to the still (ECC, affine) on the pixels that are held (`keep`, 0-255: where the mask is zero) and warped back.
-    Returns the frames and each frame's drift in pixels (0 where it was not found); frames that drift under a third of a
-    pixel are not touched (resampling would only soften them)."""
+def stabilise_flow(frames: np.ndarray, ref: np.ndarray, keep: np.ndarray, log=print) -> tuple[np.ndarray, np.ndarray]:
+    """Pin the picture around the moving part to the still. A video model moves the camera however it is told not to (a push
+    in, a slow drift, the parallax of a dolly), and a cinemagraph's whole point is that nothing but the one thing moves:
+    wherever the video meets the still, the two must agree. Per frame, dense optical flow (DIS) to the still is measured on
+    the pixels that are held (`keep`, 255 where the mask is zero), smoothed, carried inward across the moving part by
+    normalised convolution (the moving part has no flow of its own to measure: it moves), and the frame is warped back
+    along it. Returns the frames and each frame's typical shift in pixels (the median over the held pixels)."""
     import cv2
     T, H, W, _ = frames.shape
-    s = min(1.0, 480 / max(H, W))
-    gray = lambda a: cv2.GaussianBlur(cv2.cvtColor(a, cv2.COLOR_RGB2GRAY), (0, 0), 1.2)
+    s = min(1.0, 640 / max(H, W))
+    sw, sh = max(8, round(W * s)), max(8, round(H * s))
+    small = lambda a, interp=cv2.INTER_AREA: cv2.resize(a, (sw, sh), interpolation=interp) if s < 1 else a
+    gray = lambda a: cv2.GaussianBlur(cv2.cvtColor(small(a), cv2.COLOR_RGB2GRAY), (0, 0), 1.0)
     rg = gray(ref)
-    msk = (keep > 200).astype(np.uint8) * 255
-    if s < 1:
-        rs = cv2.resize(rg, None, fx=s, fy=s, interpolation=cv2.INTER_AREA)
-        ms = cv2.resize(msk, (rs.shape[1], rs.shape[0]), interpolation=cv2.INTER_NEAREST)
-    else:
-        rs, ms = rg, msk
-    if (ms > 0).mean() < 0.05:           # nothing held to register on (the mask covers the crop)
+    held = small((keep > 200).astype(np.uint8) * 255, cv2.INTER_NEAREST) > 0
+    held = cv2.erode(held.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
+    if held.mean() < 0.05:
         return frames, np.zeros(T)
+    dis = cv2.DISOpticalFlow_create(cv2.DISOPTICAL_FLOW_PRESET_MEDIUM)
+    wgt = held.astype(np.float32)
+    sig = max(6.0, 0.05 * max(sh, sw))
+    wblur = cv2.GaussianBlur(wgt, (0, 0), sig) + 1e-4
+    gx, gy = np.meshgrid(np.arange(W, dtype=np.float32), np.arange(H, dtype=np.float32))
     out = frames.copy()
-    worst = np.zeros(T)
-    crit = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 60, 1e-5)
+    shifts = np.zeros(T)
     for t in range(T):
-        g = gray(frames[t])
-        gs = cv2.resize(g, (rs.shape[1], rs.shape[0]), interpolation=cv2.INTER_AREA) if s < 1 else g
-        warp = np.eye(2, 3, dtype=np.float32)
-        try:
-            _, warp = cv2.findTransformECC(rs, gs, warp, cv2.MOTION_AFFINE, crit, ms, 5)
-        except cv2.error:
-            continue
-        warp[:, 2] /= s                  # translation back to full size
-        # how far the frame moved, at the corners and the centre
-        pts = np.array([[0, 0, 1], [W, 0, 1], [0, H, 1], [W, H, 1], [W / 2, H / 2, 1]], dtype=np.float32)
-        drift = float(np.abs(pts @ warp.T - pts[:, :2]).max())
-        if drift > 0.03 * max(H, W) or abs(np.linalg.det(warp[:, :2]) - 1) > 0.10:    # a registration gone wrong, not a drift
-            continue
-        worst[t] = drift
-        if drift < 0.33:
-            continue
-        out[t] = cv2.warpAffine(frames[t], warp, (W, H), flags=cv2.INTER_CUBIC | cv2.WARP_INVERSE_MAP,
-                                borderMode=cv2.BORDER_REPLICATE)
-    return out, worst
+        # flow from the still to the frame: sampling the frame at (x + flow) puts its content where the still has it
+        fl = dis.calc(rg, gray(frames[t]), None)
+        med = float(np.median(np.hypot(fl[..., 0], fl[..., 1])[held]))
+        shifts[t] = med / s
+        if med / s < 0.4 and float(np.percentile(np.hypot(fl[..., 0], fl[..., 1])[held], 95)) / s < 1.0:
+            continue                                        # already registered: resampling would only soften it
+        fill = np.stack([cv2.GaussianBlur(fl[..., c] * wgt, (0, 0), sig) / wblur for c in (0, 1)], axis=-1)
+        near = cv2.GaussianBlur(wgt, (0, 0), 2.0)
+        near = np.clip(near * 1.5, 0, 1)[..., None]
+        fh = np.stack([cv2.GaussianBlur(fl[..., c], (0, 0), 2.0) for c in (0, 1)], axis=-1)
+        flow = fh * near + fill * (1 - near)               # held pixels keep their own flow; the moving part takes the carried one
+        if s < 1:
+            flow = cv2.resize(flow, (W, H), interpolation=cv2.INTER_LINEAR) / s
+        out[t] = cv2.remap(frames[t], gx + flow[..., 0], gy + flow[..., 1], cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+    return out, shifts
 
 
 def tone_match(frames: np.ndarray, ref: np.ndarray, mask: np.ndarray, ring: int) -> np.ndarray:
@@ -305,25 +305,37 @@ def close_loop(frames: np.ndarray, overlap: int, flow: bool = True) -> np.ndarra
     return np.stack(out)
 
 
-def trim_to_budget(frames: np.ndarray, seed: np.ndarray, strength: float, floor: int = FPS) -> tuple[np.ndarray, dict]:
-    """A video model's motion grows with the clip: it starts as the gentle sway a cinemagraph wants and, a second or two
-    later, becomes a curtain flying across the room. For a pingpong loop (which only needs the way out) keep the frames until
-    the region has changed from the first frame by a budget: the mean absolute difference, over the region and its
-    surroundings, of BUDGET levels (x `strength`), but at least `floor` frames. A clip that never gets there is kept whole."""
+def trim_to_budget(frames: np.ndarray, still: np.ndarray, seed: np.ndarray, strength: float, region_budget: bool,
+                   floor: int = FPS // 2) -> tuple[np.ndarray, dict]:
+    """Keep the part of the clip that is good for a cinemagraph. A video model starts as asked (the gentle sway, the curl of
+    steam) and drifts into what it likes (the camera pushes in, the curtain flies across the room). Frames are kept until
+
+      held      the picture around the moving part has changed from the still by more than HELD_BUDGET levels beyond what
+                the first frame already differed by (after the flow stabilisation: what is left is real change, a parallax,
+                something coming into view), or
+      region    (pingpong only, which only needs the way out) the moving part has changed from the first frame by more than
+                BUDGET levels x `strength`: far enough for one swing,
+
+    but at least `floor` frames. A clip that never gets there is kept whole."""
     import cv2
     k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * 12 + 1, 2 * 12 + 1))
-    area = cv2.dilate((seed > 127).astype(np.uint8), k) > 0
-    if not area.any():
-        return frames, {"kept": len(frames), "of": len(frames), "budget": None}
+    near = cv2.dilate((seed > 127).astype(np.uint8), k) > 0
+    held = cv2.dilate((seed > 127).astype(np.uint8), np.ones((51, 51), np.uint8)) == 0
     f0 = frames[0].astype(np.float32)
+    st = still.astype(np.float32)
     budget = BUDGET * float(strength)
-    keep = len(frames)
+    base = float(np.abs(f0 - st).mean(axis=-1)[held].mean()) if held.mean() > 0.05 else 0.0
+    keep, why = len(frames), None
     for t in range(1, len(frames)):
-        d = float(np.abs(frames[t].astype(np.float32) - f0).mean(axis=-1)[area].mean())
-        if d > budget and t + 1 >= floor:
-            keep = t + 1
+        ft = frames[t].astype(np.float32)
+        if held.mean() > 0.05 and float(np.abs(ft - st).mean(axis=-1)[held].mean()) > base + HELD_BUDGET:
+            keep, why = t, "the picture around it started to change"
+        elif region_budget and near.any() and float(np.abs(ft - f0).mean(axis=-1)[near].mean()) > budget:
+            keep, why = t + 1, "the region has moved as far as it should"
+        if why:
             break
-    return frames[:keep], {"kept": int(keep), "of": int(len(frames)), "budget": round(budget, 1)}
+    keep = max(min(floor, len(frames)), keep)
+    return frames[:keep], {"kept": int(keep), "of": int(len(frames)), "budget": round(budget, 1), "cut_because": why}
 
 
 def slow(frames: np.ndarray, n_out: int) -> np.ndarray:
@@ -560,7 +572,8 @@ def build(project, ref: ImageInput, log: Callable[[str], None] = print, force: b
     # flows (steam, smoke, water, a flame: the same thing a moment later); and a pingpong loop uses only the way out.
     # a pingpong loop plays the clip forward then back, so the model is asked for half of `seconds` (a short clip also stays
     # close to the still: a video model's motion grows the longer it runs)
-    gen_seconds = seconds if cg.loop == "seamless" else max(1.5, seconds / 2)
+    # a video model's first second or two are the useful ones (see trim_to_budget): ask for no more than that and play it slower
+    gen_seconds = min(2.5, max(1.5, seconds if cg.loop == "seamless" else seconds / 2))
     crop_png = work / "crop.png"
     sim.crop(box).save(crop_png)
 
@@ -594,27 +607,25 @@ def build(project, ref: ImageInput, log: Callable[[str], None] = print, force: b
     seed_id = hashlib.sha1(seed_c.tobytes()).hexdigest()[:12]
 
     # ---- prep: the clip as the rest works on it: stabilised against the still, and (pingpong) cut where it has gone far enough
-    pid = _digest([ckey, cg.loop, cg.strength, VERSION])
+    pid = _digest([ckey, cg.loop, cg.strength, cg.seconds, VERSION])
     prep, prep_json = work / f"prep_{pid}.mkv", work / f"prep_{pid}.json"
 
     def run_prep():
         raw = read_video(clip)
-        st, drifts = stabilise(raw, still_c, np.where(seed_c > 0, 0, 255).astype(np.uint8), log)
-        trim = {"kept": len(raw), "of": len(raw), "budget": None}
-        if cg.loop == "pingpong":
-            st, trim = trim_to_budget(st, seed_c, cg.strength)
-            drifts = drifts[:trim["kept"]]
-            if trim["kept"] < trim["of"]:
-                log(f"  pingpong: the clip is cut at {trim['kept']} of {trim['of']} frames, where the region has moved as far as it should")
-            want = int(round(cg.seconds / 2 * FPS)) + 1          # the way out takes half the loop
-            n_out = min(want, int(len(st) * MAX_SLOW))
-            if n_out > len(st):
-                log(f"  pingpong: played {n_out / len(st):.1f}x slower to fill the {cg.seconds:g} s loop")
-                st = slow(st, n_out)
-            trim["slowed_to"] = int(len(st))
+        st, shifts = stabilise_flow(raw, still_c, np.where(seed_c > 0, 0, 255).astype(np.uint8), log)
+        st, trim = trim_to_budget(st, still_c, seed_c, cg.strength, region_budget=cg.loop == "pingpong")
+        shifts = shifts[:trim["kept"]]
+        if trim["kept"] < trim["of"]:
+            log(f"  the clip is cut at {trim['kept']} of {trim['of']} frames: {trim['cut_because']}")
+        want = int(round((cg.seconds / 2 if cg.loop == "pingpong" else cg.seconds) * FPS)) + 1
+        n_out = min(want, int(len(st) * MAX_SLOW))
+        if n_out > len(st):
+            log(f"  played {n_out / len(st):.1f}x slower to fill the {cg.seconds:g} s loop")
+            st = slow(st, n_out)
+        trim["slowed_to"] = int(len(st))
         write_lossless(st, prep)
-        prep_json.write_text(json.dumps({"drift": round(float(drifts.max()), 2), **trim}))
-    ctx.stage(f"prep_{pid}", {"v": VERSION, "clip": cid, "loop": cg.loop, "strength": cg.strength, "seed": seed_id}, [prep, prep_json], run_prep)
+        prep_json.write_text(json.dumps({"camera_shift_px": round(float(shifts.max()), 1), **trim}))
+    ctx.stage(f"prep_{pid}", {"v": VERSION, "clip": cid, "loop": cg.loop, "strength": cg.strength, "seconds": cg.seconds, "seed": seed_id}, [prep, prep_json], run_prep)
     prep_info = json.loads(prep_json.read_text())
 
     # ---- track: SAM 2.1 follows the moving thing through the clip
@@ -687,7 +698,7 @@ def build(project, ref: ImageInput, log: Callable[[str], None] = print, force: b
                      "seamless": decoded["seam"] <= max(SEAM_OK * decoded["ref"], decoded["ref"] + CODEC_STEP)},
             "still": [W, H], "box": [x0, y0, x1, y1], "video": [ww, wh], "bytes": mp4.stat().st_size + wp.stat().st_size,
             "mask": {"share_of_still": round(float((mask > 127).sum()) / sc / sc / (W * H), 4), **minfo},
-            "motion": {"temporal_std": round(motion, 2), "drift_px": prep_info["drift"], "kept_frames": prep_info["kept"],
+            "motion": {"temporal_std": round(motion, 2), "camera_shift_px_removed": prep_info["camera_shift_px"], "cut_because": prep_info["cut_because"], "kept_frames": prep_info["kept"],
                        "of_generated": prep_info["of"], "played_frames": prep_info.get("slowed_to", prep_info["kept"])},
             "held": {"max_change_outside_mask": outside["page"], "video_file_change_outside_mask": outside["file"]},
         }

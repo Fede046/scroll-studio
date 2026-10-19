@@ -104,16 +104,6 @@ def test_closing_a_loop_and_pingpong_remove_the_seam():
     assert len(pp) == 34 + 32 and C.seam_report(pp, m)["ratio"] <= C.SEAM_OK
 
 
-def test_a_pingpong_clip_is_cut_where_the_motion_has_gone_far_enough():
-    still, frames, seed = _scene(T=48)
-    cut, info = C.trim_to_budget(frames, seed, 1.0)
-    assert info["of"] == 48 and C.FPS // 2 < info["kept"] < 48 or info["kept"] == info["of"]
-    near, ni = C.trim_to_budget(frames, seed, 0.2)                       # a tighter budget cuts sooner, never below the floor
-    assert ni["kept"] <= info["kept"] and ni["kept"] >= min(C.FPS, 48)
-    calm, ci = C.trim_to_budget(np.repeat(still[None], 30, 0), seed, 1.0)  # nothing moves: kept whole
-    assert ci["kept"] == 30
-
-
 def test_damping_scales_the_motion_about_its_mean():
     _, frames, _ = _scene()
     calm = C.damp(frames, 0.5)
@@ -121,18 +111,50 @@ def test_damping_scales_the_motion_about_its_mean():
     assert C.damp(frames, 1.0) is frames
 
 
-def test_a_video_models_drift_is_taken_out():
+def test_a_video_models_camera_move_is_taken_out():
     import cv2
     still, _, _ = _scene(H=320, W=400)
-    T, (H, W) = 8, still.shape[:2]
-    drifting = np.stack([cv2.warpAffine(still, np.array([[1 + 0.0012 * t, 0, 0.18 * t], [0, 1 + 0.0012 * t, -0.12 * t]], np.float32),
-                                        (W, H), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE) for t in range(T)])
+    T, (H, W) = 6, still.shape[:2]
+    # a push in with a pan: 1.5 % zoom and 5 px by the last frame
+    moved = np.stack([cv2.warpAffine(still, np.array([[1 + 0.003 * t, 0, 1.0 * t], [0, 1 + 0.003 * t, -0.6 * t]], np.float32),
+                                     (W, H), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE) for t in range(T)])
     keep = np.full((H, W), 255, np.uint8)
     keep[80:200, 120:260] = 0
-    fixed, drifts = C.stabilise(drifting, still, keep)
-    assert drifts.max() > 0.5 and len(drifts) == T
-    err = lambda a: np.abs(a[-1].astype(float) - still).mean()
-    assert err(fixed) < err(drifting) / 4
+    fixed, shifts = C.stabilise_flow(moved, still, keep)
+    assert shifts.max() > 2 and len(shifts) == T
+    err = lambda a: np.abs(a[-1].astype(float) - still)[keep > 0].mean()
+    assert err(fixed) < err(moved) / 3
+
+
+def test_a_clip_is_cut_where_it_stops_being_a_cinemagraph():
+    still, frames, seed = _scene(T=48)
+    sharpen = lambda a: np.clip(128 + (a.astype(np.float32) - 110) * 6, 0, 255).astype(np.uint8)    # texture a registration can see
+    still, frames = sharpen(still), sharpen(frames)
+    # the picture around the moving part stays put for 20 frames, then the "camera" moves
+    clip = frames.copy()
+    for t in range(20, 48):
+        clip[t] = np.roll(frames[t], 3 + (t - 20), axis=1)
+    cut, info = C.trim_to_budget(clip, still, seed, 1.0, region_budget=False)
+    assert 12 <= info["kept"] <= 24 and info["cut_because"].startswith("the picture")
+    whole, wi = C.trim_to_budget(frames, still, seed, 1.0, region_budget=False)
+    assert wi["kept"] == 48 and wi["cut_because"] is None
+
+
+def test_a_pingpong_clip_is_cut_where_the_motion_has_gone_far_enough():
+    still, frames, seed = _scene(T=48)
+    cut, info = C.trim_to_budget(frames, still, seed, 1.0, region_budget=True)
+    assert info["of"] == 48 and C.FPS // 2 <= info["kept"] <= 48
+    tight, ti = C.trim_to_budget(frames, still, seed, 0.2, region_budget=True)   # a tighter budget cuts sooner, never below the floor
+    assert C.FPS // 2 <= ti["kept"] <= info["kept"]
+    calm, ci = C.trim_to_budget(np.repeat(still[None], 30, 0), still, seed, 1.0, region_budget=True)  # nothing moves: kept whole
+    assert ci["kept"] == 30
+
+
+def test_slowing_a_clip_fills_the_loop_without_changing_its_ends():
+    _, frames, _ = _scene(T=20)
+    slowed = C.slow(frames, 36)
+    assert len(slowed) == 36 and (slowed[0] == frames[0]).all() and (slowed[-1] == frames[-1]).all()
+    assert C.slow(frames, 10) is frames
 
 
 def test_tone_matching_removes_a_global_shade():
@@ -259,14 +281,14 @@ def test_a_cinemagraph_builds_and_every_stage_is_cached(fake):
 
 def test_a_changed_field_redoes_only_what_follows_it(fake):
     project, calls = fake
-    C.build(project, _ref(seconds=1.0), lambda m: None)
-    C.build(project, _ref(seconds=1.0, strength=0.5), lambda m: None)       # damping: no new clip
-    C.build(project, _ref(seconds=1.0, loop="pingpong"), lambda m: None)    # a loop kind changes what is asked of the model
-    assert calls["animate"] == 2 and calls["last"]["end"] is False
-    C.build(project, _ref(seconds=1.0, feather=40, grow=14), lambda m: None)  # the mask's shape: the clip is kept
+    first = C.build(project, _ref(seconds=4.0), lambda m: None)
+    C.build(project, _ref(seconds=4.0, strength=0.5), lambda m: None)       # damping: no new clip
+    C.build(project, _ref(seconds=4.0, feather=40, grow=14), lambda m: None)    # the mask's shape: the clip is kept
+    assert calls["animate"] == 1
+    pp = C.build(project, _ref(seconds=4.0, loop="pingpong"), lambda m: None)   # a pingpong asks the model for half the loop
+    assert calls["animate"] == 2 and calls["last"]["seconds"] == 2.0 and pp["id"] != first["id"]
+    C.build(project, _ref(seconds=4.0), lambda m: None)                     # going back finds the first clip again
     assert calls["animate"] == 2
-    C.build(project, _ref(seconds=2.0), lambda m: None)
-    assert calls["animate"] == 3
 
 
 def test_only_cached_never_runs_a_model(fake):
@@ -283,7 +305,7 @@ def test_pingpong_has_no_seam_and_is_twice_as_long(fake):
     assert calls["last"]["seconds"] == 2.0 and calls["last"]["end"] is False   # half the loop, one way, no end frame
     m = b["data"]["motion"]
     assert b["data"]["loop"]["seamless"] and b["data"]["frames"] == 2 * m["played_frames"] - 2
-    assert m["kept_frames"] <= 25 <= m["played_frames"] <= 2 * m["kept_frames"]      # cut short, then played slower to fill the loop
+    assert m["kept_frames"] <= m["played_frames"] <= 2 * m["kept_frames"]      # maybe cut short, then played slower to fill the loop
 
 
 # ---------------------------------------------------------------- the page
