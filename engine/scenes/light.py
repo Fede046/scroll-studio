@@ -344,7 +344,7 @@ def build(sec: LightScene, ctx: BuildContext, theme: dict) -> dict:
         "w": W, "h": H, "times": cfg_times, "pairs": pairs, "holds": holds, "stepTimes": step_times,
         "depth": ctx.url(ctx.web / "depth.png"), "sky": ctx.url(ctx.web / "sky.png"),
         "sun": sun.model_dump(mode="json") if sun else None, "mist": sec.mist, "drift": sec.drift, "follow": sec.follow,
-        "clock": sec.clock, "blend": sec.blend, "layout": sec.layout,
+        "clock": sec.clock, "blend": sec.blend, "layout": sec.layout, "focus": list(sec.focus),
         "poster": ctx.url(ctx.web / "poster.jpg"), "end": ctx.url(ctx.web / f"t{len(times) - 1}.webp"),
         "credits": credits,
     }

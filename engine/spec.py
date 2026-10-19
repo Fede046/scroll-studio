@@ -1232,6 +1232,8 @@ class LightScene(SceneBase):
     follow: bool = Field(True, description="The section's colours follow the sky: caption ink, accent and the shade "
                                            "behind the text are measured from each time's picture and blended with the light")
     clock: bool = Field(True, description="Show the time of day (a clock and a sun arc) in a corner")
+    focus: tuple[float, float] = Field((0.5, 0.5), description="Where a narrow screen (a phone, in portrait) looks: the point of "
+                                                              "the picture, 0-1 across and down, kept in view when it is cropped")
     blend: Literal["light", "fade"] = Field("light", description="light: the light-aware transition; fade: a plain "
                                                                  "crossfade (for comparison, or a quieter page)")
     structure: LightStructure = Field(default_factory=LightStructure, description="Geometry lock: measure each relight against the world, warp small drift away, retry a relight that still drifts")

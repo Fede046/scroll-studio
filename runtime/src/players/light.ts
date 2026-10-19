@@ -25,6 +25,7 @@ precision highp float;
 in vec2 uv; out vec4 o;
 uniform sampler2D imgA, imgB, ratioT, lampT, depthT, skyT;
 uniform vec2 sc;            // cover-fit scale
+uniform vec2 ctr;           // the picture point the screen's centre looks at
 uniform vec3 cam;           // drift x, y and zoom
 uniform float strength;     // parallax strength
 uniform float focus;        // depth that stays put
@@ -51,7 +52,7 @@ float fbm(vec2 p){ return .55 * vn(p) + .3 * vn(p * 2.1 + 7.3) + .15 * vn(p * 4.
 
 void main(){
   // 2.5D: solve for the picture point that lands on this pixel (near things move further than far ones)
-  vec2 c = (uv - .5) / (sc * cam.z) + .5;
+  vec2 c = (uv - .5) / (sc * cam.z) + ctr;
   vec2 q = c;
   for (int i = 0; i < ITER; i++) { float d = texture(depthT, q).r; q = c - (d - focus) * cam.xy * strength; }
   q = clamp(q, vec2(.001), vec2(.999));
@@ -233,6 +234,7 @@ const factory: PlayerFactory = async (cfg, ctx) => {
     await Promise.all(times.map(async (t, i) => {
       const im = await loadImage(small ? t.imgS : t.img);
       im.className = "ss-light-still"; im.alt = ""; im.style.opacity = i === 0 ? "1" : "0";
+      im.style.objectPosition = `${(cfg.focus?.[0] ?? 0.5) * 100}% ${(cfg.focus?.[1] ?? 0.5) * 100}%`;
       ctx.visual.appendChild(im); imgs[i] = im;
     }));
     return {
@@ -262,7 +264,7 @@ const factory: PlayerFactory = async (cfg, ctx) => {
   const loc = gl.getAttribLocation(prog, "p");
   gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
   const U: Record<string, WebGLUniformLocation | null> = {};
-  for (const n of ["imgA", "imgB", "ratioT", "lampT", "depthT", "skyT", "sc", "cam", "strength", "focus", "fe", "aspect", "origin", "light",
+  for (const n of ["imgA", "imgB", "ratioT", "lampT", "depthT", "skyT", "sc", "ctr", "cam", "strength", "focus", "fe", "aspect", "origin", "light",
     "hasLamp", "lampOn", "glow", "lampCol", "hazeA", "hazeB", "mistOn", "fogA", "fogB", "sunCol", "edgeCol", "sunPos", "sunAmt", "sunSize", "t", "vig", "grain"]) U[n] = gl.getUniformLocation(prog, n);
   ["imgA", "imgB", "ratioT", "lampT", "depthT", "skyT"].forEach((n, i) => gl.uniform1i(U[n], i));
 
@@ -339,7 +341,9 @@ const factory: PlayerFactory = async (cfg, ctx) => {
       const zoom = 1.035 + dr * 0.025 * (tau / Math.max(1, nT - 1)) + dr * 0.004 * Math.sin(idle * 0.07);
       bind(0, imgT[a]); bind(1, imgT[a + 1]); bind(2, ratioT[a] || flatRatio); bind(3, lampT[a] || noLamp); bind(4, depthT); bind(5, skyT);
       const ca = cw / ch;
-      gl.uniform2f(U.sc, ca > aspect ? 1 : aspect / ca, ca > aspect ? ca / aspect : 1);
+      const sx = ca > aspect ? 1 : aspect / ca, sy = ca > aspect ? ca / aspect : 1, fo = cfg.focus || [0.5, 0.5];
+      gl.uniform2f(U.sc, sx, sy);
+      gl.uniform2f(U.ctr, clamp(fo[0], 0.5 / (sx * 1.04), 1 - 0.5 / (sx * 1.04)), clamp(fo[1], 0.5 / (sy * 1.04), 1 - 0.5 / (sy * 1.04)));
       gl.uniform3f(U.cam, cx, cy, zoom);
       gl.uniform1f(U.strength, 1.0); gl.uniform1f(U.focus, 0.55);
       gl.uniform1f(U.fe, f); gl.uniform1f(U.aspect, aspect);
