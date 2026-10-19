@@ -54,33 +54,24 @@ def surface_quad(mask: np.ndarray, inset: float = 0.03) -> np.ndarray:
 
 
 def plane_aspect(quad: np.ndarray, size: tuple[int, int] = (W, H)) -> float:
-    """Width / height of the rectangle that a quadrilateral seen in perspective really is (Zhang and He's whiteboard
-    method: the focal length and the aspect fall out of the quad when the pixels are square and the principal point is the
-    centre). Falls back to the mean edge lengths when the quad is nearly fronto-parallel (the formula divides by zero)."""
+    """Width / height of the rectangle that a quadrilateral seen in perspective really is, for an ordinary lens (`FOCAL`,
+    square pixels, the principal point in the middle): the homography of a unit square onto the quad is K [r1 r2 t] up to
+    scale, and r1, r2 are orthonormal, so |K^-1 h1| / |K^-1 h2| is the quad's width over its height. Falls back to the mean
+    edge lengths when that is degenerate."""
     q = np.asarray(quad, dtype=np.float64).reshape(4, 2)
     tl, tr, br, bl = q
     edge = 0.5 * (np.linalg.norm(tr - tl) + np.linalg.norm(br - bl)) / max(0.5 * (np.linalg.norm(bl - tl) + np.linalg.norm(br - tr)), 1e-6)
-    u0, v0 = size[0] / 2, size[1] / 2
-    m1, m2, m3, m4 = [np.array([p[0] - u0, p[1] - v0, 1.0]) for p in (tl, tr, bl, br)]
+    w, h = size
+    f = FOCAL * w
     try:
-        k2 = np.dot(np.cross(m1, m4), m3) / np.dot(np.cross(m2, m4), m3)
-        k3 = np.dot(np.cross(m1, m4), m2) / np.dot(np.cross(m3, m4), m2)
-        n2, n3 = k2 * m2 - m1, k3 * m3 - m1
-        den = n2[2] * n3[2]
-        f2 = -((n2[0] * n3[0]) + (n2[1] * n3[1])) / den if abs(den) > 1e-9 else -1.0
-        if f2 <= 0 or not np.isfinite(f2):
-            return float(np.clip(edge, 0.25, 6.0))
-        f = np.sqrt(f2)
-        Ai = np.linalg.inv(np.array([[f, 0, 0], [0, f, 0], [0, 0, 1.0]]))
-        Q = Ai.T @ Ai
-        a = np.sqrt(abs(n2 @ Q @ n2) / max(abs(n3 @ Q @ n3), 1e-12))
-        if not np.isfinite(a):
-            return float(np.clip(edge, 0.25, 6.0))
-        # trust the projective estimate only when it is not wildly away from what the edges say
-        if not (0.5 < a / edge < 2.0):
+        Hm = cv2.getPerspectiveTransform(np.float32([[0, 0], [1, 0], [1, 1], [0, 1]]), np.float32(q))
+        Ki = np.linalg.inv(np.array([[f, 0, w / 2], [0, f, h / 2], [0, 0, 1.0]]))
+        v1, v2 = Ki @ Hm[:, 0], Ki @ Hm[:, 1]
+        a = np.linalg.norm(v1) / max(np.linalg.norm(v2), 1e-12)
+        if not np.isfinite(a) or not (0.4 < a / edge < 2.5):
             a = edge
         return float(np.clip(a, 0.25, 6.0))
-    except (ZeroDivisionError, FloatingPointError, np.linalg.LinAlgError):
+    except (cv2.error, np.linalg.LinAlgError, FloatingPointError):
         return float(np.clip(edge, 0.25, 6.0))
 
 
