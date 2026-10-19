@@ -52,7 +52,7 @@ sections:
         section: mark
         shape: the white ring
         becomes: a glowing orange sun disc
-        prompt: a calm dark sea at dusk under a deep orange and purple sky, a big sun low over the horizon in the middle of the frame
+        prompt: a calm dark sea at dusk under a deep orange and purple sky, one single big sun low over the horizon in the middle of the frame, no other sun
     transition:
       type: match
       shape: the sun disc
