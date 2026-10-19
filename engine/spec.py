@@ -1412,6 +1412,8 @@ class JourneyStop(Model):
     laid out to sit with the picture, and moves on."""
     id: str = Field(..., description="Short name; the beats are called <id>-travel and <id>-hold")
     label: Optional[str] = Field(None, description="Name of the place in the page's places rail (default: the id)")
+    world: Optional[str] = Field(None, description="Replaces `journey.world` in this stop's prompts: for a place the shared "
+                                 "world would mislead, such as the view out of a window in a journey described from inside")
     place: str = Field(..., description="The place as a photograph: what the camera sees at rest here, in the world "
                                         "described once at `journey.world`. The first stop's picture is made from it; "
                                         "later stops arrive at it through `move` (it steers the video model toward the "

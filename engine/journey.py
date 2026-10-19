@@ -91,7 +91,7 @@ def expand(sec) -> None:
             m = stop.move
             beats.append(Beat(
                 id=travel_id(stop), seconds=m.seconds, seed=stop_seed(j, i, stop),
-                prompt=f"{j.world}. {stop.place}", motion=m.motion or default_motion(stop.place),
+                prompt=f"{stop.world or j.world}. {stop.place}", motion=m.motion or default_motion(stop.place),
                 image=ImageInput(beat_frame=BeatFrame(beat=hold_id(prev), at="last", pick="last")),
                 camera=CameraMove(keys=_travel_keys(m), ease=m.ease, subjects="", parallax=m.parallax, anchor=m.anchor,
                                   guide_strength=m.guide_strength, res=m.res, seed=m.seed if m.seed is not None else seed)))
@@ -106,7 +106,7 @@ def expand(sec) -> None:
             fz = Freeze(**{"from": travel_id(stop)}, pick="last", camera=_hold_keys(stop), ease="smoother",
                         parallax=stop.parallax, grain=j.grain, seed=seed)
         else:
-            fz = Freeze(image=ImageInput(generate=f"{j.world}. {stop.place}", size=(W, H), seed=seed), pick="last",
+            fz = Freeze(image=ImageInput(generate=f"{stop.world or j.world}. {stop.place}", size=(W, H), seed=seed), pick="last",
                         camera=_hold_keys(stop), ease="smoother", parallax=stop.parallax, grain=j.grain, seed=seed)
         beats.append(Beat(id=hold_id(stop), seconds=stop.seconds, seed=seed, freeze=fz))
     sec.beats = beats
@@ -155,7 +155,7 @@ def _expand_take(sec) -> None:
     total = t
     frames = []
     for i, stop in enumerate(j.stops):
-        frames.append({"name": stop.id, "t": 0.0 if i == 0 else round(centre[i], 3), "prompt": f"{j.world}. {stop.place}",
+        frames.append({"name": stop.id, "t": 0.0 if i == 0 else round(centre[i], 3), "prompt": f"{stop.world or j.world}. {stop.place}",
                        "strength": 1.0 if i == 0 else b.keyframe_strength, **({"seed": stop.seed} if stop.seed is not None else {})})
 
     def stop_at(x: float) -> int:
