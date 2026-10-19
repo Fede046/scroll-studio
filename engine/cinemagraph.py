@@ -245,12 +245,20 @@ def final_mask(seed: np.ndarray, energy: np.ndarray, grow: float, feather: float
     moving = energy > tau
     side = min(H, W)
     ell = lambda r: cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))
-    reach = max(6, int(0.07 * side))
-    near = cv2.dilate(base.astype(np.uint8), ell(reach)) > 0
-    where = base | (moving & near)
-    # keep it only where something moves within a feather's width (a still part of the region is kept as the still)
+    # everything that moves AND is joined to the thing (or to its tracked path) is the thing: a curtain's hem lifts, a flame
+    # leans, steam climbs well past the box it was found in. Pieces that move but are not joined to it (the model moving
+    # something else) are left as the still.
+    joined = cv2.dilate(moving.astype(np.uint8), ell(max(2, int(0.01 * side)))) > 0
+    n, lab = cv2.connectedComponents(joined.astype(np.uint8), connectivity=8)
+    hit = np.unique(lab[base & joined])
+    hit = hit[hit > 0]
+    parts = np.isin(lab, hit) & moving
+    if parts.sum() > 0.7 * H * W:          # most of the picture "moves": the model moved the camera, not a thing; stay near it
+        reach = max(6, int(0.07 * side))
+        parts = parts & (cv2.dilate(base.astype(np.uint8), ell(reach)) > 0)
+    # the region itself is kept only where something moves within a feather's width (a still part of the region stays the still)
     live = cv2.dilate(moving.astype(np.uint8), ell(max(3, int(feather)))) > 0
-    where = where & live
+    where = (base & live) | parts
     info = {"tau": round(tau, 2), "peak": round(peak, 2), "moving_px": int(moving.sum())}
     if where.sum() < max(64, 0.0005 * H * W):
         raise BuildError("the clip does not move where the picture says: nothing in the region moves. Raise `strength`, describe "
@@ -324,6 +332,32 @@ def page_composite(poster: np.ndarray, frame: np.ndarray, mask: np.ndarray) -> n
     region.composite): where the mask is 0 the pixel is the poster's, exactly."""
     from .region import composite
     return composite(poster, frame, mask)
+
+
+def review_sheet(still: np.ndarray, dec: np.ndarray, mask: np.ndarray, path: Path) -> None:
+    """A contact sheet to read: the still with the mask's edge, the mask, six frames as the page composes them, and where the
+    pixels change over the loop (bright = moves; black = held exactly)."""
+    import cv2
+    from PIL import Image
+    from .region import outline
+    H, W = mask.shape
+    tw = min(W, 520)
+    th = round(H * tw / W)
+    fit = lambda a: cv2.resize(a, (tw, th), interpolation=cv2.INTER_AREA)
+    ol = np.asarray(outline(mask))
+    base = still.astype(np.float32)
+    edge = (base * (1 - ol[..., 3:4] / 255.0) + ol[..., :3] * (ol[..., 3:4] / 255.0)).astype(np.uint8)
+    idx = np.linspace(0, len(dec) - 1, 6).astype(int)
+    shown = [page_composite(still, dec[i], mask) for i in idx]
+    rng = np.abs(np.stack(shown).astype(np.int16) - still[None].astype(np.int16)).max(axis=0).max(axis=-1)
+    heat = cv2.applyColorMap(np.clip(rng * 3, 0, 255).astype(np.uint8), cv2.COLORMAP_INFERNO)[..., ::-1]
+    tiles = [fit(edge), fit(np.repeat(mask[..., None], 3, axis=2)), *[fit(f) for f in shown], fit(np.ascontiguousarray(heat))]
+    cols = 3
+    rows = -(-len(tiles) // cols)
+    sheet = np.zeros((rows * th, cols * tw, 3), np.uint8)
+    for k, t in enumerate(tiles):
+        sheet[(k // cols) * th:(k // cols + 1) * th, (k % cols) * tw:(k % cols + 1) * tw] = t
+    Image.fromarray(sheet).save(path, quality=88)
 
 
 # ---------------------------------------------------------------- video in and out
@@ -524,6 +558,7 @@ def build(project, ref: ImageInput, log: Callable[[str], None] = print, force: b
     # ---- encode: stabilise, tone-match, close the loop, damp, composite, encode, measure
     out_id = _digest([ckey, region_key(cg), cg.grow, cg.feather, cg.track, cg.loop, cg.strength, VERSION])
     mp4, wp, rep = work / f"cine_{out_id}.mp4", work / f"cine_{out_id}.mask.webp", work / f"cine_{out_id}.json"
+    sheet = work / f"cine_{out_id}.sheet.jpg"
     ekey = {"v": VERSION, "out": out_id}
 
     def run_encode():
@@ -549,6 +584,7 @@ def build(project, ref: ImageInput, log: Callable[[str], None] = print, force: b
         encode_h264(vid, mp4)
         save_mask(mask, wp)
         dec = read_video(mp4)                                   # measure what the page will play, not what we meant
+        review_sheet(still_c, dec, mask, sheet)
         outside = _outside_change(dec, still_c, mask)
         decoded = seam_report(dec, mask)
         motion = float(np.mean(np.std(seq.astype(np.float32), axis=0).mean(axis=-1)[mask > 127])) if (mask > 127).any() else 0.0
@@ -563,9 +599,9 @@ def build(project, ref: ImageInput, log: Callable[[str], None] = print, force: b
             "held": {"max_change_outside_mask": outside["page"], "video_file_change_outside_mask": outside["file"]},
         }
         rep.write_text(json.dumps(report, indent=1))
-    ctx.stage(f"encode_{out_id}", ekey, [mp4, wp, rep], run_encode)
+    ctx.stage(f"encode_{out_id}", ekey, [mp4, wp, rep, sheet], run_encode)
     report = json.loads(rep.read_text())
-    return Built(video=mp4, mask=wp, report=rep, data=report, box=[x0 / W, y0 / H, x1 / W, y1 / H], still=[W, H],
+    return Built(video=mp4, mask=wp, report=rep, sheet=sheet, data=report, box=[x0 / W, y0 / H, x1 / W, y1 / H], still=[W, H],
                  size=[ww, wh], poster_crop=crop_png, id=out_id)
 
 
