@@ -173,7 +173,7 @@ def _expand_take(sec) -> None:
         p, q = stop_at(a + 1e-3), stop_at(z - 1e-3)
         places = [j.stops[k].place for k in range(p, q + 1)]
         motion = next((j.stops[k].move.motion for k in range(q, p, -1) if j.stops[k].move.motion), None)
-        text = (f"{j.world}. One continuous smooth shot: the camera rests at {places[0]}"
+        text = (f"{j.world}. One continuous smooth shot. The camera rests on {places[0]}"
                 + "".join(f", then glides on to {x}" for x in places[1:]) + f". {motion + '. ' if motion else ''}Steady, no cuts, photoreal, cinematic.")
         segments.append({"id": f"seg{n + 1}", "range": [round(a, 3), round(z, 3)], "prompt": text})
     sec.take = Take.model_validate({
