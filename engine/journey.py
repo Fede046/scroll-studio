@@ -3,12 +3,18 @@
 A `journey:` on a film section is written as stops (places) with the page's blocks at each. This module turns it into
 what the engine already builds and plays:
 
-  expand      stops -> beats. The first stop is a frozen moment of a picture made from the world and its place. Every
-              later stop is a camera move (a keyed move on a moving shot, flown through the picture before it and painted
-              by the video model, so the place is *arrived at*, not cut to) followed by a frozen moment of the frame it
-              arrived at, with a slow parallax while the page holds. Every join is on the same frame.
-  weights     the scroll each beat gets: a move plays as you scroll through it, a hold is the page resting at a stop.
-  timeline    the map from scroll progress to film time, and each stop's window, from the rendered clips' lengths.
+  expand      stops -> the film, by one of two approaches (measured, see docs/ENGINE.md):
+              chain   (no `blockout`) beats. The first stop is a frozen moment of a picture made from the world and its
+                      place. Every later stop is a camera move (a keyed move on a moving shot, flown through the picture
+                      before it and painted by the video model, so the place is *arrived at*, not cut to) followed by a
+                      frozen moment of the frame it arrived at, with a slow parallax while the page holds. Every join is
+                      on the same frame. The camera can only go into what the picture before it shows.
+              take    (a `blockout`) one continuous take: the world as rough shapes, the camera a real 3D path through it
+                      that rests at every stop, a picture of every stop painted over the blockout's depth and the video
+                      model painting between them, cut at the middle of a hold (the camera is at rest there).
+  plan        the segments of the journey, in order: a move to a stop and the hold at it, with their film seconds and the
+              scroll each gets (a move plays as you scroll through it, a hold is the page resting at a stop).
+  timeline    the map from scroll progress to film time, and each stop's window, from the rendered lengths.
   analyse     where a stop's blocks sit on its picture (the calmest part, found from the picture) and the lettering
               colour and scrim that keep them readable (contrast-checked against the picture under them).
   build       the stage the film builder runs after the beats are joined: stop stills (the reduced-motion and
@@ -74,6 +80,8 @@ def expand(sec) -> None:
             raise ValueError(f"film '{sec.id}': a journey makes the film and its captions; do not also write `{name}`")
     if sec.take is not None or sec.video or sec.shot:
         raise ValueError(f"film '{sec.id}': a journey makes the film; do not also write `take`, `shot` or `video`")
+    if j.blockout is not None:
+        return _expand_take(sec)
     W, H = sec.beat_res[0] // 32 * 32, sec.beat_res[1] // 32 * 32
     beats = []
     for i, stop in enumerate(j.stops):
@@ -103,25 +111,100 @@ def expand(sec) -> None:
         beats.append(Beat(id=hold_id(stop), seconds=stop.seconds, seed=seed, freeze=fz))
     sec.beats = beats
     sec.beat_fade = j.fade
+    sec.beat_restore = j.restore
+    _finish(sec)
+
+
+def _finish(sec) -> None:
     sec.layout = "overlay"
     sec.steps = []
     sec.length = round(sum(w for _, _, _, w in weights(sec)) + 1.0, 3)
-    for name in ("beats", "beat_fade", "layout", "steps", "length"):      # derived: not part of the spec as written
+    for name in ("beats", "beat_fade", "beat_restore", "layout", "steps", "length", "take"):   # derived: not part of the spec as written
         sec.__pydantic_fields_set__.discard(name)
+
+
+NEGATIVE = "cuts, jump cuts, flicker, warped shapes, morphing, text, watermark, people, blur"
+
+
+def _expand_take(sec) -> None:
+    """One continuous take: the blockout's world, a camera path that rests at every stop, a picture of each stop painted
+    over the blockout's depth, the video model painting between them in stretches cut at the middle of a hold."""
+    from .spec import Take
+    j = sec.journey
+    b = j.blockout
+    segs = plan(sec)
+    keys, t = [], 0.0
+
+    def key(at, pose):
+        keys.append({"t": round(at, 3), "at": list(pose.at), "look": list(pose.look)})
+    key(0.0, j.stops[0].pose)
+    centre, start_of, end_of = {}, {}, {}
+    for _, kind, i, secs, _ in segs:
+        stop = j.stops[i]
+        if kind == "move":
+            n = len(stop.move.path)
+            for k, pose in enumerate(stop.move.path, 1):
+                key(t + secs * k / (n + 1), pose)
+            t += secs
+            key(t, stop.pose)
+        else:
+            start_of[i], centre[i] = t, t + secs / 2
+            t += secs
+            end_of[i] = t
+            key(t, stop.pose)
+    total = t
+    frames = []
+    for i, stop in enumerate(j.stops):
+        frames.append({"name": stop.id, "t": 0.0 if i == 0 else round(centre[i], 3), "prompt": f"{j.world}. {stop.place}",
+                       "strength": 1.0 if i == 0 else b.keyframe_strength})
+
+    def stop_at(x: float) -> int:
+        for i in range(len(j.stops)):
+            if x < end_of[i] - 1e-6:
+                return i
+        return len(j.stops) - 1
+    cuts = [0.0] + [centre[i] for i in range(1, len(j.stops))] + [total]
+    bounds = [cuts[0]]
+    for a, z in zip(cuts, cuts[1:]):                    # a stretch longer than the video model likes is split evenly
+        n = max(1, math.ceil((z - a) / b.segment - 1e-9))
+        bounds += [a + (z - a) * k / n for k in range(1, n + 1)]
+    segments = []
+    for n, (a, z) in enumerate(zip(bounds, bounds[1:])):
+        p, q = stop_at(a + 1e-3), stop_at(z - 1e-3)
+        places = [j.stops[k].place for k in range(p, q + 1)]
+        motion = next((j.stops[k].move.motion for k in range(q, p, -1) if j.stops[k].move.motion), None)
+        text = (f"{j.world}. One continuous smooth shot: the camera rests at {places[0]}"
+                + "".join(f", then glides on to {x}" for x in places[1:]) + f". {motion + '. ' if motion else ''}Steady, no cuts, photoreal, cinematic.")
+        segments.append({"id": f"seg{n + 1}", "range": [round(a, 3), round(z, 3)], "prompt": text})
+    sec.take = Take.model_validate({
+        "duration": round(total, 3), "fps": 24, "sky": b.sky, "light": list(b.light),
+        "ground": b.ground.model_dump(mode="json") if b.ground else None,
+        "objects": [o.model_dump(mode="json") for o in b.objects], "camera": keys, "lens": b.lens, "depth_far": b.depth_far,
+        "keyframes": {"control_strength": b.control_strength, "res": list(b.keyframe_res), "seed": j.seed, "frames": frames},
+        "ltx": {"res": list(b.ltx_res), "seed": j.seed, "guide_strength": b.guide_strength, "guide_blur": b.guide_blur,
+                "sampler": "euler_cfg_pp", "negative_prompt": b.negative or NEGATIVE, "segments": segments},
+        "restore": j.restore})
+    _finish(sec)
 
 
 # ---------------------------------------------------------------- scroll
 
-def weights(sec) -> list[tuple[str, str, int, float]]:
-    """(beat id, 'move' | 'hold', stop index, scroll in screen heights) for every beat of the film, in order."""
+def plan(sec) -> list[tuple[str, str, int, float, float]]:
+    """(id, 'move' | 'hold', stop index, film seconds, scroll in screen heights) for every segment of the journey, in
+    order. A chain's ids are its beats'."""
     j = sec.journey
     out = []
     for i, stop in enumerate(j.stops):
         if i:
             m = stop.move
-            out.append((travel_id(stop), "move", i, (m.scroll if m.scroll is not None else m.seconds * 0.5) * j.pace))
-        out.append((hold_id(stop), "hold", i, stop.hold * j.pace))
+            out.append((travel_id(stop), "move", i, m.seconds, (m.scroll if m.scroll is not None else m.seconds * 0.5) * j.pace))
+        out.append((hold_id(stop), "hold", i, stop.seconds, stop.hold * j.pace))
     return out
+
+
+def weights(sec) -> list[tuple[str, str, int, float]]:
+    """(id, 'move' | 'hold', stop index, scroll in screen heights) of every segment (see `plan`)."""
+    return [(a, b, c, e) for a, b, c, _, e in plan(sec)]
 
 
 def timeline(sec, durs: list[float], fades: list[float]) -> dict:
@@ -265,8 +348,13 @@ def build(sec, ctx, film: Path, cfg: dict, theme: Optional[dict] = None) -> dict
     from .freeze_beats import beat_clip_path
     from .scenes.film import join_fades
     j = sec.journey
-    durs = [float(probe(beat_clip_path(ctx.project, sec, b))["duration"]) for b in sec.beats]
-    fades = join_fades(sec, durs)
+    if sec.take is not None:       # one take: the segments are the plan, stretched to the film's real length
+        nominal = [x[3] for x in plan(sec)]
+        k = float(probe(film)["duration"]) / sum(nominal)
+        durs, fades = [d * k for d in nominal], [0.0] * (len(nominal) - 1)
+    else:
+        durs = [float(probe(beat_clip_path(ctx.project, sec, b))["duration"]) for b in sec.beats]
+        fades = join_fades(sec, durs)
     tl = timeline(sec, durs, fades)
     times = stop_frame_times(tl)
     ink = lettering(theme)
@@ -302,12 +390,10 @@ def build(sec, ctx, film: Path, cfg: dict, theme: Optional[dict] = None) -> dict
 
 
 def describe(sec) -> list[dict]:
-    """The journey as a table (`studio journey`): every beat, what it is, how long in the film and in scroll."""
-    ws = {b: (k, i, w) for b, k, i, w in weights(sec)}
+    """The journey as a table (`studio journey`): every segment, what it is, how long in the film and in scroll."""
     rows = []
-    for b in sec.beats:
-        kind, i, w = ws[b.id]
+    for sid, kind, i, secs, w in plan(sec):
         stop = sec.journey.stops[i]
-        rows.append({"beat": b.id, "kind": kind, "stop": stop.id, "film_seconds": b.seconds, "scroll_screens": round(w, 2),
+        rows.append({"segment": sid, "kind": kind, "stop": stop.id, "film_seconds": secs, "scroll_screens": round(w, 2),
                      "blocks": [x.type for x in stop.blocks] if kind == "hold" else []})
     return rows

@@ -205,3 +205,67 @@ def test_rail_links_to_every_stop():
         assert f'href="#{sid}"' in html and f'id="{sid}"' in html
     cfg = json.loads(html.split('class="ss-config">')[1].split("</script>")[0])
     assert [s["id"] for s in cfg["journey"]["stops"]] == ["door", "hearth", "table"]
+
+
+# ---------------------------------------------------------------- the take approach (a blockout)
+
+POSES = [{"at": [0, -0.4, 1.5], "look": [0, 12, 1.3]}, {"at": [0.9, 2.5, 1.5], "look": [-1.8, 2.1, 1.0]},
+         {"at": [0.4, 6.4, 1.5], "look": [2.2, 6.9, 1.4]}]
+
+
+def take_site(**blockout) -> Site:
+    stops = [dict(s, pose=p) for s, p in zip(STOPS, POSES)]
+    stops[1]["move"] = {"seconds": 5, "path": [{"at": [0.2, 1.0, 1.5], "look": [-1, 3, 1.2]}]}
+    stops[2]["move"] = {"seconds": 6}
+    return Site.model_validate({"name": "T", "sections": [{"id": "stay", "type": "film", "journey": {
+        "world": "a stone house", "stops": stops, "blockout": {"objects": [{"kind": "box", "at": [0, 5, 1], "size": [1, 1, 1], "color": "#888888"}], **blockout}}}]})
+
+
+def test_a_blockout_makes_one_take_with_a_camera_that_rests_at_every_stop():
+    sec = take_site().sections[0]
+    assert sec.beats == [] and sec.take is not None
+    t = sec.take
+    assert t.duration == pytest.approx(3 + 5 + 3 + 6 + 3)                    # holds and moves, in order
+    ts = [(k.t, tuple(k.at)) for k in t.camera]
+    assert ts[0] == (0.0, (0, -0.4, 1.5)) and ts[1][1] == (0, -0.4, 1.5) and ts[1][0] == 3     # rests on the first stop for its hold
+    assert any(abs(k.t - 5.5) < 1e-6 and tuple(k.at) == (0.2, 1.0, 1.5) for k in t.camera)     # the waypoint, halfway through the move
+    assert [k.t for k in t.camera] == sorted(k.t for k in t.camera)
+
+
+def test_a_picture_of_every_stop_is_painted_over_the_blockout():
+    t = take_site().sections[0].take
+    frames = t.keyframes["frames"]
+    assert [f["name"] for f in frames] == ["door", "hearth", "table"]
+    assert frames[0]["t"] == 0 and frames[1]["t"] == pytest.approx(3 + 5 + 1.5)               # the middle of the hold
+    assert frames[1]["prompt"].startswith("a stone house. The hall")
+
+
+def test_the_take_is_cut_at_the_middle_of_a_hold_and_long_stretches_are_split():
+    t = take_site(segment=6).sections[0].take
+    segs = t.ltx["segments"]
+    assert segs[0]["range"][0] == 0 and segs[-1]["range"][1] == pytest.approx(t.duration)
+    assert all(b["range"][0] == a["range"][1] for a, b in zip(segs, segs[1:]))               # they tile the take
+    assert all(s["range"][1] - s["range"][0] <= 6 + 1e-6 for s in segs)
+    assert any(abs(s["range"][1] - 9.5) < 1e-6 for s in segs)                                # the middle of the hearth hold
+    assert "The hall" in segs[0]["prompt"] and "One continuous" in segs[0]["prompt"]
+
+
+def test_a_blockout_needs_poses_and_poses_need_a_blockout():
+    stops = [dict(s) for s in STOPS]
+    with pytest.raises(ValidationError, match="needs a `pose`"):
+        Site.model_validate({"name": "T", "sections": [{"id": "s", "type": "film", "journey": {"world": "w", "stops": stops, "blockout": {}}}]})
+    with pytest.raises(ValidationError, match="place the camera in a `blockout`"):
+        Site.model_validate({"name": "T", "sections": [{"id": "s", "type": "film", "journey": {"world": "w", "stops": [dict(s, pose=POSES[0]) for s in STOPS]}}]})
+    with pytest.raises(ValidationError, match="fly through a picture"):
+        take_site().model_validate({"name": "T", "sections": [{"id": "s", "type": "film", "journey": {"world": "w", "blockout": {}, "stops": [
+            dict(STOPS[0], pose=POSES[0]), dict(STOPS[1], pose=POSES[1], move={"into": [0.1, 0.1, 0.5, 0.5]})]}}]})
+
+
+def test_the_take_timeline_is_the_plan_stretched_to_the_film():
+    sec = take_site().sections[0]
+    nominal = [x[3] for x in jy.plan(sec)]
+    k = 1.01
+    t = jy.timeline(sec, [d * k for d in nominal], [0.0] * (len(nominal) - 1))
+    assert t["duration"] == pytest.approx(sum(nominal) * k, abs=1e-2)
+    s = {x["id"]: x for x in t["stops"]}
+    assert s["door"]["t0"] == 0 and s["hearth"]["t1"] - s["hearth"]["t0"] == pytest.approx(3 * k, abs=1e-2)

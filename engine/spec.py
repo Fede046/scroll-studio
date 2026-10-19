@@ -903,7 +903,7 @@ class FilmScene(SceneBase):
     def _journey_dump(self, handler, info):
         d = handler(self)
         if self.journey is not None and isinstance(d, dict) and info.include is None:   # a field list (the compiler's) keeps them
-            for k in ("beats", "steps", "length", "beat_fade"):
+            for k in ("beats", "steps", "length", "beat_fade", "beat_restore", "take"):
                 d.pop(k, None)
         return d
 
@@ -1344,17 +1344,54 @@ JourneyBlock = Annotated[Union[IntroBlock, FeaturesBlock, StatsBlock, TimelineBl
 JourneyBox = tuple[float, float, float, float]
 
 
+class JourneyPose(Model):
+    """Where the camera is and what it looks at, in the blockout's world units (metres, z up, y forward)."""
+    at: tuple[float, float, float] = Field(..., description="Camera position")
+    look: tuple[float, float, float] = Field(..., description="The point the camera looks at")
+
+
+class JourneyBlockout(Model):
+    """The world as rough shapes, as a take's: Blender renders their depth along the camera path, a still of every stop
+    is painted over that depth (Z-Image Turbo + depth ControlNet) and the video model paints the world between the stops
+    along the same depth (LTX-2.3). The camera is a real 3D path, so it can go through a door into a room the first
+    picture never showed; the price is describing the world's layout once, in shapes."""
+    objects: list[WorldObject] = Field(default_factory=list, description="Boxes, cylinders, blobs, planes, scatter: only "
+                                       "layout, scale and depth matter, the models paint the detail. Leave a gap in a wall "
+                                       "for a doorway (two boxes and a lintel)")
+    ground: Optional[WorldObject] = Field(None, description="A plane under everything (default: 400 x 400 at z = 0)")
+    sky: str = Field("#b9cde0", description="Colour of the sky in the blockout")
+    light: tuple[float, float, float] = Field((0.0, -0.4, 0.9), description="Light direction of the blockout preview")
+    lens: float = Field(28.0, description="Focal length in mm")
+    depth_far: float = Field(400.0, description="Depth guide far plane")
+    control_strength: float = Field(0.75, ge=0, le=1, description="How tightly each stop's picture follows the blockout's "
+                                    "depth (Z-Image depth ControlNet)")
+    keyframe_res: tuple[int, int] = Field((1536, 864), description="Size of each stop's picture")
+    ltx_res: tuple[int, int] = Field((1024, 576), description="Size the video model runs at (multiples of 64); the "
+                                     "film is scaled to the page. 1024x576 is the size it holds its look at")
+    guide_strength: float = Field(1.0, ge=0, le=2, description="How strongly the depth guide steers the video model")
+    guide_blur: float = Field(1.5, ge=0, le=12, description="Blur of the depth guide in pixels: keeps the camera and the "
+                              "big shapes, drops the blockout's hard edges so a box does not stay a box")
+    segment: float = Field(8.0, ge=3, le=10, description="Longest stretch the video model paints in one go, in seconds. "
+                           "The film is cut into stretches at the middle of each hold (the camera is at rest there, so "
+                           "the seam cannot show) and a longer one is split evenly")
+    keyframe_strength: float = Field(0.9, ge=0, le=1, description="How firmly each stop's picture is pinned in the film")
+    negative: Optional[str] = Field(None, description="What the video model must avoid (default: cuts, flicker, warped "
+                                                      "shapes, text, watermark, blur)")
+
+
 class JourneyMove(Model):
     """How the camera gets from the stop before to this one: a keyed camera move on a moving shot (`camera:` of a beat),
     flown through the picture the last stop left and painted by the video model, so the place it arrives at is the one
     this stop's `place` describes, found inside the last picture and not cut to."""
-    into: Optional[JourneyBox] = Field(None, description="The part of the previous stop's picture the camera travels "
+    into: Optional[JourneyBox] = Field(None, description="Chain (no `blockout`): the part of the previous stop's picture the camera travels "
                                        "into: [x0, y0, x1, y1] in 0-1 of that picture, the doorway, the window, the "
                                        "table. The camera arrives with this box filling the frame. Default: the middle "
                                        "third")
-    via: list[JourneyBox] = Field(default_factory=list, description="Boxes the camera passes on the way (a bend in the "
+    via: list[JourneyBox] = Field(default_factory=list, description="Chain: boxes the camera passes on the way (a bend in the "
                                   "path: past the fire and on to the stairs), evenly spaced in time")
-    seconds: float = Field(4.0, ge=1, le=10, description="Length of the move in the film")
+    path: list[JourneyPose] = Field(default_factory=list, description="With a `blockout`: poses the camera passes on the "
+                                    "way (evenly spaced in time), a bend in its path: round the table, through the arch")
+    seconds: float = Field(4.0, ge=1, le=20, description="Length of the move in the film (a chain: at most 10)")
     scroll: Optional[float] = Field(None, ge=0.3, le=12, description="Scroll distance of the move, in screen heights "
                                     "(default: half the seconds of film). The page lands on the stop at the end of it")
     motion: Optional[str] = Field(None, description="What the move looks like, in words, for the video model: 'the "
@@ -1387,14 +1424,15 @@ class JourneyStop(Model):
                                 "(Qwen-Image-Edit): 'a wooden crate of jars stands on the table'. With `region` the "
                                 "rest of the frame is that frame, pixel for pixel, so the join stays invisible")
     region: Optional[EditRegion] = Field(None, description="`edit`: where it may change the picture")
+    pose: Optional[JourneyPose] = Field(None, description="With a `blockout`: where the camera rests at this stop")
     move: JourneyMove = Field(default_factory=JourneyMove, description="How the camera gets here (not used by the first stop)")
     frame: Optional[JourneyBox] = Field(None, description="The framing the hold settles on, a box in 0-1 of the stop's "
                                         "picture (default: a slow push-in of `breathe`). The hold starts and ends on the "
                                         "whole picture, so it joins the moves before and after exactly")
     breathe: float = Field(0.05, ge=0, le=0.3, description="How far the camera pushes in during the hold when `frame` is "
                            "not set, as a share of the picture. The frozen moment keeps its parallax, so it lives")
-    seconds: float = Field(3.0, ge=1, le=20, description="Length of the hold in the film (a frozen moment: no model, "
-                                                          "rendered offline in seconds)")
+    seconds: float = Field(3.0, ge=1, le=20, description="Length of the hold in the film (chain: a frozen moment, no model, "
+                                                          "rendered offline in seconds; blockout: the camera at rest)")
     hold: float = Field(1.4, ge=0.3, le=12, description="Scroll distance of the hold, in screen heights: how long the "
                         "page stays at this place while its blocks are read")
     parallax: float = Field(0.6, ge=0, le=2, description="Depth effect of the hold (as `freeze.parallax`)")
@@ -1449,8 +1487,15 @@ class Journey(Model):
     seed: int = Field(11, description="Seed of the pictures and moves (each stop adds its position)")
     fade: float = Field(0.25, ge=0, le=1, description="Seconds of cross-dissolve between the move and the hold on the "
                         "same frame (invisible; it only hides the one-frame seam of two encodes)")
-    grain: float = Field(0.012, ge=0, le=0.2, description="Film grain laid over the frozen holds so they match the "
+    grain: float = Field(0.012, ge=0, le=0.2, description="Chain: film grain laid over the frozen holds so they match the "
                          "generated moves on either side (as `freeze.grain`)")
+    blockout: Optional[JourneyBlockout] = Field(None, description="The generation approach. Unset: a chain of camera moves "
+                                                "between stop pictures (the camera flies through the picture the last stop "
+                                                "left, so every stop must be visible in the one before: a facade, a street, "
+                                                "a landscape). Set: one continuous take through a blockout of the world "
+                                                "(real 3D, so doors and rooms work); every stop then needs a `pose`")
+    restore: Optional[int] = Field(None, ge=360, le=2160, description="Run SeedVR2 over the finished film at this height "
+                                   "(e.g. 1080) to clean the video model's softness and redraw fine detail; slow")
 
     @model_validator(mode="after")
     def _unique_stops(self):
@@ -1458,6 +1503,16 @@ class Journey(Model):
         dup = sorted({i for i in ids if ids.count(i) > 1})
         if dup:
             raise ValueError(f"journey stop ids must be unique: {', '.join(dup)}")
+        for i, st in enumerate(self.stops):
+            if self.blockout is not None and st.pose is None:
+                raise ValueError(f"stop '{st.id}': with a `blockout` every stop needs a `pose` (where the camera rests)")
+            if self.blockout is None and (st.pose is not None or st.move.path):
+                raise ValueError(f"stop '{st.id}': `pose` and `move.path` place the camera in a `blockout`; without one the "
+                                 "camera flies through the pictures (`move.into`, `move.via`)")
+            if self.blockout is not None and i and (st.move.into or st.move.via):
+                raise ValueError(f"stop '{st.id}': `move.into` and `move.via` fly through a picture; with a `blockout` use `move.path`")
+            if self.blockout is None and i and st.move.seconds > 10:
+                raise ValueError(f"stop '{st.id}': a move in a chain is at most 10 seconds (one generated shot)")
         return self
 
 
