@@ -21,9 +21,9 @@ const SUB = 0.05;       // camera travel between two items of one list (all of a
 const K_BLUR = 8;       // how soft a plate goes per unit of 1/distance away from the focus
 const smoothAB = smooth;
 
-interface Plate { def: PlateDef; wrap: HTMLElement; sharp: HTMLCanvasElement; soft: HTMLCanvasElement; z: number; state: string; w: number; h: number; offx: number; offy: number; built: boolean; s: number; tx: number; ty: number; d: number; shown: boolean }
+interface Plate { def: PlateDef; wrap: HTMLElement; sharp: HTMLCanvasElement; soft: HTMLCanvasElement; z: number; state: string; w: number; h: number; offx: number; offy: number; built: boolean; s: number; tx: number; ty: number; d: number; shown: boolean; opa: string }
 interface Stack { side: number; g: number; z0: number; z1: number; n: number; plates: Plate[]; builtAt: number; building: boolean; pal: ReturnType<typeof colourScript>[number]; recipe: number }
-interface Plane { el: HTMLElement; d0: number; a: number; s: number; vis: boolean; z: number; live: boolean; tx: number; ty: number; blur: number }
+interface Plane { moved: number; dirty: boolean; rewc: boolean; el: HTMLElement; d0: number; a: number; s: number; vis: boolean; z: number; live: boolean; tx: number; ty: number; blur: number }
 interface Beat { el: HTMLElement; group: number; sub: number; n: number; Z: number; R: number; planes: Plane[]; kind: string; label: string }
 
 export default function start() {
@@ -51,7 +51,7 @@ function run(world: HTMLElement, els: HTMLElement[], root: HTMLElement) {
     if (b.group !== prevG) { z += i === 0 ? 0 : LEN; sub = 0; prevG = b.group; }
     else { sub++; z += Math.min(SUB, 0.16 / Math.max(1, b.n - 1)); }
     b.sub = sub; b.Z = z;
-    b.planes = $$<HTMLElement>(".mp-plane", b.el).map((el) => ({ el, d0: Number(el.dataset.mpD || 1), a: 0, s: 1, vis: false, z: 0, live: false, tx: 0, ty: 0, blur: 0 }));
+    b.planes = $$<HTMLElement>(".mp-plane", b.el).map((el) => ({ moved: 0, dirty: false, rewc: false, el, d0: Number(el.dataset.mpD || 1), a: 0, s: 1, vis: false, z: 0, live: false, tx: 0, ty: 0, blur: 0 }));
     b.label = (b.el.querySelector("h1, h2, h3, blockquote, summary, .mp-fig") as HTMLElement | null)?.textContent?.trim().replace(/\s+/g, " ").slice(0, 44) || b.kind;
   });
   const nG = group + 1;
@@ -128,11 +128,12 @@ function run(world: HTMLElement, els: HTMLElement[], root: HTMLElement) {
     const { sharp, soft, cw, ch, offx, offy } = drawPlate(st, def, idx);
     const wrap = document.createElement("div");
     wrap.className = `mp-plate mp-plate--${def.role}`;
-    wrap.style.cssText = `width:${cw}px;height:${ch}px;margin:${-ch / 2}px 0 0 ${-cw / 2}px;opacity:0;`;
+    wrap.style.cssText = `width:${cw}px;height:${ch}px;margin:${-ch / 2}px 0 0 ${-cw / 2}px;`;
+    sharp.style.opacity = "0";
     sharp.className = "mp-sharp"; soft.className = "mp-soft";
     wrap.appendChild(sharp); wrap.appendChild(soft);
     world.appendChild(wrap);
-    return { def, wrap, sharp, soft, z: -1, state: "", w: cw, h: ch, offx, offy, built: true, s: 1, tx: 0, ty: 0, d: def.d, shown: false };
+    return { def, wrap, sharp, soft, z: -1, state: "", w: cw, h: ch, offx, offy, built: true, s: 1, tx: 0, ty: 0, d: def.d, shown: false, opa: "" };
   }
   function build(st: Stack) {
     if (st.building || st.plates.length) return;
@@ -308,12 +309,15 @@ function run(world: HTMLElement, els: HTMLElement[], root: HTMLElement) {
         pl.s = s; pl.tx = pl.offx * s + px; pl.ty = pl.offy * s + py; pl.d = d;
         const tf = `translate(${pl.tx.toFixed(1)}px,${pl.ty.toFixed(1)}px) scale(${s.toFixed(4)})`;
         pl.wrap.style.transform = tf;
-        pl.wrap.style.opacity = a.toFixed(3);
+        // opacity goes on the canvases themselves: on the wrapper it would make the compositor draw each plate into a
+        // surface its full (huge) size first
+        const as = a.toFixed(2);
+        if (as !== pl.opa) { pl.opa = as; pl.sharp.style.opacity = as; if (pl.def.role === "sky") pl.soft.style.opacity = "0"; }
         if (zi !== pl.z) { pl.wrap.style.zIndex = String(zi); pl.z = zi; }
         // depth of field: the farther a plate is from the plane in focus, the more of its soft twin shows
         if (def.role !== "sky") {
           const m = clamp(Math.abs(1 / d - invF) * K_BLUR / 5.5);
-          const sm = m < 0.04 ? "0" : m.toFixed(2);
+          const sm = m < 0.04 ? "0" : (m * a).toFixed(2);
           if (sm !== pl.state) { pl.soft.style.opacity = sm; pl.state = sm; }
         }
       }
@@ -323,7 +327,9 @@ function run(world: HTMLElement, els: HTMLElement[], root: HTMLElement) {
     beats.forEach((b, bi) => {
       const near = bi === i || bi === j || (bi === here);
       for (const pn of b.planes) {
-        if (!near) { if (pn.vis) { pn.el.style.visibility = "hidden"; pn.el.style.opacity = "0"; pn.vis = false; pn.live = false; pn.el.classList.remove("is-live"); } continue; }
+        // planes off the lens are fully transparent and not layers (so they cost nothing) but stay in the tab order:
+        // a link focused in one brings its beat to the lens (see focusin)
+        if (!near) { if (pn.vis) { pn.el.style.opacity = "0"; pn.el.style.willChange = "auto"; pn.vis = false; pn.live = false; pn.rewc = false; pn.dirty = false; pn.el.classList.remove("is-live"); } continue; }
         const d = pn.d0 + (b.Z - cz);
         let a: number, s: number, x = kx / pn.d0 * 0.6, yy = ky / pn.d0 * 0.6;
         if (dolly) {
@@ -338,21 +344,24 @@ function run(world: HTMLElement, els: HTMLElement[], root: HTMLElement) {
           if (i === j) a = 1;
           x += bi === i ? -sw * W * 0.04 : (1 - sw) * W * 0.04;
         }
-        const vis = a > 0.01;
         const tfm = `translate(${x.toFixed(1)}px,${yy.toFixed(1)}px) scale(${s.toFixed(4)})`;
         // defocus: only while the plane is far from where the lens is focused
         const bl = Math.round(clamp(Math.abs(1 / Math.max(0.3, d) - invF) * K_BLUR * 0.7, 0, rack ? 3 : 9));
-        if (vis !== pn.vis) { pn.el.style.visibility = vis ? "visible" : "hidden"; pn.vis = vis; }
+        if (!pn.vis) { pn.el.style.willChange = "transform, opacity"; pn.vis = true; }
         pn.el.style.transform = tfm;
         pn.el.style.opacity = a.toFixed(3);
         if (bl !== pn.blur) { pn.el.style.filter = bl > 0 ? `blur(${bl * 0.6}px)` : "none"; pn.blur = bl; }
+        // a plane is its own compositor layer, so moving it costs no repaint; but a layer keeps the scale it was
+        // painted at, so when the words have come to rest the layer is released for one frame and painted again, crisp
+        if (Math.abs(s - 1) > 0.004) { pn.moved = t; pn.dirty = true; }
+        else if (pn.dirty && t - pn.moved > 0.15) { pn.dirty = false; pn.rewc = true; pn.el.style.willChange = "auto"; }
+        else if (pn.rewc) { pn.rewc = false; pn.el.style.willChange = "transform, opacity"; }
         const live = a > 0.7;
         if (live !== pn.live) { pn.live = live; pn.el.classList.toggle("is-live", live); }
         const zi = 10 + Math.round((6 - d) * 100);
         if (zi !== pn.z) { pn.el.style.zIndex = String(zi); pn.z = zi; }
       }
     });
-    root.dataset.mpHere = String(here);
 
     // ---- readouts
     if (t - hudAt > 0.1) {

@@ -240,7 +240,6 @@ function run(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, els: HTML
     beats.forEach((b, k) => { b.swatch?.classList.toggle("is-here", k === i); b.el.classList.toggle("is-here", k === i); });
     beats[i].el.classList.add("is-on");
     if (sceneEl) sceneEl.textContent = String(i + 1).padStart(2, "0");
-    root.style.removeProperty("--pg-none");
   }
   // a reveal that does not depend on the phase: anything on screen is shown (words are never held back for long)
   const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) (e.target as HTMLElement).classList.add("is-on"); }), { threshold: 0.35 });
@@ -365,8 +364,8 @@ function run(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, els: HTML
     if (t - hud > 0.12) {
       hud = t;
       if (countEl) countEl.textContent = String(strokes).padStart(5, "0");
-      if (stateEl) stateEl.textContent = performance.now() - lastStrokeAt < 700 && !settled ? "wet" : "set";
-      root.classList.toggle("pg-wet", performance.now() - lastStrokeAt < 700 && !settled);
+      const wet = performance.now() - lastStrokeAt < 700 && !settled;
+      if (stateEl && stateEl.dataset.w !== String(wet)) { stateEl.dataset.w = String(wet); stateEl.textContent = wet ? "wet" : "set"; stateEl.classList.toggle("is-wet", wet); }
     }
   });
   void fine; void lum; void parseColor;

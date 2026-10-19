@@ -241,7 +241,7 @@ const plate = (role: PlateDef["role"], d: number, draw: PlateDef["draw"], yt?: n
   const sky = role === "sky";
   const half = sky ? 0.53 : 0.5 * d * 1.1 + 0.12;
   return { role, d, xl: -half, xr: half,
-    yt: yt ?? (sky ? -0.53 : role === "far" ? (0.12 - 0.5) * d : role === "mid" ? (0.3 - 0.5) * d : -0.5 * d * 1.1),
+    yt: yt ?? (sky ? -0.53 : role === "far" ? (0.2 - 0.5) * d : role === "mid" ? (0.3 - 0.5) * d : -0.5 * d * 1.1),
     yb: yb ?? (sky ? 0.53 : 0.5 * d * 1.12), draw };
 };
 
