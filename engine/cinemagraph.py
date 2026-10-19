@@ -39,7 +39,7 @@ from .project import BuildContext, BuildError, ffmpeg, file_key, probe
 from .spec import Cinemagraph, EditRegion, ImageInput
 
 VERSION = 1
-MASK_VERSION = 2         # bump when the mask or what follows it would come out differently for the same clip (the clip is kept)
+MASK_VERSION = 3         # bump when the mask or what follows it would come out differently for the same clip (the clip is kept)
 FPS = 24
 CONTEXT = 0.5            # how much of the surroundings the video model sees: a share of the region's size on every side
 LTX_MP = 0.5             # megapixels LTX-2.3 renders the crop at (aspect kept)
@@ -47,7 +47,7 @@ MAX_VIDEO_W = 1280       # the encoded video's widest side
 MIN_SIDE = 320           # the crop is at least this big (as far as the still goes)
 CODEC_STEP = 2.5         # levels a lossy encode may add to the wrap step (an I-frame meeting a P-frame) before it counts as a seam
 HELD_BUDGET = 3.0        # levels the picture around the moving part may change beyond what its first frame already differs by
-BUDGET = 12.0            # pingpong: how far (mean levels) the region may move from its first frame before the clip is cut there
+REACH = 0.02             # pingpong: how far the region may travel from its first frame (share of the crop's long side) before the clip is cut
 MAX_SLOW = 2.0           # a clip cut short is played slower to fill the loop, by at most this much (beyond it flow interpolation smears)
 SEAM_OK = 1.5            # a loop whose closing step is at most this many typical steps is seamless
 NEGATIVE = ("camera movement, camera shake, zoom, pan, tilt, cuts, flicker, morphing, warping, new objects appearing, "
@@ -306,6 +306,15 @@ def close_loop(frames: np.ndarray, overlap: int, flow: bool = True) -> np.ndarra
     return np.stack(out)
 
 
+def _reach(g0: np.ndarray, frame: np.ndarray, area: np.ndarray, dis, sc: float) -> float:
+    """How far (px of the full-size frame) the content of `area` has moved from the first frame to this one: the mean optical
+    flow magnitude over the area (g0: the first frame, grey and blurred at scale `sc`)."""
+    import cv2
+    g = cv2.GaussianBlur(cv2.cvtColor(cv2.resize(frame, None, fx=sc, fy=sc, interpolation=cv2.INTER_AREA), cv2.COLOR_RGB2GRAY), (0, 0), 1.0)
+    fl = dis.calc(g0, g, None)
+    return float(np.hypot(fl[..., 0], fl[..., 1])[area].mean()) / sc
+
+
 def trim_to_budget(frames: np.ndarray, still: np.ndarray, seed: np.ndarray, strength: float, region_budget: bool,
                    floor: int = FPS // 2) -> tuple[np.ndarray, dict]:
     """Keep the part of the clip that is good for a cinemagraph. A video model starts as asked (the gentle sway, the curl of
@@ -314,8 +323,9 @@ def trim_to_budget(frames: np.ndarray, still: np.ndarray, seed: np.ndarray, stre
       held      the picture around the moving part has changed from the still by more than HELD_BUDGET levels beyond what
                 the first frame already differed by (after the flow stabilisation: what is left is real change, a parallax,
                 something coming into view), or
-      region    (pingpong only, which only needs the way out) the moving part has changed from the first frame by more than
-                BUDGET levels x `strength`: far enough for one swing,
+      region    (pingpong only, which only needs the way out) the moving part has travelled from its first frame by more than
+                REACH x the crop's long side x `strength` (mean optical-flow magnitude over the region: real displacement, not
+                the re-rendered texture a video model "boils" from frame to frame): far enough for one swing,
 
     but at least `floor` frames. A clip that never gets there is kept whole."""
     import cv2
@@ -324,14 +334,19 @@ def trim_to_budget(frames: np.ndarray, still: np.ndarray, seed: np.ndarray, stre
     held = cv2.dilate((seed > 127).astype(np.uint8), np.ones((51, 51), np.uint8)) == 0
     f0 = frames[0].astype(np.float32)
     st = still.astype(np.float32)
-    budget = BUDGET * float(strength)
+    H, W = frames.shape[1:3]
+    sc = min(1.0, 480 / max(H, W))
+    budget = REACH * max(H, W) * float(strength)         # how far (px, as optical flow) the region may travel from its first frame
+    g0 = cv2.GaussianBlur(cv2.cvtColor(cv2.resize(frames[0], None, fx=sc, fy=sc, interpolation=cv2.INTER_AREA), cv2.COLOR_RGB2GRAY), (0, 0), 1.0)
+    dis = cv2.DISOpticalFlow_create(cv2.DISOPTICAL_FLOW_PRESET_FAST)
+    near = cv2.resize(near.astype(np.uint8), (g0.shape[1], g0.shape[0]), interpolation=cv2.INTER_NEAREST) > 0
     base = float(np.abs(f0 - st).mean(axis=-1)[held].mean()) if held.mean() > 0.05 else 0.0
     keep, why = len(frames), None
     for t in range(1, len(frames)):
         ft = frames[t].astype(np.float32)
         if held.mean() > 0.05 and float(np.abs(ft - st).mean(axis=-1)[held].mean()) > base + HELD_BUDGET:
             keep, why = t, "the picture around it started to change"
-        elif region_budget and near.any() and float(np.abs(ft - f0).mean(axis=-1)[near].mean()) > budget:
+        elif region_budget and near.any() and _reach(g0, frames[t], near, dis, sc) > budget:
             keep, why = t + 1, "the region has moved as far as it should"
         if why:
             break
@@ -608,7 +623,7 @@ def build(project, ref: ImageInput, log: Callable[[str], None] = print, force: b
     seed_id = hashlib.sha1(seed_c.tobytes()).hexdigest()[:12]
 
     # ---- prep: the clip as the rest works on it: stabilised against the still, and (pingpong) cut where it has gone far enough
-    pid = _digest([ckey, cg.loop, cg.strength, cg.seconds, VERSION])
+    pid = _digest([ckey, cg.loop, cg.strength, cg.seconds, MASK_VERSION])
     prep, prep_json = work / f"prep_{pid}.mkv", work / f"prep_{pid}.json"
 
     def run_prep():
