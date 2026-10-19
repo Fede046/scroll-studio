@@ -849,7 +849,13 @@ Honest limits. The depth is relative, so `at: 0.4` means 40% of that shot's own 
 (`at: "the spruce"`) is more reliable. A surface seen almost edge-on (a floor under a level camera) gives slivers of
 letters; put the type lower in the frame or on a more frontal surface, and `studio world` says so above 80 degrees.
 Generated depth is soft where the footage is soft (hair, mist, thin branches) and the occlusion follows it. A layer with
-nothing to track (clear sky) holds still. In-world type is not drawn through `reveal`'s shader yet.
+nothing to track (clear sky, a plain backdrop) holds still. The type follows what is at or behind its depth, so people
+walking in front of it do not drag it, but a billboard that plays video or a crowd that fills the layer makes the track
+wander: `studio world` measures it, and `follow: 0` pins the type to the screen. A surface mask that is not one plane in
+the depth map (a person leaning on the wall) falls back to type laid flat to the screen, with a note in the build log; `slant`
+tames the estimate and `quad` replaces it. A surface type is only as long-lived as the surface is on screen: a floor the
+camera flies over carries its paint out of the bottom of the frame in about a second and a half. In-world type is not
+drawn through `reveal`'s shader yet (such a film keeps its titles as captions, and says so in the build log).
 
 ### Faces, repaired (`faces: restore`)
 
