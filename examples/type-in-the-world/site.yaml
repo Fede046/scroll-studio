@@ -101,7 +101,7 @@ sections:
       - kicker: The deck
         title: Stay <em>cold.</em>
         at: [0.6, 0.72]
-        place: { kind: surface, at: "the wooden deck floor", x: 0.3, y: 0.8, size: 0.46 }
+        place: { kind: surface, at: "the wooden deck floor", anchor: { t: 0.69 }, x: 0.3, y: 0.8, size: 0.46 }
       - kicker: The bottle
         title: Still cold <em>at noon.</em>
         at: [0.86, 0.99]
