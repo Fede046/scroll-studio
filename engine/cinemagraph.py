@@ -554,10 +554,13 @@ def build(project, ref: ImageInput, log: Callable[[str], None] = print, force: b
     ww, wh = work_size(cw, ch)
     gw, gh = gen_size(cw, ch, model, wan)
     seconds = float(cg.seconds)
-    flf = cg.loop == "seamless"
+    # Measured on LTX-2.3: pinning the last frame to the first (first = last frame) leaves a clip that hardly moves, and a loose
+    # pin lets the middle go wild; so a seamless loop is a free clip closed afterwards (a flow-aligned crossfade), which is
+    # right for what flows (steam, smoke, water, flame: the same thing a moment later). Wan 2.2 is told the loop's end.
+    flf = cg.loop == "seamless" and model == "wan"
     # a pingpong loop plays the clip forward then back, so the model is asked for half of `seconds` (a short clip also stays
     # close to the still: a video model's motion grows the longer it runs)
-    gen_seconds = seconds if flf else max(1.5, seconds / 2)
+    gen_seconds = seconds if cg.loop == "seamless" else max(1.5, seconds / 2)
     crop_png = work / "crop.png"
     sim.crop(box).save(crop_png)
 
@@ -685,7 +688,7 @@ def build(project, ref: ImageInput, log: Callable[[str], None] = print, force: b
             "still": [W, H], "box": [x0, y0, x1, y1], "video": [ww, wh], "bytes": mp4.stat().st_size + wp.stat().st_size,
             "mask": {"share_of_still": round(float((mask > 127).sum()) / sc / sc / (W * H), 4), **minfo},
             "motion": {"temporal_std": round(motion, 2), "drift_px": prep_info["drift"], "kept_frames": prep_info["kept"],
-                       "of_generated": prep_info["of"]},
+                       "of_generated": prep_info["of"], "played_frames": prep_info.get("slowed_to", prep_info["kept"])},
             "held": {"max_change_outside_mask": outside["page"], "video_file_change_outside_mask": outside["file"]},
         }
         rep.write_text(json.dumps(report, indent=1))

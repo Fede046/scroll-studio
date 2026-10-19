@@ -250,7 +250,10 @@ def test_a_cinemagraph_builds_and_every_stage_is_cached(fake):
     rep = b["data"]
     assert rep["loop"]["seamless"] and rep["held"]["max_change_outside_mask"] == 0
     assert 0.0 < rep["mask"]["share_of_still"] < 0.5 and rep["motion"]["temporal_std"] > 3
-    assert calls["animate"] == 1 and calls["last"]["end"] is True            # seamless: first = last frame
+    assert calls["animate"] == 1 and calls["last"]["end"] is False           # ltx: a free clip, closed afterwards
+    C.build(project, _ref(seconds=1.0, model="wan"), lambda m: None)
+    assert calls["animate"] == 2 and calls["last"]["end"] is True            # wan is told where the loop ends (first = last frame)
+    calls["animate"] = 1
     x0, y0, x1, y1 = b["box"]
     assert 0 <= x0 < x1 <= 1 and 0 <= y0 < y1 <= 1 and b["still"] == [640, 480]
     again = C.build(project, _ref(seconds=1.0), lambda m: None)
@@ -281,8 +284,9 @@ def test_pingpong_has_no_seam_and_is_twice_as_long(fake):
     project, calls = fake
     b = C.build(project, _ref(seconds=4.0, loop="pingpong"), lambda m: None)
     assert calls["last"]["seconds"] == 2.0 and calls["last"]["end"] is False   # half the loop, one way, no end frame
-    kept = b["data"]["motion"]["kept_frames"]
-    assert b["data"]["loop"]["seamless"] and b["data"]["frames"] == 2 * kept - 2 and kept <= 25
+    m = b["data"]["motion"]
+    assert b["data"]["loop"]["seamless"] and b["data"]["frames"] == 2 * m["played_frames"] - 2
+    assert m["kept_frames"] <= 25 <= m["played_frames"] <= 2 * m["kept_frames"]      # cut short, then played slower to fill the loop
 
 
 # ---------------------------------------------------------------- the page
