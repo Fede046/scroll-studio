@@ -273,7 +273,9 @@ def build_site(project: Project, log: Callable[[str], None] = print,
             e["screen"] = block_image(s.device.image, 800) if s.device and s.device.image else None
             e["clip"] = publish(s.device.video) if s.device and s.device.video else None
         elif s.type == "product":
-            e["img"] = block_image(s.image, 1600, knockout=s.knockout and s.surface != "dark")
+            # a cinemagraph's video is the photograph as shot: whitening the still's studio background would put a box around it
+            moving = isinstance(s.image, ImageInput) and s.image.cinemagraph is not None
+            e["img"] = block_image(s.image, 1600, knockout=s.knockout and s.surface != "dark" and not moving)
             e["screen"] = block_image(s.device.image, 800) if s.device and s.device.image else None
             e["clip"] = publish(s.device.video) if s.device and s.device.video else None
             e["behind"] = block_image(s.behind.image, 800) if s.behind and s.behind.image else None
