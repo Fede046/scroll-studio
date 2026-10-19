@@ -45,8 +45,9 @@ CONTEXT = 0.5            # how much of the surroundings the video model sees: a 
 LTX_MP = 0.5             # megapixels LTX-2.3 renders the crop at (aspect kept)
 MAX_VIDEO_W = 1280       # the encoded video's widest side
 MIN_SIDE = 320           # the crop is at least this big (as far as the still goes)
-CODEC_STEP = 1.5         # levels a lossy encode may add to the wrap step (an I-frame meeting a P-frame) before it counts as a seam
+CODEC_STEP = 2.5         # levels a lossy encode may add to the wrap step (an I-frame meeting a P-frame) before it counts as a seam
 BUDGET = 12.0            # pingpong: how far (mean levels) the region may move from its first frame before the clip is cut there
+MAX_SLOW = 2.0           # a clip cut short is played slower to fill the loop, by at most this much (beyond it flow interpolation smears)
 SEAM_OK = 1.5            # a loop whose closing step is at most this many typical steps is seamless
 NEGATIVE = ("camera movement, camera shake, zoom, pan, tilt, cuts, flicker, morphing, warping, new objects appearing, "
             "people, text, watermark, blur, motion in the background, changing light")
@@ -125,12 +126,12 @@ def seam_report(frames: np.ndarray, mask: Optional[np.ndarray] = None) -> dict:
             "seam": round(seam, 3), "ref": round(ref, 3), "ratio": round(seam / ref, 2), "frames": int(len(f))}
 
 
-def stabilise(frames: np.ndarray, ref: np.ndarray, keep: np.ndarray, log=print) -> tuple[np.ndarray, float]:
+def stabilise(frames: np.ndarray, ref: np.ndarray, keep: np.ndarray, log=print) -> tuple[np.ndarray, np.ndarray]:
     """Undo the drift of the whole frame. A video model moves the picture a little as it renders (a slow push, a sway of
     a pixel or two), which would show as the moving part sliding against the still around it. Each frame is registered
     to the still (ECC, affine) on the pixels that are held (`keep`, 0-255: where the mask is zero) and warped back.
-    Returns the frames and the largest drift found in pixels; frames that drift under a third of a pixel are not touched
-    (resampling would only soften them)."""
+    Returns the frames and each frame's drift in pixels (0 where it was not found); frames that drift under a third of a
+    pixel are not touched (resampling would only soften them)."""
     import cv2
     T, H, W, _ = frames.shape
     s = min(1.0, 480 / max(H, W))
@@ -143,9 +144,9 @@ def stabilise(frames: np.ndarray, ref: np.ndarray, keep: np.ndarray, log=print) 
     else:
         rs, ms = rg, msk
     if (ms > 0).mean() < 0.05:           # nothing held to register on (the mask covers the crop)
-        return frames, 0.0
+        return frames, np.zeros(T)
     out = frames.copy()
-    worst = 0.0
+    worst = np.zeros(T)
     crit = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 60, 1e-5)
     for t in range(T):
         g = gray(frames[t])
@@ -161,7 +162,7 @@ def stabilise(frames: np.ndarray, ref: np.ndarray, keep: np.ndarray, log=print) 
         drift = float(np.abs(pts @ warp.T - pts[:, :2]).max())
         if drift > 0.03 * max(H, W) or abs(np.linalg.det(warp[:, :2]) - 1) > 0.10:    # a registration gone wrong, not a drift
             continue
-        worst = max(worst, drift)
+        worst[t] = drift
         if drift < 0.33:
             continue
         out[t] = cv2.warpAffine(frames[t], warp, (W, H), flags=cv2.INTER_CUBIC | cv2.WARP_INVERSE_MAP,
@@ -326,6 +327,36 @@ def trim_to_budget(frames: np.ndarray, seed: np.ndarray, strength: float, floor:
     return frames[:keep], {"kept": int(keep), "of": int(len(frames)), "budget": round(budget, 1)}
 
 
+def slow(frames: np.ndarray, n_out: int) -> np.ndarray:
+    """Play `frames` over `n_out` frames instead (slower): the in-between frames are made by moving the two neighbours toward
+    each other along optical flow (DIS), so cloth and smoke glide rather than dissolve. First and last frames are kept."""
+    import cv2
+    n = len(frames)
+    if n_out <= n or n < 2:
+        return frames
+    dis = cv2.DISOpticalFlow_create(cv2.DISOPTICAL_FLOW_PRESET_MEDIUM)
+    gray = [cv2.cvtColor(f, cv2.COLOR_RGB2GRAY) for f in frames]
+    H, W = frames.shape[1:3]
+    gx, gy = np.meshgrid(np.arange(W, dtype=np.float32), np.arange(H, dtype=np.float32))
+    flows: dict[int, tuple] = {}
+    out = []
+    for k in range(n_out):
+        pos = k * (n - 1) / (n_out - 1)
+        i = min(int(pos), n - 2)
+        w = pos - i
+        if w < 1e-3:
+            out.append(frames[i])
+            continue
+        if i not in flows:
+            flows[i] = (dis.calc(gray[i], gray[i + 1], None), dis.calc(gray[i + 1], gray[i], None))
+        fab, fba = flows[i]
+        a = cv2.remap(frames[i], gx + fab[..., 0] * w, gy + fab[..., 1] * w, cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+        b = cv2.remap(frames[i + 1], gx + fba[..., 0] * (1 - w), gy + fba[..., 1] * (1 - w), cv2.INTER_LINEAR,
+                      borderMode=cv2.BORDER_REPLICATE)
+        out.append(np.clip(a.astype(np.float32) * (1 - w) + b.astype(np.float32) * w + 0.5, 0, 255).astype(np.uint8))
+    return np.stack(out)
+
+
 def pingpong(frames: np.ndarray) -> np.ndarray:
     """Forward, then back without repeating the turning frames: the loop's wrap is a step between neighbours."""
     if len(frames) < 3:
@@ -420,7 +451,7 @@ def encode_h264(frames: np.ndarray, path: Path, fps: int = FPS, crf: int = 23) -
     vf = "scale=out_color_matrix=bt709:out_range=tv,format=yuv420p"
     p = subprocess.Popen([settings()["ffmpeg"], "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24",
                           "-s", f"{W}x{H}", "-r", str(fps), "-i", "-", "-vf", vf, "-an", "-c:v", "libx264", "-profile:v", "main",
-                          "-preset", "slow", "-crf", str(crf), "-g", str(fps * 2), "-colorspace", "bt709", "-color_primaries",
+                          "-preset", "slow", "-crf", str(crf), "-x264-params", "ipratio=1.0:pbratio=1.0", "-g", str(fps * 2), "-colorspace", "bt709", "-color_primaries",
                           "bt709", "-color_trc", "bt709", "-color_range", "tv", "-movflags", "+faststart", str(tmp)],
                          stdin=subprocess.PIPE, stderr=subprocess.PIPE)
     _, err = p.communicate(np.ascontiguousarray(frames).tobytes())
@@ -565,14 +596,21 @@ def build(project, ref: ImageInput, log: Callable[[str], None] = print, force: b
 
     def run_prep():
         raw = read_video(clip)
-        st, drift = stabilise(raw, still_c, np.where(seed_c > 0, 0, 255).astype(np.uint8), log)
+        st, drifts = stabilise(raw, still_c, np.where(seed_c > 0, 0, 255).astype(np.uint8), log)
         trim = {"kept": len(raw), "of": len(raw), "budget": None}
         if cg.loop == "pingpong":
             st, trim = trim_to_budget(st, seed_c, cg.strength)
+            drifts = drifts[:trim["kept"]]
             if trim["kept"] < trim["of"]:
                 log(f"  pingpong: the clip is cut at {trim['kept']} of {trim['of']} frames, where the region has moved as far as it should")
+            want = int(round(cg.seconds / 2 * FPS)) + 1          # the way out takes half the loop
+            n_out = min(want, int(len(st) * MAX_SLOW))
+            if n_out > len(st):
+                log(f"  pingpong: played {n_out / len(st):.1f}x slower to fill the {cg.seconds:g} s loop")
+                st = slow(st, n_out)
+            trim["slowed_to"] = int(len(st))
         write_lossless(st, prep)
-        prep_json.write_text(json.dumps({"drift": round(drift, 2), **trim}))
+        prep_json.write_text(json.dumps({"drift": round(float(drifts.max()), 2), **trim}))
     ctx.stage(f"prep_{pid}", {"v": VERSION, "clip": cid, "loop": cg.loop, "strength": cg.strength, "seed": seed_id}, [prep, prep_json], run_prep)
     prep_info = json.loads(prep_json.read_text())
 

@@ -129,8 +129,8 @@ def test_a_video_models_drift_is_taken_out():
                                         (W, H), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE) for t in range(T)])
     keep = np.full((H, W), 255, np.uint8)
     keep[80:200, 120:260] = 0
-    fixed, worst = C.stabilise(drifting, still, keep)
-    assert worst > 0.5
+    fixed, drifts = C.stabilise(drifting, still, keep)
+    assert drifts.max() > 0.5 and len(drifts) == T
     err = lambda a: np.abs(a[-1].astype(float) - still).mean()
     assert err(fixed) < err(drifting) / 4
 
