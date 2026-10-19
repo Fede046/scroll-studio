@@ -34,7 +34,7 @@ import cv2
 import numpy as np
 from PIL import Image
 
-VERSION = 3                # bump when the maps (ratio, lamps, flow, tokens) would come out differently for the same inputs
+VERSION = 5                # bump when the maps (ratio, lamps, flow, tokens) would come out differently for the same inputs
 RELIGHT_VERSION = 1        # bump when a relight or its alignment would come out differently for the same inputs (re-renders every time of day)
 MEASURE_W = 1024           # width at which structure is compared, so drift means the same on any picture
 MAX_FLOW = 28.0            # a correction larger than this (px at MEASURE_W) is not trusted: it is a different picture
@@ -433,12 +433,23 @@ def tokens(rgb: np.ndarray) -> dict:
     hsv[1] = max(hsv[1], 150)
     hsv[2] = 240 if dark else 120
     acc = tuple(float(v) for v in cv2.cvtColor(np.uint8([[hsv]]), cv2.COLOR_HSV2RGB)[0, 0])
-    bg2 = th._mix(bg, ink, 0.06)
+    bg2 = th._mix(ink, bg, 0.06)
     bgs = [bg, bg2]
     a3 = th._min_alpha(ink, bgs, th.SMALL_TEXT, 0.44)
     a2 = max(th._min_alpha(ink, bgs, th.SMALL_TEXT, 0.68), min(1.0, round(a3 + 0.14, 2)))
-    em = th._readable_accent(acc, ink, bgs, th.SMALL_TEXT)
-    atext = th._readable_accent(acc, ink, bgs, th.SMALL_TEXT)
+    # accent words stay the colour of the light: move its brightness (not its hue) until it reads on the shade
+    def readable(target):
+        v = float(hsv[2])
+        for _ in range(60):
+            c = tuple(float(x) for x in cv2.cvtColor(np.uint8([[[hsv[0], hsv[1], v]]]), cv2.COLOR_HSV2RGB)[0, 0])
+            if min(th.contrast(c, b) for b in bgs) >= target:
+                return c
+            v = v + 5 if dark else v - 5
+            if not 20 <= v <= 255:
+                break
+        return th._readable_accent(acc, ink, bgs, target)
+    em = readable(th.SMALL_TEXT)
+    atext = em
     r = lambda c: [int(round(v)) for v in c]
     return {"bg": r(bg), "bg2": r(bg2), "ink": r(ink), "em": r(em), "accent": r(atext), "a2": a2, "a3": a3, "dark": bool(dark)}
 
