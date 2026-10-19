@@ -263,6 +263,8 @@ def build(sec: InsideScene, ctx: BuildContext, theme: dict) -> dict:
         "desktop": {"base": ctx.url(desk) + "/", "ext": "webp"},
         "mobile": {"base": ctx.url(mob) + "/", "ext": "webp"},
         "poster": still("poster.jpg"), "end": still("end.jpg"),
+        "off": [f["off"] for f in plan.frames], "offset": lk["offset"],
+        "wideFill": round(min(0.86, 0.95 * (1 - inside.WIDE_OFFSET * sec.offset)), 3),
         "stops": [{"label": s.label, "frame": w["frame"], "at": w["copy"], "still": still(f"stop{s.index + 1}.jpg")}
                   for s, w in zip(res.stops, plan.windows)],
         "stepsAt": [list(st.at) if st.at else None for st in sec.steps], "scrollLength": sec.length,

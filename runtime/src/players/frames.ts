@@ -61,13 +61,22 @@ const factory: PlayerFactory = async (cfg, ctx) => {
   let last = -1, cur = 0;
   resize();
   const size = (f: Frame) => [(f as any).width || (f as HTMLImageElement).naturalWidth, (f as any).height || (f as HTMLImageElement).naturalHeight];
-  function draw(f: Frame, alpha: number) {
+  function draw(f: Frame, alpha: number, idx: number) {
     const cw = canvas.width, ch = canvas.height, [fw, fh] = size(f);
     const fit = cfg.fit === "contain" ? Math.min : Math.max;
-    const k = fit(cw / fw, ch / fh), w = fw * k, h = fh * k;
+    let k = fit(cw / fw, ch / fh), x = (cw - fw * k) / 2, y = (ch - fh * k) / 2;
+    if (Array.isArray(cfg.off) && cw < ch) {
+      // inside, on a phone: the subject sits off-centre in the frame (for the copy), so pan the crop to it; the wide
+      // shots (off near 0.5) are drawn smaller so the whole product is in view
+      const o = cfg.off[idx] ?? 1, wide = Math.max(0, Math.min(1, (1 - o) / 0.5));
+      const cover = Math.max(cw / fw, ch / fh), kw = Math.min(cover, (cw * 0.94) / (fw * (cfg.wideFill || 0.8)));
+      k = cover + (kw - cover) * wide;
+      x = cw / 2 - (0.5 + (cfg.offset || 0) * o) * fw * k;
+      y = (ch - fh * k) / 2;
+    }
     const shift = isMobile() ? 0 : (cfg.shift || 0) * cw;
     g.globalAlpha = alpha;
-    g.drawImage(f as CanvasImageSource, (cw - w) / 2 + shift, (ch - h) / 2, w, h);
+    g.drawImage(f as CanvasImageSource, x + shift, y, fw * k, fh * k);
   }
 
   return {
@@ -80,7 +89,7 @@ const factory: PlayerFactory = async (cfg, ctx) => {
         if (!f || pick.frame === last) return;
         last = pick.frame;
         g.clearRect(0, 0, canvas.width, canvas.height);
-        draw(f, 1);
+        draw(f, 1, pick.frame);
         return;
       }
       cur += (s.p * (count - 1) - cur) * follow;
@@ -90,8 +99,8 @@ const factory: PlayerFactory = async (cfg, ctx) => {
       const a = frames[i], b = frames[Math.min(count - 1, i + 1)];
       if (!a) return;
       g.clearRect(0, 0, canvas.width, canvas.height);
-      draw(a, 1);
-      if (b && b !== a && t > 0.01) draw(b, t);
+      draw(a, 1, i);
+      if (b && b !== a && t > 0.01) draw(b, t, Math.min(count - 1, i + 1));
       g.globalAlpha = 1;
     },
   };
