@@ -46,6 +46,7 @@ LTX_MP = 0.5             # megapixels LTX-2.3 renders the crop at (aspect kept)
 MAX_VIDEO_W = 1280       # the encoded video's widest side
 MIN_SIDE = 320           # the crop is at least this big (as far as the still goes)
 CODEC_STEP = 1.5         # levels a lossy encode may add to the wrap step (an I-frame meeting a P-frame) before it counts as a seam
+BUDGET = 12.0            # pingpong: how far (mean levels) the region may move from its first frame before the clip is cut there
 SEAM_OK = 1.5            # a loop whose closing step is at most this many typical steps is seamless
 NEGATIVE = ("camera movement, camera shake, zoom, pan, tilt, cuts, flicker, morphing, warping, new objects appearing, "
             "people, text, watermark, blur, motion in the background, changing light")
@@ -304,6 +305,27 @@ def close_loop(frames: np.ndarray, overlap: int, flow: bool = True) -> np.ndarra
     return np.stack(out)
 
 
+def trim_to_budget(frames: np.ndarray, seed: np.ndarray, strength: float, floor: int = FPS) -> tuple[np.ndarray, dict]:
+    """A video model's motion grows with the clip: it starts as the gentle sway a cinemagraph wants and, a second or two
+    later, becomes a curtain flying across the room. For a pingpong loop (which only needs the way out) keep the frames until
+    the region has changed from the first frame by a budget: the mean absolute difference, over the region and its
+    surroundings, of BUDGET levels (x `strength`), but at least `floor` frames. A clip that never gets there is kept whole."""
+    import cv2
+    k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * 12 + 1, 2 * 12 + 1))
+    area = cv2.dilate((seed > 127).astype(np.uint8), k) > 0
+    if not area.any():
+        return frames, {"kept": len(frames), "of": len(frames), "budget": None}
+    f0 = frames[0].astype(np.float32)
+    budget = BUDGET * float(strength)
+    keep = len(frames)
+    for t in range(1, len(frames)):
+        d = float(np.abs(frames[t].astype(np.float32) - f0).mean(axis=-1)[area].mean())
+        if d > budget and t + 1 >= floor:
+            keep = t + 1
+            break
+    return frames[:keep], {"kept": int(keep), "of": int(len(frames)), "budget": round(budget, 1)}
+
+
 def pingpong(frames: np.ndarray) -> np.ndarray:
     """Forward, then back without repeating the turning frames: the loop's wrap is a step between neighbours."""
     if len(frames) < 3:
@@ -531,40 +553,67 @@ def build(project, ref: ImageInput, log: Callable[[str], None] = print, force: b
     if plan is not None and not clip.exists():
         return None
 
-    frames_raw = read_video(clip)
-    T = len(frames_raw)
     import cv2
     still_c = cv2.resize(np.asarray(sim.crop(box)), (ww, wh), interpolation=cv2.INTER_AREA if (ww, wh) < (cw, ch) else cv2.INTER_CUBIC)
     seed_c = cv2.resize(seed_full[y0:y1, x0:x1], (ww, wh), interpolation=cv2.INTER_LINEAR)
     sc = ww / cw                                           # work pixels per still pixel
+    seed_id = hashlib.sha1(seed_c.tobytes()).hexdigest()[:12]
+
+    # ---- prep: the clip as the rest works on it: stabilised against the still, and (pingpong) cut where it has gone far enough
+    pid = _digest([ckey, cg.loop, cg.strength, VERSION])
+    prep, prep_json = work / f"prep_{pid}.mkv", work / f"prep_{pid}.json"
+
+    def run_prep():
+        raw = read_video(clip)
+        st, drift = stabilise(raw, still_c, np.where(seed_c > 0, 0, 255).astype(np.uint8), log)
+        trim = {"kept": len(raw), "of": len(raw), "budget": None}
+        if cg.loop == "pingpong":
+            st, trim = trim_to_budget(st, seed_c, cg.strength)
+            if trim["kept"] < trim["of"]:
+                log(f"  pingpong: the clip is cut at {trim['kept']} of {trim['of']} frames, where the region has moved as far as it should")
+        write_lossless(st, prep)
+        prep_json.write_text(json.dumps({"drift": round(drift, 2), **trim}))
+    ctx.stage(f"prep_{pid}", {"v": VERSION, "clip": cid, "loop": cg.loop, "strength": cg.strength, "seed": seed_id}, [prep, prep_json], run_prep)
+    prep_info = json.loads(prep_json.read_text())
 
     # ---- track: SAM 2.1 follows the moving thing through the clip
-    tracked = None
+    tr = work / f"track_{pid}.npz"
     if cg.track:
-        tr = work / f"track_{cid}.npz"
-        tkey = {"v": VERSION, "clip": ckey, "seed": hashlib.sha1(seed_c.tobytes()).hexdigest()[:12]}
-
         def run_track():
-            _track(ctx, frames_raw, seed_c, tr, log)
-        try:
-            ctx.stage(f"track_{cid}", tkey, [tr], run_track)
-            if tr.exists():
-                tracked = np.load(tr)["union"]
-        except BuildError as e:
-            log(f"  note: tracking did not run ({e}); the mask follows the region and the clip's motion instead")
+            try:
+                _track(ctx, read_video(prep), seed_c, tr, log)
+            except BuildError as e:
+                log(f"  note: tracking did not run ({e}); the mask follows the region and the clip's motion instead")
+                np.savez_compressed(tr, union=np.zeros((1, 1), np.uint8), ok=False)
+        ctx.stage(f"track_{pid}", {"v": VERSION, "prep": pid, "seed": seed_id}, [tr], run_track)
 
     # ---- mask: where the clip moves, the region and the path it sweeps, grown and feathered
-    frames_st, drift = stabilise(frames_raw, still_c, np.where(seed_c > 0, 0, 255).astype(np.uint8), log)
-    energy = motion_energy(frames_st)
-    mask, minfo = final_mask(seed_c, energy, cg.grow * sc, cg.feather * sc, tracked)
+    mid = _digest([pid, cg.track, cg.grow, cg.feather, VERSION])
+    mask_png, mask_json = work / f"mask_{mid}.png", work / f"mask_{mid}.json"
+
+    def run_mask():
+        tracked = None
+        if cg.track and tr.exists():
+            z = np.load(tr)
+            tracked = z["union"] if "ok" not in z.files else None
+        m, info = final_mask(seed_c, motion_energy(read_video(prep)), cg.grow * sc, cg.feather * sc, tracked)
+        Image.fromarray(m, "L").save(mask_png)
+        mask_json.write_text(json.dumps({**info, "tracked": tracked is not None}))
+    ctx.stage(f"mask_{mid}", {"v": VERSION, "prep": pid, "track": cg.track, "grow": cg.grow, "feather": cg.feather}, [mask_png, mask_json], run_mask)
+    if plan is not None and not (mask_png.exists() and prep.exists()):
+        return None
 
     # ---- encode: stabilise, tone-match, close the loop, damp, composite, encode, measure
-    out_id = _digest([ckey, region_key(cg), cg.grow, cg.feather, cg.track, cg.loop, cg.strength, VERSION])
+    out_id = _digest([mid, cg.loop, cg.strength, VERSION])
     mp4, wp, rep = work / f"cine_{out_id}.mp4", work / f"cine_{out_id}.mask.webp", work / f"cine_{out_id}.json"
     sheet = work / f"cine_{out_id}.sheet.jpg"
     ekey = {"v": VERSION, "out": out_id}
 
     def run_encode():
+        frames_st = read_video(prep)
+        T = len(frames_st)
+        mask = np.asarray(Image.open(mask_png).convert("L"))
+        minfo = json.loads(mask_json.read_text())
         ring = max(8, int(round(cg.feather * sc)))
         fr = tone_match(frames_st, still_c, mask, ring)
         before = seam_report(fr, mask)
@@ -596,13 +645,15 @@ def build(project, ref: ImageInput, log: Callable[[str], None] = print, force: b
             "loop": {"mode": cg.loop, "closed_by": how, "generated": before, "closed": closed, "encoded": decoded,
                      "seamless": decoded["seam"] <= max(SEAM_OK * decoded["ref"], decoded["ref"] + CODEC_STEP)},
             "still": [W, H], "box": [x0, y0, x1, y1], "video": [ww, wh], "bytes": mp4.stat().st_size + wp.stat().st_size,
-            "mask": {"share_of_still": round(float((mask > 127).sum()) / sc / sc / (W * H), 4), **minfo,
-                     "tracked": tracked is not None},
-            "motion": {"temporal_std": round(motion, 2), "drift_px": round(drift, 2)},
+            "mask": {"share_of_still": round(float((mask > 127).sum()) / sc / sc / (W * H), 4), **minfo},
+            "motion": {"temporal_std": round(motion, 2), "drift_px": prep_info["drift"], "kept_frames": prep_info["kept"],
+                       "of_generated": prep_info["of"]},
             "held": {"max_change_outside_mask": outside["page"], "video_file_change_outside_mask": outside["file"]},
         }
         rep.write_text(json.dumps(report, indent=1))
     ctx.stage(f"encode_{out_id}", ekey, [mp4, wp, rep, sheet], run_encode)
+    if plan is not None and not rep.exists():
+        return None
     report = json.loads(rep.read_text())
     return Built(video=mp4, mask=wp, report=rep, sheet=sheet, data=report, box=[x0 / W, y0 / H, x1 / W, y1 / H], still=[W, H],
                  size=[ww, wh], poster_crop=crop_png, id=out_id)

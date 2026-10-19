@@ -104,6 +104,16 @@ def test_closing_a_loop_and_pingpong_remove_the_seam():
     assert len(pp) == 34 + 32 and C.seam_report(pp, m)["ratio"] <= C.SEAM_OK
 
 
+def test_a_pingpong_clip_is_cut_where_the_motion_has_gone_far_enough():
+    still, frames, seed = _scene(T=48)
+    cut, info = C.trim_to_budget(frames, seed, 1.0)
+    assert info["of"] == 48 and C.FPS // 2 < info["kept"] < 48 or info["kept"] == info["of"]
+    near, ni = C.trim_to_budget(frames, seed, 0.2)                       # a tighter budget cuts sooner, never below the floor
+    assert ni["kept"] <= info["kept"] and ni["kept"] >= min(C.FPS, 48)
+    calm, ci = C.trim_to_budget(np.repeat(still[None], 30, 0), seed, 1.0)  # nothing moves: kept whole
+    assert ci["kept"] == 30
+
+
 def test_damping_scales_the_motion_about_its_mean():
     _, frames, _ = _scene()
     calm = C.damp(frames, 0.5)
@@ -271,7 +281,8 @@ def test_pingpong_has_no_seam_and_is_twice_as_long(fake):
     project, calls = fake
     b = C.build(project, _ref(seconds=4.0, loop="pingpong"), lambda m: None)
     assert calls["last"]["seconds"] == 2.0 and calls["last"]["end"] is False   # half the loop, one way, no end frame
-    assert b["data"]["loop"]["seamless"] and b["data"]["frames"] == 25 + 23
+    kept = b["data"]["motion"]["kept_frames"]
+    assert b["data"]["loop"]["seamless"] and b["data"]["frames"] == 2 * kept - 2 and kept <= 25
 
 
 # ---------------------------------------------------------------- the page
