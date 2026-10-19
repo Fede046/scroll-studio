@@ -352,6 +352,20 @@ def tokens(rgb: np.ndarray) -> dict:
     return {"bg": r(bg), "bg2": r(bg2), "ink": r(ink), "em": r(em), "accent": r(atext), "a2": a2, "a3": a3, "dark": bool(dark)}
 
 
+def fog_color(rgb: np.ndarray, sky: Optional[np.ndarray] = None) -> list[int]:
+    """The colour mist takes at this time: the sky's own average (the mist is the sky come down to the water), a little
+    lifted; from the picture's top band when there is no sky mask."""
+    h, w = rgb.shape[:2]
+    if sky is not None and float(sky.mean()) > 0.02:
+        m = cv2.resize(sky.astype(np.float32), (w // 4, h // 4), interpolation=cv2.INTER_AREA)
+        small = cv2.resize(rgb, (w // 4, h // 4), interpolation=cv2.INTER_AREA).astype(np.float32)
+        c = (small * m[..., None]).sum((0, 1)) / max(float(m.sum()), 1e-6)
+    else:
+        c = rgb[: max(1, h // 12)].reshape(-1, 3).astype(np.float32).mean(axis=0)
+    c = c * 0.92 + 14
+    return [int(round(float(v))) for v in np.clip(c, 0, 255)]
+
+
 # ---------------------------------------------------------------- reports
 
 def contact_sheet(times: list[dict], images: list[np.ndarray], out: Path, cols: int = 3) -> Path:

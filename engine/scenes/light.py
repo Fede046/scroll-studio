@@ -272,7 +272,9 @@ def build(sec: LightScene, ctx: BuildContext, theme: dict) -> dict:
                              glow=max([l.glow for l in sec.lamps] or [1.0]))
             meta["pairs"].append(entry)
         for im in imgs:
-            meta["tokens"].append(light.tokens(im))
+            tk = light.tokens(im)
+            tk["fog"] = light.fog_color(im, sky)
+            meta["tokens"].append(tk)
         meta_json.write_text(json.dumps(meta))
     ctx.stage("maps", {"v": VERSION, "light": light.VERSION, "times": tkeys, "lamps": lamps_key, "sky": file_key(sky_png)},
               [meta_json, *pair_files], make_maps)
