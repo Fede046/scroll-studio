@@ -83,15 +83,22 @@ def _map_image(plan: dict, tex, table: str, size: int = 1280):
     return bg
 
 
+def stage_key(sec: DioramaScene, table: str, draft: bool) -> dict:
+    """What the layout depends on: the world, the places, the camera and the steps' timing and targets. The look
+    (tilt-shift, sun, grade) is drawn live and is not here, so changing it rebuilds nothing."""
+    from .. import diorama
+    return {"v": VERSION + diorama.plan.VERSION, "draft": draft, "table": table, "layout": sec.layout, "side": sec.side,
+            "scene": sec.model_dump(mode="json", include={"world", "places", "camera"}),
+            "steps": [{"intro": s.intro, "length": s.length, "place": (s.state or {}).get("place"), "wide": (s.state or {}).get("wide")}
+                      for s in sec.steps]}
+
+
 def build(sec: DioramaScene, ctx: BuildContext, theme: dict) -> dict:
     from .. import diorama
     table = sec.look.table or theme["colors"]["bg"]
     draft = bool(ctx.options.get("draft"))
     out_plan, out_ground, out_map = ctx.web / "world.json", ctx.web / "ground.jpg", ctx.web / "map.jpg"
-    key = {"v": VERSION + diorama.plan.VERSION, "draft": draft, "table": table, "layout": sec.layout, "side": sec.side,
-           "scene": sec.model_dump(mode="json", include={"world", "places", "camera"}),
-           "steps": [{"intro": s.intro, "length": s.length, "place": (s.state or {}).get("place"), "wide": (s.state or {}).get("wide")}
-                     for s in sec.steps]}
+    key = stage_key(sec, table, draft)
 
     def run():
         from PIL import Image
