@@ -274,6 +274,16 @@ def build_site(project: Project, log: Callable[[str], None] = print,
         if e["s"].type == "cta" and bg:
             e["bg"] = finals.get(bg[6:]) if bg.startswith("scene:") else publish(bg)
 
+    # film grammar between sections (`transition:`): which joins get their own stretch of scroll (engine/cuts.py)
+    from .. import cuts as cuts_mod
+    style_cfg = themes.styles().get(theme["style"], {}) if theme["style"] else {}
+    blocked = f"the {theme['style']} style plays its own hand-over between sections" if style_cfg.get("cuts") is False else None
+    cut_cfgs = cuts_mod.plan(site, log, None if blocked else cuts_mod.find_anchors(project, site, sections, dist, log), blocked)
+    for e in sections:
+        e["cut_in"] = e["cut_out"] = None
+    for c in cut_cfgs:
+        sections[c["a"]]["cut_out"], sections[c["b"]]["cut_in"] = c["n"], c["n"]
+
     if runtime_href is None:
         rt = dist / "runtime"
         if rt.exists():
@@ -327,7 +337,7 @@ def build_site(project: Project, log: Callable[[str], None] = print,
         style_blocks=bool(sdir and (sdir / "blocks.html.j2").exists()),
         style_chrome=bool(sdir and (sdir / "chrome.html.j2").exists()),
         style_scenes=bool(sdir and (sdir / "scenes.html.j2").exists()),
-        runtime=runtime_href or "runtime/", looks=looks, icon=favicon(site, theme), trailer=trailer,
+        runtime=runtime_href or "runtime/", looks=looks, icon=favicon(site, theme), trailer=trailer, cuts=cut_cfgs,
     )
     if badge:   # the storyboard marks its pages: never mistaken for the finished site
         mark = (f'<div class="ss-storyboard-badge" style="position:fixed;left:14px;bottom:14px;z-index:2147483000;'

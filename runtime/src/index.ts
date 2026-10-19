@@ -71,6 +71,7 @@ class Scene {
   hud: Record<string, any> = {};
   scaleOverride: string | null = null;
   loaded = 0;
+  lastActive = -1;
   onProgress: () => void = () => {};
 
   constructor(el: HTMLElement) {
@@ -132,9 +133,13 @@ class Scene {
     if (!this.near()) return;
     const layout = this.data.layout;
     let active = -1;
-    if (layout === "overlay") {
-      this.p += (this.rawProgress() - this.p) * follow;
-      if (Math.abs(this.rawProgress() - this.p) < 1e-4) this.p = this.rawProgress();
+    const held = cuts?.holding(this.el) ?? null;   // a cut is playing on this section (it moves its rectangle): progress stays where it was
+    if (held != null) {
+      active = this.lastActive;
+    } else if (layout === "overlay") {
+      const raw = this.rawProgress();
+      this.p += (raw - this.p) * follow;
+      if (Math.abs(raw - this.p) < 1e-4) this.p = raw;
     } else {
       let total = 0, done = 0;
       this.stepEls.forEach((s, i) => {
@@ -150,6 +155,7 @@ class Scene {
         total += h; done += this.stepVals[i] * h;
       });
       this.p = total ? done / total : 0;
+      this.lastActive = active;
     }
     const p = this.p;
 
@@ -206,7 +212,10 @@ class Scene {
 const scenes = [...document.querySelectorAll<HTMLElement>("[data-scene]")].map((el) => new Scene(el));
 
 const nav = document.getElementById("ss-nav");
-const updateBlocks = makeBlocks();
+const updateBlocks = makeBlocks((el) => cuts?.holding(el) != null);
+// Film grammar between sections (`transition:`, lib/cuts.ts): loaded only by pages that carry cuts.
+let cuts: import("./lib/cuts").CutsApi | null = null;
+if (document.getElementById("ss-cuts")) import("./lib/cuts").then((m) => { cuts = m.makeCuts(); });
 // The nav reads in the colours of the section under it: a dark film on a light site gets a dark nav, and back.
 const surfaced = [...document.querySelectorAll<HTMLElement>("main [class*='ss-surface-']")]
   .filter((el) => el.matches("section, .ss-panel, .ss-backdrop"));
@@ -215,7 +224,8 @@ function surfaceUnderNav() {
   if (!nav) return;
   const y = nav.offsetHeight / 2;
   let found = "";
-  for (const el of surfaced) {
+  for (const el of cuts ? [...surfaced].reverse() : surfaced) {   // during a cut the section on top is the later one
+    if (cuts && el.closest(".ss-cut-off")) continue;
     const r = el.getBoundingClientRect();
     if (r.top <= y && r.bottom > y) { found = (el.className.match(/ss-surface-(\w+)/) || [])[1] || ""; break; }
   }
@@ -227,6 +237,7 @@ function surfaceUnderNav() {
 }
 function frame() {
   const t = (performance.now() - t0) / 1000;
+  cuts?.update();
   for (const s of scenes) s.tick(t);
   updateReveals();
   updateBlocks();
@@ -294,7 +305,9 @@ document.querySelectorAll<HTMLAnchorElement>('a[href^="#"]').forEach((a) => a.ad
   const target = document.querySelector(id);
   if (!target) return;
   e.preventDefault();
-  if (lenis) lenis.scrollTo(target as HTMLElement, { duration: 1.4 / pace });
+  const settled = cuts?.docTop(target);   // a section in a cut is reached where it sits with no cut holding it (after the cut that leads into it)
+  if (settled != null) { if (lenis) lenis.scrollTo(settled, { duration: 1.4 / pace }); else scrollTo(0, settled); }
+  else if (lenis) lenis.scrollTo(target as HTMLElement, { duration: 1.4 / pace });
   else target.scrollIntoView();
 }));
 
@@ -306,7 +319,7 @@ if (debugP !== null) {
     const id = params.get("s");
     const sc = (id && scenes.find((s) => s.el.id === id)) || scenes[0];
     if (!sc) return;
-    const top = sc.el.getBoundingClientRect().top + scrollY;
+    const top = cuts?.docTop(sc.el) ?? sc.el.getBoundingClientRect().top + scrollY;
     if (sc.data.layout === "overlay") {
       scrollTo(0, top + (sc.track.offsetHeight - innerHeight) * target);
     } else {

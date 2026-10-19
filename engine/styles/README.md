@@ -75,3 +75,8 @@ the art in your style's own medium; keep it decorative (`role="img"` with the la
 7. **Everything comes from the spec.** Content, order and counts come from the site's sections; nothing is
    hard-coded for one demo. Handle a spec with more or fewer items, missing optional fields, and repeated block
    types.
+8. **Transitions** (`transition:` on a section, see the README's "Edited like a film"): by default a style takes them, since
+   they play on the sections' own wrappers. A style that makes the whole page one object of its own (a book, a wheel, a
+   game, one canvas) already plays its own hand-over between sections: give it `cuts: false` in style.yaml and the cuts
+   are dropped for it with a note. A style with its own markup should keep its sections' content in one root element
+   per section, since the cut moves, scales and blurs that element.

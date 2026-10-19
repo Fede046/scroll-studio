@@ -122,6 +122,23 @@ the real first frames (same stages and caches), so approving them is not wasted 
   `pick`, `within`, `points` / `negative_points`, `grow` (the boxes found are in `region_<digest>.boxes.jpg`), not by
   rewording the instruction.
 
+### Sections that join like a film (`transition:`)
+
+- Give a section `transition:` to hand over to the next in film grammar instead of a plain scroll: `cut` (instant, a beat of hold
+  either side), `dissolve`, `wipe` (`direction`, `angle`, `soft`), `iris` (`origin`, `closing`), `whip` (a fast blur-pan),
+  `match` (a shared shape: the frames scale and move until the shapes coincide and the picture swaps on it) and `carry` (an
+  element travels from its place in one section to its place in the next). A bare name is enough (`transition: whip`).
+  One or two well-chosen cuts do more than one on every join; `length` (screens of scroll) and `hold` pace them.
+- A match cut wants two pictures that share a shape. Name the shapes (`shape: the sun`, `becomes: the rim of a cup`: Florence-2 +
+  SAM 2.1) or a page element (`{selector: ".ss-phone__screen"}`), or design the second picture so it matches the first:
+  `image: { match: { section: <id>, shape: ..., becomes: ..., prompt: <the rest of the scene> } }` redraws that section's last
+  frame (Qwen-Image-Edit) with the shape in the same place at the same size. Make the shapes about the same size and keep them
+  inside the middle of the frame (a phone shows a narrower slice than a laptop); `zoom` caps how far a side may be scaled.
+- Look at it: `cuts(project, strip=True)` (`studio cuts --strip`) writes a frame strip around each cut: read it, fix the spec, repeat.
+  `--mobile` and `--reduced-motion` check a phone and a visitor who asks for less motion (a plain flow, a clean cut).
+- Not for `layout: stack`, nor for styles that play their own hand-over (`cuts: false` in their style.yaml): the cuts are dropped
+  with a note. Scenes with no picture to find a shape on (chart, map, code, type) take every cut except a match on a picture.
+
 ## 4. Build, look, fix
 1. `build(project, draft=True)` (or `only=[ids]` for a few shots) then `wait_for_job`. Read the log on failure: it names the stage and the cause.
 2. `snapshot(project)`, then read the sheet image. Check: text legible over the visual, the subject framed

@@ -150,6 +150,25 @@ class BeatFrame(Model):
                                                      "omitted)")
 
 
+class FrameMatch(Model):
+    """An image designed to match another section's last frame, so a match cut can be built rather than found: the shape
+    that ends that section becomes something else in this picture, in the same place at the same size. `edit` hands the
+    frame to Qwen-Image-Edit with an instruction made from these fields; `hint` generates this picture from `prompt` with
+    the shape's place and size written into it. The section must come before this picture's in the page (it is built
+    first); pair it with `transition: {type: match}` on that section."""
+    section: str = Field(..., description="The id of the section whose last frame to match")
+    shape: str = Field(..., description="What to match in that frame, as you would say it to a person: \"the round logo\"")
+    becomes: Optional[str] = Field(None, description="What that shape is in this picture: \"the sun\", \"the rim of a coffee cup\"")
+    prompt: Optional[str] = Field(None, description="The rest of this picture (the scene around the shape); with how: hint "
+                                                    "this is the whole prompt")
+    how: Literal["edit", "hint"] = Field("edit", description="edit: redraw that frame (Qwen-Image-Edit) keeping the shape's "
+                                                             "place, size and outline. hint: generate this picture "
+                                                             "(Z-Image) from `prompt` with the shape's place and size in it")
+    at: Literal["last", "first"] = Field("last", description="Match the section's last frame (or its first)")
+    seed: int = 7
+    steps: int = Field(30, ge=4, le=60, description="how: edit, the editor's steps")
+
+
 class ImageInput(Model):
     """An image the engine uses as input: a file in the project's inputs/, one generated locally, a gradient, or a
     still of the site's product."""
@@ -169,6 +188,8 @@ class ImageInput(Model):
     beat_frame: Optional[BeatFrame] = Field(None, description="A frame of a beat of a film (its first or last frame, "
                                                               "or the frame at a time): chain one beat onto the "
                                                               "end of another")
+    match: Optional[FrameMatch] = Field(None, description="Design this image to match another section's last frame, for a "
+                                                         "match cut (see FrameMatch)")
     credit: Optional[str] = Field(None, description="Attribution shown in the footer")
 
 
@@ -269,6 +290,103 @@ class Hud(Model):
     legend: list[dict[str, str]] = Field(default_factory=list, description="legend: [{label, color}]")
 
 
+# ---------------------------------------------------------------- film grammar between sections (transition:, engine/cuts.py)
+
+CUT_TYPES = ("cut", "dissolve", "wipe", "iris", "whip", "match", "carry")
+
+
+class CutAnchor(Model):
+    """Where a shape sits on one side of a match cut: named (found on that side's picture by Florence-2 and SAM 2.1),
+    boxed, or a page element. A bare string is a prompt: `shape: "the round logo"`."""
+    prompt: Optional[str] = Field(None, description="What to find on the picture, as you would say it to a person: "
+                                                    "\"the sun\", \"the round logo\", \"the cup\"")
+    box: Optional[tuple[float, float, float, float]] = Field(None, description="x0, y0, x1, y1 around the shape, 0-1 of "
+                                                                               "the section's picture")
+    selector: Optional[str] = Field(None, description="A CSS selector for a page element inside the section (the phone "
+                                                      "screen: `.ss-phone__screen`, a logo: `.ss-wordmark svg`); "
+                                                      "measured in the browser, so it works on any block")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _bare_prompt(cls, v):
+        return {"prompt": v} if isinstance(v, str) else v
+
+    @model_validator(mode="after")
+    def _one(self):
+        if sum(x is not None for x in (self.prompt, self.box, self.selector)) != 1:
+            raise ValueError("a cut anchor is exactly one of prompt, box or selector")
+        return self
+
+
+class Carry(Model):
+    """An element that travels across the cut: it leaves its place in this section and settles in its place in the
+    next (FLIP: the browser measures both), so the eye is led over the join."""
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    from_: str = Field("h1, h2", alias="from", description="CSS selector of the element in this section "
+                                                                       "(the last match on its final screen)")
+    to: str = Field("h1, h2", description="CSS selector of the element in the next section (the first match "
+                                                         "on its first screen)")
+    via: Literal["dissolve", "cut", "wipe", "iris"] = Field("dissolve", description="What the rest of the picture does "
+                                                                                     "while the element travels")
+
+
+class Transition(Model):
+    """How a section hands over to the next, in the language of film. Without it sections simply follow one another
+    (today's behaviour). The cut takes its own stretch of scroll (`length`): both pictures are held on screen while the
+    scroll drives the cut, then the page carries on. Reduced motion, and pages without scripts, get a plain cut.
+
+    cut: an instant cut at a scroll position with a held beat either side. dissolve: a held cross-dissolve.
+    wipe: the next picture is revealed along a line (`direction`, `angle`, `soft`). iris: it opens from a point as a
+    circle (`origin`, or `closing` for the iris that closes on this one). whip: a fast directional blur-pan into the
+    next (`direction`, `blur`). match: the end of this section and the start of the next share a shape; the frames scale
+    and move until the two shapes coincide and the picture swaps on the shape (`shape`, `becomes`). carry: an element
+    travels from its place here to its place there (`carry`)."""
+    type: Literal["cut", "dissolve", "wipe", "iris", "whip", "match", "carry"] = Field(
+        ..., description="cut, dissolve, wipe, iris, whip, match or carry")
+    length: Optional[float] = Field(None, ge=0.1, le=4, description="Scroll distance the cut takes, in screen heights "
+                                    "(defaults: cut 0.8, dissolve 1.2, wipe 1.3, iris 1.4, whip 1.1, match 1.5, carry 1.5)")
+    hold: float = Field(0.15, ge=0, le=0.4, description="The share of the stretch held still at each end, so each picture "
+                                                         "is on screen a moment before and after the cut")
+    at: float = Field(0.5, ge=0.1, le=0.9, description="cut and match: where in the cut (between the two holds) the picture swaps, 0-1")
+    direction: Optional[Literal["left", "right", "up", "down"]] = Field(
+        None, description="wipe and whip: the way things travel (left: the next picture arrives from the right). "
+                          "Default left")
+    angle: Optional[float] = Field(None, description="wipe: the edge's direction in degrees (0 right, 90 down); overrides direction")
+    soft: float = Field(0.0, ge=0, le=1, description="wipe and iris: how soft the edge is (0 hard)")
+    origin: Optional[tuple[float, float]] = Field(None, description="iris: where it opens from, 0-1 across and down the "
+                                                                    "screen (default the middle; with a match, the shape)")
+    closing: bool = Field(False, description="iris: close on this section (the next shows behind it) instead of opening the next")
+    blur: float = Field(1.0, ge=0, le=3, description="whip: blur strength, 1 is natural")
+    shape: Optional[CutAnchor] = Field(None, description="match: the shape on this section's last picture. Leave out "
+                                                         "both `shape` and `becomes` to let the engine look for the "
+                                                         "best-matching pair of shapes (contours)")
+    becomes: Optional[CutAnchor] = Field(None, description="match: the shape on the next section's first picture "
+                                                            "(default: the same prompt as `shape`)")
+    zoom: float = Field(3.0, ge=1, le=8, description="match: the most each side may be scaled to bring the shapes to the "
+                                                      "same size (more than this and they only nearly coincide)")
+    blend: float = Field(0.0, ge=0, le=0.3, description="match: a quick cross-dissolve over the swap, as a share of the "
+                                                         "stretch (0: a hard swap on the shape)")
+    carry: Optional[Carry] = Field(None, description="carry: the element that travels (the section's heading to the next one's by default)")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _bare_type(cls, v):
+        return {"type": v} if isinstance(v, str) else v
+
+    @model_validator(mode="after")
+    def _fit(self):
+        if self.type != "carry" and self.carry is not None:
+            raise ValueError("`carry` belongs to a transition of type carry")
+        if self.type != "match" and (self.shape is not None or self.becomes is not None):
+            raise ValueError("`shape` and `becomes` belong to a transition of type match")
+        return self
+
+
+TRANSITION_DOC = ("How this section hands over to the next one, in film grammar: cut, dissolve, wipe, iris, whip, match "
+                  "(a shared shape) or carry (an element travels over). Unset: the sections just follow one another. "
+                  "A bare name works: `transition: whip`. See Transition")
+
+
 class SceneBase(Model):
     id: str
     nav_label: Optional[str] = None
@@ -290,6 +408,7 @@ class SceneBase(Model):
                                             "storyboard` never re-render it, even when its settings change (a log line "
                                             "says so). A locked scene that was never rendered is rendered once. Unlock "
                                             "(or delete the render) to redo it")
+    transition: Optional[Transition] = Field(None, description=TRANSITION_DOC)
 
 
 # ---------------------------------------------------------------- scene types
@@ -1125,6 +1244,7 @@ class BlockBase(Model):
     backdrop: Optional[ImageRef] = Field(
         None, description="Full-bleed image behind the whole section: a file, URL, generate: or gradient:. In the stack "
                           "layout it is the panel's own backdrop. Pair with `surface` for legible text.")
+    transition: Optional[Transition] = Field(None, description=TRANSITION_DOC)
 
 
 class IntroBlock(BlockBase):

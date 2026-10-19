@@ -9,6 +9,7 @@
   studio directions my-site [--n 6] [--seed 1] [--pick a]   art directions as side-by-side boards; pick one into site.yaml
   studio preview my-site [--port 5173]
   studio record my-site [--section hero] [--seconds 12] [--gif]
+  studio cuts my-site [--strip] [--only 0,2] [--mobile]   the film grammar between sections: each cut, the shapes a match found, frame strips
   studio inspect my-site [--section story] [--json]   polish report of a built film: pops, softness, halos, style drift, morphs
   studio trailer my-site [--format 9x16] [--plan]      launch trailer from the site's renders -> dist/trailer/
   studio ui                                         the Studio app (http://localhost:5180)
@@ -500,6 +501,37 @@ def snapshot(name: str, at: list[str] = typer.Option(..., help="scene:progress, 
     root = resolve(name)
     snap(root / "dist", at, root / "snapshots", size=(width, height))
     typer.echo(f"sheet: {root / 'snapshots' / 'sheet.jpg'}")
+
+
+@app.command()
+def cuts(name: str, strip: bool = typer.Option(False, "--strip", help="Frame strips around each cut of the built site "
+                                                                      "(<project>/.build/cuts/cut_<n>.jpg)"),
+         only: Optional[str] = typer.Option(None, help="Comma-separated cut numbers (default: all)"),
+         mobile: bool = typer.Option(False, "--mobile", help="Strips at a phone's size (390x844)"),
+         reduced: bool = typer.Option(False, "--reduced-motion", help="Strips with prefers-reduced-motion on (the cuts "
+                                                                      "fall back to plain cuts)"),
+         frames: int = typer.Option(9, help="Frames in each strip"),
+         clip: bool = typer.Option(False, "--clip", help="With --strip: also a short video of each cut (cut_<n>.mp4)")):
+    """The film grammar between a built site's sections (`transition:`): each cut, how long it is, the shapes a match
+    cut found; with --strip, a frame strip around each one to look at."""
+    from . import cuts as cuts_mod
+    root = resolve(name)
+    found = cuts_mod.read_cuts(root / "dist")
+    if not found:
+        typer.echo("no cuts in the built page (add `transition:` to a section and build)")
+        raise typer.Exit()
+    for c in found:
+        line = f"  {c['n']}: {c['label']}  {c['type']}, {c['length']} screens"
+        if c["type"] == "match":
+            a = (c.get("anchors") or {})
+            line += "  shapes: " + (", ".join(f"{k}={v.get('how') or 'selector'}" for k, v in a.items() if isinstance(v, dict)) or "none found (dissolves)")
+        typer.echo(line)
+    if strip:
+        ids = [int(x) for x in only.split(",")] if only else None
+        size = (390, 844) if mobile else (1280, 720)
+        cuts_mod.strips(root / "dist", root / ".build" / "cuts", only=ids, size=size, mobile=mobile, frames=frames,
+                        reduced=reduced, clip=clip, log=typer.echo)
+        typer.echo(f"strips: {root / '.build' / 'cuts'}")
 
 
 @app.command()
