@@ -216,17 +216,22 @@ def build(sec: LightScene, ctx: BuildContext, theme: dict) -> dict:
         if t.image is not None:
             msrc = resolve_image(ctx.project, t.image, ctx.log)
             key = {"v": RELIGHT_VERSION, "world": wkey, "image": image_key(t.image), "file": file_key(msrc), "align": sec.structure.align}
+            legacy = None
             mode = "image"
         elif tid == sec.world_time:
             key = {"v": RELIGHT_VERSION, "world": wkey, "anchor": True}
+            legacy = None
             mode = "anchor"
         else:
             instr = light_presets.instruction(t.preset, t.prompt)
             seed0 = t.seed if t.seed is not None else sec.seed + 13 * i
             steps = max(4, sec.edit_steps // 2) if draft else sec.edit_steps
             st = sec.structure
+            # the limit and the retries are not part of the key: a picture that was made stays the picture (a time that
+            # failed its limit is warned about on every build; give it another `seed:` to redo it)
             key = {"v": RELIGHT_VERSION, "light": light.RELIGHT_VERSION, "world": wkey, "ins": instr, "seed": seed0, "steps": steps,
-                   "align": st.align, "max": st.max_drift, "retries": 0 if draft else st.retries}
+                   "align": st.align}
+            legacy = dict(key, max=st.max_drift, retries=0 if draft else st.retries)
             mode = "relight"
 
         def run(tid=tid, mode=mode, t=t, png=png, js=js, i=i):
@@ -246,14 +251,14 @@ def build(sec: LightScene, ctx: BuildContext, theme: dict) -> dict:
                                                 sec.structure.align, tdir, tid, ctx.log)
             Image.fromarray(img).save(png)
             js.write_text(json.dumps(rep, indent=1))
-        ctx.stage(f"time_{tid}", key, [png, js], run)
+        ctx.stage(f"time_{tid}", key, [png, js], run, legacy=legacy)
         ctx.progress(0.1 + 0.6 * (i + 1) / len(sec.times), f"time {i + 1}/{len(sec.times)}")
         imgs.append(light.load_rgb(png))
         reports.append(json.loads(js.read_text()))
-        if not reports[-1].get("ok", True):
+        reports[-1]["ok"] = bool(reports[-1].get("anchor")) or reports[-1]["aligned"]["drift"] <= sec.structure.max_drift
+        if not reports[-1]["ok"]:
             ctx.log(f"  warning: '{tid}' is still {reports[-1]['aligned']['drift']:.2f}px from the world "
-                    f"(limit {sec.structure.max_drift}); try `seed:` on that time, a world with simpler structure, or raise "
-                    f"structure.max_drift")
+                    f"(limit {sec.structure.max_drift}); give that time another `seed:`, or raise structure.max_drift")
 
     # ---- the maps between times, and the colours at each time
     mdir = ctx.work / "maps"
