@@ -202,12 +202,12 @@ const factory: PlayerFactory = async (cfgIn, ctx) => {
   const fovFor = () => Math.min(62, plan.camera.fov * (aspect < 0.9 ? 1.4 : 1));
   const wideDist = () => {
     const f = fovFor(), tv = Math.tan(THREE.MathUtils.degToRad(f / 2)), th = tv * aspect;
-    const sideRoom = aspect > 1.05 && ctx.data.layout !== "overlay" ? 0.76 : 0.84;
+    const sideRoom = aspect > 1.05 && ctx.data.layout !== "overlay" ? 0.66 : 0.84;
     const byW = plan.camera.fit / (th * sideRoom);
     const byH = (plan.camera.fit * Math.sin(THREE.MathUtils.degToRad(plan.camera.pitch)) + 4.5) / (tv * 0.8);
     return Math.max(byW, byH);
   };
-  const rig = new Rig(plan.camera, wideDist, cfg.side, () => (mobile ? 0 : 0.17), () => (mobile || aspect < 1.05 ? 0 : cfg.side * 0.11),
+  const rig = new Rig(plan.camera, wideDist, cfg.side, () => (mobile ? 0 : 0.17), () => (mobile || aspect < 1.05 ? 0 : cfg.side * 0.16),
     () => Math.tan(THREE.MathUtils.degToRad(plan.camera.fov / 2)) / Math.tan(THREE.MathUtils.degToRad(fovFor() / 2)));
   const state: CamState = { yaw: 0, pitch: 30, dist: 40, target: new THREE.Vector3(), shift: 0, open: 1, beat: 0 };
   const drift = plan.camera.drift;
@@ -215,7 +215,10 @@ const factory: PlayerFactory = async (cfgIn, ctx) => {
   function resize() {
     W = visual.clientWidth || innerWidth; H = visual.clientHeight || innerHeight;
     aspect = W / Math.max(1, H);
-    const pr = Math.min(devicePixelRatio || 1, mobile ? 1.5 : 1.5);
+    // the scene is drawn at the screen's own pixels up to a budget (the depth of field hides the rest), and the budget
+    // shrinks by itself when the machine cannot keep up (see adapt())
+    const budget = (mobile ? 1.15e6 : 2.3e6);
+    const pr = Math.max(0.45, Math.min(devicePixelRatio || 1, 1.5, Math.sqrt(budget / Math.max(1, W * H))) * quality);
     renderer.setPixelRatio(1);
     renderer.setSize(Math.round(W * pr), Math.round(H * pr), false);
     canvas.style.width = "100%"; canvas.style.height = "100%";
@@ -225,6 +228,15 @@ const factory: PlayerFactory = async (cfgIn, ctx) => {
     last = "";
   }
   let last = "";
+  let quality = 1, slow = 0, fast = 0, lastT = 0;
+  /** dynamic resolution: a frame budget of ~30 ms; a slow stretch lowers the pixel count, a long fast one raises it again */
+  function adapt(t: number) {
+    const dt = (t - lastT) * 1000; lastT = t;
+    if (dt <= 0 || dt > 250) return;
+    if (dt > 34) { slow++; fast = 0; } else if (dt < 15) { fast++; slow = 0; } else { slow = 0; fast = 0; }
+    if (slow > 24 && quality > 0.5) { quality = Math.max(0.5, quality * 0.8); slow = 0; resize(); }
+    else if (fast > 240 && quality < 1) { quality = Math.min(1, quality * 1.15); fast = 0; resize(); }
+  }
 
   // ---- pins: the places' names over the diorama while the camera is up (buttons: jump to the step)
   const pinsEl = document.createElement("div");
@@ -265,6 +277,7 @@ const factory: PlayerFactory = async (cfgIn, ctx) => {
     const shiftX = state.shift * W;
     const shiftY = mobile ? -(0.1 + 0.1 * (1 - state.open)) * H : 0;
     camera.setViewOffset(W, H, -shiftX, -shiftY, W, H);
+    if (!reducedMotion) adapt(t);
     uni.uTime.value = reducedMotion ? 0 : t;
     if (!reducedMotion) for (const a of anims) a.tick(a.o, t);
     camera.updateMatrixWorld();

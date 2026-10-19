@@ -332,10 +332,10 @@ def harbour(w: World, pal, spec_world):
         return yaw_of(tx - x, tz - z)
     bc = bay_c
     spots = [
-        Spot("hill", *P(-9.6, -6.2), face_to(*P(-9.6, -6.2), *bc), ("lighthouse",)),
+        Spot("hill", *P(-9.6, -6.2), yaw_of(-9.6, -6.2), ("lighthouse",)),
         Spot("yard", *P(7.6, -5.5), yaw_of(0.0, 1.0), ("crane", "warehouse")),
-        Spot("plaza", *P(-9.4, 5.6), face_to(*P(-9.4, 5.6), *bc), ("stall", "cafe")),
-        Spot("quay", *P(11.0, 0.4), face_to(*P(11.0, 0.4), *bc), ("office", "warehouse")),
+        Spot("plaza", *P(-9.4, 5.6), yaw_of(-9.4, 5.6), ("stall", "cafe")),
+        Spot("quay", *P(11.0, 0.4), yaw_of(1.0, 0.0), ("office", "warehouse")),
         Spot("meadow", *P(-2.8, -11.2), yaw_of(0.0, 1.0), ("windmill",)),
         Spot("village", *P(-11.0, -1.0), face_to(*P(-11.0, -1.0), *bc), ("shop", "cafe", "house")),
         Spot("bay", *P(0.6, 1.4), yaw_of(0.4, 1.0), ("ferry",), water=True),

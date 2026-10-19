@@ -119,10 +119,13 @@ BLOCKERS = {"tree": (2.2, 0.7), "pine": (2.0, 0.6), "house": (3.0, 1.2), "shop":
             "plant": (2.6, 1.0), "deskLamp": (3.8, 0.8), "robot": (3.8, 1.4), "conveyor": (1.8, 2.2), "boat": (1.5, 0.9), "fountain": (2.2, 1.5)}
 
 
-def clear_yaw(w: World, pl: dict, target, dist: float, pitch: float, base_deg: float, prefer: float) -> float:
-    """The camera azimuth, near `base_deg` (the place's front), from which the fewest tall things stand between the camera
-    and the place: candidates are tried by distance from the preferred offset and scored by how much of the sight
-    line they block."""
+OFFSETS = (-72, -56, -42, -30, -18, -6, 0, 6, 18, 30, 42, 56, 72)
+
+
+def yaw_options(w: World, pl: dict, target, dist: float, pitch: float, base_deg: float, prefer: float) -> list[tuple[float, float]]:
+    """Camera azimuths near `base_deg` (the place's front) and what each costs: how much of the sight line to the place,
+    and of a cone round it, is blocked by tall things, whether the camera would leave the base, and a little for turning
+    away from the preferred three-quarter view."""
     tx, ty, tz = target
     cp, sp = math.cos(math.radians(pitch)), math.sin(math.radians(pitch))
     own = (pl["x"], pl["z"])
@@ -136,9 +139,8 @@ def clear_yaw(w: World, pl: dict, target, dist: float, pitch: float, base_deg: f
             bz = p["z"] + (dz * math.cos(p["r"]) - dx * math.sin(p["r"])) * p["s"]
             lo = (ymin[0] if ymin else 0.0) * p["s"]
             blockers.append((bx, bz, p["y"] + lo, h * p["s"], r * p["s"]))
-    nx, nz = math.cos(math.radians(base_deg)), -math.sin(math.radians(base_deg))
-    best, best_score = base_deg + prefer, 1e9
-    for off in sorted({prefer, -prefer, 0, 20, -20, 38, -38, 55, -55, 75, -75}, key=lambda o: abs(o - prefer)):
+    out = []
+    for off in OFFSETS:
         yaw = math.radians(base_deg + off)
         cx, cy, cz = tx + dist * math.sin(yaw) * cp, ty + dist * sp, tz + dist * math.cos(yaw) * cp
         blocked = 0.0
@@ -151,12 +153,56 @@ def clear_yaw(w: World, pl: dict, target, dist: float, pitch: float, base_deg: f
                     if (x - bx) ** 2 + (z - bz) ** 2 < br * br and by <= y < by + bh:
                         blocked += 1.0 if lat == 0 else 0.6
                         break
-            # the camera must stay inside the base, or the world falls away behind the place
-        edge = 0.0 if w.inside_pt(cx, cz, 0.0) else 1.0
-        score = blocked + edge * 6 + 0.012 * abs(off - prefer)
-        if score < best_score - 1e-9:
-            best, best_score = base_deg + off, score
-    return best
+        # tall things close to the lens and inside the picture become big blurred shapes in the corner of the frame
+        near = 0.0
+        view = math.atan2(tx - cx, tz - cz)
+        for bx, bz, by, bh, br in blockers:
+            d = math.hypot(bx - cx, bz - cz)
+            if bh < 2.6 or d > dist * 0.8 or d < 1e-6:
+                continue
+            ang = abs((math.atan2(bx - cx, bz - cz) - view + math.pi) % (2 * math.pi) - math.pi)
+            if ang < math.radians(26) and by + bh > cy - 2.0:
+                near += 1.0 - d / (dist * 0.8)
+        out.append((base_deg + off, 0.5 * blocked + 1.4 * near + 0.03 * abs(abs(off) - abs(prefer))))
+    return out
+
+
+def _turn(a: float, b: float, mode: str) -> float:
+    """Degrees the camera swings going from azimuth a to b: the short way, or always one way round."""
+    d = (b - a) % 360.0
+    if mode == "ccw":
+        return d
+    if mode == "cw":
+        return d - 360.0 if d > 1e-6 else 0.0
+    return d - 360.0 if d > 180.0 else d
+
+
+def choose_yaws(options: list[list[tuple[float, float]]], mode: str) -> list[float]:
+    """The azimuth for each place, in order: cheapest sight lines overall, and the least swinging between places
+    (a Viterbi pass over every place's options)."""
+    if not options:
+        return []
+    cost = [[c for _, c in options[0]]]
+    back: list[list[int]] = [[0] * len(options[0])]
+    for i in range(1, len(options)):
+        row, br = [], []
+        for yj, cj in options[i]:
+            best, bk = 1e18, 0
+            for k, (yk, _) in enumerate(options[i - 1]):
+                tot = cost[i - 1][k] + 0.005 * abs(_turn(yk, yj, mode))
+                if tot < best:
+                    best, bk = tot, k
+            row.append(best + cj)
+            br.append(bk)
+        cost.append(row)
+        back.append(br)
+    k = min(range(len(cost[-1])), key=lambda j: cost[-1][j])
+    path = [k]
+    for i in range(len(options) - 1, 0, -1):
+        k = back[i][k]
+        path.append(k)
+    path.reverse()
+    return [options[i][k][0] for i, k in enumerate(path)]
 
 
 def camera_plan(w: World, sec, placed: list[dict], stepmap: list[Optional[int]]) -> dict:
@@ -167,15 +213,23 @@ def camera_plan(w: World, sec, placed: list[dict], stepmap: list[Optional[int]])
     view_side = 1 if sec.side == "right" else -1
     if sec.layout == "overlay":
         view_side = 1
+    framing: dict[int, tuple] = {}
+    options = []
+    order = [pi for pi in stepmap if pi is not None]
+    for n, pi in enumerate(order):
+        pl = placed[pi]
+        gy = w.height_at(pl["x"], pl["z"])
+        fr = max(2.6 * pl["r"], min(pl["h"], 9.0) + 1.6)
+        dist = fr / (0.72 * 2 * tan_half) / cam.dive
+        tgt = (pl["x"], gy + min(pl["h"], 9.0) * 0.44, pl["z"])
+        framing[pi] = (gy, dist, tgt)
+        options.append(yaw_options(w, pl, tgt, dist, cam.dive_pitch, math.degrees(pl["yaw"]), 24.0))
+    chosen = dict(zip(order, choose_yaws(options, cam.orbit)))
     for si, pi in enumerate(stepmap):
         if pi is not None:
             pl = placed[pi]
-            gy = w.height_at(pl["x"], pl["z"])
-            off = 24.0 * (1 if pi % 2 == 0 else -1)
-            fr = max(2.6 * pl["r"], min(pl["h"], 9.0) + 1.6)
-            dist = fr / (0.72 * 2 * tan_half) / cam.dive
-            tgt = (pl["x"], gy + min(pl["h"], 9.0) * 0.44, pl["z"])
-            yaw = clear_yaw(w, pl, tgt, dist, cam.dive_pitch, math.degrees(pl["yaw"]), off)
+            gy, dist, tgt = framing[pi]
+            yaw = chosen[pi]
             side = {"left": -1, "right": 1}.get(pl["side"] or "", view_side)
             beats.append({"kind": "place", "place": pi, "yaw": yaw, "pitch": cam.dive_pitch, "dist": round(dist, 2),
                           "target": [round(pl["x"], 3), round(gy + min(pl["h"], 9.0) * 0.44, 3), round(pl["z"], 3)],

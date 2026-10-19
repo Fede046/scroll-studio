@@ -18,7 +18,7 @@ export class Post {
   constructor(private renderer: THREE.WebGLRenderer, private o: PostOpts) {
     const depth = new THREE.DepthTexture(1, 1);
     depth.type = THREE.UnsignedIntType;
-    this.rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: o.mobile ? 0 : 4, depthTexture: depth, depthBuffer: true });
+    this.rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: o.mobile ? 2 : (innerWidth * innerHeight > 2.2e6 ? 2 : 4), depthTexture: depth, depthBuffer: true });
     this.rt.texture.minFilter = this.rt.texture.magFilter = THREE.LinearFilter;
     const taps = o.mobile ? 22 : 40;
     this.mat = new THREE.ShaderMaterial({
