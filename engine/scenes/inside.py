@@ -83,6 +83,68 @@ def frame_hashes(plan, glb: Path, size, samples, lk: dict, stops: list[dict]) ->
     return out
 
 
+def gpu_free_mb() -> Optional[int]:
+    """Free VRAM of the first GPU (MiB), or None without nvidia-smi."""
+    try:
+        out = subprocess.run(["nvidia-smi", "--query-gpu=memory.free", "--format=csv,noheader,nounits"], capture_output=True,
+                             text=True, timeout=10).stdout.strip().splitlines()
+        return int(out[0]) if out else None
+    except Exception:
+        return None
+
+
+def render_device(log=print) -> str:
+    """cpu when STUDIO_INSIDE_DEVICE says so, or when the GPU has less than 1.2 GB free (other jobs: a Cycles scene that
+    cannot get its memory stalls for minutes instead of failing); else gpu."""
+    want = os.environ.get("STUDIO_INSIDE_DEVICE", "").lower()
+    if want in ("cpu", "gpu"):
+        return want
+    free = gpu_free_mb()
+    if free is not None and free < 1200:
+        log(f"  the GPU has {free} MiB free (shared with other jobs): rendering on the CPU (STUDIO_INSIDE_DEVICE=gpu forces the GPU)")
+        return "cpu"
+    return "gpu"
+
+
+STALL_SECONDS = float(os.environ.get("STUDIO_INSIDE_STALL", 900))     # no new frame for this long: the render is stuck
+
+
+def _run_blender(cmd: list, todo: list, hashes: list, frames_dir: Path, log, progress, stall: float) -> tuple[bool, list]:
+    """Run the renderer, move each finished frame into place as it is announced. Returns (finished, output tail); a render
+    that makes no progress for `stall` seconds (a shared GPU out of memory stalls Cycles instead of failing) is killed."""
+    import queue
+    import threading
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
+    q: "queue.Queue" = queue.Queue()
+
+    def pump():
+        for line in p.stdout:
+            q.put(line)
+        q.put(None)
+    threading.Thread(target=pump, daemon=True).start()
+    tail, done = [], 0
+    while True:
+        try:
+            line = q.get(timeout=stall)
+        except queue.Empty:
+            p.kill()
+            return False, tail
+        if line is None:
+            break
+        tail = (tail + [line])[-40:]
+        if line.startswith("FRAME "):
+            parts = line.split()
+            k = int(parts[2])
+            tmp = frames_dir / f"{hashes[k]}.tmp.png"
+            if tmp.exists():
+                tmp.replace(frames_dir / f"{hashes[k]}.png")
+            done += 1
+            progress(0.9 * done / len(todo), f"rendering frame {done}/{len(todo)}")
+        elif line.startswith(("STOP ", "DISSOLVE", "RAY ", "DEVICE")):
+            log("  " + line.strip())
+    return p.wait() == 0, tail
+
+
 def render_frames(project: Project, sec: InsideScene, glb: Path, res, plan, hashes: list[str], indices: list[int],
                   frames_dir: Path, size, samples: int, lk: dict, log=print, progress=lambda f, m="": None) -> None:
     todo = [k for k in indices if not (frames_dir / f"{hashes[k]}.png").exists()]
@@ -91,32 +153,32 @@ def render_frames(project: Project, sec: InsideScene, glb: Path, res, plan, hash
     from ..fidelity import would_render
     would_render("inside", f"{sec.id}: {len(todo)} frames")
     frames_dir.mkdir(parents=True, exist_ok=True)
-    job = {"glb": str(glb), "size": list(size), "samples": samples, **lk, "stops": job_stops(res), "frames": plan.frames,
-           "render": [{"k": k, "out": str(frames_dir / f"{hashes[k]}.tmp.png")} for k in todo],
-           "debug": int(os.environ["SS_INSIDE_DEBUG"]) if os.environ.get("SS_INSIDE_DEBUG") else None}
-    jf = frames_dir / "job.json"
-    jf.write_text(json.dumps(job), encoding="utf-8")
-    cmd = [settings()["blender"], "-b", "--factory-startup", "--python-exit-code", "1", "-P", str(SCRIPT), "--", "--job", str(jf)]
-    log(f"  $ blender inside.py: {len(todo)} of {len(plan.frames)} frames at {size[0]}x{size[1]}, {samples} samples")
-    try:
-        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
-    except FileNotFoundError:
-        raise BuildError(f"Blender not found at {settings()['blender']}: install Blender 4.2+ or set `blender` in studio.toml")
-    tail = []
-    for line in p.stdout:
-        tail = (tail + [line])[-40:]
-        if line.startswith("FRAME "):
-            n = int(line.split()[1].split("/")[0])
-            progress(0.9 * n / len(todo), f"rendering frame {n}/{len(todo)}")
-        elif line.startswith(("STOP ", "DISSOLVE", "RAY ")):
-            log("  " + line.strip())
-    if p.wait() != 0:
+    device = render_device(log)
+    for attempt in (1, 2):
+        todo = [k for k in indices if not (frames_dir / f"{hashes[k]}.png").exists()]
+        if not todo:
+            return
+        job = {"glb": str(glb), "size": list(size), "samples": samples, **lk, "stops": job_stops(res), "frames": plan.frames,
+               "render": [{"k": k, "out": str(frames_dir / f"{hashes[k]}.tmp.png")} for k in todo],
+               "debug": int(os.environ["SS_INSIDE_DEBUG"]) if os.environ.get("SS_INSIDE_DEBUG") else None, "device": device}
+        jf = frames_dir / "job.json"
+        jf.write_text(json.dumps(job), encoding="utf-8")
+        cmd = [settings()["blender"], "-b", "--factory-startup", "--python-exit-code", "1", "-P", str(SCRIPT), "--", "--job", str(jf)]
+        log(f"  $ blender inside.py: {len(todo)} of {len(plan.frames)} frames at {size[0]}x{size[1]}, {samples} samples ({device})")
+        try:
+            ok, tail = _run_blender(cmd, todo, hashes, frames_dir, log, progress, STALL_SECONDS)
+        except FileNotFoundError:
+            raise BuildError(f"Blender not found at {settings()['blender']}: install Blender 4.2+ or set `blender` in studio.toml")
+        if ok:
+            break
+        if attempt == 1 and device == "gpu" and (not tail or "Traceback" not in "".join(tail)):
+            log(f"  no progress for {int(STALL_SECONDS)} s on the GPU (shared with other jobs?): finishing the remaining frames on the CPU")
+            device = "cpu"
+            continue
         raise BuildError("Blender render failed:\n" + "".join(tail))
-    for k in todo:
-        tmp = frames_dir / f"{hashes[k]}.tmp.png"
-        if not tmp.exists():
-            raise BuildError(f"inside '{sec.id}': frame {k} was not rendered")
-        tmp.replace(frames_dir / f"{hashes[k]}.png")
+    missing = [k for k in indices if not (frames_dir / f"{hashes[k]}.png").exists()]
+    if missing:
+        raise BuildError(f"inside '{sec.id}': frame {missing[0]} was not rendered")
 
 
 def _grade(im, vignette: float, grain: float, k: int):

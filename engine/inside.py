@@ -38,6 +38,7 @@ from .spec import InsideScene, InsideStop
 SENSOR = 36.0                       # mm, full frame width
 WIDE_LENS = 32.0                    # the opening and closing shot
 WIDE_VIEW = (-35.0, 22.0)           # yaw, pitch of the opening shot
+WIDE_OFFSET = 0.5                   # the opening and closing shots use this share of the scene's `offset`
 EDGE_WINDOW = 0.28                  # how far into the flights on either side a stop's copy stays on screen
 DRIFT_YAW = 2.2                     # degrees the camera creeps around a stop while it rests
 DRIFT_PUSH = 0.035                  # share of the distance it creeps in
@@ -353,6 +354,7 @@ class Pose:
     fstop: float
     roll: float
     explode: float
+    off: float = 1.0         # share of the scene's `offset` (the wide shots sit nearer the middle)
 
 
 @dataclass
@@ -387,7 +389,7 @@ class Plan:
                 "windows": self.windows, "intro": self.intro_window, "outro": self.outro_window, "notes": self.notes}
 
 
-def wide_pose(res: Resolution, aspect: float) -> Pose:
+def wide_pose(res: Resolution, aspect: float, offset: float = 0.0) -> Pose:
     lo, hi = res.lo, res.hi
     centre = (lo + hi) / 2
     size = hi - lo
@@ -401,14 +403,14 @@ def wide_pose(res: Resolution, aspect: float) -> Pose:
     er = float(np.max(np.abs(corners @ right)))
     eu = float(np.max(np.abs(corners @ up)))
     ed = float(np.max(np.abs(corners @ fwd)))
-    fill = 0.86                    # the product fills this much of the frame: room for the copy beside it
+    fill = min(0.86, 0.95 * (1 - WIDE_OFFSET * offset))      # the product fills this much of the frame, off-centre by the offset
     d = max(er / (math.tan(fh / 2) * fill), eu / (math.tan(fv / 2) * fill)) + ed
     target = centre
-    return Pose(target + direction(yaw, pitch) * d, target, centre, WIDE_LENS, 5.6, 0.0, 0.0)
+    return Pose(target + direction(yaw, pitch) * d, target, centre, WIDE_LENS, 5.6, 0.0, 0.0, WIDE_OFFSET)
 
 
 def stop_pose(r: Resolved) -> Pose:
-    return Pose(r.cam.copy(), r.aim.copy(), r.focus.copy(), r.lens, r.fstop, r.roll, r.explode)
+    return Pose(r.cam.copy(), r.aim.copy(), r.focus.copy(), r.lens, r.fstop, r.roll, r.explode, 1.0)
 
 
 def _drift(p: Pose, u: float, sign: float) -> Pose:
@@ -417,7 +419,7 @@ def _drift(p: Pose, u: float, sign: float) -> Pose:
     th = math.radians(DRIFT_YAW) * sign * (2 * u - 1)
     c, s = math.cos(th), math.sin(th)
     off2 = np.array([off[0] * c - off[1] * s, off[0] * s + off[1] * c, off[2]]) * (1 - DRIFT_PUSH * u)
-    return Pose(p.target + off2, p.target.copy(), p.focus.copy(), p.lens, p.fstop, p.roll, p.explode)
+    return Pose(p.target + off2, p.target.copy(), p.focus.copy(), p.lens, p.fstop, p.roll, p.explode, p.off)
 
 
 def _travel(a: Pose, b: Pose, u: float) -> Pose:
@@ -436,12 +438,13 @@ def _travel(a: Pose, b: Pose, u: float) -> Pose:
     lens = math.exp(math.log(a.lens) + (math.log(b.lens) - math.log(a.lens)) * s)
     fstop = math.exp(math.log(a.fstop) + (math.log(b.fstop) - math.log(a.fstop)) * s)
     fstop *= 1 + 0.9 * math.sin(math.pi * s)          # the aperture closes in flight: more stays sharp while things rush past
-    return Pose(cam, target, focus, lens, fstop, a.roll + (b.roll - a.roll) * s, a.explode + (b.explode - a.explode) * s)
+    return Pose(cam, target, focus, lens, fstop, a.roll + (b.roll - a.roll) * s, a.explode + (b.explode - a.explode) * s,
+                a.off + (b.off - a.off) * s)
 
 
 def make_plan(sec: InsideScene, res: Resolution, aspect: float = 16 / 9) -> Plan:
     stops = res.stops
-    wide = wide_pose(res, aspect)
+    wide = wide_pose(res, aspect, sec.offset)
     segs: list[Segment] = []
     t = 0.0
 
@@ -479,14 +482,14 @@ def make_plan(sec: InsideScene, res: Resolution, aspect: float = 16 / 9) -> Plan
         u = (tau - seg.t0) / max(seg.t1 - seg.t0, 1e-9)
         if seg.kind == "hold":
             pose = Pose(seg.a.cam + (seg.b.cam - seg.a.cam) * u, seg.a.target + (seg.b.target - seg.a.target) * u,
-                        seg.a.focus.copy(), seg.a.lens, seg.a.fstop, seg.a.roll, seg.a.explode)
+                        seg.a.focus.copy(), seg.a.lens, seg.a.fstop, seg.a.roll, seg.a.explode, seg.a.off)
             near = seg.stop
         else:
             pose = _travel(seg.a, seg.b, u)
             near = seg.stop if u >= 0.5 else seg.stop_a
         frames.append({"k": k, "p": round(k / (n - 1), 6), "cam": _r(pose.cam), "target": _r(pose.target), "focus": _r(pose.focus),
                        "lens": round(pose.lens, 3), "fstop": round(pose.fstop, 3), "roll": round(pose.roll, 3),
-                       "explode": round(pose.explode, 4), "stop": int(near), "rest": seg.kind == "hold" and seg.stop >= 0})
+                       "explode": round(pose.explode, 4), "off": round(pose.off, 4), "stop": int(near), "rest": seg.kind == "hold" and seg.stop >= 0})
     windows, intro, outro = _windows(segs, stops, total, n, sec)
     return Plan(VERSION, frames, segs, total, stops, wide, windows, intro, outro, res.notes)
 

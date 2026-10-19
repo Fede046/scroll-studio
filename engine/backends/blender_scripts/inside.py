@@ -230,17 +230,21 @@ for o in meshes:
 # ---------------------------------------------------------------- look
 scene.render.engine = "CYCLES"
 prefs = bpy.context.preferences.addons["cycles"].preferences
-for dev_type in ("OPTIX", "CUDA", "HIP", "METAL", "ONEAPI"):
-    try:
-        prefs.compute_device_type = dev_type
-        prefs.get_devices()
-        if any(d.type == dev_type for d in prefs.devices):
-            for d in prefs.devices:
-                d.use = d.type == dev_type
-            scene.cycles.device = "GPU"
-            break
-    except TypeError:
-        continue
+if J.get("device") != "cpu":
+    for dev_type in ("OPTIX", "CUDA", "HIP", "METAL", "ONEAPI"):
+        try:
+            prefs.compute_device_type = dev_type
+            prefs.get_devices()
+            if any(d.type == dev_type for d in prefs.devices):
+                for d in prefs.devices:
+                    d.use = d.type == dev_type
+                scene.cycles.device = "GPU"
+                break
+        except TypeError:
+            continue
+else:
+    scene.cycles.device = "CPU"
+print("DEVICE", scene.cycles.device, flush=True)
 scene.cycles.samples = int(J["samples"])
 scene.cycles.use_adaptive_sampling = True
 scene.cycles.use_denoising = True
@@ -321,7 +325,6 @@ scene.collection.objects.link(cam)
 scene.camera = cam
 cam_data.clip_start, cam_data.clip_end = 0.002, 200
 cam_data.dof.use_dof = True
-cam_data.shift_x = -float(J.get('offset', 0.0))     # the subject sits off-centre: the copy has the other side
 cam.rotation_mode = "QUATERNION"
 
 
@@ -341,6 +344,7 @@ def place(fr, k):
     cam.rotation_quaternion = q @ Quaternion(Vector((0, 0, 1)), math.radians(fr.get("roll", 0)))
     cam.location = c
     cam_data.lens = fr["lens"]
+    cam_data.shift_x = -float(J.get('offset', 0.0)) * fr.get('off', 1.0)     # the subject sits off-centre: the copy has the other side
     cam_data.dof.focus_distance = max(0.002, (fp - c).dot(fwd))
     cam_data.dof.aperture_fstop = fr["fstop"] * radius
     d = max((fp - c).length, 0.01)

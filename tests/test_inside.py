@@ -353,3 +353,45 @@ def test_the_plan_estimates_the_render(project):
     sec = project.load().sections[0]
     unit, amount = plan_mod.units(sec, "render")
     assert unit == "inside:render" and amount > 0
+
+
+# ---------------------------------------------------------------- the renderer process
+
+FAKE = """
+import sys, time, pathlib
+d = pathlib.Path(sys.argv[1]); stall = sys.argv[2] == "stall"
+print("DEVICE GPU", flush=True)
+for n, k in enumerate([0, 1, 2], 1):
+    if stall and n == 3:
+        time.sleep(30)
+    (d / f"h{k}.tmp.png").write_bytes(b"png")
+    print(f"FRAME {n}/3 {k}", flush=True)
+"""
+
+
+def test_finished_frames_are_put_in_place_as_they_are_announced(tmp_path):
+    import sys
+    seen = []
+    ok, tail = scene._run_blender([sys.executable, "-c", FAKE, str(tmp_path), "ok"], [0, 1, 2], ["h0", "h1", "h2"], tmp_path,
+                                  lambda m: None, lambda f, m="": seen.append(m), 20)
+    assert ok and (tmp_path / "h0.png").exists() and (tmp_path / "h2.png").exists() and not list(tmp_path.glob("*.tmp.png"))
+    assert seen[-1] == "rendering frame 3/3"
+
+
+def test_a_render_that_stalls_is_killed_and_keeps_the_frames_it_finished(tmp_path):
+    import sys
+    ok, tail = scene._run_blender([sys.executable, "-c", FAKE, str(tmp_path), "stall"], [0, 1, 2], ["h0", "h1", "h2"], tmp_path,
+                                  lambda m: None, lambda f, m="": None, 2)
+    assert not ok and (tmp_path / "h0.png").exists() and (tmp_path / "h1.png").exists() and not (tmp_path / "h2.png").exists()
+
+
+def test_the_device_is_the_cpu_when_the_gpu_is_nearly_full_or_when_asked(monkeypatch):
+    monkeypatch.delenv("STUDIO_INSIDE_DEVICE", raising=False)
+    monkeypatch.setattr(scene, "gpu_free_mb", lambda: 800)
+    assert scene.render_device(lambda m: None) == "cpu"
+    monkeypatch.setattr(scene, "gpu_free_mb", lambda: 9000)
+    assert scene.render_device(lambda m: None) == "gpu"
+    monkeypatch.setattr(scene, "gpu_free_mb", lambda: None)
+    assert scene.render_device(lambda m: None) == "gpu"
+    monkeypatch.setenv("STUDIO_INSIDE_DEVICE", "cpu")
+    assert scene.render_device(lambda m: None) == "cpu"
