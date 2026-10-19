@@ -362,6 +362,7 @@ def test_only_what_differs_from_the_base_is_written(project):
     ds = writer.write(site, raw)["directions"]
     d = ds[0]
     d.palette = dict(d.palette, **{k: themes.resolve(site.theme)["colors"][k] for k in ("bg", "bg2", "ink", "accent", "accent2", "accent_ink")})
+    d.palette["mode"] = themes.resolve(site.theme)["mode"]
     d.style = None
     d.fonts = dict(d.fonts, display=themes.resolve(site.theme)["fonts"]["display"], body=themes.resolve(site.theme)["fonts"]["body"],
                    mono=themes.resolve(site.theme)["fonts"]["mono"], weight=themes.resolve(site.theme)["display_weight"],
@@ -442,3 +443,58 @@ def test_the_api_picks_and_serves_the_board(project):
     assert c.post("/api/dir/casa-test/undo").status_code == 200
     r = c.post("/api/dir/casa-test/reroll", json={"id": "a"})
     assert r.status_code == 200 and r.json()["ok"]
+
+
+# ---------------------------------------------------------------- the layout of a pick
+
+def test_a_pick_keeps_crlf_files_crlf_and_lays_the_theme_out_as_a_block(project):
+    project.spec_path.write_bytes(SPEC.replace("\n", "\r\n").encode("utf-8"))
+    dr.make(project, count=4, images=False, sheet=False, log=lambda m: None)
+    dr.pick(project, "b", lambda m: None)
+    raw = project.spec_path.read_bytes().decode("utf-8")
+    assert "\r\r" not in raw and raw.count("\n") == raw.count("\r\n"), "line endings must stay CRLF, never doubled"
+    text = raw.replace("\r\n", "\n")
+    assert "\ntheme:\n  preset: dusk\n" in text and "\nimagery:\n  medium: " in text
+    assert text.index("\ntheme:") < text.index("\nimagery:") < text.index("\nnav:")
+
+
+def test_an_existing_theme_block_and_scroll_are_replaced_in_place(tmp_path, monkeypatch):
+    from engine.directions import board
+    monkeypatch.setattr(board, "vendor_fonts", lambda project, dirs, log: [])
+    root = tmp_path / "blk"
+    root.mkdir()
+    (root / "site.yaml").write_text("name: Blk\ndescription: A shop.\ntheme:\n  preset: paper\n  colors: { bg: '#ffffff' }\n"
+                                    "scroll:\n  speed: 1.4\nsections:\n  - type: intro\n    title: Hi\n    body: Yo.\n", encoding="utf-8")
+    p = Project(root)
+    st = dr.make(p, count=4, images=False, sheet=False, log=lambda m: None)
+    for d in st["directions"]:
+        dr.pick(p, d["id"], lambda m: None)
+        after = yaml.safe_load((root / "site.yaml").read_text(encoding="utf-8"))
+        assert after["sections"][0]["title"] == "Hi" and after["theme"]["preset"] == "paper"
+        assert after["theme"]["colors"].get("bg") != "#ffffff" or d["palette"]["bg"].lower() == "#ffffff"
+        assert after.get("scroll", {}).get("speed", 1.0) == d["pace"]
+        assert (root / "site.yaml").read_text(encoding="utf-8").count("\ntheme:") == 1
+
+
+def test_every_picked_direction_compiles_a_page(tmp_path, monkeypatch):
+    """The page builds in each direction's style, fonts and colours (blocks only: no GPU, no network for fonts)."""
+    from engine.compile.compiler import build_site
+    from engine.directions import board
+    monkeypatch.setattr(board, "vendor_fonts", lambda project, dirs, log: [])
+    from engine.compile import fonts
+    monkeypatch.setattr(fonts, "vendor", lambda links, dist, log=print: None)
+    root = tmp_path / "pages"
+    root.mkdir()
+    (root / "site.yaml").write_text(
+        "name: Pages\ndescription: A bakery on a hill.\nsections:\n  - type: intro\n    kicker: Bread\n    title: Baked <em>before dawn.</em>\n"
+        "    body: Sourdough, rye and a very good croissant.\n  - type: features\n    items:\n      - { tag: Daily, title: Loaves, body: Seven kinds. }\n"
+        "  - type: stats\n    items:\n      - { value: '4', label: Hours of proving }\n  - type: cta\n    title: Come early.\n    button: { label: Find us, href: '#' }\n",
+        encoding="utf-8")
+    p = Project(root)
+    st = dr.make(p, count=6, images=False, sheet=False, log=lambda m: None)
+    for d in st["directions"]:
+        dr.pick(p, d["id"], lambda m: None)
+        out = build_site(p, log=lambda m: None)
+        page = Path(out).read_text(encoding="utf-8")
+        assert "Baked" in page and "Sourdough, rye and a very good croissant." in page
+        assert (d["fonts"]["display"] in page) or (d["fonts"]["display"].replace(" ", "+") in page)

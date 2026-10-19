@@ -69,6 +69,9 @@ tiktoken (`cl100k_base`) on the files in this repo; other tokenizers differ by r
 
 ### New in 1.3
 
+- **Direction boards** (`studio directions`): how a design studio pitches. One brief in, several complete art directions
+  out, side by side on one page, so you pick a direction in minutes before committing to a build. Pick one and it is
+  written into `site.yaml`. ([Direction boards](#direction-boards-pitch-it-before-you-build-it))
 - **Colour that follows the camera** (`reveal:` on a film section): render the film once in full colour; the page shows
   it black and white (or dimmed, blurred, tinted) and brings colour into tracked regions as you scroll.
   ([Colour that follows the camera](#colour-that-follows-the-camera-reveal))
@@ -220,6 +223,86 @@ model: colour stops, glows, stars and grain, enough for colour cards, dusk skies
         stars: 120
     title: Your words stay <em>on your phone.</em>
 ```
+
+## Direction boards: pitch it before you build it
+
+A studio does not start with the build. It shows the client three or six different ideas of what the site could be, side
+by side, and the client points at one. `studio directions` does that from the site's own spec:
+
+```bash
+studio directions my-site                      # six directions: board.html + board.png in my-site/directions/
+studio directions my-site --n 4 --seed 7       # another seed, another set
+studio directions my-site --brief "calmer, more editorial, for people who travel slowly"
+studio directions my-site --serve              # the boards in the browser, a Pick button on each
+studio directions my-site --pick c             # write direction C into site.yaml (a minimal diff; backup kept)
+studio directions my-site --undo               # put the file back as it was before the last pick
+studio directions my-site --reroll d           # another idea in place of one direction
+studio storyboard my-site                      # now every image redraws in the picked direction's imagery
+```
+
+Each **direction** is a complete art direction, not a colourway: a **concept** line; a **palette**; a **type pairing**
+(Google Fonts the engine loads and self-hosts); one of the engine's **styles** (the experience: what scrolling does, how
+sections hand over; or the default editorial layout); an **imagery treatment**, which is how every generated image and film
+prompt is phrased (medium, light, lens, mood, colour in words) so the whole page looks like one shoot; **motion notes**
+(page, camera, type) and the pace; and the **voice** that suits it. Its board shows the hero and two or three key sections
+as storyboard stills (Z-Image Turbo, the same generator and seeds in every direction, so what differs is the direction),
+set in that direction's palette and type, with the palette, faces, style and imagery written out under them. The page is
+`directions/board.html` (open it, or `--serve` it like the storyboard editor), and `directions/board.png` is the same page
+as one contact sheet.
+
+**They differ in kind.** The set is built from schools of design (a naturalist's plate book, the Swiss grid, golden-hour
+film photography, neon noir, drafting-table blueprint, a risograph zine, a picture book, soft clay, silver noir, art deco,
+cut paper, a travel poster, a Dutch still life, Y2K chrome, an arcade, a terminal, a quiet product studio, reportage,
+wabi-sabi, an old atlas, cel animation, Memphis pop), picked greedily so each next one fits the subject and is far from
+those already chosen. A distance measure (kind of picture, experience, colour, type, what the pictures are made of) then
+checks every pair; a pair closer than 0.5 is one idea twice, and the weaker of the two is replaced. The board header shows
+the closest pair, how many kinds and experiences the set spans, and what was regenerated. Directions are listed from closest
+to today's site to a different site.
+
+**There is no text model, so the writer is deterministic.** The engine has no local language model (ComfyUI's `models/LLM`
+holds Florence-2, a captioner, and Gemma is only LTX's text encoder), so ideas are not generated: they are composed from a
+curated, combinable vocabulary (`engine/directions/vocab.py`: schools, palettes, type pairings, imagery treatments,
+photographers' lighting such as Rembrandt, Vermeer window light or Penn's north light, and which engine styles give each
+school the right experience), chosen to fit the subject and mood words found in the site's copy and the brief, and combined
+by a seed. The same brief and seed give the same boards. Add a school by adding data; tests check every palette's contrast,
+that every font loads and every style exists. Nothing is sent anywhere and there are no API keys.
+
+The optional **`directions:`** block in the spec is the brief and the constraints:
+
+```yaml
+directions:
+  brief: "Quiet and handmade, never precious; a working studio, not a gallery."
+  count: 6
+  seed: 4
+  moods: [handmade, warm, calm]            # also read from the brief: calm, warm, bold, playful, technical, raw, nostalgic ...
+  keep: [colors]                           # parts of today's look every direction keeps: style, colors, fonts, imagery
+  styles:   { avoid: [pixel-art, ascii-art] }              # or only: [none, halftone, sand]; none = the default layout
+  fonts:    { avoid: [Press Start 2P] }                    # or only: [Fraunces, Karla ...]
+  palettes: { avoid: [pink], brand: ["#c2612a"] }          # brand colours become every direction's accent
+  stills: 4                                # stills per board: the hero, then key sections
+```
+
+**A pick** writes the direction into `site.yaml` and nothing else: `theme` (style, mode, colours, fonts, display weight and
+emphasis, radius), `imagery` and `scroll.speed`. Only what differs from what the site already resolves to is written, comments
+and layout stay, the old file is kept in `directions/backups/`, and an edit that would make the spec invalid is refused.
+**Copy is never touched** (a direction has a voice note, but the writer cannot write copy, so there is nothing to apply).
+
+`imagery:` is a spec field on its own, so you can write it by hand:
+
+```yaml
+imagery:
+  medium: 35mm film photograph, Kodak Portra 400, fine grain
+  light: low golden-hour sun, long soft shadows
+  lens: 35mm, eye level, shallow depth of field
+  mood: unhurried, sun-warmed, quietly luxurious
+  palette: honey, terracotta and sea blue
+```
+
+It is added to every prompt the engine sends to the image and video models (a `generate:` image, a beat's frame and clip, a
+take's keyframes and segments), and with `restyle` on (the default) the phrases it replaces in the original prompts
+(`photorealistic`, `shot on a medium format camera`, `golden hour`) are dropped first. Unset, nothing is added and no cache
+key changes. Example: [Kiln & Kettle](examples/kiln-and-kettle/site.yaml). MCP tools: `directions`, `direction_reroll`,
+`direction_pick`, `direction_undo`.
 
 ## Storyboard first
 

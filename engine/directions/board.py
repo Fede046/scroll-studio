@@ -23,11 +23,11 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable
 
 from ..compile import fonts as fontlib
 from ..compile import themes
-from ..inputs import generate_image
+from ..inputs import generate_image, generated_digest
 from ..project import BuildError, Project
 from . import shots, typefaces
 from .model import Direction
@@ -60,17 +60,30 @@ def draw_stills(project: Project, dirs: list[Direction], moments: list[shots.Mom
     alive = generate and comfy.alive()
     if generate and not alive:
         log("  ComfyUI is not running: the boards get placeholder cards (start ComfyUI and run `studio directions --stills`)")
-    total = max(1, len(dirs) * len(moments))
+    w, h = STILL_SIZE
+    jobs = [(d, k, m, shots.prompt_for(m, d.imagery)) for d in dirs for k, m in enumerate(moments)]
+    if alive:
+        # every still is queued at once: ComfyUI may be shared, and one run of consecutive Z-Image jobs loads the model
+        # once instead of once per still between other people's jobs
+        from concurrent.futures import ThreadPoolExecutor
+        todo = [j for j in jobs if not (project.build / "_generated" / f"{generated_digest(j[3], w, h, j[2].seed)}.png").exists()]
+        if todo:
+            log(f"  drawing {len(todo)} stills ({len(jobs) - len(todo)} cached)")
+            comfy.free()
+        done_n = 0
+        with ThreadPoolExecutor(max_workers=max(1, min(len(todo), 32))) as ex:
+            futs = {ex.submit(generate_image, project, j[3], w, h, j[2].seed, log, False): j for j in todo}
+            for f, j in futs.items():
+                f.result()
+                done_n += 1
+                progress(0.85 * done_n / max(1, len(todo)), f"{j[0].name}: {j[2].role}")
     done = 0
-    first = True
     for d in dirs:
         d.stills = []
         for k, m in enumerate(moments):
             prompt = shots.prompt_for(m, d.imagery)
-            w, h = STILL_SIZE
             if alive:
-                src = generate_image(project, prompt, w, h, m.seed, log, free=first)
-                first = False
+                src = generate_image(project, prompt, w, h, m.seed, log, False)
             else:
                 src = placeholder(project.build / "_storyboard" / "placeholders", prompt, (w, h), "direction still, not drawn yet",
                                   d.palette["bg2"])
@@ -85,9 +98,8 @@ def draw_stills(project: Project, dirs: list[Direction], moments: list[shots.Mom
                 im.save(jpg, quality=86)
             d.stills.append({"role": m.role, "section": m.section, "title": m.title, "kicker": m.kicker, "prompt": prompt,
                              "seed": m.seed, "image": f"stills/{jpg.name}", "placeholder": not alive,
-                             "title_html": m.title_html, "slug": re.sub(r"[^a-z0-9]+", "-", (m.section or m.type).lower()).strip("-") + ".html"})
+                             "title_html": m.title_html, "title_short": html.escape(_short(m.title)), "slug": re.sub(r"[^a-z0-9]+", "-", (m.section or m.type).lower()).strip("-") + ".html"})
             done += 1
-            progress(done / total, f"{d.name}: {m.role}")
         log(f"  {d.id.upper()} {d.name}: {len(d.stills)} stills")
     keep = {Path(s["image"]).name for d in dirs for s in d.stills}
     for f in out.glob("*.jpg"):
@@ -96,6 +108,15 @@ def draw_stills(project: Project, dirs: list[Direction], moments: list[shots.Mom
 
 
 # ---------------------------------------------------------------- the page
+
+def _short(title: str, limit: int = 30) -> str:
+    """A headline cut at a word for the small stills."""
+    t = (title or "").strip()
+    if len(t) <= limit:
+        return t
+    cut = t[:limit].rsplit(" ", 1)[0].rstrip(" ,.;:")
+    return cut + "…"
+
 
 def _em_style(d: Direction) -> str:
     f = d.fonts
@@ -171,7 +192,6 @@ def write_page(project: Project, state: dict, log: Callable[[str], None] = print
     env = Environment(loader=FileSystemLoader(str(HERE)), autoescape=select_autoescape(["html", "j2"]))
     env.globals.update(css_font=_css_font, em_style=_em_style, em_color=_em_color, em_weight=_em_weight, swatch_ink=_swatch_ink)
     hero = shots.Moment(**{k: v for k, v in moments[0].items() if k in shots.Moment.__dataclass_fields__}) if moments else None
-    raw = project.raw()
     brief = state["brief"]
     read_line = "; ".join(brief.get("notes") or [])
     tpl = env.get_template("board.html.j2")

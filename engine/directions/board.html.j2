@@ -4,8 +4,8 @@
   <img src="{{ s.image }}" alt="{{ s.title }}" loading="eager">
   <figcaption>
     {%- if d.board == 'grid' %}<span class="n">{{ '%02d'|format(n + 1) }}</span>{% endif %}
-    {%- if d.board == 'terminal' %}<span class="t">$ open {{ s.slug }} &mdash; {{ s.title }}</span>
-    {%- else %}<div><div class="k">{% if d.board == 'plate' %}Plate {{ n + 1 }}{% else %}{{ s.kicker or s.role }}{% endif %}</div><div class="t">{{ s.title_html|safe }}</div></div>{% endif -%}
+    {%- if d.board == 'terminal' %}<span class="t">$ open {{ s.slug }}</span>
+    {%- else %}<div><div class="k">{% if d.board == 'plate' %}Plate {{ n + 1 }}{% else %}{{ s.kicker or s.role }}{% endif %}</div><div class="t">{{ (s.title_html if n == 0 else s.title_short)|safe }}</div></div>{% endif -%}
   </figcaption>
 </figure>
 {%- endmacro -%}
@@ -67,15 +67,15 @@ button:hover { border-color: var(--hi); }
 .b-split figcaption { grid-column: 2; align-self: center; padding: 0 5cqw; color: var(--ink); }
 .row .b-split { grid-template-columns: 50% 50%; }
 /* poster: type on a field of the accent colour, the picture inset */
-.b-poster { background: var(--accent); color: var(--aink); display: grid; grid-template-rows: auto 1fr; padding: 4cqw; gap: 2.4cqw; }
+.b-poster { background: var(--accent); color: var(--aink); display: grid; grid-template-rows: auto 1fr; padding: 4%; gap: 2.4%; }
 .b-poster img { border-radius: 0; min-height: 0; order: 2; }
 .b-poster figcaption { order: 1; }
 .b-poster .t { font-size: 8cqw; text-transform: uppercase; letter-spacing: -.01em; } .row .b-poster .t { font-size: 9.4cqw; }
 .b-poster em { color: inherit !important; }
 .b-poster .k { display: none; }
 /* plate: a picture mounted on paper with a caption in the margin */
-.b-plate { background: var(--bg2); padding: 3.4cqw 3.4cqw 12cqw; border: 1px solid var(--line2); }
-.row .b-plate { padding-bottom: 20cqw; }
+.b-plate { background: var(--bg2); padding: 3.4% 3.4% 12%; border: 1px solid var(--line2); }
+.row .b-plate { padding-bottom: 21%; }
 .b-plate img { height: 100%; box-shadow: 0 1px 0 var(--line2); }
 .b-plate figcaption { position: absolute; left: 3.4cqw; right: 3.4cqw; bottom: 1.6cqw; color: var(--ink); display: flex; flex-direction: column; gap: .4cqw; }
 .b-plate .t { font-size: 5.4cqw; font-style: italic; } .row .b-plate .t { font-size: 8cqw; }

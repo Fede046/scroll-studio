@@ -11,7 +11,7 @@ tests check contrast, that every font is loadable and every style exists.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -295,7 +295,7 @@ SCHOOLS: tuple[School, ...] = (
         motion=("Page: cards drop in and squash on landing, buttons push in under the finger, lots of overshoot",
                 "Camera on film: slow turntable moves on a miniature set, stepped like stop-motion",
                 "Type: letters wobble once on entry like jelly"),
-        voice="Friendly, plain, lots of verbs; jokes allowed.", pace=0.95, radius="28px", board="plate"),
+        voice="Friendly, plain, lots of verbs; jokes allowed.", pace=0.95, radius="28px", board="poster"),
 
     School(
         key="noir", name="Silver Noir", kind="photo",
@@ -420,7 +420,7 @@ SCHOOLS: tuple[School, ...] = (
         motion=("Page: very slow fades from black; the headline arrives last, after the picture has settled",
                 "Camera on film: a creeping push across a table; focus racks from foreground to the glint",
                 "Type: italic serif fades up, no movement besides opacity"),
-        voice="Unhurried, precise about materials and provenance.", pace=0.8, radius="2px", board="plate"),
+        voice="Unhurried, precise about materials and provenance.", pace=0.8, radius="2px", board="overlay"),
 
     School(
         key="y2k", name="Chrome Future", kind="dimensional",
@@ -570,7 +570,7 @@ SCHOOLS: tuple[School, ...] = (
         motion=("Page: one gesture per scroll: sections are swept in like sand, then rest",
                 "Camera on film: almost no movement; wind in a curtain, steam from a cup, long static holds",
                 "Type: a few words per screen, set small and far apart"),
-        voice="Few words, concrete things, no exclamation marks.", pace=0.8, radius="2px", board="plate"),
+        voice="Few words, concrete things, no exclamation marks.", pace=0.8, radius="2px", board="split"),
 
     School(
         key="atlas", name="Old Atlas", kind="illustration",
@@ -669,9 +669,9 @@ DOMAIN_WORDS = {
     "hospitality": "hotel resort inn stay rooms suite villa lodge guest booking reserve retreat hostel airbnb getaway cliff coast beach ocean sea island",
     "tech": "software app platform api developer cloud saas data ai machine code startup product digital dashboard automation analytics tool engineer",
     "science": "research lab laboratory biotech bio cell molecule dna genome institute scientific experiment study physics chemistry observatory",
-    "art": "art gallery museum painting artist exhibition sculpture drawing studio atelier collection curator design illustration",
+    "art": "art gallery museum painting artist exhibition sculpture drawing studio atelier collection curator design illustration pottery ceramic ceramics clay kiln glaze craft maker workshop print printmaking",
     "luxury": "luxury bespoke handmade crafted jewel watch heritage atelier couture premium fine artisan commission walnut crystal",
-    "food": "restaurant cafe coffee bakery bread kitchen chef menu wine cocktail bar food dining recipe farm roast tea",
+    "food": "restaurant cafe coffee bakery bread kitchen chef menu wine cocktail bar food dining recipe farm roast tea teapot teas cups table drink",
     "wellness": "wellness spa yoga sleep mindful meditation calm skincare self-care massage fitness therapy rest",
     "health": "health clinic doctor patient care medical sleep therapy nurse hospital pharmacy treatment symptoms",
     "fashion": "fashion clothing collection runway wear apparel style garment boutique wardrobe",

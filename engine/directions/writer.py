@@ -168,7 +168,7 @@ def compose(school: vocab.School, brief: Brief, rules: Rules, seed, used_styles=
     if not styles:
         return None
     names = list(styles)
-    ws = [styles[s] * (0.12 if s in used_styles else 1.0) for s in names]
+    ws = [styles[s] ** 2 * (0.12 if s in used_styles else 1.0) for s in names]
     style = _pick(r, names, ws)
     style = None if style == "none" else style
     # ---- palette
@@ -302,10 +302,10 @@ def write(site: Site, raw: dict, cfg: Optional[Directions] = None, seed=None, co
         chosen.append(d)
         used_styles.add(d.style or "none")
         used_pal.add(d.palette["name"])
-    # ---- repair: a pair that is too close is one idea twice
-    replaced = []
+    # ---- repair: a pair that is too close is one idea twice. The weaker member (lower fit) is swapped for the school that
+    # fits and differs most from the rest; a school once dropped is never brought back (no going round in circles)
+    replaced, tabu = [], set()
     for _ in range(24):
-        rep = measure.report(chosen, fixed)
         for i, d in enumerate(chosen):
             d.id = LETTERS[i]
         rep = measure.report(chosen, fixed)
@@ -314,17 +314,29 @@ def write(site: Site, raw: dict, cfg: Optional[Directions] = None, seed=None, co
         a, b = (next(d for d in chosen if d.id == k) for k in rep["closest"])
         weak = a if a.fit <= b.fit else b
         others = [d for d in chosen if d is not weak]
-        have = {d.school for d in chosen}
-        spare = [x for x in scored if x[1].key not in have and x[0] >= floor * 0.8]
-        if not spare:
+        have = {d.school for d in chosen} | tabu
+        used_s, used_p = {o.style or "none" for o in others}, {o.palette["name"] for o in others}
+        cands = []
+        for fit, sc, _d in scored:
+            if sc.key in have or fit < floor * 0.5:
+                continue
+            cand = compose(sc, brief, rules, seed, used_s, used_p)
+            far = min(measure.distance(cand, o, fixed) for o in others)
+            cand.fit, cand.why = round(fit, 3), next(x[2].why for x in scored if x[1].key == sc.key)
+            cands.append((far >= measure.MIN_DISTANCE, fit + 1.5 * far, cand))
+        if not cands:
             warnings.append(f"directions {a.id} ({a.name}) and {b.id} ({b.name}) are close (distance {rep['min']:.2f}); "
                             "the constraints leave no more different school to swap in")
             break
-        fit, sc, _d = max(spare, key=lambda x: x[0] + 1.5 * min(measure.distance(build(x[1], x[0], []), o, fixed) for o in others))
-        why = next(x[2].why for x in scored if x[1].key == sc.key)
-        new = build(sc, fit, why)
+        new = max(cands, key=lambda c: (c[0], c[1]))[2]
+        tabu.add(weak.school)
         replaced.append({"replaced": weak.name, "with": new.name, "distance": rep["min"], "was_close_to": (b if weak is a else a).name})
         chosen[chosen.index(weak)] = new
+    for i, d in enumerate(chosen):
+        d.id = LETTERS[i]
+    if measure.report(chosen, fixed)["min"] < measure.MIN_DISTANCE and not any("close" in w for w in warnings):
+        warnings.append(f"the closest pair is {measure.report(chosen, fixed)['min']:.2f} apart (below {measure.MIN_DISTANCE}): "
+                        "the brief and constraints leave few schools to choose from")
     # ---- order by how far each is from today's site, and name the step
     cur = _current_as_direction(brief, rules)
     for d in chosen:

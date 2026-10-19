@@ -15,7 +15,6 @@ from __future__ import annotations
 import socket
 import threading
 import webbrowser
-from pathlib import Path
 from typing import Callable, Optional
 
 from fastapi import APIRouter, FastAPI, HTTPException

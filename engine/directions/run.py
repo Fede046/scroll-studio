@@ -81,7 +81,7 @@ def make(project: Project, count: Optional[int] = None, seed: Optional[int] = No
     for r in res["replaced"]:
         log(f"  weak pair: {r['replaced']} was too close to {r['was_close_to']} (distance {r['distance']:.2f}); now {r['with']}")
     moments = shots.pick(raw, cfg.stills, cfg.seed)
-    log(f"  stills: " + ", ".join(f"{m.role} ({m.section})" for m in moments))
+    log("  stills: " + ", ".join(f"{m.role} ({m.section})" for m in moments))
     board.draw_stills(project, dirs, moments, log, generate=images, progress=lambda f, m="": progress(0.05 + 0.8 * f, m))
     state = {"version": 1, "project": project.name, "seed": cfg.seed, "count": cfg.count, "brief": res["brief"],
              "keep": res["keep"], "diversity": res["diversity"], "replaced": res["replaced"], "warnings": res["warnings"],

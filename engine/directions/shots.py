@@ -8,7 +8,7 @@ same seeds, so what differs between boards is the direction and nothing else.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from ..imagery import phrase, restyle
 from ..spec import Imagery
