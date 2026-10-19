@@ -69,6 +69,10 @@ tiktoken (`cl100k_base`) on the files in this repo; other tokenizers differ by r
 
 ### New in 1.3
 
+- **Light as the scroll** (`type: light`): one place relit from dawn to night as you scroll. Each time of day is the same
+  picture relit with the geometry measured and locked; a WebGL shader carries the light between them (a front of new light,
+  windows and lamps coming on one by one, mist, a slow 2.5D drift) and the page's colours follow the sky.
+  ([One place, dawn to night](#one-place-dawn-to-night-type-light))
 - **Direction boards** (`studio directions`): how a design studio pitches. One brief in, several complete art directions
   out, side by side on one page, so you pick a direction in minutes before committing to a build. Pick one and it is
   written into `site.yaml`. ([Direction boards](#direction-boards-pitch-it-before-you-build-it))
@@ -148,6 +152,7 @@ Every example is a `site.yaml` in [`examples/`](examples/) and rebuilds with `st
 | [Hollis House](examples/hollis-house/site.yaml) | Real estate | `splat` | A walk through a scanned house, room by room |
 | [Pelorus](examples/pelorus/site.yaml) | Research | `chart` (bar) | The renewables share of electricity, every figure read from Our World in Data |
 | [Halcyon](examples/halcyon/site.yaml) | Software | blocks | One product page as twenty-one experiences (`studio looks`) |
+| [Quay House](examples/harbour-light/site.yaml) | Hospitality | `light` | One harbour from dawn to night; windows and lamps come on (needs ComfyUI to build) |
 
 ## Quick start
 
@@ -858,6 +863,53 @@ Everything is cached per region: the film, the prompt, its frame and the model a
 `feather` or `base` re-packs in seconds and re-tracks nothing. The storyboard draws every shot the way the page will
 show it (base look; with masks from a full build, the colour at that moment), and the animatic is cut from those frames.
 It runs on ComfyUI with `studio setup-comfy` (below) and about 2 GB of models.
+
+### One place, dawn to night (`type: light`)
+
+A section that is one place and a whole day. The scene takes a single picture of the place (a photo, a generated image,
+or another scene's still) and relights it into each time of day with the geometry locked; scroll then moves
+*continuously* through the day instead of cross-fading a slideshow. Each step of the section sits at a time of day, and the
+section's own colours (ink, accent, the shade behind the text) follow the sky.
+
+```yaml
+- id: day
+  type: light
+  world:
+    generate: "wide photograph of a small stone harbour town around a calm bay ..., even daylight, no people"
+  world_time: noon                       # the world picture IS noon: used as it is, the anchor everything is measured against
+  times: [dawn, morning, noon, golden-hour, blue-hour, night]     # presets, or free text ("low green storm light")
+  lamps: [{ prompt: the street lamps and the lit windows }]       # what switches on: cut out with Florence-2 + SAM 2.1
+  steps:                                 # the sections of the day, in order (or pin one: state: { time: night })
+    - { kicker: "Quay House", title: "The harbour <em>wakes first.</em>", intro: true }
+    - { kicker: "Morning",    title: "Coffee on the quay, <em>before anyone.</em>" }
+    - ...
+```
+
+**Build** (one cached stage per time: `world`, `depth`, `sky`, `time_<id>`, `maps`, `web`; an unchanged spec rebuilds nothing,
+and changing one time's words redoes that time only). Each time is the world relit by Qwen-Image-Edit
+with an instruction that changes only the light (`engine/light_presets.py`: dawn, sunrise, morning, noon, afternoon,
+golden-hour, sunset, blue-hour, night, overcast, storm; a time can also be free text, or `image:` a picture of your own).
+The editor redraws a little everywhere, so every relight is **measured against the world**: structure is compared in a
+light-invariant way (band-passed log luminance, locally normalised), the displacement is found with dense optical flow, and
+`drift` is how far the editor moved things in pixels at 1024 across. Small drift is warped away; a relight that moved things
+too far is redone with another seed (`structure.max_drift`, `structure.retries`), and the best attempt is kept. The report
+(`studio light <project>`) gives drift, strain of the correction and edge agreement per time. Between neighbouring times the build also
+writes the low-frequency light-change field and a map of the lights that turn on or off (small bright features that the
+change of ambient light cannot explain, each with its own delay and a halo).
+
+**Play** (`runtime/src/players/light.ts`, WebGL2): scroll maps to a time of day with a hold at each step (`hold`) so a headline
+reads in its own light and the change passes between headlines. Between two times the shader carries the light's low-frequency
+change across both pictures (so nothing dips to grey half-way), switches the rest (shadows, lit and unlit surfaces) with a front
+of new light that spreads from where it arrives, reaching the sky first and the near ground last, brings windows and lamps on one
+by one with a halo, draws the times' `haze` as mist that thickens with distance and drifts, and breathes the place with a slow
+2.5D drift through the world's depth map (`drift`). Optionally a sun and moon glow travels over the sky (`sun`). A clock and sun arc
+in the corner show the hour. Phones get a smaller picture set and a `focus` crop; prefers-reduced-motion gets one still per step
+(no drift, no blending); without WebGL the stills are plain images, one per step. Scrolling is never captured: it is the
+page's own scroll.
+
+`studio light <project> [--section day]` builds the section and writes `light/<id>/`: `sheet.jpg` (every time with its measured
+drift), `strip_*.jpg` (the built page across each transition, at the scroll positions a viewer passes through) and `light.json`.
+`studio light --presets` lists the named times. Example: [Quay House](examples/harbour-light/site.yaml).
 
 ### Faces, repaired (`faces: restore`)
 

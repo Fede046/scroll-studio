@@ -43,6 +43,7 @@ Each scene type is one engine module: a schema, a builder (inputs → assets), a
 | 9 | `chart` | Data story: charts that build, highlight and re-shape | CSV/JSON + narrative | Clean, aggregate, pre-compute states | `chart` (D3) |
 | 10 | `map` | Geographic journey: fly between places, draw routes | places/GeoJSON | Fetch/clip tiles to PMTiles (offline), route geometry | `map` (MapLibre GL) |
 | 11 | `type` | Kinetic typography: headlines that assemble, swap, scale with scroll | text only | none | `type` (GSAP) |
+| 12 | `light` | One place relit from dawn to night as you scroll: each step a time of day, windows and lamps coming on | one picture of the place (a file, generated, or another scene's still) and the times of day | Qwen-Image-Edit relights it per time, measured against the world (light-invariant structure, optical flow) and its global move undone; Depth Anything depth, SAM 2.1 sky and lamp regions, ratio/lamp/flow maps between neighbours (`engine/light.py`) | `light` (WebGL2: light-aware transition, lamps, mist, 2.5D drift) |
 | 13 | `showroom` | The site's product, live: scroll turns, explodes and zooms the real model | `site.product` (any model format) or a model file | `engine/product.py` normalised GLB (thinned for the web), Cycles poster | `showroom` (three.js, environment light, shadow) |
 
 **The product, declared once.** `site.product` names the model once; `engine/product.py` converts it (STEP via
