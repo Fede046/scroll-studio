@@ -139,9 +139,11 @@ export function buildTerrain(plan: Plan, ground: THREE.Texture, uni: TerrainUnif
       band(th0, th1, r0, r1, -0.45, -1.25, col.seaDeep);
       band(th0, th1, r0, r1, -1.25, FLOOR_Y, col.stone);
     } else {
-      const top = Math.max(h0, h1), bot = Math.min(h0, h1);
-      band(th0, th1, r0, r1, top, bot - 0.12, col.lip);
-      band(th0, th1, r0, r1, bot - 0.12, -0.75, col.soil);
+      // the top edge follows the ground at both ends of the segment, so the lip is smooth along a slope
+      const slope = (ta0: number, ta1: number, tb0: number, tb1: number, color: string) =>
+        M.quad(V(th0, r0, tb0), V(th0, r0, ta0), V(th1, r1, ta1), V(th1, r1, tb1), color, { ao: false });
+      slope(h0, h1, h0 - 0.12, h1 - 0.12, col.lip);
+      slope(h0 - 0.12, h1 - 0.12, -0.75, -0.75, col.soil);
       band(th0, th1, r0, r1, -0.75, -1.25, col.clay);
       band(th0, th1, r0, r1, -1.25, FLOOR_Y, col.stone);
     }

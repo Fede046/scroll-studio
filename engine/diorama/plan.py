@@ -76,7 +76,7 @@ def resolve_places(w: World, sec, pal, rng) -> list[dict]:
         sx, sz = recipes.local(pl["x"], pl["z"], pl["yaw"], -(pl["r"] + 1.1), min(pl["r"] * 0.15, 0.6) + 0.3)
         if not w.inside_pt(sx, sz, 0.3) or (w.water_at(sx, sz) and pl["kind"] not in WATER_KINDS):
             sx, sz = recipes.local(pl["x"], pl["z"], pl["yaw"], (pl["r"] + 1.1), min(pl["r"] * 0.15, 0.6) + 0.3)
-        w.add("sign", sx, sz, pl["yaw"], 1.05 + 0.1 * min(pl["scale"], 2), None, 0, 0.4, text=pl["sign"])
+        w.add("sign", sx, sz, pl["yaw"], 1.05 + 0.1 * min(pl["scale"], 2), None, 0, 0.4, text=pl["sign"], of=placed.index(pl))
     # the view cone in front of each hero stays free of scenery, so the camera has a clear look at it
     for pl in placed:
         if pl["kind"] in WATER_KINDS:
@@ -276,6 +276,29 @@ def camera_plan(w: World, sec, placed: list[dict], stepmap: list[Optional[int]])
             "fit": round(w.R * 1.14, 2), "beats": beats}
 
 
+def seat_signs(w: World, placed: list[dict], camera: dict):
+    """Each place's sign goes beside it as the camera sees it (towards the copy, facing the lens), so it is in the focal
+    plane and readable when the camera has dived in."""
+    by_place = {b["place"]: b for b in camera["beats"] if b["kind"] == "place"}
+    for p in w.props:
+        if p["k"] != "sign" or p.get("of") not in by_place:
+            continue
+        pl = placed[p["of"]]
+        b = by_place[p["of"]]
+        th = math.radians(b["yaw"])
+        rx, rz = math.cos(th), -math.sin(th)            # the camera's right, on the ground
+        fx, fz = math.sin(th), math.cos(th)             # towards the camera
+        water_kind = pl["kind"] in WATER_KINDS
+        for sd in ((1, -1) if b["side"] >= 0 else (-1, 1)):
+            d = pl["r"] * 0.7 + 1.0
+            x, z = pl["x"] + rx * sd * d + fx * 0.5, pl["z"] + rz * sd * d + fz * 0.5
+            if w.inside_pt(x, z, 0.4) and (water_kind or not w.water_at(x, z)):
+                p["x"], p["z"], p["r"] = round(x, 3), round(z, 3), round(th, 3)
+                p["y"] = round(max(w.height_at(x, z), w.water_level), 3)
+                break
+        p.pop("of", None)
+
+
 def build(sec, table: str, draft: bool = False):
     """The whole plan and the ground texture (uint8 N x N x 3) for a diorama scene."""
     wd = sec.world
@@ -290,11 +313,12 @@ def build(sec, table: str, draft: bool = False):
     for ex in wd.props:
         w.add(ex.kind, ex.at[0], ex.at[1], math.radians(ex.turn), ex.scale, ex.color, 0, 0.5 * ex.scale)
     w.finish_props()
-    w.bake_ao()
     for pl in placed:
         pl["y"] = round(w.height_at(pl["x"], pl["z"]), 3)
     stepmap = assign_steps(sec, placed)
     camera = camera_plan(w, sec, placed, stepmap)
+    seat_signs(w, placed, camera)
+    w.bake_ao()
     hg = w.height_grid(GRID)
     plan = {
         "v": VERSION, "kind": kind, "size": size, "base": w.base, "table": table,
