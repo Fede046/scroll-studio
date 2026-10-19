@@ -39,6 +39,7 @@ from .project import BuildContext, BuildError, ffmpeg, file_key, probe
 from .spec import Cinemagraph, EditRegion, ImageInput
 
 VERSION = 1
+MASK_VERSION = 2         # bump when the mask or what follows it would come out differently for the same clip (the clip is kept)
 FPS = 24
 CONTEXT = 0.5            # how much of the surroundings the video model sees: a share of the region's size on every side
 LTX_MP = 0.5             # megapixels LTX-2.3 renders the crop at (aspect kept)
@@ -265,7 +266,7 @@ def final_mask(seed: np.ndarray, energy: np.ndarray, grow: float, feather: float
         raise BuildError("the clip does not move where the picture says: nothing in the region moves. Raise `strength`, describe "
                          "the motion in `motion`, or point at the thing with `box` / `points`")
     where = cv2.morphologyEx(where.astype(np.uint8) * 255, cv2.MORPH_CLOSE, ell(max(2, int(grow))))
-    where = despeckle(where, 0.02)
+    where = despeckle(where, 0.08)          # a stray patch that moved (a car outside the window) is not the thing
     return shape(where, int(round(grow)), int(round(feather))), info
 
 
@@ -640,7 +641,7 @@ def build(project, ref: ImageInput, log: Callable[[str], None] = print, force: b
         ctx.stage(f"track_{pid}", {"v": VERSION, "prep": pid, "seed": seed_id}, [tr], run_track)
 
     # ---- mask: where the clip moves, the region and the path it sweeps, grown and feathered
-    mid = _digest([pid, cg.track, cg.grow, cg.feather, VERSION])
+    mid = _digest([pid, cg.track, cg.grow, cg.feather, MASK_VERSION])
     mask_png, mask_json = work / f"mask_{mid}.png", work / f"mask_{mid}.json"
 
     def run_mask():
@@ -651,12 +652,12 @@ def build(project, ref: ImageInput, log: Callable[[str], None] = print, force: b
         m, info = final_mask(seed_c, motion_energy(read_video(prep)), cg.grow * sc, cg.feather * sc, tracked)
         Image.fromarray(m, "L").save(mask_png)
         mask_json.write_text(json.dumps({**info, "tracked": tracked is not None}))
-    ctx.stage(f"mask_{mid}", {"v": VERSION, "prep": pid, "track": cg.track, "grow": cg.grow, "feather": cg.feather}, [mask_png, mask_json], run_mask)
+    ctx.stage(f"mask_{mid}", {"v": VERSION, "prep": pid, "track": cg.track, "grow": cg.grow, "feather": cg.feather, "m": MASK_VERSION}, [mask_png, mask_json], run_mask)
     if plan is not None and not (mask_png.exists() and prep.exists()):
         return None
 
     # ---- encode: stabilise, tone-match, close the loop, damp, composite, encode, measure
-    out_id = _digest([mid, cg.loop, cg.strength, VERSION])
+    out_id = _digest([mid, cg.loop, cg.strength, MASK_VERSION])
     mp4, wp, rep = work / f"cine_{out_id}.mp4", work / f"cine_{out_id}.mask.webp", work / f"cine_{out_id}.json"
     sheet = work / f"cine_{out_id}.sheet.jpg"
     ekey = {"v": VERSION, "out": out_id}
