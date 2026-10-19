@@ -56,7 +56,7 @@
 {% elif s.layout == "split" %}
   <div class="ss-split-grid">
     <div class="ss-steps">
-      {% for st in s.steps %}<article class="ss-step{% if st.intro %} ss-intro{% endif %}" style="--h: {{ st.length | vh }}">{{ card(st, loop.index0, s.steps | length) }}</article>{% endfor %}
+      {% for st in s.steps %}<article class="ss-step{% if st.intro %} ss-intro{% endif %}{% if st.world %} ss-has-world{% endif %}"{% if st.world %} data-world="{{ loop.index0 }}"{% endif %} style="--h: {{ st.length | vh }}">{{ card(st, loop.index0, s.steps | length) }}</article>{% endfor %}
     </div>
     <div class="ss-pin">
       <div class="ss-visual"></div>
@@ -71,7 +71,7 @@
     {{ hud(s.hud) }}
   </div>
   <div class="ss-steps ss-steps--over">
-    {% for st in s.steps %}<article class="ss-step{% if st.intro %} ss-intro{% endif %}" style="--h: {{ st.length | vh }}">{{ card(st, loop.index0, s.steps | length) }}</article>{% endfor %}
+    {% for st in s.steps %}<article class="ss-step{% if st.intro %} ss-intro{% endif %}{% if st.world %} ss-has-world{% endif %}"{% if st.world %} data-world="{{ loop.index0 }}"{% endif %} style="--h: {{ st.length | vh }}">{{ card(st, loop.index0, s.steps | length) }}</article>{% endfor %}
   </div>
 {% endif %}
   <script type="application/json" class="ss-config">{{ cfg | tojson }}</script>

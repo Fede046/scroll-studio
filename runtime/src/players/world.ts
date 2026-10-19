@@ -19,6 +19,7 @@
 import type { Player, PlayerContext } from "../lib/types";
 import { clamp, follow, isMobile, reducedMotion } from "../lib/util";
 import { loadVideo, makeVideo, PairedSeeker } from "../lib/film";
+import { WORLD_GLSL } from "../lib/worldGlsl";
 import { contrastWith, inkFor, layout, PAD, probeStyle, rasterize, type Layout, type WorldStyle } from "../lib/worldText";
 
 const N = 3;                                      // titles drawn at once (the build keeps overlapping titles within this)
@@ -44,7 +45,7 @@ precision highp float;
 in vec2 vUv; out vec4 o;
 #define N ${N}
 #define PAD ${PAD.toFixed(3)}
-const vec3 LW = vec3(0.2126, 0.7152, 0.0722);
+${WORLD_GLSL}
 uniform sampler2D uFilm, uAtlas, uText;
 uniform vec2 uGrid, uInset, uTexel;
 uniform float uOn[N], uIn[N];
@@ -54,12 +55,6 @@ uniform vec4 uBox[N], uCell[N], uA[N], uB[N];
 uniform vec2 uSlot[N];
 uniform float uHasAtlas;
 
-float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
-float vnoise(vec2 p) {
-  vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
-  return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y);
-}
-float fbm(vec2 p) { float a = 0.5, s = 0.0; for (int i = 0; i < 4; i++) { s += a * vnoise(p); p *= 2.03; a *= 0.5; } return s / 0.9375; }
 float atlasAt(vec2 slot, vec2 uv) {
   vec2 t = clamp(uv, uInset, 1.0 - uInset);
   return texture(uAtlas, (slot + t) / uGrid).r;
@@ -94,46 +89,11 @@ void main() {
     float cov = t.a * inside;
     if (cov < 0.002) continue;
     vec3 ink = t.rgb / max(t.a, 1e-4);
-    float lumLoc = dot(locl, LW), Lf = dot(film, LW), Ln = dot(near, LW);
-    float tone = uB[s].w;
     if (uKind[s] != 2) {
-      // behind / sky: shown where the scene is farther than the type
       float dep = depthAt(uSlot[s], vUv);
-      float vis = 1.0 - smoothstep(uA[s].x - uA[s].y, uA[s].x + uA[s].y, dep);
-      vec3 lit = ink * mix(1.0, clamp(lumLoc / max(tone, 0.08), 0.55, 1.25), 0.55);
-      float hz = clamp(uA[s].z * (1.0 + (1.0 - uIn[s]) * 1.4), 0.0, 0.95);
-      lit = mix(lit, air, hz);
-      lit += (Lf - Ln) * 0.9;                       // the film's grain runs through the letters
-      float a = cov * vis * uOn[s] * (1.0 - 0.3 * hz);
-      if (uKind[s] == 1) {
-        float fog = uB[s].x * (0.2 + 0.8 * smoothstep(0.05, 0.95, vUv.y));
-        fog += uB[s].x * 0.5 * (1.0 - smoothstep(0.0, 0.3, abs(dep - uA[s].x)));
-        lit = mix(lit, air, clamp(fog * 0.85, 0.0, 1.0));
-        a *= 1.0 - clamp(fog * 0.5, 0.0, 0.75);
-      }
-      col = mix(col, lit, clamp(a, 0.0, 1.0));
+      col = worldBehindSky(col, ink, cov, film, near, locl, air, dep, uA[s], uB[s], uOn[s], uIn[s], uKind[s], vUv.y);
     } else {
-      // surface: paint on the thing, in its light, worn by its grain
-      float m = atlasAt(uSlot[s], vUv);
-      float vis = smoothstep(0.35, 0.65, m);
-      float wipe = smoothstep(lc.x - 0.18, lc.x + 0.02, uIn[s] * 1.3 - 0.1);   // painted on, left to right
-      float n = fbm(pl * 52.0) * 0.75 + (0.5 - (Lf - Ln) * 5.0) * 0.25;
-      float th = 1.0 - uB[s].y * 0.9;
-      float worn = 1.0 - smoothstep(th - 0.1, th + 0.14, n) * step(0.001, uB[s].y);
-      float lightK = clamp(lumLoc / max(tone, 0.06), 0.35, 1.5);
-      vec3 paint = ink * mix(1.0, lightK, 0.9);
-      float texK = clamp(Lf / max(Ln, 0.03), 0.55, 1.5);
-      paint *= mix(1.0, texK * texK, uB[s].z);
-      float inkL = dot(ink, LW);
-      vec3 bleed = inkL < 0.5 ? film * ink * 1.8 : 1.0 - (1.0 - film) * (1.0 - ink * 0.9);
-      paint = mix(paint, bleed, 0.2 + 0.25 * uB[s].z);
-      paint += (Lf - Ln) * 0.8 * uB[s].z;
-      // paint does not stop in a clean vector edge: the grain of the surface ragged-edges every letter
-      float rough = fbm(pl * 230.0 + Lf * 3.0);
-      float thr = 0.5 + (rough - 0.5) * 0.9 * uB[s].z;
-      float edge = smoothstep(thr - 0.22, thr + 0.22, cov);
-      float a = edge * vis * uOn[s] * worn * wipe * 0.97;
-      col = mix(col, paint, clamp(a, 0.0, 1.0));
+      col = worldSurface(col, ink, cov, film, near, locl, pl, atlasAt(uSlot[s], vUv), uB[s], uOn[s], uIn[s], lc.x);
     }
   }
   o = vec4(col, 1.0);
@@ -288,7 +248,9 @@ export default async function world(cfg: Cfg, ctx: PlayerContext): Promise<Playe
     const r = ctx.visual.getBoundingClientRect();
     const va = Math.max(0.1, r.width / Math.max(1, r.height));
     const vx = va < FILM_ASPECT ? va / FILM_ASPECT : 1, vy = va > FILM_ASPECT ? FILM_ASPECT / va : 1;
-    const x0 = (1 - vx) / 2 + 0.01, x1 = 1 - (1 - vx) / 2 - 0.01, y0 = (1 - vy) / 2 + 0.01, y1 = 1 - (1 - vy) / 2 - 0.01;
+    const nav = document.getElementById("ss-nav");       // the fixed nav covers the top of the picture
+    const navTop = nav ? Math.min(0.3, (nav.offsetHeight + 6) / Math.max(1, r.height)) : 0;
+    const x0 = (1 - vx) / 2 + 0.01, x1 = 1 - (1 - vx) / 2 - 0.01, y0 = (1 - vy) / 2 + 0.01 + vy * navTop, y1 = 1 - (1 - vy) / 2 - 0.01;
     const shown = va < FILM_ASPECT ? r.height * FILM_ASPECT : r.width;      // css px across the whole film frame
     for (const L of live) {
       const t = L.cfg;

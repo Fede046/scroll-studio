@@ -512,3 +512,121 @@ def build(sec: FilmScene, ctx: BuildContext, src: Path, cfg: dict) -> dict:
     for t in texts:
         t["slot"] = "depth" if t["kind"] != "surface" else f"s{t['i']}"
     return {"fps": round(fps, 4), "frames": nframes, "atlas": atlas, "texts": texts}
+
+
+# ---------------------------------------------------------------- parallax: type in a photograph
+
+def _gray_small(path: Path, size: tuple[int, int]) -> np.ndarray:
+    from PIL import Image
+    return np.asarray(Image.open(path).convert("L").resize(size, Image.LANCZOS))
+
+
+def build_photo(sec, ctx: BuildContext, chapter: int, step_index: int, st: Step, photo: Path, depth_png: Path) -> dict:
+    """The `world` entry of one parallax chapter: the title of the step laid out on its photograph, static (the 2.5D camera moves
+    the picture, the type goes with it). behind / sky: a depth in the photo's own depth map (the displaced layers pass in front
+    of the type as the camera moves); surface: a mask found by prompt (Florence-2 + SAM 2.1 on the photo) and the plane's
+    orientation from the depth map. Cached per chapter."""
+    from PIL import Image
+    w = st.world
+    validate_photo(sec, st, w)
+    r = resolved(w)
+    out = ctx.web / f"world{chapter}.json"
+    mask_out = ctx.web / f"photo{chapter}-mask.png"
+    outs = [out] + ([mask_out] if w.kind == "surface" else [])
+    key = {"photo": fkey(photo), "depth": fkey(depth_png), "spec": {**w.model_dump(mode="json"), "r": r},
+           "title": len(plain(st.title)), "v": VERSION}
+
+    def run():
+        log = ctx.log
+        D = np.asarray(Image.open(depth_png).convert("L"), np.float32) / 255
+        dh, dw = D.shape
+        im = Image.open(photo)
+        gray = np.asarray(im.convert("L").resize((dw, dh), Image.LANCZOS))
+        title_chars = len(plain(st.title))
+        cx, cy = r["x"] * dw, r["y"] * dh
+        info: dict = {"kind": w.kind, "title": plain(st.title)}
+        plane_h = dh / dw
+        if w.kind == "surface":
+            from . import region
+            from .spec import EditRegion
+            raw = region.find(ctx.project, photo, EditRegion(prompt=w.at) if isinstance(w.at, str) else EditRegion(box=_quad_box(w.quad)), log)
+            m = Image.open(raw).convert("L").resize((dw, dh), Image.BILINEAR)
+            m.save(mask_out)
+            mk = np.asarray(m)
+            sel = mk > 127
+            tone = float(gray[sel].mean() / 255) if sel.any() else float(gray.mean() / 255)
+            sol = wm.fit_disparity_plane(D, mk, (dw, dh))
+            n = sol if sol is not None else np.array([0.0, 0.0, 1.0])
+            P = wm.plane_frame(n, (cx, cy), (dw, dh))
+            R = np.linalg.inv(P)
+            lines, bh = wm.estimate_lines(title_chars, w.lines, plane_h, r["size"], 0.3)
+            nn = n / max(np.linalg.norm(n), 1e-9)
+            M = R @ np.diag([float(dw), float(dh), 1.0])
+            info.update(box=[0.0, 0.0, round(r["size"], 4)], tilt=round(float(np.degrees(np.arccos(abs(nn[2])))), 1),
+                        normal=[round(float(v), 4) for v in nn], mask=mask_out.name, center=(0.0, 0.0))
+            center = (0.0, 0.0)
+        else:
+            lines, bh = wm.estimate_lines(title_chars, w.lines, plane_h, r["size"], 0.3)
+            bw_px, bh_px = r["size"] * dw, bh * dw
+            x0, x1 = int(max(0, cx - bw_px / 2)), int(min(dw, cx + bw_px / 2))
+            y0, y1 = int(max(0, cy - bh_px / 2)), int(min(dh, cy + bh_px / 2))
+            inbox = D[y0:y1, x0:x1] if (x1 > x0 and y1 > y0) else D
+            if kind_is_prompt(w):
+                from . import region
+                from .spec import EditRegion
+                raw = region.find(ctx.project, photo, EditRegion(prompt=w.at), log)
+                mk = np.asarray(Image.open(raw).convert("L").resize((dw, dh), Image.BILINEAR))
+                sel = D[mk > 127]
+                if len(sel) < 20:
+                    raise BuildError(f"world: nothing matching \"{w.at}\" on the photo of step {step_index}; reword the prompt or give a depth")
+                thing = float(np.median(sel))
+                dt = max(0.0, thing - w.gap)
+                info["thing_depth"] = round(thing, 3)
+            elif w.at is not None:
+                dt = float(w.at)
+            elif w.kind == "behind":
+                dt = float(np.percentile(inbox, 70)) if inbox.size else 0.4
+            else:
+                dt = 0.07
+            dt = float(np.clip(dt, 0.0, 1.0))
+            seen = gray[y0:y1, x0:x1][(inbox < dt + SOFT[w.kind])] if (x1 > x0 and y1 > y0) else gray
+            reg = seen if seen.size > 0.05 * max(1, (x1 - x0) * (y1 - y0)) else (gray[y0:y1, x0:x1] if (x1 > x0 and y1 > y0) else gray)
+            tone = float(reg.mean() / 255)
+            M = np.array([[1.0, 0, 0], [0, dh / dw, 0], [0, 0, 1.0]])
+            info.update(depth=round(dt, 4), soft=SOFT[w.kind], box=[round(r["x"], 5), round(r["y"] * plane_h, 5), round(r["size"], 4)],
+                        blur=round(w.blur if w.blur is not None else _auto_blur(*_small(gray, D), dt), 2))
+            center = (r["x"], r["y"] * plane_h)
+        info.update(tone=round(tone, 3), lines=lines, plane=[1.0, round(plane_h, 5)], ppp=1.0, m=wm.pack_matrix(M, center),
+                    style={"align": w.align, "caps": w.caps, "track": r["track"], "weight": w.weight, "color": w.color,
+                           "haze": r["haze"], "fog": w.fog, "wear": w.wear, "relief": w.relief, "lines": w.lines})
+        out.write_text(json.dumps(info))
+    ctx.stage(f"world_{chapter}", key, outs, run)
+    if not out.exists():
+        return {"kind": w.kind}
+    res = json.loads(out.read_text())
+    if res.get("mask"):
+        res["mask"] = ctx.url(mask_out)
+    return res
+
+
+def kind_is_prompt(w: WorldPlace) -> bool:
+    return w.kind == "behind" and isinstance(w.at, str)
+
+
+def _small(gray: np.ndarray, D: np.ndarray):
+    """Gray and depth at the working size (the blur estimate is tuned for it)."""
+    g = cv2.resize(gray, (wm.W, wm.H), interpolation=cv2.INTER_AREA)
+    d = (cv2.resize(D, (wm.W, wm.H), interpolation=cv2.INTER_AREA) * 255).astype(np.uint8)
+    return g, d
+
+
+def validate_photo(sec, st: Step, w: WorldPlace) -> None:
+    what = f"section '{sec.id}', step '{plain(st.title)[:40]}'"
+    if w.kind == "surface" and not w.at and not w.quad:
+        raise BuildError(f"{what}: a surface needs `at` (a prompt naming it, e.g. \"the white wall\") or a `quad`")
+    if w.kind == "surface" and w.at is not None and not isinstance(w.at, str):
+        raise BuildError(f"{what}: for a surface `at` is a prompt, not a number")
+    if w.kind == "sky" and isinstance(w.at, str):
+        raise BuildError(f"{what}: for sky `at` is a depth (0 far to 1 near), not a prompt")
+    if w.quad and w.kind != "surface":
+        raise BuildError(f"{what}: `quad` is for a surface")

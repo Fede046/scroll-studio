@@ -37,6 +37,8 @@ export function Field({ name, schema, value, onChange, ctx }: { name: string; sc
     const opts = s.enum || [s.const];
     return <label className="f">{head}<select value={value ?? s.default ?? ""} onChange={(e) => onChange(e.target.value)}>{opts.map((o: string) => <option key={o}>{o}</option>)}</select></label>;
   }
+  const eo = s?.anyOf && enumOrObject(s, ctx);
+  if (eo) return <div className="f">{head}<EnumOrObject eo={eo} value={value} onChange={onChange} ctx={ctx} /></div>;
   if (s?.anyOf) {   // e.g. focus: "auto" | [[x, y]]
     const text = typeof value === "string" || value === undefined ? (value ?? s.default ?? "") : JSON.stringify(value);
     return <label className="f">{head}<input value={text} onChange={(e) => { try { onChange(JSON.parse(e.target.value)); } catch { onChange(e.target.value); } }} /></label>;
@@ -69,6 +71,29 @@ export function Field({ name, schema, value, onChange, ctx }: { name: string; sc
   }
   if (s?.properties) return <Fieldset name={name} schema={s} value={value ?? {}} onChange={onChange} ctx={ctx} />;
   return <JsonField head={head} value={value ?? s?.default ?? {}} onChange={onChange} />;
+}
+
+/** A choice from a list, or an object with its own fields (a caption's `place`: a corner of the picture, or a spot in the world). */
+function enumOrObject(s: S, ctx: Ctx): { en: S; ob: S } | null {
+  const opts = s.anyOf.map((o: S) => deref(o, ctx));
+  const en = opts.find((o: S) => o?.enum), ob = opts.find((o: S) => o?.properties);
+  return en && ob ? { en, ob } : null;
+}
+
+function EnumOrObject({ eo, value, onChange, ctx }: { eo: { en: S; ob: S }; value: any; onChange: (v: any) => void; ctx: Ctx }) {
+  const isObj = value && typeof value === "object";
+  const first = eo.ob.properties?.kind?.enum?.[0];
+  return (
+    <div className="enum-or-object">
+      <div className="seg">
+        <button className={!isObj ? "on" : ""} onClick={(e) => { e.preventDefault(); onChange(undefined); }}>On the picture</button>
+        <button className={isObj ? "on" : ""} onClick={(e) => { e.preventDefault(); if (!isObj) onChange({ kind: first }); }}>In the world</button>
+      </div>
+      {isObj
+        ? <Fields schema={eo.ob} value={value} onChange={onChange} ctx={ctx} />
+        : <select value={value ?? ""} onChange={(e) => onChange(e.target.value || undefined)}><option value="">default</option>{eo.en.enum.map((o: string) => <option key={o}>{o}</option>)}</select>}
+    </div>
+  );
 }
 
 function JsonField({ head, value, onChange }: { head: any; value: any; onChange: (v: any) => void }) {

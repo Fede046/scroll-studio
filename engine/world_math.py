@@ -175,44 +175,50 @@ def visibility(scene_depth, text_depth: float, soft: float):
 
 # ---------------------------------------------------------------- a surface's orientation from the depth map
 
-FOCAL = 0.85 * W        # an ordinary lens: about 62 degrees across. Generated footage has no calibration; this is the guess
+FOCAL = 0.85            # the focal length as a fraction of the picture's width: an ordinary lens, about 62 degrees across.
+                        # Generated footage has no calibration; this is the guess
 
 
-def fit_disparity_plane(D: np.ndarray, mask: np.ndarray, f: float = FOCAL, iters: int = 4) -> np.ndarray | None:
+def fit_disparity_plane(D: np.ndarray, mask: np.ndarray, size: tuple[int, int] = (W, H), iters: int = 4) -> np.ndarray | None:
     """Fit d = a*x + b*y + c to the depth map `D` (0 far .. 1 near, Depth Anything's relative disparity) over the mask's
     pixels, in calibrated image coordinates x = (px - cx) / f. A plane's disparity is linear in the image, and zero on its
     vanishing line (the horizon, for a floor), so (a, b, c) is the plane's normal (in camera coordinates, up to scale) when
-    the map's zero is the far distance, which the per-shot normalisation makes it. Returns (a, b, c) or None."""
+    the map's zero is the far distance, which the per-shot normalisation makes it. `D`, `mask` and `size` are at one
+    resolution. Returns (a, b, c) or None."""
+    w, h = size
+    f = FOCAL * w
     ys, xs = np.nonzero(np.asarray(mask) > 127)
     if len(xs) < 200:
         return None
     if len(xs) > 30000:
         idx = np.random.default_rng(3).choice(len(xs), 30000, replace=False)
         xs, ys = xs[idx], ys[idx]
-    x = (xs - W / 2) / f
-    y = (ys - H / 2) / f
+    x = (xs - w / 2) / f
+    y = (ys - h / 2) / f
     d = D[ys, xs].astype(np.float64)
     A = np.stack([x, y, np.ones_like(x)], axis=1)
-    w = np.ones(len(x))
+    wt = np.ones(len(x))
     sol = None
     for _ in range(iters):
-        sol, *_ = np.linalg.lstsq(A * w[:, None], d * w, rcond=None)
+        sol, *_ = np.linalg.lstsq(A * wt[:, None], d * wt, rcond=None)
         r = np.abs(A @ sol - d)
-        w = 1.0 / (1.0 + (r / 0.03) ** 2)
+        wt = 1.0 / (1.0 + (r / 0.03) ** 2)
     return sol
 
 
-def plane_frame(n: np.ndarray, center_px: tuple[float, float], f: float = FOCAL) -> np.ndarray:
+def plane_frame(n: np.ndarray, center_px: tuple[float, float], size: tuple[int, int] = (W, H)) -> np.ndarray:
     """Homography from a surface's plane to frame pixels (a 3x3 `P`; its inverse is the rectifying map), for a plane with
     normal `n` (camera coordinates) through the ray of `center_px`. The plane's unit is the width of the frame at the
     centre; its (0, 0) is the centre; u runs along the surface's horizontal (the camera's x axis laid in it), v runs down
     the picture. A plane facing the camera gives (nearly) the identity."""
+    w, h = size
+    f = FOCAL * w
     n = np.asarray(n, dtype=np.float64)
     n = n / max(np.linalg.norm(n), 1e-9)
     if n[2] < 0:
         n = -n
     cx, cy = center_px
-    X0 = np.array([(cx - W / 2) / f, (cy - H / 2) / f, 1.0])
+    X0 = np.array([(cx - w / 2) / f, (cy - h / 2) / f, 1.0])
     ex = np.array([1.0, 0.0, 0.0])
     ex = ex - n * (ex @ n)
     if np.linalg.norm(ex) < 1e-3:                        # a plane edge-on along x: use the y axis
@@ -220,7 +226,7 @@ def plane_frame(n: np.ndarray, center_px: tuple[float, float], f: float = FOCAL)
     ex /= np.linalg.norm(ex)
     ey = np.cross(n, ex)
     ey /= np.linalg.norm(ey)
-    K = np.array([[f, 0, W / 2], [0, f, H / 2], [0, 0, 1.0]])
+    K = np.array([[f, 0, w / 2], [0, f, h / 2], [0, 0, 1.0]])
 
     def img(v):
         p = K @ v
@@ -230,6 +236,6 @@ def plane_frame(n: np.ndarray, center_px: tuple[float, float], f: float = FOCAL)
         ey = -ey
     # the unit: s plane-units-in-camera-space per plane unit, so one unit spans the frame's width at the centre
     span = np.linalg.norm(img(X0 + 0.005 * ex) - img(X0 - 0.005 * ex)) / 0.01
-    s = W / max(span, 1e-6)
+    s = w / max(span, 1e-6)
     P = K @ np.stack([ex * s, ey * s, X0], axis=1)
     return P / P[2, 2]
