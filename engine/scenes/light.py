@@ -272,10 +272,12 @@ def build(sec: LightScene, ctx: BuildContext, theme: dict) -> dict:
             a, b = imgs[k], imgs[k + 1]
             Image.fromarray(light.ratio_map(world, a, b)).save(pair_files[k])
             allow = None
+            hint = True if times[k + 1]["lit"] and not times[k]["lit"] else False if times[k]["lit"] and not times[k + 1]["lit"] else None
             if sec.lamps:
                 import cv2
-                la, lb = light.luma(a), light.luma(b)
-                lit = sec.times[k + 1].id if light._top_hat(lb, 41).sum() >= light._top_hat(la, 41).sum() else sec.times[k].id
+                if hint is None:     # both lit or both dark: whichever picture has more small bright features
+                    hint = bool(light._top_hat(light.luma(b), 41).sum() >= light._top_hat(light.luma(a), 41).sum())
+                lit = sec.times[k + 1].id if hint else sec.times[k].id
                 ms = []
                 for spec in sec.lamps:
                     try:
@@ -287,7 +289,7 @@ def build(sec: LightScene, ctx: BuildContext, theme: dict) -> dict:
                     allow = np.maximum.reduce([cv2.resize(m, (W, H)) for m in ms])
             lamp = light.lamp_map(a, b, sky=sky, allow=allow, glow=max([l.glow for l in sec.lamps] or [1.0]),
                                   grow=sec.lamps[0].grow if sec.lamps else 2, seed=5 + k,
-                                  turns_on=(True if times[k + 1]["lit"] and not times[k]["lit"] else False if times[k]["lit"] and not times[k + 1]["lit"] else None))
+                                  turns_on=hint)
             entry = {"ratio": pair_files[k].name, "lamp": None, "color": None, "count": 0}
             if lamp is not None:
                 f = mdir / f"lamp{k}.png"

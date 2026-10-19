@@ -363,3 +363,40 @@ def test_the_page_builds_with_the_scene(tmp_path, monkeypatch):
     assert cfg["times"][0]["img"].startswith("assets/day/") and (root / "dist" / cfg["times"][0]["img"]).exists()
     assert 'data-from="0.0"' in html                                  # the first caption is scheduled
     assert (root / "dist" / "runtime").exists()
+
+
+def test_named_lamps_are_cut_out_with_region_and_confine_the_lights(tmp_path, monkeypatch):
+    """`lamps: [{prompt}]`: the lit picture is searched with engine/region.py; only lights inside the cut-out switch."""
+    from engine.project import BuildContext, Project
+    root = make_project(tmp_path, "lamps: [{ prompt: the windows on the left, glow: 1.5 }]")
+    world = place(1280, 720)
+    seen = []
+
+    def fake(world_png, instruction, seed, steps, out, tag, log=print):
+        im = relit(world, gain=(0.18, 0.2, 0.4)) if "night" in tag else relit(world, gain=(0.9, 0.7, 0.8))
+        if "night" in tag:
+            for x, y in [(100, 400), (260, 420), (500, 380), (900, 430), (1100, 410)]:
+                cv2.rectangle(im, (x, y), (x + 16, y + 24), (255, 200, 110), -1)
+        Image.fromarray(im).save(out)
+        return out
+    monkeypatch.setattr(light, "relight", fake)
+    monkeypatch.setattr("engine.backends.depth.estimate", lambda im, size="small": np.zeros((im.height, im.width), np.float32))
+    import engine.region as regionmod
+
+    def find(project, src, region, log=print):
+        seen.append((Path(src).name, region.prompt))
+        if region.prompt == "the sky":
+            raise RuntimeError("no nodes")
+        m = np.zeros((720, 1280), np.uint8); m[:, :640] = 255      # "the windows on the left"
+        out = Path(project.build / "_generated" / "m.png"); out.parent.mkdir(parents=True, exist_ok=True)
+        Image.fromarray(m, "L").save(out)
+        return out
+    monkeypatch.setattr(regionmod, "find", find)
+    p = Project(root)
+    cfg = scene.build(p.load().sections[0], BuildContext(p, "day", log=lambda m: None), {})
+    assert ("night.png", "the windows on the left") in seen            # searched on the picture where the lights are lit
+    pair = cfg["pairs"][1]
+    assert pair["lamp"] and pair["glow"] == 1.5
+    lamp = np.asarray(Image.open(root / ".build" / "day" / "web" / Path(pair["lamp"]).relative_to("assets/day")))
+    xs = np.nonzero(lamp[..., 0] > 128)[1]
+    assert xs.size and xs.max() < lamp.shape[1] * 0.55                   # nothing from the right half
