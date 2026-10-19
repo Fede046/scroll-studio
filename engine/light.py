@@ -159,7 +159,7 @@ def align(world: np.ndarray, cand: np.ndarray, base_st: Optional[np.ndarray] = N
 
 # ---------------------------------------------------------------- relighting through ComfyUI
 
-def relight(world_png: Path, instruction: str, seed: int, steps: int, out: Path, tag: str, log=print) -> Path:
+def relight(world_png: Path, instruction: str, seed: int, steps: int, out: Path, tag: str, log=print, denoise: float = 1.0) -> Path:
     """One Qwen-Image-Edit pass over the whole world picture; the result saved at `out` at the editor's own size."""
     import shutil
     from .backends import comfy
@@ -168,7 +168,7 @@ def relight(world_png: Path, instruction: str, seed: int, steps: int, out: Path,
         raise BuildError(f"light: relighting needs ComfyUI (Qwen-Image-Edit), which is not running at {comfy.COMFY}.")
     comfy.free()
     name = comfy.upload(str(world_png))
-    images = comfy.run(comfy.build_qwen_edit_graph([name], instruction, seed, steps, prefix=f"studio/light_{tag}"), poll=2)
+    images = comfy.run(comfy.build_qwen_edit_graph([name], instruction, seed, steps, prefix=f"studio/light_{tag}", denoise=denoise), poll=2)
     tmp = comfy.fetch(images, str(out.parent / f"_light_{tag}"))
     out.parent.mkdir(parents=True, exist_ok=True)
     shutil.move(str(Path(tmp) / "0001.png"), out)

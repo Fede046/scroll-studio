@@ -1230,7 +1230,7 @@ class LightScene(SceneBase):
     clock: bool = Field(True, description="Show the time of day (a clock and a sun arc) in a corner")
     blend: Literal["light", "fade"] = Field("light", description="light: the light-aware transition; fade: a plain "
                                                                  "crossfade (for comparison, or a quieter page)")
-    structure: LightStructure = Field(default_factory=LightStructure)
+    structure: LightStructure = Field(default_factory=LightStructure, description="Geometry lock: measure each relight against the world, warp small drift away, retry a relight that still drifts")
     depth_model: Literal["small", "base", "large"] = Field("small", description="Depth Anything V2 size for the drift and "
                                                                                  "the mist (small is Apache-2.0)")
     seed: int = Field(7, description="Seed for the relights")

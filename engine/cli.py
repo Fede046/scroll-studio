@@ -16,6 +16,7 @@
   studio setup-comfy                                install the ComfyUI nodes for `reveal` and `faces` (restart ComfyUI after)
   studio schema                                     JSON Schema of site.yaml
   studio product my-site [--parts] [--still three-quarter]   the site's product: parts, stills
+  studio light my-site [--section day] [--presets]   a `light` scene (one place, dawn to night): build it, the times with their measured drift, frame strips across each transition
 """
 from __future__ import annotations
 
@@ -690,6 +691,48 @@ def camera(name: str, beat: str,
                        f"(static world {p['static_end_px']:.1f} px; a frozen picture under the same camera {pf['people_end_px']:.1f} px; "
                        f"frame is {p['width']} px wide)")
         typer.echo(f"  sheet: {r.get('sheet')}")
+
+
+@app.command()
+def light(name: str, section: Optional[str] = typer.Option(None, help="The light section (default: every one)"),
+         build_: bool = typer.Option(True, "--build/--no-build", help="Build the section first (cached stages are skipped)"),
+         strips: bool = typer.Option(True, "--strips/--no-strips", help="Screenshot the built page across every transition"),
+         frames: int = typer.Option(7, help="Frames per transition strip"),
+         presets: bool = typer.Option(False, "--presets", help="List the named times of day and exit")):
+    """Light as the scroll (`type: light`): build the section, then write what it made to look at, in
+    <project>/light/<section>/: sheet.jpg (every time of day with its drift from the world, raw and aligned), strip_*.jpg (the page
+    across each transition, the same scroll positions a viewer passes through) and light.json (drift, edge agreement and
+    how far apart neighbouring times are). The drift is how far the editor moved the place, in pixels at 1024 across."""
+    from . import light_presets, light_report
+    from .project import Project
+    if presets:
+        for k, p in light_presets.PRESETS.items():
+            typer.echo(f"{k:12s} {p['clock']}  haze {p['haze']:.2f}  {'lamps on' if p['lit'] else 'lamps off':9s} {p['prompt'][:70]}")
+        return
+    project = Project(resolve(name))
+    secs = light_report.sections(project, section)
+    if not secs:
+        raise typer.BadParameter("no light section in this project" + (f" called '{section}'" if section else ""))
+    if build_:
+        from .compile.compiler import build_site
+        build_site(project, log=typer.echo, only=[s.id for s in secs])
+    for sec in secs:
+        out = project.root / "light" / sec.id
+        out.mkdir(parents=True, exist_ok=True)
+        sheet = light_report.times_sheet(project, sec, out)
+        rep = json.loads((project.build / sec.id / "report.json").read_text())
+        rep.update(light_report.sequence_diff(project, sec))
+        (out / "light.json").write_text(json.dumps(rep, indent=1))
+        typer.echo(f"[{sec.id}] times: {sheet}")
+        for t in rep["times"]:
+            al, raw = t["aligned"], t["raw"]
+            typer.echo(f"  {t['id']:12s} {t['clock']}  drift {raw['drift']:5.2f}px raw -> {al['drift']:4.2f} aligned   edges {raw['edges']:.2f} -> {al['edges']:.2f}"
+                       + ("" if t.get("ok", True) else "   (still drifting)"))
+        for p in rep["pairs"]:
+            typer.echo(f"  {p['from']} > {p['to']}: light step {p['luma_step']:.3f}, structure agreement {p['edges']:.2f}")
+        if strips:
+            light_report.strips(project, sec, out, frames=frames, log=typer.echo)
+        typer.echo(f"[{sec.id}] report: {out / 'light.json'}")
 
 
 @app.command()

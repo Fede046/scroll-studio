@@ -135,6 +135,26 @@ def schedule(sec: LightScene) -> tuple[list[int], list[dict]]:
     return out, holds
 
 
+def time_at(p: float, holds: list[dict]) -> float:
+    """The time index (fractional: 2.5 is half-way from the third time to the fourth) at section progress `p`. The CPU
+    twin of `timeAt` in runtime/src/players/light.ts: the light holds still through each step's hold, then eases to the
+    next step's time (smoothstep) before the next hold begins."""
+    if not holds:
+        return 0.0
+    if p <= holds[0]["a"]:
+        return float(holds[0]["t"])
+    for i, h in enumerate(holds):
+        if p <= h["b"]:
+            return float(h["t"])
+        if i + 1 >= len(holds):
+            return float(h["t"])
+        n = holds[i + 1]
+        if p < n["a"]:
+            k = min(1.0, max(0.0, (p - h["b"]) / max(n["a"] - h["b"], 1e-9)))
+            return h["t"] + (n["t"] - h["t"]) * k * k * (3 - 2 * k)
+    return float(holds[-1]["t"])
+
+
 def build(sec: LightScene, ctx: BuildContext, theme: dict) -> dict:
     from .. import region as regionmod
     from ..spec import EditRegion
