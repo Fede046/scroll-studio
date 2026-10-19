@@ -9,6 +9,7 @@
   studio directions my-site [--n 6] [--seed 1] [--pick a]   art directions as side-by-side boards; pick one into site.yaml
   studio preview my-site [--port 5173]
   studio record my-site [--section hero] [--seconds 12] [--gif]
+  studio cinemagraph my-site [--only steam] [--force]   build (or list) every `cinemagraph:` image: video + mask + a measured report
   studio inspect my-site [--section story] [--json]   polish report of a built film: pops, softness, halos, style drift, morphs
   studio trailer my-site [--format 9x16] [--plan]      launch trailer from the site's renders -> dist/trailer/
   studio ui                                         the Studio app (http://localhost:5180)
@@ -690,6 +691,33 @@ def camera(name: str, beat: str,
                        f"(static world {p['static_end_px']:.1f} px; a frozen picture under the same camera {pf['people_end_px']:.1f} px; "
                        f"frame is {p['width']} px wide)")
         typer.echo(f"  sheet: {r.get('sheet')}")
+
+
+@app.command("cinemagraph")
+def cinemagraph_cmd(name: str,
+                    only: Optional[str] = typer.Option(None, help="Only the cinemagraphs whose `moves` or spec path contains this text"),
+                    force: bool = typer.Option(False, help="Ignore the cache"),
+                    list_only: bool = typer.Option(False, "--list", help="List the cinemagraphs in the spec and their cache state, build nothing")):
+    """Build the site's cinemagraphs (an image input with `cinemagraph:`: a still where only one thing moves) and report on each:
+    the loop's seam, how much of the picture moves, what the page holds still, bytes. Files are in <project>/.build/_cinemagraph/.
+    `studio build` makes them too, as part of the page."""
+    from . import cinemagraph as cine
+    from .project import Project
+    project = Project(resolve(name))
+    site = project.load()
+    found = [(w, r) for w, r in cine.collect(site) if not only or only in w or only in r.cinemagraph.moves]
+    if not found:
+        typer.echo("no image input with `cinemagraph:` in this spec" + (f" matching '{only}'" if only else ""))
+        raise typer.Exit(1)
+    for where, ref in found:
+        typer.echo(f"{where}: {ref.cinemagraph.moves}")
+        built = cine.build(project, ref, typer.echo, force=force, site_video_model=site.video_model,
+                           site_wan=site.wan.model_dump(mode="json"), only_cached=list_only)
+        if built is None:
+            typer.echo("  not built yet")
+            continue
+        typer.echo("  " + cine.summary(built["data"]))
+        typer.echo(f"  {built['video']}")
 
 
 @app.command()
