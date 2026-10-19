@@ -36,7 +36,7 @@ sections:
     type: film
     cue: Scroll to come in
     journey:
-      world: The inside of an old stone farmhouse on a northern moor at dawn, one long whitewashed hall with deep arched doorways between its rooms, flagstone floor, black oak beams, a far window onto misty moorland, firelight and cold blue daylight, nobody in it
+      world: The inside of a centuries-old stone farmhouse on a northern moor at dawn, one long hall of uneven limewashed plaster with deep arched doorways between its rooms, worn flagstone floor, hand-hewn black oak beams, plank doors with iron latches, a small deep-set window at the far end onto misty moorland, firelight and cold blue daylight, nothing modern, no electric light, nobody in it
       seed: 4
       restore: 1080
       blockout:
