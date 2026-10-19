@@ -12,6 +12,7 @@ Scroll Studio runs entirely on your machine. What you need depends on which scen
 | `film` | + Blender, FFmpeg, ComfyUI with the LTX-2.3 and Z-Image models, a 24 GB GPU (RTX 4090/5090 class). |
 | `film` with `video_model: wan` | + the Wan 2.2 files in `engine/models.yaml` (~67 GB: two i2v experts for beats and art, two Fun Control experts for takes, UMT5, the VAE, two LoRAs) and ~32 GB of free system RAM. Same 24 GB GPU. |
 | `film` with `reveal` or `faces: restore`, an image `edit:` with `region` | + `studio setup-comfy` (SAM 2.1, Florence-2, GFPGAN: ~2.5 GB, section 4); a region edit also needs Qwen-Image-Edit like any `edit:`. |
+| `film` or `parallax` with `place: {kind: behind \| surface \| sky}` (type in the world) | + Depth Anything V2 (downloads on first use, like `parallax`); a `surface`, or a `behind` named by a prompt, also needs the `reveal` setup above (SAM 2.1, Florence-2: `studio setup-comfy`). A `sky` or a `behind` with a depth number needs no ComfyUI. |
 | `film` with `take.product` | + the product's 3D model (.glb/.gltf/.obj/.fbx/.stl/.ply). `from_photo:` instead needs TRELLIS (below). |
 | `site.product`, `showroom`, product stills | + Blender. STEP/STP models need `cascadio` (OpenCascade) and 3MF needs `trimesh` + `lxml`: `pip install -e .[cad]` (in `.[all]`). `scene:` stills need ComfyUI (Z-Image, Qwen-Image-Edit). |
 | `splat` | A scan as a 3DGS `.ply` (any) or a gsplat `.pt` checkpoint (needs PyTorch to read). No GPU at build time. |

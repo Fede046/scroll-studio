@@ -153,7 +153,7 @@ comfyui:
     size_gb: 0.45
     vram_gb: 4
     licence: Apache-2.0 (Meta)
-    used_by: [film reveal (tracker large, the default)]
+    used_by: [film reveal (tracker large, the default), "type in the world: surface type and a behind prompt"]
     node: sam2
   - name: SAM 2.1 Hiera Base+ (fp16)
     file: sam2/sam2.1_hiera_base_plus-fp16.safetensors
@@ -169,7 +169,7 @@ comfyui:
     size_gb: 1.5
     vram_gb: 3
     licence: MIT (Microsoft)
-    used_by: [film reveal (a region's prompt -> a box)]
+    used_by: [film reveal (a region's prompt -> a box), "type in the world (a prompt for a surface or what the type sits behind)"]
     node: florence2
   - name: GFPGAN v1.4
     file: facerestore_models/GFPGANv1.4.pth
@@ -188,12 +188,12 @@ huggingface:
     repo: depth-anything/Depth-Anything-V2-Small-hf
     size_gb: 0.1
     licence: Apache-2.0
-    used_by: [parallax (default), "frozen moments (freeze.depth_model, default)"]
+    used_by: [parallax (default), "frozen moments (freeze.depth_model, default)", "type in the world (film depth_model, default)"]
   - name: Depth Anything V2 Base / Large
     repo: depth-anything/Depth-Anything-V2-Large-hf
     size_gb: 1.3
     licence: CC-BY-NC-4.0 (non-commercial)
-    used_by: [parallax (depth_model: base | large), "frozen moments (freeze.depth_model: base | large)"]
+    used_by: [parallax (depth_model: base | large), "frozen moments (freeze.depth_model: base | large)", "type in the world (film depth_model: base | large)"]
 
   - name: OpenCLIP ViT-H/14 (LAION-2B)
     repo: laion/CLIP-ViT-H-14-laion2B-s32B-b79K

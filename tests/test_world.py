@@ -598,3 +598,94 @@ def test_the_film_encode_key_does_not_know_about_world(monkeypatch):
     import inspect
     src = inspect.getsource(film.build)
     assert "typeworld.active(sec)" in src and src.index("typeworld.active") < src.index("encode(src")
+
+
+# ---------------------------------------------------------------- a photograph (parallax)
+
+@pytest.fixture
+def photo_rig(tmp_path, monkeypatch):
+    from PIL import Image
+    from engine import region
+    proj = tmp_path / "pp"
+    proj.mkdir()
+    (proj / "site.yaml").write_text("name: t\nsections: []\n")
+    ctx = BuildContext(Project(proj), "stay", log=lambda m: None)
+    rng = np.random.default_rng(6)
+    img = cv2.GaussianBlur(rng.integers(40, 220, (720, 1280, 3), dtype=np.uint8), (0, 0), 2)
+    photo = ctx.web / "photo0.jpg"
+    Image.fromarray(img).save(photo, quality=92)
+    depth = np.tile(np.linspace(0, 255, 720, dtype=np.uint8)[:, None], (1, 1280))
+    depth[200:500, 700:900] = 230                                                      # a near post
+    dpng = ctx.web / "photo0-depth.png"
+    Image.fromarray(depth).save(dpng)
+    calls = {"find": 0}
+
+    def fake_find(project, src, reg, log=print):
+        calls["find"] += 1
+        m = np.zeros((720, 1280), np.uint8)
+        if reg.prompt and "post" in reg.prompt:
+            m[200:500, 700:900] = 255
+        else:
+            m[360:700, 100:1200] = 255                                                 # a floor
+        out = Path(project.build) / "_generated" / f"fake_{calls['find']}.png"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        Image.fromarray(m).save(out)
+        return out
+
+    monkeypatch.setattr(region, "find", fake_find)
+    return SimpleNamespace(ctx=ctx, photo=photo, dpng=dpng, calls=calls)
+
+
+def _step(**place):
+    return Step.model_validate({"title": "Breakfast <em>at the edge.</em>", "place": place})
+
+
+def test_a_photographs_title_is_laid_out_static_with_its_depth_or_its_surface(photo_rig):
+    sec = SimpleNamespace(id="stay")
+    r = photo_rig
+    b = world.build_photo(sec, r.ctx, 0, 1, _step(kind="behind", at="the post", y=0.3, size=0.6), r.photo, r.dpng)
+    assert b["kind"] == "behind" and b["plane"] == [1.0, pytest.approx(720 / 1280, abs=1e-4)] and b["box"][2] == 0.6
+    assert b["depth"] == pytest.approx(b["thing_depth"] - 0.05, abs=1e-3) and b["thing_depth"] > 0.8
+    M = wm.unpack_matrix(b["m"])
+    assert wm.apply(M, 0.5, 0.3) == pytest.approx((0.5, 0.3 * 720 / 1280), abs=1e-4)      # photo uv -> plane: a frame plane, static
+    assert 0 <= b["tone"] <= 1 and "mask" not in b
+    s = world.build_photo(sec, r.ctx, 1, 2, _step(kind="sky", y=0.25), r.photo, r.dpng)
+    assert s["depth"] == 0.07 and s["soft"] == world.SOFT["sky"] and s["style"]["haze"] == 0.35
+    f = world.build_photo(sec, r.ctx, 2, 3, _step(kind="surface", at="the floor", x=0.5, y=0.8, size=0.5), r.photo, r.dpng)
+    assert f["kind"] == "surface" and f["mask"].endswith("photo2-mask.png") and (r.ctx.web / "photo2-mask.png").exists()
+    Mf = wm.unpack_matrix(f["m"])
+    centre = wm.apply(Mf, 0.5, 0.8)
+    assert centre is not None and abs(centre[0]) < 0.02 and abs(centre[1]) < 0.02       # the plane's origin is where the type was asked for
+    assert f["tilt"] > 20 and f["box"][:2] == [0.0, 0.0]
+
+
+def test_a_photographs_title_is_cached_per_chapter(photo_rig):
+    sec = SimpleNamespace(id="stay")
+    r = photo_rig
+    st = _step(kind="behind", at="the post")
+    world.build_photo(sec, r.ctx, 0, 1, st, r.photo, r.dpng)
+    n = r.calls["find"]
+    world.build_photo(sec, r.ctx, 0, 1, st, r.photo, r.dpng)
+    assert r.calls["find"] == n                                                        # up to date: nothing found again
+    world.build_photo(sec, r.ctx, 0, 1, _step(kind="behind", at="the post", x=0.3), r.photo, r.dpng)
+    assert r.calls["find"] == n + 1                                                    # a new placement is a new stage run
+
+
+def test_a_photographs_impossible_placements_are_refused(photo_rig):
+    sec = SimpleNamespace(id="stay")
+    r = photo_rig
+    with pytest.raises(BuildError, match="a surface needs"):
+        world.build_photo(sec, r.ctx, 0, 1, _step(kind="surface"), r.photo, r.dpng)
+    with pytest.raises(BuildError, match="not a prompt"):
+        world.build_photo(sec, r.ctx, 0, 1, _step(kind="sky", at="the sky"), r.photo, r.dpng)
+
+
+def test_the_depth_snap_works_without_opencv_contrib(monkeypatch):
+    rng = np.random.default_rng(1)
+    guide = cv2.GaussianBlur(rng.integers(0, 255, (60, 80, 3), dtype=np.uint8), (0, 0), 1.0)
+    depth = np.tile(np.linspace(0, 1, 80, dtype=np.float32)[None, :], (60, 1))
+    with_contrib = world_depth.snap(depth, guide, 4, 1e-3)
+    monkeypatch.setattr(cv2, "ximgproc", None, raising=False)                           # no contrib module: the box-filter fallback
+    plain = world_depth.snap(depth, guide, 4, 1e-3)
+    assert plain.shape == depth.shape and np.abs(plain - depth).mean() < 0.05
+    assert np.abs(plain - with_contrib).mean() < 0.05
