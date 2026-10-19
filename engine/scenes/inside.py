@@ -94,13 +94,13 @@ def gpu_free_mb() -> Optional[int]:
 
 
 def render_device(log=print) -> str:
-    """cpu when STUDIO_INSIDE_DEVICE says so, or when the GPU has less than 1.2 GB free (other jobs: a Cycles scene that
+    """cpu when STUDIO_INSIDE_DEVICE says so, or when the GPU has less than 2 GB free (other jobs: a Cycles scene that
     cannot get its memory stalls for minutes instead of failing); else gpu."""
     want = os.environ.get("STUDIO_INSIDE_DEVICE", "").lower()
     if want in ("cpu", "gpu"):
         return want
     free = gpu_free_mb()
-    if free is not None and free < 1200:
+    if free is not None and free < 2000:
         log(f"  the GPU has {free} MiB free (shared with other jobs): rendering on the CPU (STUDIO_INSIDE_DEVICE=gpu forces the GPU)")
         return "cpu"
     return "gpu"

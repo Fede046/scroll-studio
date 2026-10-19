@@ -567,6 +567,11 @@ What the engine does with it (`engine/inside.py`, `engine/scenes/inside.py`, `ba
   lens and only the frames near it are redrawn; changing copy, vignette or grain redraws nothing.
 - **Phones, reduced motion.** A 960 px set for phones; with `prefers-reduced-motion` the page shows one still per stop
   (the opening frame, each stop's resting frame when its copy arrives, the closing frame) and downloads only those; scrolling is never captured.
+- **A shared GPU.** The renderer uses the GPU, or the CPU when the GPU has under 2 GB free (a Cycles scene that cannot get its
+  memory stalls instead of failing); `STUDIO_INSIDE_DEVICE=cpu|gpu` forces one, and a render that makes no progress for
+  15 minutes (`STUDIO_INSIDE_STALL`, seconds) is stopped and the remaining frames finish on the CPU. Frames are kept as they
+  finish, so an interrupted build resumes where it stopped. On a 4090 the example's 284 frames at 1600x900 and 64 samples take about
+  half an hour with the GPU to itself; the desktop set is about 33 MB and the phone set 5 MB.
 - **Authoring.** `studio inside <project> [--still all|wide|3,5] [--strip 8]` prints the route (parts found per stop,
   view, camera side, where the stop rests and its copy sits) and renders quick stills and a contact sheet; the MCP tool
   `inside_route` does the same. `studio storyboard` shows the wide shot and a still per stop.
