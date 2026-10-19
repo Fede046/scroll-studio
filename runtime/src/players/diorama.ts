@@ -199,10 +199,10 @@ const factory: PlayerFactory = async (cfgIn, ctx) => {
   const camera = new THREE.PerspectiveCamera(plan.camera.fov, 1, 1, 420);
   const post = new Post(renderer, { tilt: cfg.look.tilt_shift * (mobile ? 0.7 : 1), saturation: cfg.look.saturation, vignette: cfg.look.vignette, grain: cfg.look.grain, mobile });
   let W = 1, H = 1, aspect = 1;
-  const fovFor = () => Math.min(62, plan.camera.fov * (aspect < 0.9 ? 1.4 : 1));
+  const fovFor = () => Math.min(62, plan.camera.fov * (aspect < 0.9 ? 1.3 : 1));
   const wideDist = () => {
     const f = fovFor(), tv = Math.tan(THREE.MathUtils.degToRad(f / 2)), th = tv * aspect;
-    const sideRoom = aspect > 1.05 && ctx.data.layout !== "overlay" ? 0.66 : 0.84;
+    const sideRoom = aspect > 1.05 && ctx.data.layout !== "overlay" ? 0.66 : (aspect < 0.9 ? 0.95 : 0.84);
     const byW = plan.camera.fit / (th * sideRoom);
     const byH = (plan.camera.fit * Math.sin(THREE.MathUtils.degToRad(plan.camera.pitch)) + 4.5) / (tv * 0.8);
     return Math.max(byW, byH);

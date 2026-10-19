@@ -233,6 +233,9 @@ def camera_plan(w: World, sec, placed: list[dict], stepmap: list[Optional[int]])
             gy, dist, tgt = framing[pi]
             yaw = chosen[pi]
             side = {"left": -1, "right": 1}.get(pl["side"] or "", view_side)
+            cap = sec.steps[si].place if sec.layout == "overlay" else None
+            if cap and not pl["side"]:        # a caption set on the left leaves the world the right of the picture
+                side = -1 if cap.endswith("right") else 1 if cap.endswith("left") else side
             beats.append({"kind": "place", "place": pi, "yaw": yaw, "pitch": cam.dive_pitch, "dist": round(dist, 2),
                           "target": [round(pl["x"], 3), round(gy + min(pl["h"], 9.0) * 0.44, 3), round(pl["z"], 3)],
                           "side": side})
