@@ -366,3 +366,19 @@ html:not(.js) .ss-strip { overflow-x: auto; }
   .js .ss-reveal { opacity: 1; transform: none; }
   .js .ss-w > span { transition: none; }
 }
+
+/* light as the scroll (players/light.ts): the time of day in a corner; the section's own tokens follow the sky */
+.ss-type-light .ss-stage, .ss-type-light .ss-pin { background: var(--bg); }
+.ss-tod { position: absolute; right: var(--gutter); bottom: 26px; display: grid; grid-template-columns: auto auto; column-gap: 14px; align-items: center;
+  color: var(--ink); pointer-events: none; z-index: 3; text-shadow: 0 0 18px rgba(var(--bg-rgb), .7); }
+.ss-tod svg { overflow: visible; grid-row: 1 / span 2; }
+.ss-tod__dot { fill: var(--accent); filter: drop-shadow(0 0 6px var(--accent)); }
+.ss-tod__dot.moon { fill: var(--ink); filter: drop-shadow(0 0 5px var(--ink)); }
+.ss-tod__t { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.15; }
+.ss-tod__time { font: 500 22px/1 var(--font-mono); letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+.ss-tod__label { font: 500 11px/1.3 var(--font-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); margin-top: 5px; }
+.ss-tod__ticks { display: flex; gap: 6px; margin-top: 8px; }
+.ss-tod__ticks i { width: 14px; height: 2px; background: var(--ink); opacity: .28; transition: opacity .4s, width .4s; }
+.ss-tod__ticks i.on { opacity: .95; width: 26px; }
+.ss-light-still { transition: none; }
+@media (max-width: 760px) { .ss-tod { bottom: 18px; } .ss-tod svg { display: none; } .ss-tod__time { font-size: 17px; } .ss-tod__ticks { display: none; } }

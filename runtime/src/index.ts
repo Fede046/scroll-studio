@@ -30,6 +30,7 @@ const PLAYERS: Record<string, () => Promise<{ default: PlayerFactory }>> = {
   splat: () => import("./players/splat"),
   code: () => import("./players/code"),
   showroom: () => import("./players/showroom"),
+  light: () => import("./players/light"),
 };
 
 let mx = 0, my = 0;
