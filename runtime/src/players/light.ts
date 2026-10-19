@@ -88,8 +88,9 @@ void main(){
     vec3 offc = lampOn > .5 ? Am : A;
     vec3 onc = lampOn > .5 ? B : Bm;
     col = mix(col, mix(offc, onc, pop), L.r);
-    float level = lampOn > .5 ? smoothstep(.05, .95, fe) : 1. - smoothstep(.05, .95, fe);
-    col += lampCol * L.b * glow * .5 * level;
+    // the halo is the flash of switching, not a state: the pictures at either end already carry their own glow
+    float level = sin(3.14159 * fe);
+    col += lampCol * L.b * glow * .45 * level * level;
   }
 
   // mist: thicker with distance and low on the water, drifting
