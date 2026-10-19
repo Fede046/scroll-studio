@@ -1,0 +1,24 @@
+# Paint on glass: oil on a pane lit from behind (Petrov, Loving Vincent). See docs/styles/styles-30-31.md section 1
+# for the research.
+label: Paint on glass
+about: >-
+  One wet painting on a pane of lit glass, never cut. Scrolling is the painter's hand: the brush lays strokes from one scene's painting into the next, coarse first, each stroke dragging the old paint into the new colour, and scrolling back paints toward the earlier scene. Stop and the painting stops half reworked. Headlines are brushed in, numbers run, the pointer is a finger that smears the wet paint.
+mode: dark
+colors:
+  bg: '#0b0e16'
+  bg2: '#10141f'
+  ink: '#f3e7d1'
+  accent: '#e69a3c'
+  accent2: '#4fa7b8'
+  accent_ink: '#1a1008'
+  accent_text: '#f3e7d1'
+fonts:
+  display: Fraunces
+  body: Newsreader
+  mono: IBM Plex Mono
+font_axes:
+  Fraunces: "ital,opsz,wght,SOFT,WONK@0,9..144,100..900,0..100,0..1;1,9..144,100..900,0..100,0..1"
+  Newsreader: "ital,opsz,wght@0,6..72,200..800;1,6..72,200..800"
+  IBM Plex Mono: "wght@400;500"
+display_weight: 500
+radius: 999px
