@@ -56,8 +56,8 @@ vec3 worldSurface(vec3 col, vec3 ink, float cov, vec3 film, vec3 near, vec3 locl
   paint += (Lf - Ln) * 0.8 * B.z;
   // paint does not stop in a clean vector edge: the grain of the surface ragged-edges every letter
   float rough = fbm(pl * 230.0 + Lf * 3.0);
-  float thr = 0.5 + (rough - 0.5) * 0.9 * B.z;
-  float edge = smoothstep(thr - 0.22, thr + 0.22, cov);
+  float thr = 0.45 + (rough - 0.5) * 0.5 * B.z;
+  float edge = smoothstep(thr - 0.16, thr + 0.16, cov);
   float a = edge * vis * on * worn * wipe * 0.97;
   return mix(col, paint, clamp(a, 0.0, 1.0));
 }

@@ -792,11 +792,11 @@ its `title` is the text, in the site's fonts, with the `<em>` words set as every
         at: [0.44, 0.58]
         place: { kind: behind, at: "the spruce tree", x: 0.5, y: 0.3, size: 0.62 }     # set just behind the spruce
       - title: Stay <em>cold.</em>
-        at: [0.6, 0.72]
-        place: { kind: surface, at: "the wooden deck floor", x: 0.3, y: 0.8, size: 0.46 }   # painted on the deck
+        at: [0.58, 0.7]
+        place: { kind: surface, at: "the wooden deck floor", x: 0.34, y: 0.84, size: 0.44 }   # painted on the deck
       - title: Still cold <em>at noon.</em>
         at: [0.86, 0.99]
-        place: { kind: sky, y: 0.26, size: 0.7, caps: true, track: 0.12 }              # in the haze, fog in front
+        place: { kind: sky, y: 0.24, size: 0.7, caps: true, track: 0.12 }              # in the haze, fog in front
 ```
 
 | `kind` | What it is | `at` |
