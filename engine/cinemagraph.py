@@ -39,7 +39,7 @@ from .project import BuildContext, BuildError, ffmpeg, file_key, probe
 from .spec import Cinemagraph, EditRegion, ImageInput
 
 VERSION = 1
-MASK_VERSION = 6         # bump when the mask or what follows it would come out differently for the same clip (the clip is kept)
+MASK_VERSION = 7         # bump when the mask or what follows it would come out differently for the same clip (the clip is kept)
 FPS = 24
 CONTEXT = 0.5            # how much of the surroundings the video model sees: a share of the region's size on every side
 LTX_MP = 0.5             # megapixels LTX-2.3 renders the crop at (aspect kept)
@@ -713,7 +713,13 @@ def build(project, ref: ImageInput, log: Callable[[str], None] = print, force: b
                 if alt["ratio"] < closed["ratio"]:
                     seq, how, closed = plain, f"crossfade ({n} frames)", alt
         seq = damp(seq, cg.strength)
-        vid = composite_video(seq, still_c, mask)
+        # the video holds only the moving part: the mask's own box (and a pixel or two), not the whole crop the model was shown
+        ys, xs = np.nonzero(mask)
+        bx0, by0 = max(0, int(xs.min()) - 2) // 2 * 2, max(0, int(ys.min()) - 2) // 2 * 2
+        bx1, by1 = min(ww, -(-(int(xs.max()) + 3) // 2) * 2), min(wh, -(-(int(ys.max()) + 3) // 2) * 2)
+        seq, mask, still_k = seq[:, by0:by1, bx0:bx1], mask[by0:by1, bx0:bx1], still_c[by0:by1, bx0:bx1]
+        rbox = [round(x0 + bx0 / sc), round(y0 + by0 / sc), round(x0 + bx1 / sc), round(y0 + by1 / sc)]
+        vid = composite_video(seq, still_k, mask)
         encode_h264(vid, mp4)
         for crf in (27, 31):                                       # fine texture (water, foliage) costs bytes: a page loads this
             if mp4.stat().st_size <= MAX_VIDEO_BYTES:
@@ -721,8 +727,8 @@ def build(project, ref: ImageInput, log: Callable[[str], None] = print, force: b
             encode_h264(vid, mp4, crf=crf)
         save_mask(mask, wp)
         dec = read_video(mp4)                                   # measure what the page will play, not what we meant
-        review_sheet(still_c, dec, mask, sheet)
-        outside = _outside_change(dec, still_c, mask)
+        review_sheet(still_k, dec, mask, sheet)
+        outside = _outside_change(dec, still_k, mask)
         decoded = seam_report(dec, mask)
         motion = float(np.mean(np.std(seq.astype(np.float32), axis=0).mean(axis=-1)[mask > 127])) if (mask > 127).any() else 0.0
         report = {
@@ -730,7 +736,7 @@ def build(project, ref: ImageInput, log: Callable[[str], None] = print, force: b
             "loop": {"mode": cg.loop, "closed_by": how, "generated": before, "closed": closed, "encoded": decoded,
                      "seamless": decoded["seam"] <= max(SEAM_OK * max(decoded["ref"], decoded["typical_step"]),
                                                   max(decoded["ref"], decoded["typical_step"]) + CODEC_STEP)},
-            "still": [W, H], "box": [x0, y0, x1, y1], "video": [ww, wh], "bytes": mp4.stat().st_size + wp.stat().st_size,
+            "still": [W, H], "box": rbox, "video": [bx1 - bx0, by1 - by0], "bytes": mp4.stat().st_size + wp.stat().st_size,
             "mask": {"share_of_still": round(float((mask > 127).sum()) / sc / sc / (W * H), 4), **minfo},
             "motion": {"temporal_std": round(motion, 2), "camera_shift_px_removed": prep_info["camera_shift_px"], "cut_because": prep_info["cut_because"], "kept_frames": prep_info["kept"],
                        "of_generated": prep_info["of"], "played_frames": prep_info.get("slowed_to", prep_info["kept"])},
@@ -741,8 +747,9 @@ def build(project, ref: ImageInput, log: Callable[[str], None] = print, force: b
     if plan is not None and not rep.exists():
         return None
     report = json.loads(rep.read_text())
-    return Built(video=mp4, mask=wp, report=rep, sheet=sheet, data=report, box=[x0 / W, y0 / H, x1 / W, y1 / H], still=[W, H],
-                 size=[ww, wh], poster_crop=crop_png, id=out_id)
+    bx0, by0, bx1, by1 = report["box"]
+    return Built(video=mp4, mask=wp, report=rep, sheet=sheet, data=report, box=[bx0 / W, by0 / H, bx1 / W, by1 / H], still=[W, H],
+                 size=report["video"], poster_crop=crop_png, id=out_id)
 
 
 def _outside_change(dec: np.ndarray, still: np.ndarray, mask: np.ndarray) -> dict:

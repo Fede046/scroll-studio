@@ -83,8 +83,35 @@ export function start(): void {
   if (!items.length) return;
   (window as unknown as { __ssCine: Item[] }).__ssCine = items;
 
+  // ---- framing: a photograph cropped to fill a narrow screen (object-fit: cover) can crop the moving part away. Slide the crop
+  // (object-position / background-position) so it stays in view: the one thing that moves is the point of the picture.
+  function frame(it: Item) {
+    const r = stillRect(it);
+    if (!r) return;
+    const { host, e } = it;
+    const W = it.img ? host.offsetWidth : host.clientWidth, H = it.img ? host.offsetHeight : host.clientHeight;
+    const pos: number[] = [];
+    let moved = false;
+    for (const [axis, size, span, b0, bw] of [[0, W, r.w, e.b[0], e.b[2]], [1, H, r.h, e.b[1], e.b[3]]] as [number, number, number, number, number][]) {
+      const cur = axis === 0 ? r.x : r.y;
+      const lo = cur + b0 * span, hi = cur + (b0 + bw) * span;
+      const visible = Math.max(0, Math.min(hi, size) - Math.max(lo, 0)) / Math.max(1, hi - lo);
+      let p = span > size ? cur / (size - span) : 0.5;                    // where the crop is now, as a 0-1 position
+      if (span > size + 1 && visible < 0.75) {
+        const centre = b0 + bw / 2;
+        p = Math.min(1, Math.max(0, (size / 2 - centre * span) / (size - span)));
+        moved = true;
+      }
+      pos.push(Math.round(p * 1000) / 10);
+    }
+    if (!moved) return;
+    const css = `${pos[0]}% ${pos[1]}%`;
+    if (it.img) host.style.objectPosition = css; else host.style.backgroundPosition = css;
+  }
+
   // ---- layout: the layer takes the still's box; the video sits where the moving part is on the still
   function layout(it: Item) {
+    frame(it);
     const r = stillRect(it);
     if (!r) { it.layer.style.display = "none"; return; }
     const { host, layer, e } = it;
