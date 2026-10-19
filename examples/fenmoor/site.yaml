@@ -36,7 +36,7 @@ sections:
     type: film
     cue: Scroll to come in
     journey:
-      world: The inside of a centuries-old stone farmhouse on a northern moor at dawn, one long hall of uneven limewashed plaster with deep arched doorways between its rooms, worn flagstone floor, hand-hewn black oak beams, plank doors with iron latches, a small deep-set window at the far end onto misty moorland, firelight and cold blue daylight, nothing modern, no electric light, nobody in it
+      world: A centuries-old stone farmhouse on a northern moor at dawn, uneven limewashed plaster and rough stone, hand-hewn black oak beams, worn flagstones, plank doors with iron latches, small deep-set windows, firelight and cold blue daylight, nothing modern, no electric light, nobody in it
       seed: 4
       restore: 1080
       blockout:
@@ -65,10 +65,11 @@ sections:
           - { kind: box, name: Arch2R, at: [1.45, 9.0, 1.5], size: [1.1, 0.4, 3.0], color: "#d8d1c2" }
           - { kind: box, name: Arch2Top, at: [0, 9.0, 2.725], size: [1.8, 0.4, 0.55], color: "#d8d1c2" }
           # the far wall with its window
-          - { kind: box, name: FarSill, at: [0, 17, 0.45], size: [4.0, 0.4, 0.9], color: "#d8d1c2" }
-          - { kind: box, name: FarHead, at: [0, 17, 2.7], size: [4.0, 0.4, 0.6], color: "#d8d1c2" }
-          - { kind: box, name: FarL, at: [-1.55, 17, 1.6], size: [0.9, 0.4, 1.6], color: "#d8d1c2" }
-          - { kind: box, name: FarR, at: [1.55, 17, 1.6], size: [0.9, 0.4, 1.6], color: "#d8d1c2" }
+          - { kind: box, name: FarSill, at: [0, 17.1, 0.45], size: [4.0, 0.7, 0.9], color: "#d8d1c2" }
+          - { kind: box, name: WindowSeat, at: [0, 16.3, 0.5], size: [2.1, 0.6, 0.5], color: "#6a4a2c" }
+          - { kind: box, name: FarHead, at: [0, 17.1, 2.7], size: [4.0, 0.7, 0.6], color: "#d8d1c2" }
+          - { kind: box, name: FarL, at: [-1.55, 17.1, 1.6], size: [0.9, 0.7, 1.6], color: "#d8d1c2" }
+          - { kind: box, name: FarR, at: [1.55, 17.1, 1.6], size: [0.9, 0.7, 1.6], color: "#d8d1c2" }
           # the hearth room, the library, the table
           - { kind: box, name: Fireplace, at: [-1.75, 2.1, 0.75], size: [0.7, 1.9, 1.5], color: "#8c877d" }
           - { kind: box, name: Breast, at: [-1.85, 2.1, 2.0], size: [0.5, 1.6, 1.5], color: "#8c877d" }
@@ -88,7 +89,7 @@ sections:
       stops:
         - id: door
           label: The door
-          place: the view from just inside the open oak front door down the whole length of the house, flagstones, black beams, an arched doorway and then another, and a bright window at the very end
+          place: inside, the view from just inside the open oak front door down the whole length of the long hall, flagstones, black beams, deep arched doorways one behind another, and a small bright window at the very end
           pose: { at: [0.15, -0.4, 1.55], look: [0, 12, 1.3] }
           seconds: 3
           hold: 1.6
@@ -103,7 +104,7 @@ sections:
                 - { label: Come in and look round, href: "#hearth" }
         - id: hearth
           label: The hearth room
-          place: a whitewashed room with a stone fireplace and a low fire burning, an oak settle, flagstones, cold blue light from a small window against the warm firelight
+          place: inside, a stone fireplace with a low fire burning in the foreground on the left, an oak settle, flagstones, and an arched doorway to the next room ahead, cold blue light against the warm firelight
           pose: { at: [0.9, 1.4, 1.5], look: [-1.0, 6.0, 1.35] }
           move: { seconds: 4, path: [{ at: [0.5, 0.5, 1.55], look: [-0.5, 5.0, 1.4] }], motion: "the camera drifts in through the door and the fire comes into view on the left" }
           blocks:
@@ -116,7 +117,7 @@ sections:
                 - { title: "Wool, oak and slate", body: "Nothing in the house is newer than the beams." }
         - id: library
           label: The library
-          place: a small library with floor-to-ceiling oak shelves full of old books on the right, a worn armchair, whitewashed walls and cold blue light
+          place: inside, a small library with floor-to-ceiling oak shelves full of old books on the right, a worn armchair, an arched doorway ahead, cold blue light
           pose: { at: [-1.2, 5.2, 1.5], look: [0.8, 10.0, 1.3] }
           move: { seconds: 5, path: [{ at: [0.0, 4.3, 1.55], look: [0.0, 9.0, 1.4] }], motion: "the camera passes through the arch and the shelves come into view on the right" }
           blocks:
@@ -130,7 +131,7 @@ sections:
                 - { value: "0", label: Signal bars }
         - id: table
           label: The table
-          place: a long oak table with benches in a farmhouse dining room, a loaf of bread, a bowl and a lantern on the table, a bright window at the far end onto a misty moor
+          place: inside, a long oak table with benches in the farmhouse dining room, a loaf of bread, a bowl and a lantern on the table, a small bright window at the far end onto a misty moor
           pose: { at: [0, 10.0, 1.55], look: [0, 13.5, 0.85] }
           move: { seconds: 5, path: [{ at: [0.0, 8.8, 1.55], look: [0, 13.0, 1.1] }], motion: "the camera passes the arch and settles above the table" }
           blocks:
@@ -144,7 +145,7 @@ sections:
               note: £48 · delivered in two days · the crate comes back to us
         - id: window
           label: The window
-          place: the far end of the farmhouse, a deep stone window with a wide oak sill, cold daylight and a misty moor beyond the glass
+          place: inside, the far end of the dining room, a deep stone window with a wide oak sill and a window seat, cold daylight and a misty moor beyond the glass
           pose: { at: [-1.3, 14.3, 1.55], look: [0.2, 17, 1.5] }
           move: { seconds: 6, path: [{ at: [-1.4, 12.0, 1.6], look: [-0.5, 15.5, 1.4] }], motion: "the camera slides along the table and comes to the window" }
           blocks:
@@ -157,7 +158,7 @@ sections:
                 - { tag: Any night, title: The whole house, body: "Eight guests, nobody else for eleven miles. £720." }
         - id: view
           label: The view
-          place: looking out through the window over a wide misty moor at dawn, hills in layers, soft gold light on the heather, a stone wall running away into the distance
+          place: outside, looking over a wide misty moor at dawn from the farmhouse window, hills in layers, soft gold light on the heather, a dry-stone wall running away into the distance, no building in view
           pose: { at: [0, 20.5, 1.7], look: [0, 80, 6] }
           move: { seconds: 5, path: [{ at: [-0.4, 16.0, 1.6], look: [0, 30, 2.5] }, { at: [0, 17.0, 1.65], look: [0, 60, 4] }], motion: "the camera moves through the open window and out over the moor" }
           blocks:

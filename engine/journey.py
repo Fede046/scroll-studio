@@ -156,7 +156,7 @@ def _expand_take(sec) -> None:
     frames = []
     for i, stop in enumerate(j.stops):
         frames.append({"name": stop.id, "t": 0.0 if i == 0 else round(centre[i], 3), "prompt": f"{j.world}. {stop.place}",
-                       "strength": 1.0 if i == 0 else b.keyframe_strength})
+                       "strength": 1.0 if i == 0 else b.keyframe_strength, **({"seed": stop.seed} if stop.seed is not None else {})})
 
     def stop_at(x: float) -> int:
         for i in range(len(j.stops)):
