@@ -18,7 +18,7 @@ from mcp.server.fastmcp import FastMCP
 from pydantic import ValidationError
 
 from .config import ROOT, settings
-from .project import Project
+from .project import BuildError, Project
 from .server.jobs import JobQueue, logger
 from .spec import SCENE_TYPES, Site
 
@@ -78,13 +78,14 @@ def create_project(name: str, example: Optional[str] = None) -> dict:
 
 @mcp.tool()
 def spec_schema(part: Optional[str] = None) -> dict:
-    """JSON Schema of site.yaml. part = a scene/block type (film, artwork, scene3d, sequence, parallax, type,
+    """JSON Schema of site.yaml. part = a scene/block type (film, artwork, scene3d, sequence, parallax, type, inside,
     intro, features, stats, timeline, quote, cta, gallery) or 'Site'/'Theme'/'Step'/'Hud' to get just that definition."""
     sch = Site.model_json_schema()
     if not part:
         return sch
     names = {"film": "FilmScene", "artwork": "ArtworkScene", "scene3d": "Scene3DScene", "sequence": "SequenceScene",
              "parallax": "ParallaxScene", "type": "TypeScene", "code": "CodeScene", "showroom": "ShowroomScene", "diorama": "DioramaScene",
+             "inside": "InsideScene", "stop": "InsideStop",
              "product": "Product", "parts": "PartMaterial", "shot": "ProductShot", "intro": "IntroBlock", "features": "FeaturesBlock",
              "stats": "StatsBlock", "timeline": "TimelineBlock", "quote": "QuoteBlock", "cta": "CtaBlock", "gallery": "GalleryBlock"}
     key = names.get(part, part)
@@ -536,6 +537,44 @@ def brand_from_logo(project: str, logo: str, mode: str = "light", dry_run: bool 
     """Set theme colours from a logo inside the project (contrast-checked) and use it as the nav logo."""
     from .brand import apply_brand
     return apply_brand(_find(project), logo, mode=mode, dry_run=dry_run)
+
+
+# ---------------------------------------------------------------- inside: the product as the set
+
+@mcp.tool()
+def inside_route(project: str, section: Optional[str] = None, stills: Optional[list[str]] = None, samples: int = 24,
+                 scale: float = 0.5) -> dict:
+    """The route of a `type: inside` scene (the camera flying into the site's product): per stop the parts it found,
+    the view, the camera side, where it rests and where its copy sits on the scroll (0-1), plus the notes (automatic
+    stops). With `stills` (stop numbers as strings, 'all', 'wide', or 'strip:8' for 8 frames along the route) it renders
+    quick Cycles stills and a contact sheet and returns their paths to look at. A stop that matches no part or a model
+    without parts returns the error with the part names the model has."""
+    from .scenes import inside as ins
+    p = _find(project)
+    sec = ins.find_section(p, section)
+    with contextlib.redirect_stdout(sys.stderr):
+        try:
+            info, glb, res, plan = ins.route(sec, p, lambda m: None)
+        except BuildError as e:
+            return {"error": str(e)}
+        out = plan.describe()
+        picks: list[int] = []
+        for tok in stills or []:
+            if tok == "wide":
+                picks.append(0 if sec.establish else plan.windows[0]["frame"])
+            elif tok == "all":
+                picks += [w["frame"] for w in plan.windows]
+            elif tok.startswith("strip:"):
+                n, k = len(plan.frames), int(tok.split(":")[1])
+                picks += sorted({round(i * (n - 1) / max(k - 1, 1)) for i in range(k)})
+            else:
+                picks.append(plan.windows[int(tok) - 1]["frame"])
+        if picks:
+            sheet = p.root / f"inside_{sec.id}.jpg"
+            paths = ins.preview(p, sec, picks, samples, scale, lambda m: None, sheet)
+            out["stills"] = [str(x) for x in paths]
+            out["sheet"] = str(sheet)
+    return out
 
 
 # ---------------------------------------------------------------- product (site.product)

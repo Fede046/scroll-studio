@@ -172,6 +172,13 @@ def build_site(project: Project, log: Callable[[str], None] = print,
             if selected is not None and sec.id not in selected:
                 prev = project.build / sec.id / "config.json"
                 entry["config"] = json.loads(prev.read_text())
+                if entry["config"].get("stepsAt"):      # a builder that placed the copy itself (inside): keep its placement
+                    for st, at in zip(sec.steps, entry["config"]["stepsAt"]):
+                        if st.at is None and at:
+                            st.at = tuple(at)
+                    if entry["config"].get("scrollLength") and not sec.length:
+                        sec.length = entry["config"]["scrollLength"]
+                    entry["sdata"] = sec.model_dump(mode="json", include={"hud", "steps", "layout", "length"})
             else:
                 k = scenes.index(sec)
                 log(f"[{sec.id}] {sec.type}")

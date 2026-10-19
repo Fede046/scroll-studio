@@ -22,7 +22,7 @@ spec field, a cached builder, a runtime player where needed, CLI and MCP, docs a
 - [x] **Cinemagraph pages**: stills where only one thing moves (steam, a curtain, light on water); a mask picks what
   moves and the rest is held perfectly still.
 - [ ] **Light as the scroll**: one world from dawn to night; each section is a time of day, the same place relit.
-- [ ] **The product as the set**: fly into the product (inside a speaker, between the layers of a board, macro around a
+- [x] **The product as the set** (`type: inside`): fly into the product (inside a speaker, between the layers of a board, macro around a
   bottle); each feature is a stop inside it.
 - [x] **Miniature worlds** (`diorama`, [docs/miniature.md](miniature.md)): a tilt-shift diorama you orbit and dive into; sections are places on it.
 - [x] **Styles 30-33**: `paint-on-glass`, `multiplane`, `scratch-film`, `smears`.

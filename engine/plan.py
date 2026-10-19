@@ -47,13 +47,15 @@ DEFAULTS = {
     "film:faces": 0.25,         # per frame of film (GFPGAN over every face)
     "sequence:render": 0.13,    # per frame at 96 samples, 1920x1080
     "sequence:encode": 1.0,     # per frame
+    "inside:render": 0.55,      # per frame at 64 samples, 1600x900 (macro Cycles with a shared GPU)
+    "inside:encode": 0.5,       # per frame (grade, desktop and phone WebP)
 }
 FLAT = 10.0                     # any other stage, per run
 IMAGES = {"beat frame": 3.0, "image": 15.0, "edit": 60.0, "product still": 25.0, "scene still": 150.0, "product model": 60.0,
           "download": 5.0, "art": 240.0, "stand-in": 5.0}
 # what counts as heavy GPU work (a video model, SeedVR2, a Cycles pass over every frame): the build lists these first
 HEAVY = ("film:generate", "film:generate_wan", "film:restore", "film:product", "film:beat", "film:camera", "film:keyframes",
-         "film:freeze_up", "film:freeze_zoom", "film:freeze_layers", "sequence:render", "film:reveal_track", "film:faces")
+         "film:freeze_up", "film:freeze_zoom", "film:freeze_layers", "sequence:render", "inside:render", "film:reveal_track", "film:faces")
 
 
 @dataclass
@@ -232,6 +234,15 @@ def units(sec, name: str) -> tuple[str, float]:
             return "film:faces", frames
         if name == "track":
             return "film:track", 1.0
+    if t == "inside":
+        w, h = sec.size
+        stops = sec.stops or [None] * max(1, len([x for x in sec.steps if not x.intro]) or 5)
+        screens = sec.length or (sum((st.hold + st.travel) if st else 2.2 for st in stops) + (2.0 if sec.establish else 0) + (1.9 if sec.outro == "wide" else 0))
+        frames = max(8.0, screens * sec.density)
+        if name == "render":
+            return "inside:render", frames * (sec.samples / 64) * (w * h) / (1600 * 900)
+        if name == "encode":
+            return "inside:encode", frames
     if t == "sequence":
         w, h = sec.size
         if name == "render":

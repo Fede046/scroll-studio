@@ -600,6 +600,36 @@ class Maker:
         c.captions = step_captions(sec.steps)
         return [c]
 
+    def scene_inside(self, sec) -> list[Card]:
+        """The product as the set: the opening wide shot and a still of every stop (Cycles, low samples), each a held piece
+        with the stop's copy over it."""
+        from ..fidelity import previewing
+        from ..scenes import inside as ins
+        c = Card(sec.id, sec.id, "sequence", f"{sec.id} (inside the product)",
+                 prompt="the camera flies into the product, one stop per part: "
+                        + ", ".join(st.part or "a point" for st in (sec.stops or [])) if sec.stops else "the camera flies into the product, stops chosen from its parts",
+                 caption=" / ".join(plain(st.title) for st in sec.steps), scroll=sec.length or 0.0, locked=sec.locked,
+                 fingerprint=_digest({"inside": sec.model_dump(mode="json", exclude={"steps", "hud", "transition", "backdrop"}),
+                                      "product": self.site.product.model_dump(mode="json") if self.site.product else None}))
+        self.estimate_section(c)
+        c.rendered = self.plan.section_fresh(sec.id)
+        if self.nogen:
+            self.reuse(c)
+        elif not ((c.locked or not self.selected(c.id, sec.id)) and self.reuse(c)):
+            from ..compile import themes
+            lvl = "sketch" if self.level == "sketch" or not self.selected(c.id, sec.id) else "stills"
+            with previewing(lvl):
+                info, glb, res, plan = ins.route(sec, self.project, self.log)
+                picks = ([0] if sec.establish else []) + [w["frame"] for w in plan.windows]
+                labels = (["wide"] if sec.establish else []) + [s.label for s in res.stops]
+                if not sec.length:
+                    sec.length = round(max(3.0, plan.screens), 2)
+                paths = ins.preview(self.project, sec, picks, 8 if lvl == "sketch" else 24, 0.5, self.log)
+            c.frames = [Frame(p, lab, lvl, 0) for p, lab in zip(paths, labels)]
+        c.pieces = [Piece(2.0, f.path, None, Move(1.0, 1.05)) for f in c.frames]
+        c.captions = step_captions(sec.steps)
+        return [c]
+
     def scene_showroom(self, sec) -> list[Card]:
         from .. import product as prod
         k0 = sorted(sec.keys, key=lambda k: k.get("t", 0))[0] if sec.keys else {}

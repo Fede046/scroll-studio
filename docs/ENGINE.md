@@ -45,12 +45,32 @@ Each scene type is one engine module: a schema, a builder (inputs → assets), a
 | 11 | `type` | Kinetic typography: headlines that assemble, swap, scale with scroll | text only | none | `type` (GSAP) |
 | 14 | `diorama` | A tilt-shift miniature world you orbit and dive into: places on it carry the steps' content | `world` kind + seed, `places`, `camera`, `look` | `engine/diorama/` lays out ground, props, places and camera beats (CPU, cached per stage); no GPU | `diorama` (three.js, depth-of-field pass; `docs/miniature.md`) |
 | 13 | `showroom` | The site's product, live: scroll turns, explodes and zooms the real model | `site.product` (any model format) or a model file | `engine/product.py` normalised GLB (thinned for the web), Cycles poster | `showroom` (three.js, environment light, shadow) |
+| 14 | `inside` | The camera flies into the site's product and the page happens inside it, one stop per named part | `site.product` (a model with named parts) | `engine/inside.py` plans the route from the parts report; Cycles (`inside.py`) draws a frame per slice with a cutaway dissolve; WebP sets for desktop and phones | `frame-seq` (shared with `sequence`; one still per stop for reduced motion) |
 
 **The product, declared once.** `site.product` names the model once; `engine/product.py` converts it (STEP via
 OpenCascade, 3MF via trimesh), normalises it in Blender (axes, units, base at the origin, part materials, explode
 offsets as node extras) into one cached GLB, and renders stills (`image: {product: <view>}`, optionally into a
 generated `scene:`). Takes (`product: {}`), sequences (`model: product`) and showroom scenes all use that GLB; takes
 light it from the plate (environments built from the generated frames) and grade it to the plate.
+
+**Inside the product** (`inside`, `engine/inside.py`, `engine/scenes/inside.py`, `backends/blender_scripts/inside.py`). The
+route is planned without Blender from the parts report (`product_info`: every part's name, path, centre, size, explode
+offset): stops resolve to part boxes (a name match beats mesh and assembly names; `studio product --parts` names), the
+camera side is chosen by a cheap box test (open, near the previous side, 15-40 degrees up), the pose follows the stop's
+`span` and lens (the view at the focal plane is `span` wide: distance = span x lens / 36 mm), and the flight between poses
+is a quadratic Bezier that bows away from the surfaces with the look point leading, `smootherstep` eased both ends (zero speed
+at landing; the aperture closes up to 1.9x mid-flight) around a rest of slow creep. The timeline is in screens
+(`hold`, `travel`), sampled at `density` frames a screen; each step's `at` comes from the stop's rest window widened by
+28% of the adjoining flights. The renderer only draws that plan, scaled to a unit-radius product like the stills (aperture
+scaled back to the real product's blur): a camera lamp (energy x distance squared, so exposure holds at any distance), a
+rim light behind the subject and a dim studio HDRI for reflections; camera rays see the void colour. The cutaway is a first
+pass over the whole route: from every camera pose, ray casts (to the stop, and a 7 x 4 grid across the frame) list the parts
+in front of the focal plane that cover it (excluding the stop's own parts and the floor under it); each is a 0/1 series
+over the frames, widened (3 behind, 8 ahead) and smoothed (sigma 2.5), then set per frame as an object property that every
+material mixes into a transparent shader (all ray types, so light passes through a dissolved wall). Frames are keyed per
+frame by their own plan entries and the 14 behind and 18 ahead that the dissolve reads, so one changed stop redraws only
+its neighbourhood. Limits: only AABB-level planning of the camera side (an enclosed part may need a `yaw`/`pitch`), the
+dissolve is whole-part (no section capping), a one-mesh model has no parts (use `point:` stops).
 
 Mapping the current demos: Lodestar Orbital and Meridian = `film`; Atelier Sfumato = `artwork`;
 Cellwright Bio = `scene3d` with generator presets (cells, chromatin, helix, molecule).

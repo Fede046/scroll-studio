@@ -1105,6 +1105,105 @@ class SequenceScene(SceneBase):
     hdri: str = Field("studio", description="Blender studio light: studio, forest, city, courtyard, night, interior, sunrise, sunset")
 
 
+# ---------------------------------------------------------------- inside: the product as the set (engine/inside.py)
+
+class InsideStop(Model):
+    """One stop of the camera inside the product: it flies to a named part (or a point), lands there at macro scale
+    with a shallow depth of field, and the stop's copy (the step in the same position) arrives with it. Only `part`
+    (or `point`) is needed; everything else has a default that suits any model with named parts."""
+    part: Optional[str] = Field(None, description="Glob on the part, mesh or assembly name, case-insensitive: 'driver*', "
+                                                  "'*magnet*', 'Housing/*' (see `studio product <project> --parts`). Several "
+                                                  "parts are framed together. Use `point` for a model with no named parts")
+    point: Optional[tuple[float, float, float]] = Field(
+        None, description="Instead of a part: a point inside the product, x y z in 0-1 of its bounds (x left to right, y "
+                          "front to back, z bottom to top)")
+    aim: tuple[float, float, float] = Field(
+        (0.5, 0.5, 0.5), description="Where in the part's own bounds the camera looks, x y z in 0-1 (z 1 = its top "
+                                     "surface): look at one end of a long part, or its top")
+    label: Optional[str] = Field(None, description="Name for this stop in `studio inside` and in alt text "
+                                                   "(default: the part's name)")
+    span: Optional[float] = Field(None, gt=0, description="How much fills the frame at the stop: the width of the view at "
+                                                          "the focal plane, in millimetres of the real product (macro: "
+                                                          "8-40). Default: the part with a margin, never wider than 40% "
+                                                          "of the product")
+    lens: Optional[float] = Field(None, gt=4, description="Focal length in mm (default: the scene's `lens`). Longer "
+                                                          "flattens and blurs more")
+    fstop: Optional[float] = Field(None, gt=0.5, description="Aperture (default: the scene's `fstop`). 1.8 is a razor "
+                                                             "thin plane in focus, 8 keeps most of the part sharp")
+    focus: Optional[str] = Field(None, description="Glob on the part the focus is held on (default: the stop's part). "
+                                                   "Rack focus by naming a part in front of or behind it")
+    yaw: Optional[float] = Field(None, description="Which side the camera comes from, degrees (0 the front, 90 the right "
+                                                   "side). Default: chosen per stop, the clearest way in, close to the "
+                                                   "previous stop's side")
+    pitch: Optional[float] = Field(None, ge=-85, le=89, description="Camera height above the horizon, degrees (default: "
+                                                                    "chosen, 15-40)")
+    roll: float = Field(0.0, description="Tilt of the horizon at the stop, degrees (a few degrees reads as handheld/"
+                                         "cinematic)")
+    explode: Optional[float] = Field(None, ge=0, le=1.5, description="How far the parts are pulled apart at this stop "
+                                                                     "(default: the scene's `explode`); opens a closed "
+                                                                     "assembly so the camera can enter")
+    hold: float = Field(0.8, gt=0, description="Scroll distance, in screens, the camera rests here while the copy is read")
+    travel: float = Field(1.4, gt=0, description="Scroll distance, in screens, of the flight that arrives at this stop")
+
+
+class InsideScene(SceneBase):
+    """The product as the set: the camera flies into the product and the page happens inside it (between the layers of
+    a board, past the cone and magnet of a speaker, along a keyboard's switches). Each feature is a stop: the camera
+    lands at a named part with a macro lens and a shallow depth of field, and the copy (the steps, in order) arrives
+    with it. Rendered offline by Cycles from the site's product (`site.product`: any model with named parts), a frame
+    per slice of the flight, and scrubbed by scroll like a sequence. Parts between the camera and the stop's part
+    dissolve (a cutaway) so the camera can see and travel through the assembly.
+
+    Copy: leading steps with `intro: true` are shown over the opening wide shot; the next steps are matched to the
+    stops in order; steps after those are shown over the pull-back. `studio inside <project>` prints the plan (which
+    parts each stop found, where the copy sits) and renders a still of any stop."""
+    type: Literal["inside"] = "inside"
+    layout: Literal["overlay"] = Field("overlay", description="overlay only: the camera is pinned and the copy arrives "
+                                                              "over it")
+    length: float = Field(0.0, description="Scroll distance in screens (0: the sum of the stops' travel and hold, plus "
+                                           "the opening and closing shots)")
+    model: Optional[str] = Field(None, description="Model file or https URL; omit, or write 'product', to use site.product")
+    credit: Optional[str] = Field(None, description="Attribution shown in the footer (for a model that is not site.product)")
+    stops: Optional[list[InsideStop]] = Field(
+        None, description="The camera's stops, in order. Omit for automatic stops: as many as there are copy steps (5 "
+                          "without any), the model's most distinct named parts in a tour order")
+    establish: bool = Field(True, description="Open on a wide shot of the whole product, then dive in")
+    outro: Literal["wide", "stay"] = Field("wide", description="wide: pull back to the whole product after the last stop "
+                                                               "(room for a closing step); stay: end at the last stop")
+    lens: float = Field(60.0, gt=4, description="Focal length in mm at the stops (the opening shot uses a wider lens)")
+    fstop: float = Field(11.0, gt=0.5, description="Aperture at the stops, for the real product: this is macro, where f/2.8 leaves only a sliver in focus and f/11 keeps a part sharp with the rest falling softly away; f/16 keeps most in focus")
+    explode: float = Field(0.0, ge=0, le=1.5, description="Spread of the parts at every stop unless it sets its own")
+    cutaway: bool = Field(True, description="Parts between the camera and the stop's part dissolve while the camera is "
+                                            "behind them, so it can see (and fly) inside a closed product")
+    density: float = Field(18.0, gt=1, description="Rendered frames per screen of scroll. 18 is smooth on desktop; "
+                                                   "lower renders faster and steps more")
+    size: tuple[int, int] = Field((1600, 900), description="Frame size (a second set at 960 px wide is made for phones)")
+    samples: int = Field(64, ge=4, le=4096, description="Cycles samples per frame (denoised)")
+    offset: float = Field(0.2, ge=0, le=0.4, description="How far the stop's part sits off the centre of the frame, as a "
+                                                          "share of its width, towards `side` (the copy has the other "
+                                                          "side). 0 centres it")
+    hdri: str = Field("studio", description="Blender studio light the interior reflects: studio, city, courtyard, forest, "
+                                            "interior, night, sunrise, sunset")
+    ambient: float = Field(0.25, ge=0, le=4, description="Strength of that light on the scene (low: the camera's own lamp "
+                                                         "lights the macro shot)")
+    lamp: float = Field(1.0, ge=0, le=10, description="Strength of the lamp that travels with the camera")
+    lamp_color: str = Field("#ffe8d0", description="Colour of the camera lamp, hex")
+    rim: float = Field(1.0, ge=0, le=10, description="Strength of the light behind the stop's part (edges, translucent "
+                                                     "materials glow)")
+    exposure: float = Field(0.0, ge=-4, le=4, description="Exposure in stops")
+    background: Optional[str] = Field(None, description="Colour of the void beyond the product (hex; default: the "
+                                                        "theme background)")
+    vignette: float = Field(0.35, ge=0, le=1, description="Darkening towards the corners")
+    grain: float = Field(0.02, ge=0, le=0.2, description="Film grain")
+
+    @model_validator(mode="after")
+    def _stops(self):
+        for i, st in enumerate(self.stops or []):
+            if (st.part is None) == (st.point is None):
+                raise ValueError(f"inside '{self.id}': stop {i + 1} needs exactly one of `part` and `point`")
+        return self
+
+
 class ShowroomScene(SceneBase):
     """The real product, live in the page: three.js renders the product's normalised GLB with studio environment
     lighting and a soft shadow; scroll turns, explodes and zooms it along `keys`, and the pointer nudges the view."""
@@ -1590,13 +1689,13 @@ class FaqBlock(BlockBase):
 
 Section = Annotated[Union[
     FilmScene, ArtworkScene, Scene3DScene, SequenceScene, ParallaxScene, TypeScene, VectorScene, ChartScene, MapScene,
-    SplatScene, CodeScene, ShowroomScene, DioramaScene,
+    SplatScene, CodeScene, ShowroomScene, DioramaScene, InsideScene,
     IntroBlock, FeaturesBlock, StatsBlock, TimelineBlock, QuoteBlock, CtaBlock, GalleryBlock,
     HeroBlock, ProductBlock, StripBlock, OrbitBlock, FaqBlock,
 ], Field(discriminator="type")]
 
 SCENE_TYPES = ("film", "artwork", "scene3d", "sequence", "parallax", "type", "vector", "chart", "map", "splat", "code",
-               "showroom", "diorama")
+               "showroom", "diorama", "inside")
 
 
 # ---------------------------------------------------------------- site

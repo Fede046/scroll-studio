@@ -27,6 +27,18 @@ Everything so far is version 1. On 2026-10-12 the releases first published as 2.
   `examples/little-harbour`. Tests: `tests/test_diorama.py`.
 - Style `paint-on-glass` (Aleksandr Petrov, *Loving Vincent*): the page is one oil painting on a lit pane, never cut. Scroll distance is brush strokes laid toward the next picture, coarse to fine, each dragging the old colour into the new; scrolling back paints forward again (paint can't be unpainted); a slow boil keeps it alive at rest; the pointer smears wet paint. Research in `docs/styles/styles-30-31.md`.
 - Style `multiplane` (Disney's multiplane camera): each section is a stack of painted glass plates at real distances; scroll trucks the camera down through the stack, plates grow and pass the lens, focus pulls to the plane carrying the words, and a foreground plate sweeps past to cover changes inside a list; the pointer trucks sideways and pulls focus.
+- The product as the set (`type: inside`): the camera flies into `site.product` and the page happens inside it, one stop
+  per named part with its copy arriving there (macro lens, shallow depth of field, a lamp that travels with the camera and a
+  rim light behind the part). Stops are globs on part, mesh and assembly names (`part:`), or points (`point:`) for a model
+  with no named parts, with `span` (mm of the real product in view), `lens`, `fstop`, `focus`, `roll`, `explode`, `aim`,
+  `yaw`/`pitch`, `hold`, `travel`; with no `stops:` they are chosen from the model's most distinct parts. Parts between the
+  camera and the stop dissolve (a cutaway worked out with ray casts over the whole route), the route is eased so the camera
+  lands softly, the copy is placed on it, and every frame is cached on its own camera so changing one stop redraws only the
+  frames near it. Phones get a 960 px set; reduced motion gets one still per stop. `studio inside <project> [--still] [--strip]`
+  and the MCP tool `inside_route` print the route and render stills; storyboard cards show the wide shot and each stop. Modules:
+  `engine/inside.py` (route), `engine/scenes/inside.py` (builder), `backends/blender_scripts/inside.py` (Cycles),
+  `runtime/src/players/frames.ts` (shared with `sequence`). Example: `examples/inside-board` (Framework Laptop 12 mainboard,
+  CC BY 4.0, concept page).
 - Style `scratch-film` (Len Lye, Norman McLaren, Stan Brakhage): scroll pulls a strip of drawn film through a gate. Text steps in perforation-sized pulls and seats with a bump; the strip runs down the edge with sprockets and a drawn soundtrack; a new scratched, dyed or pressed drawing is projected every frame; sections are spliced reels with one flash frame (flashing kept within safe limits); the pointer is a needle that scratches the emulsion; optional sound. Research in `docs/styles/styles-32-33.md`.
 - Style `smears` (Spider-Verse timing): the page is sampled 12 times a second; where a pose changes, headlines, numbers, buttons and pictures are drawn as smear frames with trailing colour plates, faster scrolling adds multiples, no blur anywhere; plates slip with speed while the focused element stays in register; crossing into the next sheet fast gives one impact frame (at most one per 520 ms); the pointer leaves multiples.
 - Cinemagraphs: `cinemagraph: {moves, motion, seconds, loop: seamless|pingpong, strength, ...}` on any image input (hero, product,

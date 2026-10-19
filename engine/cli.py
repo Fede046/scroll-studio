@@ -680,6 +680,63 @@ def product(name: str, parts: bool = typer.Option(False, "--parts", help="List t
 
 
 @app.command()
+def inside(name: str, section: Optional[str] = typer.Option(None, help="The `type: inside` section (when the site has several)"),
+           still: Optional[str] = typer.Option(None, help="Render stills: stop numbers (1,3), `all` for every stop, `wide` for the opening shot"),
+           strip: int = typer.Option(0, help="Render this many frames spaced evenly along the whole route"),
+           samples: int = typer.Option(24, help="Cycles samples for the stills"),
+           scale: float = typer.Option(0.5, help="Still size as a fraction of the scene's frame size"),
+           out: Optional[Path] = typer.Option(None, help="Contact sheet of the stills (default: <project>/inside_<section>.jpg)")):
+    """The product as the set: print the route (which parts each stop found, how the camera comes in, where the copy
+    sits on the scroll) and render quick stills of stops or a strip along the route, with a contact sheet."""
+    from .project import BuildError, Project
+    from .scenes import inside as ins
+    project = Project(resolve(name))
+    sec = ins.find_section(project, section)
+    try:
+        info, glb, res, plan = ins.route(sec, project, typer.echo)
+    except BuildError as e:
+        typer.echo(str(e))
+        raise typer.Exit(1)
+    typer.echo(f"{sec.id}: {len(res.stops)} stops, {plan.screens:.1f} screens of scroll, {len(plan.frames)} frames")
+    for n in plan.notes:
+        typer.echo(f"  {n}")
+    for s, w in zip(res.stops, plan.windows):
+        d = s.describe()
+        parts = ", ".join(d["parts"][:4]) + (f" +{d['matched'] - 4} more" if d["matched"] > 4 else "")
+        typer.echo(f"  {s.index + 1}. {s.label}  [{d['pattern']}]  {d['matched']} part(s): {parts}")
+        typer.echo(f"       view {d['span_mm']} mm wide, {s.lens:g} mm f/{s.fstop:g}, from yaw {d['from']['yaw']} pitch {d['from']['pitch']}, "
+                   f"{d['distance_mm']} mm away; rests p {w['arrive']:.3f}-{w['leave']:.3f}, copy p {w['copy'][0]:.3f}-{w['copy'][1]:.3f}")
+    shown = [st for st in sec.steps]
+    if shown:
+        typer.echo(f"  copy: {len(shown)} step(s), {len([x for x in shown if x.intro])} intro; steps without `at` are placed on the route")
+    picks: list[int] = []
+    if still:
+        for tok in [t.strip() for t in still.split(",") if t.strip()]:
+            if tok == "wide":
+                picks.append(0 if sec.establish else plan.windows[0]["frame"])
+            elif tok == "all":
+                picks += [w["frame"] for w in plan.windows]
+            else:
+                i = int(tok)
+                if not 1 <= i <= len(plan.windows):
+                    raise typer.BadParameter(f"stop {i}: the route has {len(plan.windows)} stops")
+                picks.append(plan.windows[i - 1]["frame"])
+    if strip:
+        n = len(plan.frames)
+        picks += sorted({round(i * (n - 1) / max(strip - 1, 1)) for i in range(strip)})
+    if picks:
+        sheet = out or (project.root / f"inside_{sec.id}.jpg")
+        try:
+            paths = ins.preview(project, sec, picks, samples, scale, typer.echo, sheet)
+        except BuildError as e:
+            typer.echo(str(e))
+            raise typer.Exit(1)
+        for k, p in zip(picks, paths):
+            typer.echo(f"  frame {k + 1}: {p}")
+        typer.echo(f"contact sheet -> {sheet}")
+
+
+@app.command()
 def trailer(name: str, format: Optional[str] = typer.Option(None, help="16x9 or 9x16 (default: trailer.formats)"),
             force: bool = typer.Option(False, help="Ignore the cache"),
             plan: bool = typer.Option(False, help="Print the cut and stop")):

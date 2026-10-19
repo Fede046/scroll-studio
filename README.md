@@ -151,6 +151,7 @@ Every example is a `site.yaml` in [`examples/`](examples/) and rebuilds with `st
 | [Halcyon](examples/halcyon/site.yaml) | Software | blocks | One product page as twenty-one experiences (`studio looks`) |
 | [Harbourlight](examples/little-harbour/site.yaml) | Port software | `diorama` | A tiny harbour, tilt-shift and live in the page: scroll orbits it, dives to a lighthouse, a windmill, a crane, a customs house, a market stall, and lifts out again. No video, nothing to render |
 | [Halo Coffee](examples/film-cuts/site.yaml) | Coffee | `transition:` | A page edited like a film: a logo becomes the sun becomes a cup (designed match cuts), a whip pan, an iris, a carried figure, a wipe, a dissolve and a hard cut (needs ComfyUI to build; `studio cuts --strip` shows each cut) |
+| [Inside the mainboard](examples/inside-board/site.yaml) | Hardware | `inside` | The camera flies into the open-hardware Framework Laptop 12 mainboard: past the processor package, along the heat pipe, over the fan's blades, down the memory module, to a USB-C port; each feature is a stop, Cycles-rendered, macro lens |
 
 ## Quick start
 
@@ -523,6 +524,61 @@ pass (checked: if the edit changed the product, the rendered product is put back
 
 A take's `product: {}` and a sequence's `model: product` use the same model, materials and credit; the credit and
 licence go in the footer automatically.
+
+### Inside the product (`type: inside`)
+
+The product as the set. The camera flies *into* the product and the page happens inside it: between the layers of a
+board, past the cone and magnet of a speaker, along a keyboard's switches. Each feature is a stop at a named part, with
+its copy arriving there; the scale is macro (long lenses, shallow depth of field, light from a lamp that travels with the
+camera and a rim light behind the part). It is rendered offline by Cycles from `site.product` and scrubbed by scroll like a
+`sequence`; nothing runs in the browser but a canvas.
+
+```yaml
+product:
+  name: Framework Laptop 12 mainboard
+  model: https://github.com/FrameworkComputer/Framework-Laptop-12/raw/main/Mainboard/FRAMEWORK_LAPTOP_12_MAINBOARD_V01.stp
+  licence: CC BY 4.0
+sections:
+  - id: inside
+    type: inside
+    steps:                                    # leading `intro: true` steps are shown over the opening wide shot;
+      - { intro: true, title: "Go <em>inside</em> the mainboard." }
+      - { kicker: "04  The fan", title: "A fan 53 mm across." }     # then one step per stop, in order
+    stops:                                    # omit for automatic stops chosen from the model's named parts
+      - { part: "IMP_*", span: 96, pitch: 22, roll: 3 }            # glob on part, mesh or assembly names
+      - { part: "PHO16_DDR5_CARD*", aim: [0.25, 0.5, 1.0], focus: "*MYLAR*" }
+      - { point: [0.9, 0.2, 0.5], lens: 85 }                       # a model with no named parts: stops at points
+```
+
+What the engine does with it (`engine/inside.py`, `engine/scenes/inside.py`, `backends/blender_scripts/inside.py`):
+
+- **Stops.** `part` is a case-insensitive glob on part, mesh and assembly names (a part's own name wins over mesh names;
+  `Driver/*` finds everything in an assembly); several matches are framed together. A glob that matches nothing stops the
+  build with the closest names and `studio product <project> --parts`; a model that is one mesh gets an explanation and the
+  `point:` alternative. `span` is how wide the view is at the focal plane in millimetres of the real product (macro: 8-40;
+  the default frames the part with a margin, never wider than 40% of the product), `lens`, `fstop` (default f/11, real
+  macro optics), `focus` (rack focus to another part), `roll`, `explode` (open the assembly at a stop), `aim` (where in the
+  part), `yaw` / `pitch` (the side the camera comes in from; by default the clearest, close to the previous side).
+- **The route.** An opening wide shot, a flight to each stop (a curve that leaves the surfaces, eased so the camera
+  lands softly, the aperture closing in flight), a slow creep while it rests, and a pull-back (`establish`, `outro`). Scroll
+  distance follows: each stop's `hold` and `travel` in screens add up to the section's `length` (set it to override).
+- **A cutaway.** Parts between the camera and the stop (a fan cover, a heat spreader, a cabinet wall) dissolve for the
+  frames the camera is behind them, so it can see and fly through a closed assembly. The dissolve is worked out with ray
+  casts over the whole route and smoothed in time (it starts before the camera arrives and ends after it leaves). `cutaway: false` turns it off.
+- **The copy.** Steps without an `at` are placed on the route (intro steps over the wide shot, then one per stop while it
+  rests, extra steps over the pull-back), and the subject sits off-centre (`offset`, towards `side`) so the words have the other half.
+- **Cache.** Every frame is keyed by its own camera and the frames around it that the dissolve looks at: change one stop's
+  lens and only the frames near it are redrawn; changing copy, vignette or grain redraws nothing.
+- **Phones, reduced motion.** A 960 px set for phones; with `prefers-reduced-motion` the page shows one still per stop
+  (the opening frame, each stop's resting frame when its copy arrives, the closing frame) and downloads only those; scrolling is never captured.
+- **A shared GPU.** The renderer uses the GPU, or the CPU when the GPU has under 2 GB free (a Cycles scene that cannot get its
+  memory stalls instead of failing); `STUDIO_INSIDE_DEVICE=cpu|gpu` forces one, and a render that makes no progress for
+  15 minutes (`STUDIO_INSIDE_STALL`, seconds) is stopped and the remaining frames finish on the CPU. Frames are kept as they
+  finish, so an interrupted build resumes where it stopped. On a 4090 the example's 284 frames at 1600x900 and 64 samples take about
+  half an hour with the GPU to itself; the desktop set is about 33 MB and the phone set 5 MB.
+- **Authoring.** `studio inside <project> [--still all|wide|3,5] [--strip 8]` prints the route (parts found per stop,
+  view, camera side, where the stop rests and its copy sits) and renders quick stills and a contact sheet; the MCP tool
+  `inside_route` does the same. `studio storyboard` shows the wide shot and a still per stop.
 
 ## One Take, places and data
 
