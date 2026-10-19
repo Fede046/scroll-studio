@@ -166,8 +166,8 @@ class Cinemagraph(Model):
                                         "the still by Florence-2 grounding; it must be visible in the picture")
     motion: Optional[str] = Field(None, description="How it moves, for the video model: \"slow, curling upward\", "
                                                     "\"swaying a little in a soft breeze\". Default: gentle motion of `moves`")
-    seconds: float = Field(4.0, ge=1.0, le=8.0, description="Length of the loop in seconds (a pingpong loop plays "
-                                                            "forward then back, so its video is twice as long)")
+    seconds: float = Field(4.0, ge=1.0, le=8.0, description="Length of the loop in seconds (a pingpong loop is "
+                                                            "generated at half this and played forward then back)")
     loop: Literal["seamless", "pingpong"] = Field(
         "seamless", description="seamless: the clip is made to end where it began (first = last frame generation) and any "
                                 "seam left is closed by a flow-aligned crossfade; the motion keeps one direction (steam "

@@ -502,11 +502,14 @@ def build(project, ref: ImageInput, log: Callable[[str], None] = print, force: b
     gw, gh = gen_size(cw, ch, model, wan)
     seconds = float(cg.seconds)
     flf = cg.loop == "seamless"
+    # a pingpong loop plays the clip forward then back, so the model is asked for half of `seconds` (a short clip also stays
+    # close to the still: a video model's motion grows the longer it runs)
+    gen_seconds = seconds if flf else max(1.5, seconds / 2)
     crop_png = work / "crop.png"
     sim.crop(box).save(crop_png)
 
     # ---- clip: the video model brings the crop to life
-    ckey = {"v": VERSION, "crop": [file_key(still_path), box], "motion": motion_text(cg), "seconds": seconds, "seed": cg.seed,
+    ckey = {"v": VERSION, "crop": [file_key(still_path), box], "motion": motion_text(cg), "seconds": gen_seconds, "seed": cg.seed,
             "model": model, "wan": wan if model == "wan" else None, "flf": flf, "size": [gw, gh]}
     cid = _digest(ckey)
     clip = work / f"clip_{cid}.mkv"            # one file per variant, so going back to an earlier `loop` or `seconds` costs nothing
@@ -517,7 +520,7 @@ def build(project, ref: ImageInput, log: Callable[[str], None] = print, force: b
         from . import animate
         from .fidelity import would_render
         would_render("cinemagraph", cg.moves)
-        frames = animate.animate(crop_png, "", motion_text(cg), seconds, cg.seed, work, size=(gw, gh), log=log,
+        frames = animate.animate(crop_png, "", motion_text(cg), gen_seconds, cg.seed, work, size=(gw, gh), log=log,
                                  negative=NEGATIVE, strength=1.0, end_image=crop_png if flf else None, model=model, wan=wan)
         import cv2
         arr = np.stack([cv2.resize(np.asarray(Image.open(p).convert("RGB")), (ww, wh), interpolation=cv2.INTER_AREA

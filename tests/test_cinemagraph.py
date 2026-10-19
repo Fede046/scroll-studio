@@ -268,8 +268,9 @@ def test_only_cached_never_runs_a_model(fake):
 
 
 def test_pingpong_has_no_seam_and_is_twice_as_long(fake):
-    project, _ = fake
-    b = C.build(project, _ref(seconds=1.0, loop="pingpong"), lambda m: None)
+    project, calls = fake
+    b = C.build(project, _ref(seconds=4.0, loop="pingpong"), lambda m: None)
+    assert calls["last"]["seconds"] == 2.0 and calls["last"]["end"] is False   # half the loop, one way, no end frame
     assert b["data"]["loop"]["seamless"] and b["data"]["frames"] == 25 + 23
 
 
