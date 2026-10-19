@@ -444,6 +444,8 @@ as a departures board, a comic, a terminal session, a game level or an anime ope
 | `zoetrope` | The page is one wheel of cards: spin it, land on one, open it to read |
 | `stop-motion` | Scroll fires the shutter: felt and clay sets step on twos, dead still between exposures |
 | `paper-cut-out` | Paper sheets swing off brass brads; hinged pieces sway, a jointed paper arm points |
+| `scratch-film` | Scroll pulls a hand-scratched strip of film through the gate, frame by frame |
+| `smears` | Spider-Verse timing: on twos, smear frames and multiples, impact frames between sheets |
 
 ```bash
 studio looks examples/halcyon            # dist/looks/<style>/ for every style, plus a gallery at dist/looks/

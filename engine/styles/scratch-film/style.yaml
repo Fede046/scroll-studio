@@ -1,0 +1,23 @@
+# Scratch film: tokens and fonts for theme.style: scratch-film. See engine/styles/README.md for the contract and
+# docs/styles/styles-32-33.md section 1 for the research.
+label: Scratch film
+about: "Drawn and scratched straight onto film stock (Len Lye, Norman McLaren, Brakhage's Mothlight). The screen is the gate and the page is a strip of film being pulled through it: the text steps through a perforation at a time and seats when you stop, a new scratched or dyed drawing is projected on every frame, the strip runs down the edge with its sprockets and a drawn soundtrack, sections are spliced, and the pointer is a needle that scratches the emulsion. A Hold switch stops the projector; Sound plays the drawn track."
+mode: dark
+colors:
+  bg: '#070707'
+  bg2: '#0e0e0d'
+  ink: '#fff6df'
+  accent: '#12b8d8'
+  accent2: '#e0338f'
+  accent_ink: '#06141a'
+  accent_text: '#12b8d8'
+fonts:
+  display: Londrina Solid
+  body: Hanken Grotesk
+  mono: Share Tech Mono
+font_axes:
+  Londrina Solid: "wght@100;300;400;900"
+  Hanken Grotesk: "ital,wght@0,300..800;1,300..800"
+  Share Tech Mono: ""
+display_weight: 900
+radius: 0px

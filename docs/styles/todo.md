@@ -19,8 +19,8 @@ Styles 22 to 33 come from classic animation techniques. Each one is a way of mov
 - [x] `paper-cut-out` (shipped): flat paper layers on hinged joints, Monty Python and Lotte Reiniger silhouettes.
 - [ ] `paint-on-glass`: one living painting that morphs scene to scene with visible brushstrokes (Petrov, *Loving Vincent*).
 - [ ] `multiplane`: Disney's multiplane camera, painted glass layers with real depth and focus pulls between them.
-- [ ] `scratch-film`: drawn and scratched straight onto film stock (McLaren, Len Lye), jittery, colourful, synced to sound.
-- [ ] `smears`: Spider-Verse timing, on twos, smear frames, comic textures and mixed media.
+- [x] `scratch-film` (shipped): drawn and scratched straight onto film stock (McLaren, Len Lye), jittery, colourful, synced to sound.
+- [x] `smears` (shipped): Spider-Verse timing, on twos, smear frames, comic textures and mixed media.
 
 ## Parked
 

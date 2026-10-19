@@ -1,0 +1,195 @@
+{# Smears: every section is a SHEET from a different dimension (night, ink, riso, pop), cut at an angle and overlapping the
+   one before. A sheet has its own print texture (.sa-back) and its own palette. Things marked data-sa are ACTORS: the
+   runtime holds them on twos and draws the move between poses as a smear, with colour plates (text-shadow and
+   drop-shadow, never blur) trailing it. Body copy sits on paper scraps (.sa-scrap) and is never stretched. Without
+   JavaScript and with reduced motion each sheet is a still print stacked down the page. Reading order is the HTML order. #}
+{% set types = ["hero", "intro", "features", "product", "stats", "timeline", "quote", "faq", "cta", "gallery", "strip", "orbit"] %}
+{% set dims = ["night", "ink", "riso", "pop"] %}
+
+{% macro cap(text, cls="") %}{% if text %}<p class="sa-cap {{ cls }}" data-sa="chip">{{ text }}</p>{% endif %}{% endmacro %}
+
+{% macro head(b, e, kicker=None, cls="") %}
+{% set tag = "h1" if e.first else "h2" %}
+{{ cap(kicker if kicker is not none else b.kicker) }}
+{% if b.title %}<{{ tag }} class="sa-title {{ cls }}" data-sa="title">{{ b.title | rich }}</{{ tag }}>{% endif %}
+{% endmacro %}
+
+{% macro btns(list) %}{% if list %}<div class="sa-btns">{% for l in list %}<a class="sa-btn{% if loop.first %} sa-btn--hot{% endif %}" data-sa="btn" href="{{ l.href }}"><span>{{ l.label }}{% if loop.first %} <i class="sa-arrow" aria-hidden="true">&rarr;</i>{% endif %}</span></a>{% endfor %}</div>{% endif %}{% endmacro %}
+
+{% macro scrap(text, cls="") %}{% if text %}<div class="sa-scrap {{ cls }}" data-sa="plate"><p>{{ text | rich }}</p></div>{% endif %}{% endmacro %}
+
+{% macro sheet(b, kind, loop, e, extra="") %}
+<section class="sa-sheet sa-sheet--{{ kind }}{{ extra }}" data-kind="{{ kind }}" data-dim="{{ 'night' if loop.first else dims[loop.index0 % (dims | length)] }}" data-lean="{{ loop.index0 % 2 }}"{% if b.id %} id="{{ b.id }}"{% endif %}>
+  <i class="sa-back" aria-hidden="true"></i>
+  <p class="sa-folio" aria-hidden="true">{{ '%02d' % loop.index }}</p>
+  <div class="sa-in">{{ caller() }}</div>
+</section>
+{% endmacro %}
+
+{% macro render(b, e, base, loop) %}
+
+{# ---------------------------------------------------------------- hero #}
+{% if b.type == "hero" %}
+{% call sheet(b, "hero", loop, e) %}
+  <div class="sa-hero__text">
+    {{ cap(b.badge, "sa-cap--badge") }}
+    {{ head(b, e, "", "sa-title--hero") }}
+    {{ scrap(b.body, "sa-lede") }}
+    {{ btns(b.buttons) }}
+  </div>
+  <div class="sa-hero__prop">
+    {% if e.img or e.video %}
+    <figure class="sa-cut" data-sa="img">{% if e.video %}<video src="{{ e.video }}" autoplay muted loop playsinline{% if e.img %} poster="{{ e.img }}"{% endif %}></video>{% else %}<img src="{{ e.img }}" alt="" fetchpriority="high">{% endif %}</figure>
+    {% elif b.device %}<div class="sa-cut sa-cut--phone" data-sa="img">{{ base.phone(b.device, e.screen, e.clip) }}</div>
+    {% elif art %}<div class="sa-cut sa-art" data-sa="img" data-sa-art role="img" aria-label="{{ art.label }}" style="--ar: {{ art.w }} / {{ art.h }}"><canvas aria-hidden="true"></canvas></div>
+    {% endif %}
+  </div>
+{% endcall %}
+
+{# ---------------------------------------------------------------- intro #}
+{% elif b.type == "intro" %}
+{% call sheet(b, "intro", loop, e) %}
+  <div class="sa-intro__title">{{ head(b, e, b.kicker) }}</div>
+  <div class="sa-intro__copy">
+    {{ scrap(b.body, "sa-lede") }}
+    {% if b.button %}<div class="sa-btns"><a class="sa-btn sa-btn--hot" data-sa="btn" href="{{ b.button.href }}"><span>{{ b.button.label }} <i class="sa-arrow" aria-hidden="true">&rarr;</i></span></a></div>{% endif %}
+  </div>
+{% endcall %}
+
+{# ---------------------------------------------------------------- features: variants, three media #}
+{% elif b.type == "features" %}
+{% set n = b.items | length %}
+{% call sheet(b, "features", loop, e, " sa-n" ~ n) %}
+  <div class="sa-features__head">{{ head(b, e, b.kicker) }}</div>
+  <ul class="sa-variants" style="--n: {{ n }}">
+    {% for f in b.items %}
+    <li class="sa-variant sa-variant--{{ ['print', 'ink', 'riso'][loop.index0 % 3] }}" data-sa="card" style="--i: {{ loop.index0 }}">
+      <span class="sa-tag" aria-hidden="true">{{ f.tag or loop.index }}</span>
+      <h3>{{ f.title | rich }}</h3>
+      {% if f.body %}<p>{{ f.body | rich }}</p>{% endif %}
+      {% if f.meter is not none %}<span class="sa-meter" aria-hidden="true"><i style="width: {{ (f.meter * 100) | round }}%"></i></span>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+{% endcall %}
+
+{# ---------------------------------------------------------------- product #}
+{% elif b.type == "product" %}
+{% call sheet(b, "product", loop, e, " sa-side--" ~ b.side) %}
+  <div class="sa-product__prop">
+    {% if e.img %}<figure class="sa-cut" data-sa="img"><img src="{{ e.img }}" alt="" loading="lazy"></figure>{% endif %}
+    {% if b.device %}<div class="sa-cut sa-cut--phone" data-sa="img">{{ base.phone(b.device, e.screen, e.clip) }}</div>{% endif %}
+  </div>
+  <div class="sa-product__copy">
+    {{ head(b, e, b.kicker) }}
+    {{ scrap(b.body, "sa-lede") }}
+    {% if b.stats %}<ul class="sa-chips">{% for st in b.stats %}<li data-sa="chip"><b>{{ st.value }}{% if st.unit %}<sup>{{ st.unit }}</sup>{% endif %}</b> {{ st.label }}</li>{% endfor %}</ul>
+    {% elif b.tags %}<ul class="sa-chips">{% for t in b.tags %}<li data-sa="chip">{{ t }}</li>{% endfor %}</ul>{% endif %}
+    {{ btns(b.buttons) }}
+    {% if b.note %}<p class="sa-small">{{ b.note | rich }}</p>{% endif %}
+  </div>
+{% endcall %}
+
+{# ---------------------------------------------------------------- stats: stamped numerals, multiples trailing #}
+{% elif b.type == "stats" %}
+{% set n = b.items | length %}
+{% call sheet(b, "stats", loop, e, " sa-n" ~ n) %}
+  <ul class="sa-stamps" style="--n: {{ n }}">
+    {% for st in b.items %}
+    <li class="sa-stamp" style="--i: {{ loop.index0 }}">
+      <b class="sa-stamp__v" data-sa="num">{{ st.value }}{% if st.unit %}<sup>{{ st.unit }}</sup>{% endif %}</b>
+      <span class="sa-cap" data-sa="chip">{{ st.label }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+{% endcall %}
+
+{# ---------------------------------------------------------------- timeline: key poses along a diagonal #}
+{% elif b.type == "timeline" %}
+{% set n = b.items | length %}
+{% call sheet(b, "timeline", loop, e, " sa-n" ~ n) %}
+  <div class="sa-timeline__head">{{ head(b, e, b.kicker) }}</div>
+  <ol class="sa-keys" style="--n: {{ n }}">
+    {% for t in b.items %}
+    <li class="sa-key" data-sa="card" style="--i: {{ loop.index0 }}">
+      <span class="sa-key__no" aria-hidden="true">{{ '%02d' % loop.index }}</span>
+      <span class="sa-when">{{ t.when }}</span><h3>{{ t.title | rich }}</h3>{% if t.body %}<p>{{ t.body | rich }}</p>{% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+{% endcall %}
+
+{# ---------------------------------------------------------------- quote: a caption box on a burst #}
+{% elif b.type == "quote" %}
+{% call sheet(b, "quote", loop, e) %}
+  <figure class="sa-quotefig">
+    <i class="sa-burst" aria-hidden="true"></i>
+    <blockquote class="sa-quote" data-sa="card">{{ b.text | rich }}</blockquote>
+    {% if b.who %}<figcaption class="sa-cap" data-sa="chip">{{ b.who }}</figcaption>{% endif %}
+  </figure>
+{% endcall %}
+
+{# ---------------------------------------------------------------- faq: torn tabs #}
+{% elif b.type == "faq" %}
+{% set n = b.items | length %}
+{% call sheet(b, "faq", loop, e, " sa-n" ~ n) %}
+  <div class="sa-faq__head">{{ head(b, e, b.kicker) }}</div>
+  <div class="sa-tabs">
+    {% for it in b.items %}
+    <details class="sa-tab" data-sa="card">
+      <summary><span class="sa-tab__no" aria-hidden="true">{{ loop.index }}</span><span class="sa-tab__q">{{ it.q | rich }}</span><i class="sa-tab__x" aria-hidden="true"></i></summary>
+      <p class="sa-tab__a">{{ it.a | rich }}</p>
+    </details>
+    {% endfor %}
+  </div>
+{% endcall %}
+
+{# ---------------------------------------------------------------- cta: a burst and a slanted button #}
+{% elif b.type == "cta" %}
+{% call sheet(b, "cta", loop, e) %}
+  <i class="sa-burst sa-burst--cta" aria-hidden="true"></i>
+  <div class="sa-cta__in">
+    {{ head(b, e, b.kicker, "sa-title--cta") }}
+    {% if b.button %}<div class="sa-btns"><a class="sa-btn sa-btn--hot sa-btn--big" data-sa="btn" href="{{ b.button.href }}"><span>{{ b.button.label }} <i class="sa-arrow" aria-hidden="true">&rarr;</i></span></a></div>{% endif %}
+  </div>
+{% endcall %}
+
+{# ---------------------------------------------------------------- gallery: prints pasted at angles #}
+{% elif b.type == "gallery" %}
+{% set n = b.items | length %}
+{% call sheet(b, "gallery", loop, e, " sa-n" ~ n) %}
+  <div class="sa-gallery__head">{{ head(b, e, b.kicker) }}</div>
+  <div class="sa-prints" style="--n: {{ n }}">
+    {% for g in b.items %}
+    <a class="sa-print" data-sa="card" href="{{ g.href }}" style="--i: {{ loop.index0 }}">
+      <span class="sa-print__img">{% if g.video %}<video src="{{ g.video }}" muted loop playsinline preload="metadata"{% if g.image %} poster="{{ g.image }}"{% endif %}></video>{% elif g.image %}<img src="{{ g.image }}" alt="" loading="lazy">{% endif %}</span>
+      <span class="sa-print__cap">{% if g.kicker %}<small>{{ g.kicker }}</small>{% endif %}<b>{{ g.title | rich }}</b>{% if g.body %}<em>{{ g.body | rich }}</em>{% endif %}</span></a>
+    {% endfor %}
+  </div>
+{% endcall %}
+
+{# ---------------------------------------------------------------- strip #}
+{% elif b.type == "strip" %}
+{% set n = b.items | length %}
+{% call sheet(b, "strip", loop, e, " sa-n" ~ n) %}
+  <div class="sa-strip__head">{{ head(b, e, b.kicker) }}{{ scrap(b.body, "sa-lede") }}</div>
+  <div class="sa-prints sa-prints--strip" style="--n: {{ n }}">
+    {% for it in b.items %}
+    <figure class="sa-print" data-sa="card" style="--i: {{ loop.index0 }}"><span class="sa-print__img"><img src="{{ e.imgs[loop.index0] }}" alt="{{ it.caption or '' }}" loading="lazy"></span>{% if it.caption %}<figcaption class="sa-print__cap"><b>{{ it.caption }}</b></figcaption>{% endif %}</figure>
+    {% endfor %}
+  </div>
+{% endcall %}
+
+{# ---------------------------------------------------------------- orbit: stickers on a ring #}
+{% elif b.type == "orbit" %}
+{% set n = b.items | length %}
+{% call sheet(b, "orbit", loop, e, " sa-n" ~ n) %}
+  <div class="sa-orbit__copy">{{ head(b, e, b.kicker) }}{{ scrap(b.body, "sa-lede") }}</div>
+  <div class="sa-orbit__stage">
+    <span class="sa-orbit__center" data-sa="num">{{ b.center }}</span>
+    <ul class="sa-orbit__ring" style="--n: {{ n }}">{% for it in b.items %}<li class="sa-sticker" data-sa="chip" style="--i: {{ loop.index0 }}"><b>{{ it.label }}</b>{% if it.status %}<small>{{ it.status }}</small>{% endif %}</li>{% endfor %}</ul>
+  </div>
+{% endcall %}
+
+{% endif %}
+{% endmacro %}
