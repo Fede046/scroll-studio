@@ -72,9 +72,9 @@ sections:
       - { kicker: "06  The ports", title: "Four ports. Your choice.", body: "A USB-C connector in every corner takes an expansion card." }
       - { kicker: Open hardware, title: "The whole board, <em>open.</em>", body: "The model is CC BY 4.0: take it apart, print a case for it, or build something on it.", button: { label: The files on GitHub, href: "https://github.com/FrameworkComputer/Framework-Laptop-12" } }
     stops:
-      - { part: "MB_COMPONENT", aim: [0.22, 0.32, 1.0], span: 70, lens: 50, pitch: 16, yaw: -28 }
-      - { part: "SF-HP*", aim: [0.55, 0.5, 1.0], span: 52, pitch: 20 }
-      - { part: "IMP_*", span: 96, pitch: 22, yaw: 20, roll: 3 }
-      - { part: "PHO16_DDR5_CARD*", aim: [0.25, 0.5, 1.0], span: 60, pitch: 14, yaw: 15 }
-      - { part: "HFW30_PM991A_M2_2230", span: 44, pitch: 30, yaw: 55 }
-      - { part: "LFR20_AUSBA331_0710_B_3.001", span: 34, yaw: 78, pitch: 14 }
+      - { part: "MB_COMPONENT", label: The board, aim: [0.22, 0.32, 1.0], span: 70, lens: 50, pitch: 16, yaw: -28 }
+      - { part: "SF-HP*", label: Heat pipe, aim: [0.55, 0.5, 1.0], span: 52, pitch: 20 }
+      - { part: "IMP_*", label: Fan, span: 96, pitch: 22, yaw: 20, roll: 3 }
+      - { part: "PHO16_DDR5_CARD*", label: Memory, aim: [0.25, 0.5, 1.0], span: 60, pitch: 14, yaw: 15 }
+      - { part: "HFW30_PM991A_M2_2230", label: Storage, span: 44, pitch: 30, yaw: 55 }
+      - { part: "LFR20_AUSBA331_0710_B_3.001", label: USB-C port, span: 34, yaw: 78, pitch: 14 }
