@@ -1195,10 +1195,10 @@ class LightStructure(Model):
                               "is most of what it does to the place) and bend nothing; flow: also pull local structure onto "
                               "the world with dense optical flow (edges agree better, lines wobble where the editor redrew "
                               "things; for small drift); none: measure only. What drift remains is glided over in the page")
-    max_drift: float = Field(6.0, ge=0, le=40, description="How far the place may still be from the world after the global "
+    max_drift: float = Field(8.0, ge=0, le=40, description="How far the place may still be from the world after the global "
                                                            "move is undone, mean displacement in pixels at 1024 across; above "
                                                            "it the relight is retried with another seed")
-    retries: int = Field(2, ge=0, le=8, description="How many more seeds to try when a relight drifts too far")
+    retries: int = Field(1, ge=0, le=8, description="How many more seeds to try when a relight drifts too far")
 
 
 class LightScene(SceneBase):
