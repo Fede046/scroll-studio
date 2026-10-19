@@ -209,6 +209,22 @@ const factory: PlayerFactory = async (cfg, ctx) => {
     sec.dataset.tod = times[Math.round(tau) < 0 ? 0 : Math.min(nT - 1, Math.round(tau))].id;
   };
 
+  // each headline keeps the colours of its own time of day, so its ink never passes through grey while the light changes
+  const steps: any[] = ctx.data.steps || [];
+  const order = [...steps.map((_, i) => i).filter((i) => !steps[i].place), ...steps.map((_, i) => i).filter((i) => steps[i].place)];
+  const capEls = [...sec.querySelectorAll<HTMLElement>(".ss-caption")];
+  const cardEls = [...sec.querySelectorAll<HTMLElement>(".ss-step")];
+  const tint = (el: HTMLElement | undefined, ti: number) => {
+    if (!el || !cfg.follow) return;
+    const T = times[Math.max(0, Math.min(nT - 1, ti))].tokens, st = el.style;
+    st.setProperty("--ink", `rgb(${rgbStr(T.ink)})`); st.setProperty("--ink-rgb", rgbStr(T.ink)); st.setProperty("--bg-rgb", rgbStr(T.bg));
+    st.setProperty("--ink-2", `rgba(${rgbStr(T.ink)}, ${T.a2.toFixed(2)})`); st.setProperty("--ink-3", `rgba(${rgbStr(T.ink)}, ${T.a3.toFixed(2)})`);
+    st.setProperty("--accent", `rgb(${rgbStr(T.accent)})`); st.setProperty("--accent-text", `rgb(${rgbStr(T.accent)})`); st.setProperty("--em-color", `rgb(${rgbStr(T.em)})`);
+    st.setProperty("--line", `rgba(${rgbStr(T.ink)}, .14)`);
+  };
+  capEls.forEach((el, k) => tint(el, cfg.stepTimes[order[k]] ?? 0));
+  cardEls.forEach((el, k) => tint(el, cfg.stepTimes[k] ?? 0));
+
   // ---- no WebGL: the stills, one per step
   const canvas = document.createElement("canvas");
   const gl0 = canvas.getContext("webgl2", { antialias: false, preserveDrawingBuffer: true });

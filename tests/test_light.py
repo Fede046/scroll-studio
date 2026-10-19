@@ -98,10 +98,15 @@ def test_schedule_maps_steps_to_times_and_holds():
     tt, holds = scene.schedule(sec)
     assert tt == [0, 1, 2, 3, 4, 5]
     assert sec.length == pytest.approx(2.6 * 6)
-    assert [tuple(st.at) for st in sec.steps][0][0] == 0.0 and sec.steps[-1].at[1] == 1.0
-    for h, st in zip(holds, sec.steps):
-        a, b = st.at
-        assert a < (h["a"] + h["b"]) / 2 < b and h["b"] - h["a"] == pytest.approx(0.3 * (b - a), abs=1e-3)
+    assert sec.steps[0].at[0] == 0.0 and sec.steps[-1].at[1] == 1.0
+    for i, (h, st) in enumerate(zip(holds, sec.steps)):
+        a, b = i / 6, (i + 1) / 6
+        assert a < (h["a"] + h["b"]) / 2 < b and h["b"] - h["a"] == pytest.approx(0.3 / 6, abs=1e-3)
+        # the headline is on screen over its hold (and a little either side), never over the middle of a change
+        assert st.at[0] <= h["a"] and st.at[1] >= h["b"]
+        if i < 5:
+            nxt = sec.steps[i + 1].at[0]
+            assert st.at[1] < nxt + 1e-9 and (h["b"] + holds[i + 1]["a"]) / 2 > st.at[1]
 
 
 def test_schedule_with_fewer_steps_than_times_and_pins():

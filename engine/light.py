@@ -374,13 +374,13 @@ def tokens(rgb: np.ndarray) -> dict:
     top = rgb[l >= np.quantile(l, 0.985)].astype(np.float32).mean(axis=0)
     hsv = cv2.cvtColor(np.uint8([[np.clip(top, 0, 255)]]), cv2.COLOR_RGB2HSV)[0, 0].astype(np.float32)
     hsv[1] = max(hsv[1], 150)
-    hsv[2] = 240 if dark else 150
+    hsv[2] = 240 if dark else 120
     acc = tuple(float(v) for v in cv2.cvtColor(np.uint8([[hsv]]), cv2.COLOR_HSV2RGB)[0, 0])
     bg2 = th._mix(bg, ink, 0.06)
     bgs = [bg, bg2]
     a3 = th._min_alpha(ink, bgs, th.SMALL_TEXT, 0.44)
     a2 = max(th._min_alpha(ink, bgs, th.SMALL_TEXT, 0.68), min(1.0, round(a3 + 0.14, 2)))
-    em = th._readable_accent(acc, ink, bgs, 3.0)
+    em = th._readable_accent(acc, ink, bgs, th.SMALL_TEXT)
     atext = th._readable_accent(acc, ink, bgs, th.SMALL_TEXT)
     r = lambda c: [int(round(v)) for v in c]
     return {"bg": r(bg), "bg2": r(bg2), "ink": r(ink), "em": r(em), "accent": r(atext), "a2": a2, "a3": a3, "dark": bool(dark)}
