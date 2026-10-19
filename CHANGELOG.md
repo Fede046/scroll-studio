@@ -9,6 +9,33 @@ Everything so far is version 1. On 2026-10-12 the releases first published as 2.
 ## Unreleased
 
 ### Added
+- Type in the world: a step's title can live inside the scene instead of floating over it. `place: { kind: behind | surface |
+  sky, ... }` on a step of a film (`layout: overlay`, with an `at` window or a pinned beat) or of a parallax section; the
+  caption positions (`place: left`...) work as they always did and `place: sky` is shorthand. **behind** sets the title at a
+  depth, as a prompt (`at: "the spruce tree"`: found by Florence-2 + SAM 2.1, the type sits just behind it) or a number, so
+  what is nearer passes in front of it as the camera moves; **surface** paints it on a wall, a sign or a floor (`at: "the
+  wooden deck"`): SAM 2.1 tracks the surface through its shot (the `reveal` stages), the plane's orientation comes from the
+  depth map (a plane's disparity is linear in the picture), and a per-frame homography from planar tracking carries the
+  letters in perspective; the surface's light, grain and relief show through the paint, its grain ragged-edges every letter,
+  it wears (`wear`, `relief`) and is laid on left to right as the step arrives; **sky** is large type in the haze at far
+  depth with fog in front (`fog`, `haze`). Per film the engine makes a steady depth video (Depth Anything V2 per frame,
+  aligned frame to frame by a robust scale-and-shift fit through optical flow, blended where the flow is trustworthy,
+  snapped to the picture's edges by a guided filter, restarted at every cut: `engine/world_depth.py`), tracks each title
+  with pyramidal LK from keyframes (similarity for a layer, homography for a surface; Savitzky-Golay smoothed:
+  `engine/world_track.py`) and packs the depth and up to three surface masks into one grayscale atlas video with the
+  film's own frame rate, frame count and GOP, plus a phone copy (`engine/world.py`). The page draws the film itself in
+  WebGL2 (`players/world.ts`; a parallax photo in `players/parallax.ts`, with `build_photo`): the title is typeset with the
+  site's fonts and `<em>` style onto an atlas texture and found per pixel through the frame's matrix, shown where the scene
+  is farther than the title, lit by the light there, mixed with the air there, defocused like the footage at that depth and
+  carrying the picture's grain; the film and the atlas are seeked together and drawn only when both have landed. Reduced
+  motion, no WebGL, and a title that would be cropped off a narrow screen (a phone held upright) fall back to an ordinary
+  caption; the title stays in the page as text either way. Everything is cached per stage (`world_depth` once per film and
+  model, `world_text_<i>` per title: a headline's words matter only by their length, `world_pack`); a film without in-world
+  type keeps its cache and runs none of it. `depth_model` on the film section picks the Depth Anything size. `studio world
+  <project>` (and MCP `world_check`) draws each title's box on the film's own frames with the depth beside them, measures
+  how steady the track is and how much of the window the type is on screen, and says what to change; `build --plan` prices
+  the stages. The Studio UI's step form has an "On the picture / In the world" switch. Example: `examples/type-in-the-world`
+  (the one-take world, all three placements) and `examples/type-in-the-world-stills` (Casa Alta photographs).
 - `beat.restore`: SeedVR2 over one beat's clip at a given height, scaled back to `beat_res` (stage `restore_<beat>`), so a soft camera beat can be restored next to sharp frozen moments without restoring the whole film (`beat_restore`).
 - Camera ease `smoother` (freeze and camera beats): smootherstep, speed and acceleration both zero at every stop, so the camera settles into a hold instead of landing with a jolt (`studio inspect` read the jolt as judder).
 - Deep zoom for frozen moments: `freeze.detail` builds a pyramid of tiles (`engine/zoom.py`, `zoom_build.py`, `zoom_render.py`)
