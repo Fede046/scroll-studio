@@ -76,7 +76,9 @@ def _open(dist: Path, size, mobile: bool, dpr: float, reduced: bool, log):
 
 def _shot(cdp, rect: dict) -> np.ndarray:
     from PIL import Image
-    clip = {"x": rect["x"], "y": rect["y"], "width": rect["w"], "height": rect["h"], "scale": 1}
+    # the clip is in page coordinates; `rect` is in the viewport's
+    sx, sy = cdp.js("[scrollX, scrollY]")
+    clip = {"x": rect["x"] + sx, "y": rect["y"] + sy, "width": rect["w"], "height": rect["h"], "scale": 1}
     b = base64.b64decode(cdp.call("Page.captureScreenshot", format="png", clip=clip, captureBeyondViewport=False)["data"])
     return np.asarray(Image.open(io.BytesIO(b)).convert("RGB"))
 
