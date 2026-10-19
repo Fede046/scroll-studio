@@ -8,8 +8,7 @@ cached by its own key (an unchanged spec rebuilds nothing; a changed `seconds` o
   region   `moves` -> the thing on the still (Florence-2 grounding + SAM 2.1, engine/region.py, the same cached stage an
            `edit.region` uses), grown and feathered; the crop around it (plus its surroundings) that the video model sees.
   clip     the crop brought to life by a local video model (LTX-2.3 or Wan 2.2 image-to-video, engine/animate.py), asked
-           for low, local motion and a locked camera. `loop: seamless` generates first = last frame (the clip's end frame
-           is the still, so it comes back to where it started); `pingpong` generates one way and plays it both ways.
+           for low, local motion and a locked camera. `loop: seamless` asks for the whole loop's length and closes it afterwards; `pingpong` asks for half and plays it both ways.
            Kept lossless (FFV1) so every later stage can be redone without the GPU.
   track    SAM 2.1 follows the moving thing through the clip (seeded on the still's mask), so the mask keeps the whole
            path it sweeps (a flame that leans, a curtain that billows out of its first outline).
@@ -554,10 +553,11 @@ def build(project, ref: ImageInput, log: Callable[[str], None] = print, force: b
     ww, wh = work_size(cw, ch)
     gw, gh = gen_size(cw, ch, model, wan)
     seconds = float(cg.seconds)
-    # Measured on LTX-2.3: pinning the last frame to the first (first = last frame) leaves a clip that hardly moves, and a loose
-    # pin lets the middle go wild; so a seamless loop is a free clip closed afterwards (a flow-aligned crossfade), which is
-    # right for what flows (steam, smoke, water, flame: the same thing a moment later). Wan 2.2 is told the loop's end.
-    flf = cg.loop == "seamless" and model == "wan"
+    # Measured, on both models: telling the video model that the clip must END on the picture it began with (first = last frame)
+    # does not make a loop. LTX-2.3 returns a clip that hardly moves (the pin wins); with the pin loosened the middle of the
+    # clip goes wild and comes back; Wan 2.2 invents an action to get from the still to the still (a hand throws a sheet across
+    # the window). So a seamless loop is a free clip, closed afterwards by a flow-aligned crossfade, which is right for what
+    # flows (steam, smoke, water, a flame: the same thing a moment later); and a pingpong loop uses only the way out.
     # a pingpong loop plays the clip forward then back, so the model is asked for half of `seconds` (a short clip also stays
     # close to the still: a video model's motion grows the longer it runs)
     gen_seconds = seconds if cg.loop == "seamless" else max(1.5, seconds / 2)
@@ -566,7 +566,7 @@ def build(project, ref: ImageInput, log: Callable[[str], None] = print, force: b
 
     # ---- clip: the video model brings the crop to life
     ckey = {"v": VERSION, "crop": [file_key(still_path), box], "motion": motion_text(cg), "seconds": gen_seconds, "seed": cg.seed,
-            "model": model, "wan": wan if model == "wan" else None, "flf": flf, "size": [gw, gh]}
+            "model": model, "wan": wan if model == "wan" else None, "size": [gw, gh]}
     cid = _digest(ckey)
     clip = work / f"clip_{cid}.mkv"            # one file per variant, so going back to an earlier `loop` or `seconds` costs nothing
     if only_cached and ctx.status(f"clip_{cid}", ckey, [clip]) not in ("fresh", "migrated", "locked"):
@@ -577,7 +577,7 @@ def build(project, ref: ImageInput, log: Callable[[str], None] = print, force: b
         from .fidelity import would_render
         would_render("cinemagraph", cg.moves)
         frames = animate.animate(crop_png, "", motion_text(cg), gen_seconds, cg.seed, work, size=(gw, gh), log=log,
-                                 negative=NEGATIVE, strength=1.0, end_image=crop_png if flf else None, model=model, wan=wan)
+                                 negative=NEGATIVE, strength=1.0, model=model, wan=wan)
         import cv2
         arr = np.stack([cv2.resize(np.asarray(Image.open(p).convert("RGB")), (ww, wh), interpolation=cv2.INTER_AREA
                                    if (ww, wh) < Image.open(p).size else cv2.INTER_CUBIC) for p in frames])

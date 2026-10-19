@@ -888,10 +888,15 @@ image (no `cinemagraph:`) is untouched and keeps its cache; so does the still un
    `box`, `points`, `negative_points`, `pick`). The video model is shown a **crop** around it (plus half again its size of
    surroundings, the way `edit.region` shows the editor a crop), so the moving part gets the model's full resolution.
 2. **Clip.** LTX-2.3 or Wan 2.2 image-to-video (`model:`, else the site's `video_model`) of that crop, told that only
-   `moves` moves and the camera is locked. `loop: seamless` generates with the end frame pinned to the start (first = last
-   frame); `pingpong` generates one way and plays it forward then back (a loop with no seam by construction; use it for
-   sways and shimmer that read the same both ways, not for steam, which would fall). Kept lossless, so everything after it
-   can be redone without the GPU.
+   `moves` moves and the camera is locked. `loop: seamless` asks for the whole loop's length and closes it afterwards with
+   a flow-aligned crossfade, which is right for what flows (steam, smoke, water, a flame: the same thing a moment later).
+   `pingpong` asks for half, keeps the way out, and plays it forward then back (a loop with no seam by construction; for
+   sways and shimmer that read the same both ways, not for steam, which would fall). The way out is cut where the region
+   has moved a set distance from its first frame (a video model's motion grows: the first second is a gentle sway, the
+   third a curtain flying across the room) and played slower to fill the loop. *Tried and dropped:* generating "first =
+   last frame" (the end frame pinned to the still) does not make a loop on either model: LTX-2.3 returns a clip that hardly
+   moves, a loosened pin lets the middle go wild, and Wan 2.2 invents an action to get from the still back to itself (a hand
+   throws a sheet across the window). Kept lossless, so everything after it can be redone without the GPU.
 3. **Track.** SAM 2.1 follows the moving thing through the clip, so the mask keeps the whole path it sweeps (`track: false`
    skips it).
 4. **Mask.** The region, the tracked path and where the clip really moves (temporal motion energy), grown (`grow`) and
