@@ -356,10 +356,10 @@ const crane: Builder = (c) => {
   c.part(0, H + 0.18, depth / 2 + 1.8, (m) => {
     m.aoOn = false;
     m.rbox(0.9, 0.22, 0.5, 0, 0, 0, G, 0.03);
-    m.cyl(0.015, 0.015, 3.2, -0.3, -3.2, 0.1, DARK, 4); m.cyl(0.015, 0.015, 3.2, 0.3, -3.2, 0.1, DARK, 4);
-    m.box(2.4, 0.1, 1.0, 0, -3.5, 0, G);
-    m.box(2.4, 1.0, 1.0, 0, -4.5, 0, boxCol, { pat: PAT.ribs });
-  }, (o, t) => { o.position.z = depth / 2 + 1.8 + Math.sin(t * 0.35) * 2.4; });
+    m.cyl(0.015, 0.015, 2.1, -0.3, -2.1, 0.1, DARK, 4); m.cyl(0.015, 0.015, 2.1, 0.3, -2.1, 0.1, DARK, 4);
+    m.box(2.4, 0.1, 1.0, 0, -2.2, 0, G);
+    m.box(2.4, 1.0, 1.0, 0, -3.2, 0, boxCol, { pat: PAT.ribs });
+  }, (o, t) => { o.position.z = depth / 2 + 2.6 + Math.sin(t * 0.35) * 1.5; });
 };
 const windmill: Builder = (c) => {
   const M = c.M, roof = c.p.c?.[0] ?? "#c4433a";
@@ -372,8 +372,7 @@ const windmill: Builder = (c) => {
   // blades turn on the front
   c.part(0, 3.5, 0.95, (m) => {
     m.aoOn = false;
-    m.cyl(0.14, 0.14, 0.22, 0, -0.11, 0, "#2f3a44", 10);
-    m.pitch(Math.PI / 2); m.cyl(0.13, 0.13, 0.22, 0, 0, 0, "#2f3a44", 10);
+    m.push(); m.pitch(Math.PI / 2); m.cyl(0.16, 0.16, 0.3, 0, -0.15, 0, "#2f3a44", 12); m.pop();
     for (let i = 0; i < 4; i++) {
       m.push(); m.roll(i * Math.PI / 2);
       m.box(0.1, 3.4, 0.07, 0, 0, 0, "#7a5233");

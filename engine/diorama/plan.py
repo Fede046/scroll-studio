@@ -119,7 +119,9 @@ BLOCKERS = {"tree": (2.2, 0.7), "pine": (2.0, 0.6), "house": (3.0, 1.2), "shop":
             "plant": (2.6, 1.0), "deskLamp": (3.8, 0.8), "robot": (3.8, 1.4), "conveyor": (1.8, 2.2), "boat": (1.5, 0.9), "fountain": (2.2, 1.5)}
 
 
-OFFSETS = (-72, -56, -42, -30, -18, -6, 0, 6, 18, 30, 42, 56, 72)
+# how far from its front a kind of hero reads best (a crane's boom wants a profile, a stall a three-quarter view)
+PREFER = {"crane": 64.0, "conveyor": 50.0, "robot": 40.0, "windmill": 30.0, "ferry": 45.0, "boat": 45.0, "easel": 32.0}
+OFFSETS = (-84, -72, -64, -56, -42, -30, -18, -6, 0, 6, 18, 30, 42, 56, 64, 72, 84)
 
 
 def yaw_options(w: World, pl: dict, target, dist: float, pitch: float, base_deg: float, prefer: float) -> list[tuple[float, float]]:
@@ -223,7 +225,7 @@ def camera_plan(w: World, sec, placed: list[dict], stepmap: list[Optional[int]])
         dist = fr / (0.72 * 2 * tan_half) / cam.dive
         tgt = (pl["x"], gy + min(pl["h"], 9.0) * 0.44, pl["z"])
         framing[pi] = (gy, dist, tgt)
-        options.append(yaw_options(w, pl, tgt, dist, cam.dive_pitch, math.degrees(pl["yaw"]), 24.0))
+        options.append(yaw_options(w, pl, tgt, dist, cam.dive_pitch, math.degrees(pl["yaw"]), PREFER.get(pl["kind"], 24.0)))
     chosen = dict(zip(order, choose_yaws(options, cam.orbit)))
     for si, pi in enumerate(stepmap):
         if pi is not None:
