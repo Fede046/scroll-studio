@@ -9,13 +9,13 @@ comfyui:
     size_gb: 27
     vram_gb: 20
     licence: LTX-2 Community License
-    used_by: [film]
+    used_by: [film, cinemagraph]
   - name: Gemma 3 12B text encoder (fp8)
     file: text_encoders/gemma_3_12B_it_fp8_scaled.safetensors
     source: https://huggingface.co/Comfy-Org/ltx-2
     size_gb: 13
     licence: Gemma Terms of Use
-    used_by: [film]
+    used_by: [film, cinemagraph]
   - name: LTX-2.3 IC-LoRA Union Control
     file: loras/ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors
     source: https://huggingface.co/Lightricks/LTX-2.3
@@ -40,7 +40,7 @@ comfyui:
     size_gb: 14.3
     vram_gb: 16
     licence: Apache-2.0
-    used_by: [film beats, theme.art (video_model wan)]
+    used_by: [film beats, cinemagraph, theme.art (video_model wan)]
   - name: Wan 2.2 I2V A14B low-noise expert (fp8)
     file: diffusion_models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors
     wan: i2v_low
@@ -48,7 +48,7 @@ comfyui:
     size_gb: 14.3
     vram_gb: 16
     licence: Apache-2.0
-    used_by: [film beats, theme.art (video_model wan)]
+    used_by: [film beats, cinemagraph, theme.art (video_model wan)]
   - name: Wan 2.2 Fun Control A14B high-noise expert (fp8)
     file: diffusion_models/wan2.2_fun_control_high_noise_14B_fp8_scaled.safetensors
     wan: control_high
@@ -153,7 +153,7 @@ comfyui:
     size_gb: 0.45
     vram_gb: 4
     licence: Apache-2.0 (Meta)
-    used_by: [film reveal (tracker large, the default)]
+    used_by: [film reveal, cinemagraph (tracker large, the default)]
     node: sam2
   - name: SAM 2.1 Hiera Base+ (fp16)
     file: sam2/sam2.1_hiera_base_plus-fp16.safetensors
@@ -169,7 +169,7 @@ comfyui:
     size_gb: 1.5
     vram_gb: 3
     licence: MIT (Microsoft)
-    used_by: [film reveal (a region's prompt -> a box)]
+    used_by: [film reveal, cinemagraph (a region's prompt -> a box)]
     node: florence2
   - name: GFPGAN v1.4
     file: facerestore_models/GFPGANv1.4.pth

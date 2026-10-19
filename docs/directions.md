@@ -19,7 +19,7 @@ spec field, a cached builder, a runtime player where needed, CLI and MCP, docs a
 
 - [ ] **The one-take page**: the whole page is one camera journey through one generated world; each section is a place
   in it (hero at the door, features as rooms, pricing at the window, the CTA at the view).
-- [ ] **Cinemagraph pages**: stills where only one thing moves (steam, a curtain, light on water); a mask picks what
+- [x] **Cinemagraph pages**: stills where only one thing moves (steam, a curtain, light on water); a mask picks what
   moves and the rest is held perfectly still.
 - [ ] **Light as the scroll**: one world from dawn to night; each section is a time of day, the same place relit.
 - [ ] **The product as the set**: fly into the product (inside a speaker, between the layers of a board, macro around a
