@@ -710,7 +710,7 @@ def cinemagraph_cmd(name: str,
     if check:
         from . import cinemagraph_check as chk
         work = project.build / "_cinemagraph" / "page-check"
-        res = chk.check_page(project.dist, work, size=(390, 844) if mobile else (1440, 900), mobile=mobile, dpr=2.0 if mobile else 1.0, log=typer.echo)
+        res = chk.check_page(project.dist, work, size=(390, 844) if mobile else (1440, 900), mobile=mobile, dpr=1.0, log=typer.echo)
         res["reduced_motion"] = chk.check_reduced(project.dist, log=typer.echo)
         (work / ("mobile.json" if mobile else "desktop.json")).write_text(json.dumps(res, indent=1))
         typer.echo(f"report: {work}")
