@@ -1199,6 +1199,14 @@ class LightStructure(Model):
                                                            "move is undone, mean displacement in pixels at 1024 across; above "
                                                            "it the relight is retried with another seed")
     retries: int = Field(1, ge=0, le=8, description="How many more seeds to try when a relight drifts too far")
+    strength: float = Field(0.88, ge=0.4, le=1.0, description="How far the editor may depart from the picture it relights (the "
+                                                              "denoise strength of the edit): 1 starts from noise and relights "
+                                                              "fully but redraws and moves things; lower starts from the picture's own "
+                                                              "layout and holds it (0.75 moves things about 1 px, 0.88 a few) while "
+                                                              "relighting less. The prompts are written for 0.85-0.9")
+    chain: bool = Field(False, description="Relight each time from its neighbour nearer the world's time instead of from the "
+                                           "world: smaller steps of light hold the layout and make neighbouring times agree "
+                                           "better, at the price of a little sharpness per step")
 
 
 class LightScene(SceneBase):

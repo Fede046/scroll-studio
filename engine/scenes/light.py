@@ -208,14 +208,33 @@ def build(sec: LightScene, ctx: BuildContext, theme: dict) -> dict:
     # ---- the times
     tdir = ctx.work / "times"
     tdir.mkdir(exist_ok=True)
-    imgs: list[np.ndarray] = []
-    reports: list[dict] = []
-    for i, t in enumerate(sec.times):
+    imgs: list[Optional[np.ndarray]] = [None] * len(sec.times)
+    reports: list[Optional[dict]] = [None] * len(sec.times)
+    # what each time is relit from: the world, or (chain) its neighbour nearer the world's time. The anchor goes first, then
+    # outward, so every source is built before the time that is made from it
+    anchor = ids.index(sec.world_time) if sec.world_time else None
+    sources: list[Optional[int]] = [None] * len(sec.times)           # None: the world itself
+    order = list(range(len(sec.times)))
+    if sec.structure.chain:
+        a0 = anchor if anchor is not None else -1
+        order = ([anchor] if anchor is not None else []) + list(range(a0 + 1, len(sec.times))) + list(range(a0 - 1, -1, -1))
+        for i in range(len(sec.times)):
+            if i == anchor:
+                continue
+            sources[i] = (i - 1 if i - 1 >= 0 else None) if i > a0 else i + 1
+    for i in order:
+        t = sec.times[i]
         tid = t.id
         png, js = tdir / f"{tid}.png", tdir / f"{tid}.json"
+        if sources[i] is None:
+            base_png, base_img, base_key = world_png, world, wkey
+        else:
+            base_png = tdir / f"{ids[sources[i]]}.png"
+            base_img = imgs[sources[i]]
+            base_key = _digest([file_key(base_png)])
         if t.image is not None:
             msrc = resolve_image(ctx.project, t.image, ctx.log)
-            key = {"v": RELIGHT_VERSION, "world": wkey, "image": image_key(t.image), "file": file_key(msrc), "align": sec.structure.align}
+            key = {"v": RELIGHT_VERSION, "world": base_key, "image": image_key(t.image), "file": file_key(msrc), "align": sec.structure.align}
             legacy = None
             mode = "image"
         elif tid == sec.world_time:
@@ -229,9 +248,9 @@ def build(sec: LightScene, ctx: BuildContext, theme: dict) -> dict:
             st = sec.structure
             # the limit and the retries are not part of the key: a picture that was made stays the picture (a time that
             # failed its limit is warned about on every build; give it another `seed:` to redo it)
-            key = {"v": RELIGHT_VERSION, "light": light.RELIGHT_VERSION, "world": wkey, "ins": instr, "seed": seed0, "steps": steps,
-                   "align": st.align}
-            legacy = dict(key, max=st.max_drift, retries=0 if draft else st.retries)
+            key = {"v": RELIGHT_VERSION, "light": light.RELIGHT_VERSION, "world": base_key, "ins": instr, "seed": seed0, "steps": steps,
+                   "align": st.align, "strength": st.strength}
+            legacy = None
             mode = "relight"
 
         def run(tid=tid, mode=mode, t=t, png=png, js=js, i=i):
@@ -242,23 +261,26 @@ def build(sec: LightScene, ctx: BuildContext, theme: dict) -> dict:
                 return
             if mode == "image":
                 cand = light.load_rgb(msrc, (W, H))
-                img, rep = light.align(world, cand, None, sec.structure.align)
-                rep["ok"] = rep["aligned"]["drift"] <= sec.structure.max_drift
+                img, rep = light.align(base_img, cand, None, sec.structure.align)
             else:
                 seeds = [seed0 + 1000 * j for j in range(1 + (0 if draft else sec.structure.retries))]
                 ctx.log(f"  relighting '{tid}' (Qwen-Image-Edit, {steps} steps)")
-                img, rep = light.relight_locked(world, world_png, instr, seeds, steps, sec.structure.max_drift,
-                                                sec.structure.align, tdir, tid, ctx.log)
+                img, rep = light.relight_locked(base_img, base_png, instr, seeds, steps, sec.structure.max_drift,
+                                                sec.structure.align, tdir, tid, ctx.log, sec.structure.strength)
+            if sources[i] is not None:       # relative to the world, too: a chain must not wander
+                rep["to_world"] = light.measure(world, img)["drift"]
+                rep["source"] = ids[sources[i]]
             Image.fromarray(img).save(png)
             js.write_text(json.dumps(rep, indent=1))
         ctx.stage(f"time_{tid}", key, [png, js], run, legacy=legacy)
-        ctx.progress(0.1 + 0.6 * (i + 1) / len(sec.times), f"time {i + 1}/{len(sec.times)}")
-        imgs.append(light.load_rgb(png))
-        reports.append(json.loads(js.read_text()))
-        reports[-1]["ok"] = bool(reports[-1].get("anchor")) or reports[-1]["aligned"]["drift"] <= sec.structure.max_drift
-        if not reports[-1]["ok"]:
-            ctx.log(f"  warning: '{tid}' is still {reports[-1]['aligned']['drift']:.2f}px from the world "
-                    f"(limit {sec.structure.max_drift}); give that time another `seed:`, or raise structure.max_drift")
+        ctx.progress(0.1 + 0.6 * (order.index(i) + 1) / len(sec.times), f"time {order.index(i) + 1}/{len(sec.times)}")
+        imgs[i] = light.load_rgb(png)
+        reports[i] = json.loads(js.read_text())
+        reports[i]["ok"] = bool(reports[i].get("anchor")) or reports[i]["aligned"]["drift"] <= sec.structure.max_drift
+        if not reports[i]["ok"]:
+            ctx.log(f"  warning: '{tid}' is still {reports[i]['aligned']['drift']:.2f}px from "
+                    f"{'the world' if sources[i] is None else ids[sources[i]]} (limit {sec.structure.max_drift}); give that time "
+                    f"another `seed:`, or raise structure.max_drift")
 
     # ---- the maps between times, and the colours at each time
     mdir = ctx.work / "maps"

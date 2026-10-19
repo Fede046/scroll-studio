@@ -427,3 +427,35 @@ def test_named_lamps_are_cut_out_with_region_and_confine_the_lights(tmp_path, mo
     lamp = np.asarray(Image.open(root / ".build" / "day" / "web" / Path(pair["lamp"]).relative_to("assets/day")))
     xs = np.nonzero(lamp[..., 0] > 128)[1]
     assert xs.size and xs.max() < lamp.shape[1] * 0.55                   # nothing from the right half
+
+
+def test_chain_relights_each_time_from_its_neighbour_nearer_the_world(tmp_path, monkeypatch):
+    from engine.project import BuildContext, Project
+    root = make_project(tmp_path, "structure: { chain: true, strength: 0.8 }")
+    (root / "site.yaml").write_text((root / "site.yaml").read_text().replace("times: [dawn, noon, night]", "times: [dawn, morning, noon, golden-hour, night]")
+                                    .replace("steps: [{ title: One }, { title: Two }, { title: Three }]", "steps: [{ title: One }, { title: Two }, { title: Three }]"))
+    world = place(1280, 720)
+    seen = []
+
+    def fake(world_png, instruction, seed, steps, out, tag, log=print, denoise=1.0):
+        seen.append((tag.split("_")[0], Path(world_png).name, denoise))
+        Image.fromarray(relit(world, gain=(0.9, 0.8, 0.7) if "night" not in tag else (0.2, 0.2, 0.4))).save(out)
+        return out
+    monkeypatch.setattr(light, "relight", fake)
+    monkeypatch.setattr("engine.backends.depth.estimate", lambda im, size="small": np.zeros((im.height, im.width), np.float32))
+    import engine.region as regionmod
+    monkeypatch.setattr(regionmod, "find", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("no nodes")))
+    p = Project(root)
+    cfg = scene.build(p.load().sections[0], BuildContext(p, "day", log=lambda m: None), {})
+    by = {t: (src, d) for t, src, d in seen}
+    assert by["morning"] == ("noon.png", 0.8) and by["dawn"] == ("morning.png", 0.8)       # backwards from the world's time
+    assert by["golden-hour"] == ("noon.png", 0.8) and by["night"] == ("golden-hour.png", 0.8)    # forwards
+    assert [t["id"] for t in cfg["times"]] == ["dawn", "morning", "noon", "golden-hour", "night"]
+    rep = json.loads((root / ".build" / "day" / "times" / "night.json").read_text())
+    assert rep["source"] == "golden-hour" and "to_world" in rep
+    # change the world's own time and everything made from it is made again; change the last link and only it is
+    seen.clear()
+    (root / "site.yaml").write_text((root / "site.yaml").read_text().replace("times: [dawn, morning, noon, golden-hour, night]",
+                                                                             "times: [dawn, morning, noon, golden-hour, {preset: night, prompt: with fog}]"))
+    scene.build(p.load().sections[0], BuildContext(p, "day", log=lambda m: None), {})
+    assert [t for t, *_ in seen] == ["night"]
