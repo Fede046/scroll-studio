@@ -214,7 +214,7 @@ html.sf-live .sf-btn, html.sf-live .sf-can summary, html.sf-live .sf-head a, htm
 .sf-sw:hover { box-shadow: 0 0 0 2px var(--yellow); }
 
 /* scenes keep their own player; the gate border is all this style adds */
-html.style-scratch-film main > .ss-scene, html.style-scratch-film .bt-root + .ss-scene { border-block: 18px solid #050505; box-shadow: inset 0 0 0 2px rgba(255, 246, 223, .35); position: relative; }
+html.style-scratch-film main > .ss-scene { margin-left: var(--rail); border-block: 18px solid #050505; box-shadow: inset 0 0 0 2px rgba(255, 246, 223, .35); position: relative; }
 html.style-scratch-film .ss-footer { position: relative; z-index: 2; background: #050505; border: 0; padding-left: var(--rail); color: rgba(255, 246, 223, .8); }
 html.style-scratch-film .ss-footer__in { font: 400 13px/1.5 "Share Tech Mono", monospace; letter-spacing: .06em; }
 html.style-scratch-film .ss-footer a { color: var(--yellow); }
