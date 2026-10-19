@@ -161,6 +161,7 @@ sections:
           label: The view
           world: The North York Moors at dawn seen through a farmhouse window, heather, dry-stone walls, layers of hills, mist, soft gold light, nobody in it
           seed: 9
+          side: top
           place: looking out over a wide misty moor, only open moorland, no house and no roof in view, hills in layers, soft gold light on the heather, a dry-stone wall running away into the distance
           pose: { at: [0, 20.5, 1.7], look: [0, 80, 6] }
           move: { seconds: 5, path: [{ at: [-0.4, 16.0, 1.6], look: [0, 30, 2.5] }, { at: [0, 17.0, 1.65], look: [0, 60, 4] }], motion: "the camera moves through the open window and out over the moor" }
