@@ -58,7 +58,7 @@ void main(){
   q = clamp(q, vec2(.001), vec2(.999));
 
   float d = texture(depthT, q).r;
-  float sk = texture(skyT, q).r;
+  float sk = smoothstep(.4, .6, texture(skyT, q).r);          // the sky's edge stays where the roofline is
   // how the place's structure sits differently in the two pictures (the editor redrew it a little): the picture glides
   // along it as the light changes, so edges slide into place instead of cross-fading doubled
   vec3 fl = texture(flowT, q).rgb;
@@ -70,9 +70,9 @@ void main(){
     // the front: new light spreads from its source, sky first, near ground last, ragged edge
     float gr = clamp(length((q - origin) * vec2(aspect, 1.)) / (aspect * .9), 0., 1.);
     float g = .5 * gr + .32 * (1. - d) + .12 * vn(q * vec2(8. * aspect, 8.)) + .06 * q.y;
-    g = mix(g, g * .3, sk);
+    g = mix(g, g * .55, sk);
     g = clamp(g, 0., 1.);
-    const float w = .34;
+    const float w = .42;
     s = smoothstep(g * (1. - w), g * (1. - w) + w, fe);
     // the low-frequency change of light, carried by both pictures to the same in-between light
     R = exp2((texture(ratioT, q).rgb - .5) * 6.);
