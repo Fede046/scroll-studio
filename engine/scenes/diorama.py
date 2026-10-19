@@ -21,6 +21,30 @@ def _hex(c: str) -> tuple[int, int, int]:
     return tuple(int(c[i:i + 2], 16) for i in (0, 2, 4))
 
 
+# how a prop looks from above on the map: (shape, colour, radius in world units)
+_TOP = {"tree": ("o", "#3f8f45", 0.7), "pine": ("o", "#2d6e49", 0.6), "bush": ("o", "#4c9a45", 0.4), "rock": ("o", "#a9a59d", 0.35),
+        "house": ("s", None, 1.0), "shop": ("s", None, 1.15), "cafe": ("s", None, 1.15), "warehouse": ("s", "#8fa2b6", 2.0),
+        "office": ("s", None, 1.4), "stall": ("s", None, 0.9), "container": ("s", None, 1.0), "boat": ("o", "#fffaf0", 0.55),
+        "lamp": ("o", "#f2c95a", 0.12), "crane": ("s", "#f2b21c", 1.5), "lighthouse": ("o", "#d9503a", 1.1), "windmill": ("o", "#c4433a", 1.2),
+        "ferry": ("o", "#fffaf0", 1.2), "crate": ("s", "#c9914f", 0.3), "barrel": ("o", "#8a5a34", 0.2)}
+
+
+def _props(d, plan: dict, ox: int, oy: int, s: int):
+    S = plan["size"]
+    pal = ["#d9503a", "#2f8a9d", "#e8a23a", "#c4433a", "#3d6fa5"]
+    k = s / S
+    for p in plan["props"]:
+        t = _TOP.get(p["k"])
+        if t is None:
+            continue
+        shape, col, r = t
+        col = col or (p.get("c") or [pal[p["v"] % len(pal)]])[0]
+        x, y = ox + (p["x"] / S + 0.5) * s, oy + (p["z"] / S + 0.5) * s
+        rr = r * p["s"] * k
+        box = (x - rr, y - rr, x + rr, y + rr)
+        d.ellipse(box, fill=col) if shape == "o" else d.rectangle(box, fill=col)
+
+
 def _map_image(plan: dict, tex, table: str, size: int = 1280):
     """A flat picture of the world: the painted ground inside its outline, on the table colour, with the places pinned."""
     import numpy as np
@@ -45,6 +69,7 @@ def _map_image(plan: dict, tex, table: str, size: int = 1280):
     bg.paste(Image.new("RGB", (W, H), (60, 44, 30)), (0, 0), shadow)
     bg.paste(g, (ox, oy), m)
     d = ImageDraw.Draw(bg)
+    _props(d, plan, ox, oy, s)
     try:
         font = ImageFont.truetype("arial.ttf", 24)
     except OSError:

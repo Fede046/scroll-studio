@@ -17,7 +17,7 @@ import { Post } from "./diorama/post";
 import { Rig, type CamState } from "./diorama/camera";
 
 const SUN: Record<string, { dir: [number, number, number]; color: string; i: number; sky: string; ground: string; hemi: number; env: number; exposure: number }> = {
-  golden: { dir: [-0.55, 0.62, 0.62], color: "#ffd6a0", i: 3.3, sky: "#c6dcff", ground: "#e9cfa6", hemi: 1.0, env: 0.75, exposure: 1.0 },
+  golden: { dir: [-0.55, 0.62, 0.62], color: "#ffd6a0", i: 3.3, sky: "#c6dcff", ground: "#e9cfa6", hemi: 0.8, env: 0.7, exposure: 1.02 },
   morning: { dir: [0.62, 0.5, 0.55], color: "#fff0dc", i: 3.0, sky: "#d3e6ff", ground: "#dfe6d0", hemi: 1.05, env: 0.8, exposure: 1.0 },
   noon: { dir: [0.18, 0.95, 0.3], color: "#ffffff", i: 3.2, sky: "#c9defa", ground: "#e8e2d4", hemi: 1.0, env: 0.8, exposure: 0.98 },
   dusk: { dir: [-0.75, 0.24, 0.42], color: "#ffa66b", i: 2.7, sky: "#8fa3e0", ground: "#d89a82", hemi: 0.9, env: 0.7, exposure: 1.05 },
@@ -202,7 +202,7 @@ const factory: PlayerFactory = async (cfgIn, ctx) => {
   const fovFor = () => Math.min(62, plan.camera.fov * (aspect < 0.9 ? 1.4 : 1));
   const wideDist = () => {
     const f = fovFor(), tv = Math.tan(THREE.MathUtils.degToRad(f / 2)), th = tv * aspect;
-    const sideRoom = aspect > 1.05 && ctx.data.layout !== "overlay" ? 0.64 : 0.82;
+    const sideRoom = aspect > 1.05 && ctx.data.layout !== "overlay" ? 0.76 : 0.84;
     const byW = plan.camera.fit / (th * sideRoom);
     const byH = (plan.camera.fit * Math.sin(THREE.MathUtils.degToRad(plan.camera.pitch)) + 4.5) / (tv * 0.8);
     return Math.max(byW, byH);

@@ -91,7 +91,7 @@ export class Post {
     const u = this.mat.uniforms;
     u.uNear.value = camera.near; u.uFar.value = camera.far; u.uFocus.value = focus;
     // blur in pixels: a model on a table shot with a macro lens; scales with the picture's height
-    u.uK.value = 62 * this.o.tilt * (this.ph / 1080) * (this.o.mobile ? 1.0 : 1.0);
+    u.uK.value = 52 * this.o.tilt * (this.ph / 1080) * (this.o.mobile ? 1.0 : 1.0);
     u.uMax.value = Math.max(6, 26 * this.o.tilt * (this.ph / 1080)) * (this.o.tilt > 0 ? 1 : 0);
     u.uTime.value = time % 100; u.uBand.value = band * this.o.tilt;
     r.setRenderTarget(this.rt);

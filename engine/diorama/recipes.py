@@ -299,9 +299,10 @@ def harbour(w: World, pal, spec_world):
     X, Z = w.X, w.Z
 
     # --- heights: a bay with a channel to the front edge, a headland hill for the lighthouse, a low rise behind
-    bay_c = P(1.0, 1.6)
-    bay = ellipse_sdf(X, Z, bay_c[0], bay_c[1], 6.9 * k, 4.9 * k, -14) + (w.noise(7, 3, 21) - 0.5) * 1.6 * k
-    chan = segment_sdf(X, Z, P(3.5, 4.0), P(13.0, 14.0), 1.35 * k) + (w.noise(9, 2, 23) - 0.5) * 0.5 * k
+    bay_c = P(1.6, 1.0)
+    bay = ellipse_sdf(X, Z, bay_c[0], bay_c[1], 5.7 * k, 4.0 * k, -14) + (w.noise(7, 3, 21) - 0.5) * 1.2 * k
+    chan_pts = [P(3.2, 2.6), P(6.0, 5.2), P(6.9, 9.0), P(10.8, 12.4), P(14.5, 14.8)]
+    chan = np.minimum.reduce([segment_sdf(X, Z, a, b, (1.3 - 0.0 * i) * k) for i, (a, b) in enumerate(zip(chan_pts, chan_pts[1:]))]) + (w.noise(9, 2, 23) - 0.5) * 0.5 * k
     sw = np.minimum(bay, chan)
     hill = 1.9 * np.exp(-(((X - (-9.6 * k)) ** 2 + (Z - (-6.2 * k)) ** 2) / (2 * (3.1 * k) ** 2)))
     rise = 0.9 * np.exp(-(((X - 2.0 * k) ** 2 + (Z - (-11.2 * k)) ** 2) / (2 * (3.4 * k) ** 2)))
@@ -332,12 +333,12 @@ def harbour(w: World, pal, spec_world):
     bc = bay_c
     spots = [
         Spot("hill", *P(-9.6, -6.2), face_to(*P(-9.6, -6.2), *bc), ("lighthouse",)),
-        Spot("yard", *P(6.6, -4.6), yaw_of(0.0, 1.0), ("crane", "warehouse")),
-        Spot("plaza", *P(-10.6, 5.4), face_to(*P(-10.6, 5.4), *bc), ("stall", "cafe")),
-        Spot("quay", *P(11.3, 0.6), face_to(*P(11.3, 0.6), *bc), ("office", "warehouse")),
+        Spot("yard", *P(6.8, -5.7), yaw_of(0.0, 1.0), ("crane", "warehouse")),
+        Spot("plaza", *P(-9.4, 5.6), face_to(*P(-9.4, 5.6), *bc), ("stall", "cafe")),
+        Spot("quay", *P(11.0, 0.4), face_to(*P(11.0, 0.4), *bc), ("office", "warehouse")),
         Spot("meadow", *P(2.2, -11.4), yaw_of(0.0, 1.0), ("windmill",)),
-        Spot("village", *P(-12.0, -0.6), face_to(*P(-12.0, -0.6), *bc), ("shop", "cafe", "house")),
-        Spot("bay", *P(-1.2, 3.0), yaw_of(0.4, 1.0), ("ferry",), water=True),
+        Spot("village", *P(-11.0, -1.0), face_to(*P(-11.0, -1.0), *bc), ("shop", "cafe", "house")),
+        Spot("bay", *P(0.6, 1.4), yaw_of(0.4, 1.0), ("ferry",), water=True),
         Spot("pier", *P(-1.3, 9.2), yaw_of(0.0, -1.0), ("shop", "cafe")),
     ]
     w.spots = {s.name: s for s in spots}
@@ -371,11 +372,11 @@ def harbour_fill(w: World, pal, info, rng):
     w.scatter(boats, boat, 1.1, lambda x, z: w.dwater(x, z) < -1.2, water=True, road=False, margin=0.6)
     # container yard: stacks behind the crane
     yx, yz = w.spots["yard"].x, w.spots["yard"].z
-    paint_rect(w, yx + 0.3 * k, yz - 3.8 * k, 5.8 * k, 3.0 * k, 0, "#7b8088", stripes=2.6 * k)
+    paint_rect(w, yx + 0.6 * k, yz - 2.3 * k, 4.8 * k, 2.9 * k, 0, "#7b8088", stripes=2.35 * k)
     cont_cols = ["#d9503a", "#2f6fa8", "#3aa06a", "#e8b23a", "#c4433a", "#7a5aa8"]
-    for gx in range(-2, 3):
+    for gx in range(-2, 2):
         for gz in range(0, 2):
-            x, z = yx + (gx * 2.35 + 0.8) * k + 0.6 * k, yz - (3.0 + gz * 3.0) * k
+            x, z = yx + (gx * 2.35 + 0.8) * k + 0.4 * k, yz - (1.6 + gz * 2.3) * k
             if not w.free(x, z, 1.5, road=False, margin=0.1):
                 continue
             h = int(rng.integers(1, 4)) if (gx + gz) % 2 == 0 else int(rng.integers(1, 3))
@@ -384,11 +385,10 @@ def harbour_fill(w: World, pal, info, rng):
                       int(rng.integers(0, 2)), 1.5 if layer == 0 else 0.0, 1.05 * layer)
     # the windmill's wheat field
     mx, mz = w.spots["meadow"].x, w.spots["meadow"].z
-    paint_field(w, mx + 5.5 * k, mz + 0.8 * k, 3.4 * k, 1.8 * k, 8)
-    paint_field(w, mx - 5.0 * k, mz + 1.6 * k, 3.0 * k, 1.6 * k, -6, "#cfae43")
+    paint_field(w, mx - 5.2 * k, mz + 0.6 * k, 3.0 * k, 1.7 * k, -6, "#d9b84a")
     # plaza cobbles
     px, pz = w.spots["plaza"].x, w.spots["plaza"].z
-    paint_cobbles(w, px, pz, 3.6 * k)
+    paint_cobbles(w, px, pz, 3.1 * k)
     # paths from the places to the road
     for name in ("hill", "village", "meadow", "quay"):
         sp = w.spots[name]
@@ -407,23 +407,30 @@ def harbour_fill(w: World, pal, info, rng):
     def house(x, z):
         gx, gz = w.grad_dw(x, z)
         yaw = yaw_of(-gx, -gz) + rng.normal(0, 0.12)
-        w.add("house", x, z, yaw, rng.uniform(0.9, 1.15), pal[int(rng.integers(0, len(pal)))], int(rng.integers(0, 4)), 1.5, wall=WALLS[int(rng.integers(0, len(WALLS)))])
-    area_house = lambda x, z: 2.7 < w.dwater(x, z) < 6.8 and w.height_at(x, z) < 0.6 and (x < -4.5 * k or x > 8.2 * k or z > 8.5 * k)
-    w.scatter(int(round(11 * dens)), house, 1.6, area_house, margin=0.5)
+        w.add("house", x, z, yaw, rng.uniform(0.9, 1.1), pal[int(rng.integers(0, len(pal)))], int(rng.integers(0, 4)), 1.35, wall=WALLS[int(rng.integers(0, len(WALLS)))])
+    area_house = lambda x, z: 2.7 < w.dwater(x, z) < 8.0 and w.height_at(x, z) < 0.6
+    w.scatter(int(round(13 * dens)), house, 1.35, area_house, margin=0.15, tries=120)
     # trees in groups, bushes
     centres = []
-    for _ in range(7):
-        for _t in range(40):
+    for _ in range(int(round(12 * dens)) + 1):
+        for _t in range(400):
             x, z = rng.uniform(-w.R, w.R, 2)
-            if w.inside_pt(x, z, 1.5) and not w.water_at(x, z) and w.dwater(x, z) > 3.2:
+            if w.inside_pt(x, z, 1.5) and not w.water_at(x, z) and w.dwater(x, z) > 3.2 and w.free(x, z, 1.5, margin=0.1)                     and all((x - cx) ** 2 + (z - cz) ** 2 > 20 for cx, cz in centres):
                 centres.append((x, z))
                 break
     def tree(x, z):
         v = int(rng.integers(0, 2)) if rng.random() < 0.7 else 2
         w.add("tree" if v < 2 else "pine", x, z, rng.uniform(0, 6.28), rng.uniform(0.8, 1.25), None, v, 0.8)
     def near_centre(x, z):
-        return w.dwater(x, z) > 3.0 and any((x - cx) ** 2 + (z - cz) ** 2 < 9.0 for cx, cz in centres)
-    w.scatter(int(round(46 * dens)), tree, 0.85, near_centre, margin=0.3)
+        return w.dwater(x, z) > 3.0 and any((x - cx) ** 2 + (z - cz) ** 2 < 14.0 for cx, cz in centres)
+    def around():
+        cx, cz = centres[int(rng.integers(0, len(centres)))]
+        return cx + rng.normal(0, 2.4), cz + rng.normal(0, 2.4)
+    if centres:
+        w.scatter(int(round(46 * dens)), tree, 0.8, near_centre, margin=0.2, tries=60, sample=around)
+    # a loose fringe of trees along the rim of the base frames the world, like the hedge round a model railway
+    rim = lambda x, z: w.R - 2.6 < math.hypot(x, z) < w.R - 1.1 and w.dwater(x, z) > 2.6
+    w.scatter(int(round(14 * dens)), tree, 0.8, rim, margin=0.1, tries=300)
     def bush(x, z):
         w.add("bush", x, z, rng.uniform(0, 6.28), rng.uniform(0.7, 1.2), None, 0, 0.5)
     w.scatter(int(round(26 * dens)), bush, 0.5, lambda x, z: w.dwater(x, z) > 2.4, margin=0.2)

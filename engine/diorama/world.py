@@ -191,14 +191,14 @@ class World:
         return p
 
     def scatter(self, n: int, make: Callable[[float, float], Optional[bool]], rad: float, area: Callable[[float, float], bool],
-                tries: int = 60, rng=None, **free_kw) -> int:
+                tries: int = 60, rng=None, sample: Optional[Callable[[], tuple[float, float]]] = None, **free_kw) -> int:
         """Try to place `n` things at random points where area(x, z) holds and the spot is free; make() adds each."""
         rng = rng or self.rng
         placed = 0
         for _ in range(n * tries):
             if placed >= n:
                 break
-            x, z = rng.uniform(-self.R, self.R, 2)
+            x, z = sample() if sample else rng.uniform(-self.R, self.R, 2)
             if not area(x, z) or not self.free(x, z, rad, **free_kw):
                 continue
             if make(x, z) is not False:
@@ -215,6 +215,35 @@ class World:
                 p["y"] = round(y + p.pop("dy", 0.0), 3)
             else:
                 p["y"] = round(p["y"] + p.pop("dy", 0.0), 3)
+
+    # ------------------------------------------------------------ baked contact shadows
+    # (radius in world units at scale 1, darkness 0-1) of the soft pool of shade a prop leaves on the ground
+    AO = {"house": (1.5, 0.42), "shop": (1.7, 0.42), "cafe": (1.7, 0.42), "warehouse": (2.9, 0.4), "office": (2.0, 0.42), "stall": (1.4, 0.36),
+          "lighthouse": (1.7, 0.45), "windmill": (1.8, 0.42), "crane": (2.4, 0.18), "container": (1.5, 0.4), "tree": (0.85, 0.38),
+          "pine": (0.8, 0.38), "bush": (0.55, 0.34), "rock": (0.5, 0.34), "crate": (0.45, 0.36), "barrel": (0.4, 0.34), "lamp": (0.3, 0.3),
+          "bench": (0.6, 0.3), "bollard": (0.25, 0.3), "sign": (0.5, 0.28), "tank": (2.2, 0.4), "silo": (1.9, 0.42), "chimney": (1.3, 0.4),
+          "sofa": (2.4, 0.38), "shelf": (1.9, 0.4), "easel": (1.6, 0.3), "laptop": (2.4, 0.4), "monitor": (2.0, 0.4), "mug": (0.9, 0.4),
+          "books": (1.5, 0.4), "plant": (1.2, 0.4), "deskLamp": (1.5, 0.36), "notebook": (1.6, 0.3), "softbox": (1.5, 0.3), "camera": (1.2, 0.34),
+          "speaker": (1.1, 0.38), "robot": (2.0, 0.36), "conveyor": (3.2, 0.3), "fountain": (2.2, 0.3), "clocktower": (1.7, 0.42)}
+
+    def bake_ao(self):
+        N, S, R = self.N, self.S, self.R
+        ao = np.zeros((N, N), np.float32)
+        for p in self.props:
+            spec = self.AO.get(p["k"])
+            if spec is None or self.water_at(p["x"], p["z"]) and p["k"] not in ("lighthouse",):
+                continue
+            r, a = spec[0] * p["s"], spec[1]
+            if p.get("dy", 0) > 0.3 or p["k"] == "container" and p.get("y", 0) > self.height_at(p["x"], p["z"]) + 0.5:
+                continue
+            cx, cz = (p["x"] + R) / S * N, (p["z"] + R) / S * N
+            rp = int(r / self.px * 2.2) + 2
+            j0, j1, i0, i1 = max(0, int(cx) - rp), min(N, int(cx) + rp + 1), max(0, int(cz) - rp), min(N, int(cz) + rp + 1)
+            if j1 <= j0 or i1 <= i0:
+                continue
+            d2 = (self.X[i0:i1, j0:j1] - p["x"]) ** 2 + (self.Z[i0:i1, j0:j1] - p["z"]) ** 2
+            ao[i0:i1, j0:j1] = np.maximum(ao[i0:i1, j0:j1], a * np.exp(-d2 / (r * r) * 1.3))
+        self.col = self.col * (1 - ao[..., None] * 0.9)
 
     # ------------------------------------------------------------ output
     def height_grid(self, n: int = GRID) -> np.ndarray:

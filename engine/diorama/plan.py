@@ -116,11 +116,11 @@ def camera_plan(w: World, sec, placed: list[dict], stepmap: list[Optional[int]])
             gy = w.height_at(pl["x"], pl["z"])
             off = 24.0 * (1 if pi % 2 == 0 else -1)
             yaw = math.degrees(pl["yaw"]) + off
-            fr = max(2.5 * pl["r"], min(pl["h"], 6.4) + 1.4)
+            fr = max(2.6 * pl["r"], min(pl["h"], 9.0) + 1.6)
             dist = fr / (0.72 * 2 * tan_half) / cam.dive
             side = {"left": -1, "right": 1}.get(pl["side"] or "", view_side)
             beats.append({"kind": "place", "place": pi, "yaw": yaw, "pitch": cam.dive_pitch, "dist": round(dist, 2),
-                          "target": [round(pl["x"], 3), round(gy + min(pl["h"], 6.0) * 0.42, 3), round(pl["z"], 3)],
+                          "target": [round(pl["x"], 3), round(gy + min(pl["h"], 9.0) * 0.44, 3), round(pl["z"], 3)],
                           "side": side})
         else:
             beats.append({"kind": "wide", "yaw": None, "pitch": cam.pitch, "dist": None, "target": [0, 0.5, 0], "side": 0})
@@ -177,6 +177,7 @@ def build(sec, table: str, draft: bool = False):
     for ex in wd.props:
         w.add(ex.kind, ex.at[0], ex.at[1], math.radians(ex.turn), ex.scale, ex.color, 0, 0.5 * ex.scale)
     w.finish_props()
+    w.bake_ao()
     for pl in placed:
         pl["y"] = round(w.height_at(pl["x"], pl["z"]), 3)
     stepmap = assign_steps(sec, placed)
