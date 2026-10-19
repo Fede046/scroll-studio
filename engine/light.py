@@ -34,9 +34,11 @@ import cv2
 import numpy as np
 from PIL import Image
 
-VERSION = 3                # bump when a relight or its measurement would come out differently for the same inputs
+VERSION = 3                # bump when the maps (ratio, lamps, flow, tokens) would come out differently for the same inputs
+RELIGHT_VERSION = 1        # bump when a relight or its alignment would come out differently for the same inputs (re-renders every time of day)
 MEASURE_W = 1024           # width at which structure is compared, so drift means the same on any picture
 MAX_FLOW = 28.0            # a correction larger than this (px at MEASURE_W) is not trusted: it is a different picture
+FLOW_RANGE = 24.0          # the pair flow texture covers +-this many px at MEASURE_W
 
 
 # ---------------------------------------------------------------- small helpers
@@ -153,25 +155,85 @@ def measure(world: np.ndarray, cand: np.ndarray, base_st: Optional[np.ndarray] =
             "strain": round(strain(base_st, f), 4)}
 
 
-def align(world: np.ndarray, cand: np.ndarray, base_st: Optional[np.ndarray] = None, passes: int = 2) -> tuple[np.ndarray, dict]:
-    """Correct `cand` onto the world's geometry. Returns the warped picture and a report: the drift and edge agreement
-    before (raw) and after (aligned). Each pass re-estimates on the warped picture, so large errors are removed
-    coarsely and the remainder finely; a pass that makes the measurement worse is dropped."""
+def fit_affine(base_st: np.ndarray, cand_st: np.ndarray, f: Optional[np.ndarray] = None) -> Optional[np.ndarray]:
+    """The global move (scale, shear, shift) that best explains where the editor put things: an affine map at MEASURE_W
+    from the world's coordinates to the candidate's, fitted robustly (RANSAC) to the dense flow at structured pixels.
+    A relight that is zoomed a few percent and shifted a few pixels, as Qwen-Image-Edit's are, is mostly this, and undoing
+    it bends nothing. None when too little structure agrees."""
+    f = flow(base_st, cand_st) if f is None else f
+    wt = _weights(base_st)
+    ys, xs = np.nonzero(wt > 0.6)
+    if xs.size < 400:
+        return None
+    sel = np.random.default_rng(0).choice(xs.size, min(20000, xs.size), replace=False)
+    src = np.stack([xs[sel], ys[sel]], 1).astype(np.float32)
+    dst = src + f[ys[sel], xs[sel]]
+    M, inl = cv2.estimateAffine2D(src, dst, method=cv2.RANSAC, ransacReprojThreshold=4.0, maxIters=3000)
+    if M is None or float(inl.mean()) < 0.08:
+        return None
+    return M.astype(np.float32)
+
+
+def apply_affine(rgb: np.ndarray, M: np.ndarray) -> np.ndarray:
+    """Pull `rgb` (the candidate, full size) onto the world with a map fitted at MEASURE_W."""
+    h, w = rgb.shape[:2]
+    Ms = M.copy()
+    Ms[:, 2] *= w / MEASURE_W
+    return cv2.warpAffine(rgb, Ms, (w, h), flags=cv2.INTER_CUBIC | cv2.WARP_INVERSE_MAP, borderMode=cv2.BORDER_REFLECT)
+
+
+def align(world: np.ndarray, cand: np.ndarray, base_st: Optional[np.ndarray] = None, mode: str = "affine",
+          passes: int = 2) -> tuple[np.ndarray, dict]:
+    """Put `cand` back where the world has things. Returns the picture and a report of the drift and edge agreement before
+    (raw) and after (aligned), and the global move that was undone.
+
+    affine (the default): only the global move is undone: lines stay straight, nothing is bent. What remains is the
+        editor's own redrawing, which the page's transition glides over (the flow between neighbouring times).
+    flow: after the global move, a few passes of dense optical flow pull local structure onto the world as well. It matches
+        edges better and bends things: windows and roof lines wobble where the editor redrew them. For small drift only.
+    none: measure only."""
     base_st = structure(world) if base_st is None else base_st
     raw = measure(world, cand, base_st)
-    best, best_score, report = cand, raw["drift"] - 2 * raw["edges"], dict(raw)
-    cur = cand
-    for _ in range(passes):
-        f = flow(base_st, structure(cur))
-        nxt = warp(cur, f)
-        m = measure(world, nxt, base_st)
-        score = m["drift"] - 2 * m["edges"]
-        if score < best_score - 1e-4:
-            best, best_score, report = nxt, score, dict(m)
-            cur = nxt
-        else:
-            break
-    return best, {"raw": raw, "aligned": {k: report[k] for k in ("drift", "drift_p90", "edges")}}
+    best, report, move = cand, dict(raw), None
+    if mode != "none":
+        M = fit_affine(base_st, structure(cand))
+        if M is not None:
+            moved = apply_affine(cand, M)
+            m = measure(world, moved, base_st)
+            if m["drift"] < raw["drift"] - 1e-3:
+                best, report = moved, dict(m)
+                move = {"scale": [round(float(M[0, 0]), 4), round(float(M[1, 1]), 4)], "shear": [round(float(M[0, 1]), 4), round(float(M[1, 0]), 4)],
+                        "shift": [round(float(M[0, 2]), 2), round(float(M[1, 2]), 2)]}
+        if mode == "flow":
+            cur = best
+            for _ in range(passes):
+                nxt = warp(cur, flow(base_st, structure(cur)))
+                m = measure(world, nxt, base_st)
+                if m["drift"] + 2 * (1 - m["edges"]) < report["drift"] + 2 * (1 - report["edges"]) - 1e-4:
+                    best, report, cur = nxt, dict(m), nxt
+                else:
+                    break
+    return best, {"raw": raw, "aligned": {k: report[k] for k in ("drift", "drift_p90", "edges", "strain")}, "move": move}
+
+
+def pair_flow(a: np.ndarray, b: np.ndarray, width: int = 480) -> tuple[np.ndarray, dict]:
+    """How the structure of picture `a` is displaced in picture `b` (neighbouring times of the same place), for the page to
+    glide along as it changes from one to the other instead of cross-fading doubled edges. RGB uint8, `width` across:
+    R, G the displacement (dx, dy in px at MEASURE_W across, +-FLOW_RANGE, 128 is none), B the confidence (where there is
+    structure to measure; flat sky and water say nothing, so they are left where they are). Plus the mean glide in px."""
+    sa, sb = structure(a), structure(b)
+    f = flow(sa, sb)
+    f = np.stack([cv2.GaussianBlur(f[..., i], (0, 0), 4.0) for i in (0, 1)], -1)
+    conf = cv2.GaussianBlur(_weights(sa) * _weights(sb) ** 0.5, (0, 0), 4.0)
+    conf = np.clip(conf * 1.6, 0, 1)
+    f = np.clip(f, -FLOW_RANGE, FLOW_RANGE)
+    h, w = sa.shape
+    size = (width, max(1, round(h * width / w)))
+    enc = np.dstack([np.clip(f[..., 0] / (2 * FLOW_RANGE) + 0.5, 0, 1), np.clip(f[..., 1] / (2 * FLOW_RANGE) + 0.5, 0, 1), conf])
+    out = (cv2.resize(enc, size, interpolation=cv2.INTER_AREA) * 255).astype(np.uint8)
+    mag = np.hypot(f[..., 0], f[..., 1])
+    glide = float((mag * conf).sum() / max(float(conf.sum()), 1e-6))
+    return out, {"glide": round(glide, 3), "confidence": round(float(conf.mean()), 3)}
 
 
 # ---------------------------------------------------------------- relighting through ComfyUI
@@ -195,35 +257,30 @@ def relight(world_png: Path, instruction: str, seed: int, steps: int, out: Path,
 
 
 def relight_locked(world: np.ndarray, world_png: Path, instruction: str, seeds: list[int], steps: int, max_drift: float,
-                   align_on: bool, work: Path, tag: str, log=print) -> tuple[np.ndarray, dict]:
-    """Relight until the place holds still: try each seed, align, keep the first whose residual drift is within
-    `max_drift` (else the best of them). Returns the picture (at the world's size) and a report of every attempt."""
+                   align_mode: str, work: Path, tag: str, log=print, denoise: float = 1.0) -> tuple[np.ndarray, dict]:
+    """Relight until the place holds still: try each seed, undo the global move, keep the first whose remaining drift is
+    within `max_drift` (else the best of them). Returns the picture (at the world's size) and a report of every attempt."""
     base_st = structure(world)
     attempts, best, best_img = [], None, None
     for i, seed in enumerate(seeds):
         raw_png = work / f"_raw_{tag}_{seed}.png"
-        relight(world_png, instruction, seed, steps, raw_png, f"{tag}_{seed}", log)
+        relight(world_png, instruction, seed, steps, raw_png, f"{tag}_{seed}", log, denoise)
         cand = load_rgb(raw_png, (world.shape[1], world.shape[0]))
         raw_png.unlink(missing_ok=True)
-        if align_on:
-            fixed, rep = align(world, cand, base_st)
-        else:
-            m = measure(world, cand, base_st)
-            fixed, rep = cand, {"raw": m, "aligned": {k: m[k] for k in ("drift", "drift_p90", "edges")}}
+        fixed, rep = align(world, cand, base_st, align_mode)
         rep["seed"] = seed
         attempts.append(rep)
-        log(f"    seed {seed}: the editor moved the place {rep['raw']['drift']:.2f}px (strain {rep['raw'].get('strain', 0):.3f}); "
-            f"edges {rep['raw']['edges']:.2f} -> {rep['aligned']['edges']:.2f} after the correction")
-        # an honest score: how far the editor moved the place (raw), how much the correction had to bend it, how well
-        # the edges agree in the end. The residual after a warp alone says nothing: a warp can match anything.
-        score = rep["raw"]["drift"] + 40 * rep["raw"].get("strain", 0) - 4 * rep["aligned"]["edges"]
+        log(f"    seed {seed}: the editor moved the place {rep['raw']['drift']:.2f}px; after undoing its global move "
+            f"{rep['aligned']['drift']:.2f}px (edges {rep['raw']['edges']:.2f} -> {rep['aligned']['edges']:.2f})")
+        # score: what remains of the drift, and how well the edges agree
+        score = rep["aligned"]["drift"] - 4 * rep["aligned"]["edges"]
         if best is None or score < best[0]:
             best, best_img = (score, rep), fixed
-        if rep["raw"]["drift"] <= max_drift:
+        if rep["aligned"]["drift"] <= max_drift:
             break
     report = dict(best[1])
     report["attempts"] = attempts
-    report["ok"] = report["raw"]["drift"] <= max_drift
+    report["ok"] = report["aligned"]["drift"] <= max_drift
     return best_img, report
 
 

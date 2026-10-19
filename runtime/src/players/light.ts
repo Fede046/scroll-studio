@@ -23,7 +23,7 @@ void main(){ uv = vec2(p.x * .5 + .5, .5 - p.y * .5); gl_Position = vec4(p, 0., 
 const FS = `#version 300 es
 precision highp float;
 in vec2 uv; out vec4 o;
-uniform sampler2D imgA, imgB, ratioT, lampT, depthT, skyT;
+uniform sampler2D imgA, imgB, ratioT, lampT, depthT, skyT, flowT;
 uniform vec2 sc;            // cover-fit scale
 uniform vec2 ctr;           // the picture point the screen's centre looks at
 uniform vec3 cam;           // drift x, y and zoom
@@ -57,17 +57,16 @@ void main(){
   for (int i = 0; i < ITER; i++) { float d = texture(depthT, q).r; q = c - (d - focus) * cam.xy * strength; }
   q = clamp(q, vec2(.001), vec2(.999));
 
-  vec3 A = lin(texture(imgA, q).rgb), B = lin(texture(imgB, q).rgb);
   float d = texture(depthT, q).r;
   float sk = texture(skyT, q).r;
-  vec3 col, Am = A, Bm = B;
+  // how the place's structure sits differently in the two pictures (the editor redrew it a little): the picture glides
+  // along it as the light changes, so edges slide into place instead of cross-fading doubled
+  vec3 fl = texture(flowT, q).rgb;
+  vec2 F = (fl.rg - .5) * (2. * 24.) * fl.b;
+  vec2 Fuv = vec2(F.x / 1024., F.y * aspect / 1024.);
   float s = fe;
-
+  vec3 R = vec3(1.);
   if (light > .5) {
-    // the low-frequency change of light, carried by both pictures to the same in-between light
-    vec3 R = exp2((texture(ratioT, q).rgb - .5) * 6.);
-    Am = A * pow(R, vec3(fe));
-    Bm = B * pow(R, vec3(-(1. - fe)));
     // the front: new light spreads from its source, sky first, near ground last, ragged edge
     float gr = clamp(length((q - origin) * vec2(aspect, 1.)) / (aspect * .9), 0., 1.);
     float g = .5 * gr + .32 * (1. - d) + .12 * vn(q * vec2(8. * aspect, 8.)) + .06 * q.y;
@@ -75,6 +74,14 @@ void main(){
     g = clamp(g, 0., 1.);
     const float w = .34;
     s = smoothstep(g * (1. - w), g * (1. - w) + w, fe);
+    // the low-frequency change of light, carried by both pictures to the same in-between light
+    R = exp2((texture(ratioT, q).rgb - .5) * 6.);
+  }
+  vec3 A = lin(texture(imgA, q - s * Fuv).rgb), B = lin(texture(imgB, q + (1. - s) * Fuv).rgb);
+  vec3 col, Am = A, Bm = B;
+  if (light > .5) {
+    Am = A * pow(R, vec3(fe));
+    Bm = B * pow(R, vec3(-(1. - fe)));
     col = mix(Am, Bm, s);
     col += edgeCol * (s * (1. - s) * 4.) * .05 * smoothstep(0., .1, fe) * smoothstep(1., .9, fe);
   } else {
@@ -120,7 +127,7 @@ void main(){
 
 type Tok = { bg: number[]; bg2: number[]; ink: number[]; em: number[]; accent: number[]; a2: number; a3: number; dark: boolean; fog?: number[] };
 type TimeCfg = { id: string; label: string; clock: string; hours: number; haze: number; lit: boolean; sun: string; img: string; imgS: string; tokens: Tok };
-type Pair = { ratio: string; lamp: string | null; color: string | null; glow: number; count: number };
+type Pair = { ratio: string; flow?: string | null; lamp: string | null; color: string | null; glow: number; count: number };
 type Hold = { t: number; a: number; b: number };
 
 const hex = (h: string): number[] => { const s = h.replace("#", ""); return [0, 2, 4].map((i) => parseInt(s.slice(i, i + 2), 16) / 255); };
@@ -267,9 +274,9 @@ const factory: PlayerFactory = async (cfg, ctx) => {
   const loc = gl.getAttribLocation(prog, "p");
   gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
   const U: Record<string, WebGLUniformLocation | null> = {};
-  for (const n of ["imgA", "imgB", "ratioT", "lampT", "depthT", "skyT", "sc", "ctr", "cam", "strength", "focus", "fe", "aspect", "origin", "light",
+  for (const n of ["imgA", "imgB", "ratioT", "lampT", "depthT", "skyT", "flowT", "sc", "ctr", "cam", "strength", "focus", "fe", "aspect", "origin", "light",
     "hasLamp", "lampOn", "glow", "lampCol", "hazeA", "hazeB", "mistOn", "fogA", "fogB", "sunCol", "edgeCol", "sunPos", "sunAmt", "sunSize", "t", "vig", "grain"]) U[n] = gl.getUniformLocation(prog, n);
-  ["imgA", "imgB", "ratioT", "lampT", "depthT", "skyT"].forEach((n, i) => gl.uniform1i(U[n], i));
+  ["imgA", "imgB", "ratioT", "lampT", "depthT", "skyT", "flowT"].forEach((n, i) => gl.uniform1i(U[n], i));
 
   const tex = (im: HTMLImageElement, mip: boolean, linear = true) => {
     const t = gl.createTexture()!;
@@ -289,19 +296,20 @@ const factory: PlayerFactory = async (cfg, ctx) => {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     return t;
   };
-  const noLamp = blank([0, 0, 0, 255]), flatRatio = blank([128, 128, 128, 255]);
+  const noLamp = blank([0, 0, 0, 255]), flatRatio = blank([128, 128, 128, 255]), noFlow = blank([128, 128, 0, 255]);
 
-  const total = nT * 1 + pairs.length * 2 + 2;
+  const total = nT * 1 + pairs.length * 3 + 2;
   let loaded = 0;
   const tick = () => ctx.progress(++loaded / total);
   const imgT: WebGLTexture[] = [];
-  const ratioT: WebGLTexture[] = [], lampT: (WebGLTexture | null)[] = [];
+  const ratioT: WebGLTexture[] = [], lampT: (WebGLTexture | null)[] = [], flowT: (WebGLTexture | null)[] = [];
   let depthT: WebGLTexture = blank([128, 128, 128, 255]), skyT: WebGLTexture = blank([0, 0, 0, 255]);
   let aspect = cfg.w / cfg.h;
   await Promise.all([
     ...times.map(async (t, i) => { const im = await loadImage(small ? t.imgS : t.img); imgT[i] = tex(im, true); aspect = cfg.w / cfg.h; tick(); }),
     ...pairs.map(async (pr, k) => { const im = await loadImage(pr.ratio); ratioT[k] = tex(im, false); tick(); }),
     ...pairs.map(async (pr, k) => { lampT[k] = pr.lamp ? tex(await loadImage(pr.lamp), false) : null; tick(); }),
+    ...pairs.map(async (pr, k) => { flowT[k] = pr.flow ? tex(await loadImage(pr.flow), false) : null; tick(); }),
     loadImage(cfg.depth).then((im) => { depthT = tex(im, false); tick(); }),
     loadImage(cfg.sky).then((im) => { skyT = tex(im, false); tick(); }),
   ]);
@@ -342,7 +350,7 @@ const factory: PlayerFactory = async (cfg, ctx) => {
       const cx = dr * (0.012 * Math.sin(idle * 0.11) + 0.016 * (s.p - 0.5)) + px * 0.01 * dr;
       const cy = dr * (0.006 * Math.cos(idle * 0.083)) + py * 0.006 * dr;
       const zoom = 1.035 + dr * 0.025 * (tau / Math.max(1, nT - 1)) + dr * 0.004 * Math.sin(idle * 0.07);
-      bind(0, imgT[a]); bind(1, imgT[a + 1]); bind(2, ratioT[a] || flatRatio); bind(3, lampT[a] || noLamp); bind(4, depthT); bind(5, skyT);
+      bind(0, imgT[a]); bind(1, imgT[a + 1]); bind(2, ratioT[a] || flatRatio); bind(3, lampT[a] || noLamp); bind(4, depthT); bind(5, skyT); bind(6, flowT[a] || noFlow);
       const ca = cw / ch;
       const sx = ca > aspect ? 1 : aspect / ca, sy = ca > aspect ? ca / aspect : 1, fo = cfg.focus || [0.5, 0.5];
       gl.uniform2f(U.sc, sx, sy);

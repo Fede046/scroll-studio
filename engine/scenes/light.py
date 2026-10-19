@@ -26,7 +26,8 @@ from ..inputs import credit, image_key, resolve_image
 from ..project import BuildContext, BuildError, file_key
 from ..spec import LightScene, LightSun
 
-VERSION = 2
+VERSION = 3              # bump when the cheap stages (maps, web, depth, sky) would come out differently
+RELIGHT_VERSION = 1      # bump when a time of day would come out differently: it re-renders every relight
 HOLD_FLOOR = 0.01
 
 
@@ -214,17 +215,17 @@ def build(sec: LightScene, ctx: BuildContext, theme: dict) -> dict:
         png, js = tdir / f"{tid}.png", tdir / f"{tid}.json"
         if t.image is not None:
             msrc = resolve_image(ctx.project, t.image, ctx.log)
-            key = {"v": VERSION, "world": wkey, "image": image_key(t.image), "file": file_key(msrc), "align": sec.structure.align}
+            key = {"v": RELIGHT_VERSION, "world": wkey, "image": image_key(t.image), "file": file_key(msrc), "align": sec.structure.align}
             mode = "image"
         elif tid == sec.world_time:
-            key = {"v": VERSION, "world": wkey, "anchor": True}
+            key = {"v": RELIGHT_VERSION, "world": wkey, "anchor": True}
             mode = "anchor"
         else:
             instr = light_presets.instruction(t.preset, t.prompt)
             seed0 = t.seed if t.seed is not None else sec.seed + 13 * i
             steps = max(4, sec.edit_steps // 2) if draft else sec.edit_steps
             st = sec.structure
-            key = {"v": VERSION, "light": light.VERSION, "world": wkey, "ins": instr, "seed": seed0, "steps": steps,
+            key = {"v": RELIGHT_VERSION, "light": light.RELIGHT_VERSION, "world": wkey, "ins": instr, "seed": seed0, "steps": steps,
                    "align": st.align, "max": st.max_drift, "retries": 0 if draft else st.retries}
             mode = "relight"
 
@@ -236,11 +237,7 @@ def build(sec: LightScene, ctx: BuildContext, theme: dict) -> dict:
                 return
             if mode == "image":
                 cand = light.load_rgb(msrc, (W, H))
-                if sec.structure.align:
-                    img, rep = light.align(world, cand)
-                else:
-                    m = light.measure(world, cand)
-                    img, rep = cand, {"raw": m, "aligned": {k: m[k] for k in ("drift", "drift_p90", "edges")}}
+                img, rep = light.align(world, cand, None, sec.structure.align)
                 rep["ok"] = rep["aligned"]["drift"] <= sec.structure.max_drift
             else:
                 seeds = [seed0 + 1000 * j for j in range(1 + (0 if draft else sec.structure.retries))]
@@ -254,7 +251,7 @@ def build(sec: LightScene, ctx: BuildContext, theme: dict) -> dict:
         imgs.append(light.load_rgb(png))
         reports.append(json.loads(js.read_text()))
         if not reports[-1].get("ok", True):
-            ctx.log(f"  warning: the editor moved '{tid}' {reports[-1]['raw']['drift']:.2f}px from the world "
+            ctx.log(f"  warning: '{tid}' is still {reports[-1]['aligned']['drift']:.2f}px from the world "
                     f"(limit {sec.structure.max_drift}); try `seed:` on that time, a world with simpler structure, or raise "
                     f"structure.max_drift")
 
@@ -263,14 +260,16 @@ def build(sec: LightScene, ctx: BuildContext, theme: dict) -> dict:
     mdir.mkdir(exist_ok=True)
     meta_json = ctx.work / "maps.json"
     tkeys = [file_key(tdir / f"{t.id}.png") for t in sec.times]
-    pair_files = [mdir / f"ratio{k}.png" for k in range(len(times) - 1)]
+    pair_files = [mdir / f"ratio{k}.png" for k in range(len(times) - 1)] + [mdir / f"flow{k}.png" for k in range(len(times) - 1)]
     lamps_key = [l.model_dump(mode="json") for l in sec.lamps]
 
     def make_maps():
         meta = {"pairs": [], "tokens": []}
         for k in range(len(times) - 1):
             a, b = imgs[k], imgs[k + 1]
-            Image.fromarray(light.ratio_map(world, a, b)).save(pair_files[k])
+            Image.fromarray(light.ratio_map(world, a, b)).save(mdir / f"ratio{k}.png")
+            fl, gl = light.pair_flow(a, b)
+            Image.fromarray(fl).save(mdir / f"flow{k}.png")
             allow = None
             hint = True if times[k + 1]["lit"] and not times[k]["lit"] else False if times[k]["lit"] and not times[k + 1]["lit"] else None
             if sec.lamps:
@@ -290,7 +289,7 @@ def build(sec: LightScene, ctx: BuildContext, theme: dict) -> dict:
             lamp = light.lamp_map(a, b, sky=sky, allow=allow, glow=max([l.glow for l in sec.lamps] or [1.0]),
                                   grow=sec.lamps[0].grow if sec.lamps else 2, seed=5 + k,
                                   turns_on=hint)
-            entry = {"ratio": pair_files[k].name, "lamp": None, "color": None, "count": 0}
+            entry = {"ratio": f"ratio{k}.png", "flow": f"flow{k}.png", "glide": gl["glide"], "lamp": None, "color": None, "count": 0}
             if lamp is not None:
                 f = mdir / f"lamp{k}.png"
                 Image.fromarray(lamp["map"], "RGBA").save(f)
@@ -310,14 +309,15 @@ def build(sec: LightScene, ctx: BuildContext, theme: dict) -> dict:
     # ---- the report and the web files
     (ctx.work / "report.json").write_text(json.dumps(
         {"times": [{"id": t["id"], "clock": t["clock"], **r} for t, r in zip(times, reports)],
-         "pairs": [{"from": ids[k], "to": ids[k + 1], "lamps": p["count"]} for k, p in enumerate(meta["pairs"])]}, indent=1))
+         "pairs": [{"from": ids[k], "to": ids[k + 1], "lamps": p["count"], "glide": p["glide"]} for k, p in enumerate(meta["pairs"])]}, indent=1))
 
     small_w = max(480, round(W * 2 / 3) // 16 * 16)
     web_files = []
     for i, t in enumerate(sec.times):
         web_files += [ctx.web / f"t{i}.webp", ctx.web / f"t{i}-s.webp"]
     web_files += [ctx.web / "depth.png", ctx.web / "sky.png", ctx.web / "poster.jpg"]
-    web_files += [ctx.web / p["ratio"] for p in meta["pairs"]] + [ctx.web / p["lamp"] for p in meta["pairs"] if p["lamp"]]
+    web_files += [ctx.web / p["ratio"] for p in meta["pairs"]] + [ctx.web / p["flow"] for p in meta["pairs"]]
+    web_files += [ctx.web / p["lamp"] for p in meta["pairs"] if p["lamp"]]
 
     def make_web():
         import shutil
@@ -330,6 +330,7 @@ def build(sec: LightScene, ctx: BuildContext, theme: dict) -> dict:
         Image.fromarray(imgs[0]).resize((1280, round(H * 1280 / W)), Image.LANCZOS).save(ctx.web / "poster.jpg", quality=84)
         for p in meta["pairs"]:
             shutil.copy(mdir / p["ratio"], ctx.web / p["ratio"])
+            shutil.copy(mdir / p["flow"], ctx.web / p["flow"])
             if p["lamp"]:
                 shutil.copy(mdir / p["lamp"], ctx.web / p["lamp"])
     ctx.stage("web", {"v": VERSION, "times": tkeys, "w": W, "small": small_w, "maps": file_key(meta_json)}, web_files, make_web)
@@ -339,7 +340,7 @@ def build(sec: LightScene, ctx: BuildContext, theme: dict) -> dict:
         cfg_times.append({**{k: t[k] for k in ("id", "label", "clock", "hours", "haze", "lit", "sun")},
                           "img": ctx.url(ctx.web / f"t{i}.webp"), "imgS": ctx.url(ctx.web / f"t{i}-s.webp"), "tokens": tk,
                           "drift": reports[i].get("aligned", {}).get("drift", 0)})
-    pairs = [{"ratio": ctx.url(ctx.web / p["ratio"]), "lamp": ctx.url(ctx.web / p["lamp"]) if p["lamp"] else None,
+    pairs = [{"ratio": ctx.url(ctx.web / p["ratio"]), "flow": ctx.url(ctx.web / p["flow"]), "glide": p["glide"], "lamp": ctx.url(ctx.web / p["lamp"]) if p["lamp"] else None,
               "color": p["color"], "glow": p.get("glow", 1.0), "count": p["count"]} for p in meta["pairs"]]
     credits = [credit(sec.world)] if credit(sec.world) else []
     return {

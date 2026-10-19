@@ -1187,14 +1187,17 @@ class LightSun(Model):
 
 class LightStructure(Model):
     """Geometry lock. The place must not move between times, only the light. Every relight is measured against the world
-    (how far the editor displaced structure, and how well edges agree) and small drift is warped away; a relight that
-    moved things too far is redone with another seed, and the best attempt is kept."""
-    align: bool = Field(True, description="Warp each relight back onto the world's geometry (dense flow on structure, "
-                                          "not on colour) so edges sit exactly where they were")
-    max_drift: float = Field(4.0, ge=0, le=40, description="How far the editor may move the place, mean displacement in "
-                                                           "pixels at 1024 across; above it the relight is retried with "
-                                                           "another seed (the correction can bend what is only a little off, "
-                                                           "not rebuild a redrawn place)")
+    (how far the editor displaced structure, and how well edges agree); its global move is undone; a relight that is still
+    too far off is redone with another seed, and the best attempt is kept. What drift is left between neighbouring times
+    is measured too and the page glides along it (a flow texture) instead of cross-fading doubled edges."""
+    align: Literal["affine", "flow", "none"] = Field(
+        "affine", description="affine: undo the editor's global move (a few percent of zoom and a few pixels of shift, which "
+                              "is most of what it does to the place) and bend nothing; flow: also pull local structure onto "
+                              "the world with dense optical flow (edges agree better, lines wobble where the editor redrew "
+                              "things; for small drift); none: measure only. What drift remains is glided over in the page")
+    max_drift: float = Field(6.0, ge=0, le=40, description="How far the place may still be from the world after the global "
+                                                           "move is undone, mean displacement in pixels at 1024 across; above "
+                                                           "it the relight is retried with another seed")
     retries: int = Field(2, ge=0, le=8, description="How many more seeds to try when a relight drifts too far")
 
 

@@ -171,16 +171,30 @@ def test_structure_ignores_the_light_and_sees_a_move():
     assert moved["drift"] > 4 * dark["drift"]
 
 
-def test_align_pulls_a_drifted_relight_back_onto_the_world():
+def test_align_undoes_a_global_move_and_bends_nothing():
+    """The editor zooms a few percent and shifts a few pixels: undone exactly, lines stay straight."""
+    world = place()
+    h, w = world.shape[:2]
+    M = np.array([[0.97, 0.01, 9.0], [-0.004, 0.96, 7.0]], np.float32)            # the candidate's coordinates of world points
+    cand = cv2.warpAffine(relit(world), M, (w, h), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
+    fixed, rep = light.align(world, cand)
+    assert rep["raw"]["drift"] > 5
+    assert rep["aligned"]["drift"] < 0.35 * rep["raw"]["drift"] and rep["aligned"]["edges"] > rep["raw"]["edges"]
+    mv = rep["move"]
+    assert mv is not None and abs(mv["scale"][0] - 0.97) < 0.01 and abs(mv["scale"][1] - 0.96) < 0.01
+    assert abs(float(light.luma(fixed).mean()) - float(light.luma(cand).mean())) < 0.03       # the light survives the warp
+
+
+def test_align_flow_pulls_local_drift_in_and_affine_leaves_it():
     world = place()
     cand = relit(world, shift=(6, -3), warp=3.0)
-    fixed, rep = light.align(world, cand)
-    assert rep["raw"]["drift"] > 2.5
-    assert rep["aligned"]["drift"] < 0.5 * rep["raw"]["drift"]
-    assert rep["aligned"]["edges"] >= rep["raw"]["edges"]
+    _, aff = light.align(world, cand, mode="affine")
+    fixed, flo = light.align(world, cand, mode="flow")
+    _, none = light.align(world, cand, mode="none")
+    assert none["aligned"]["drift"] == none["raw"]["drift"] and none["move"] is None
+    assert flo["aligned"]["drift"] < 0.5 * flo["raw"]["drift"]
+    assert flo["aligned"]["drift"] <= aff["aligned"]["drift"] + 1e-6
     assert fixed.shape == world.shape and fixed.dtype == np.uint8
-    # the light survives the warp: the aligned picture is still the dark one
-    assert abs(float(light.luma(fixed).mean()) - float(light.luma(cand).mean())) < 0.03
 
 
 def test_align_leaves_a_clean_relight_alone():
@@ -191,26 +205,39 @@ def test_align_leaves_a_clean_relight_alone():
     assert float(np.abs(fixed.astype(int) - cand.astype(int)).mean()) < 2.0
 
 
+def test_pair_flow_encodes_how_neighbours_differ():
+    world = place()
+    a, b = relit(world), relit(world, gain=(0.9, 0.8, 0.7), shift=(-6, 3))        # b: the structure sits 6px left, 3 up
+    enc, stats = light.pair_flow(a, b)
+    assert enc.shape[1] == 480 and enc.shape[2] == 3 and enc.dtype == np.uint8
+    conf = enc[..., 2].astype(np.float32) / 255
+    dx = (enc[..., 0].astype(np.float32) / 255 - 0.5) * 2 * light.FLOW_RANGE
+    # where there is structure the flow says so (px at 1024 across; the picture is 640 wide, so x1.6)
+    assert stats["glide"] > 3 and float((dx * conf).sum() / conf.sum()) > 3.0
+    same, st0 = light.pair_flow(a, a)
+    assert st0["glide"] < 0.3
+
+
 def test_relight_locked_retries_until_the_place_holds_still(tmp_path, monkeypatch):
     world = place()
     wp = tmp_path / "world.png"
     Image.fromarray(world).save(wp)
     tries = []
 
-    def fake(world_png, instruction, seed, steps, out, tag, log=print):
+    def fake(world_png, instruction, seed, steps, out, tag, log=print, denoise=1.0):
         tries.append(seed)
         # the first seed drifts far, the second is clean
         # the first seed redraws the place (other houses), the second keeps it
         Image.fromarray(relit(place(seed=9) if len(tries) == 1 else world)).save(out)
         return out
     monkeypatch.setattr(light, "relight", fake)
-    img, rep = light.relight_locked(world, wp, "night", [7, 1007, 2007], 8, 4.0, True, tmp_path, "night", lambda m: None)
+    img, rep = light.relight_locked(world, wp, "night", [7, 1007, 2007], 8, 4.0, "affine", tmp_path, "night", lambda m: None)
     assert tries == [7, 1007] and rep["ok"] and len(rep["attempts"]) == 2
     assert rep["attempts"][0]["aligned"]["drift"] > rep["attempts"][1]["aligned"]["drift"]
     # and when no seed is good enough, the best of them is kept and reported not ok
     tries.clear()
     monkeypatch.setattr(light, "relight", lambda *a, **k: (Image.fromarray(relit(place(seed=9))).save(a[4]), a[4])[1])
-    img, rep = light.relight_locked(world, wp, "night", [1, 2], 8, 0.01, True, tmp_path, "n2", lambda m: None)
+    img, rep = light.relight_locked(world, wp, "night", [1, 2], 8, 0.01, "affine", tmp_path, "n2", lambda m: None)
     assert not rep["ok"] and len(rep["attempts"]) == 2
 
 
@@ -310,7 +337,7 @@ def test_build_runs_every_stage_caches_and_reports(tmp_path, monkeypatch):
     world = place(1280, 720)
     calls = []
 
-    def fake(world_png, instruction, seed, steps, out, tag, log=print):
+    def fake(world_png, instruction, seed, steps, out, tag, log=print, denoise=1.0):
         calls.append(tag)
         night = "night" in tag
         im = relit(world, gain=(0.18, 0.2, 0.4) if night else (0.9, 0.7, 0.8), shift=(2, 1))
@@ -334,7 +361,7 @@ def test_build_runs_every_stage_caches_and_reports(tmp_path, monkeypatch):
     assert cfg["times"][1]["drift"] == 0 and cfg["times"][2]["tokens"]["dark"] is True
     rep = json.loads((root / ".build" / "day" / "report.json").read_text())
     assert [t["id"] for t in rep["times"]] == ["dawn", "noon", "night"] and rep["times"][0]["aligned"]["drift"] < rep["times"][0]["raw"]["drift"] + 1e-6
-    for rel in [cfg["depth"], cfg["sky"], cfg["poster"], cfg["times"][0]["img"], cfg["times"][0]["imgS"], cfg["pairs"][0]["ratio"], cfg["pairs"][1]["lamp"]]:
+    for rel in [cfg["depth"], cfg["sky"], cfg["poster"], cfg["times"][0]["img"], cfg["times"][0]["imgS"], cfg["pairs"][0]["ratio"], cfg["pairs"][0]["flow"], cfg["pairs"][1]["lamp"]]:
         assert (root / ".build" / "day" / "web" / Path(rel).relative_to("assets/day")).exists(), rel
     # an unchanged spec renders nothing: no relight, no stage rerun
     calls.clear()
@@ -352,7 +379,7 @@ def test_the_page_builds_with_the_scene(tmp_path, monkeypatch):
     from engine.compile.compiler import build_site
     root = make_project(tmp_path)
     world = place(1280, 720)
-    monkeypatch.setattr(light, "relight", lambda wp, ins, seed, steps, out, tag, log=print: (Image.fromarray(relit(world)).save(out), out)[1])
+    monkeypatch.setattr(light, "relight", lambda wp, ins, seed, steps, out, tag, log=print, denoise=1.0: (Image.fromarray(relit(world)).save(out), out)[1])
     monkeypatch.setattr("engine.backends.depth.estimate", lambda im, size="small": np.zeros((im.height, im.width), np.float32))
     import engine.region as regionmod
     monkeypatch.setattr(regionmod, "find", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("no nodes")))
@@ -372,7 +399,7 @@ def test_named_lamps_are_cut_out_with_region_and_confine_the_lights(tmp_path, mo
     world = place(1280, 720)
     seen = []
 
-    def fake(world_png, instruction, seed, steps, out, tag, log=print):
+    def fake(world_png, instruction, seed, steps, out, tag, log=print, denoise=1.0):
         im = relit(world, gain=(0.18, 0.2, 0.4)) if "night" in tag else relit(world, gain=(0.9, 0.7, 0.8))
         if "night" in tag:
             for x, y in [(100, 400), (260, 420), (500, 380), (900, 430), (1100, 410)]:
