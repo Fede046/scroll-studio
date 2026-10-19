@@ -64,7 +64,7 @@ def collect(site) -> list[tuple[str, ImageInput]]:
             for name in ("edit", "beat_frame"):      # the source of an edited image is another input
                 walk(getattr(v, name, None), f"{path}.{name}")
         elif isinstance(v, BaseModel):
-            for name in v.model_fields:
+            for name in type(v).model_fields:
                 walk(getattr(v, name, None), f"{path}.{name}" if path else name)
         elif isinstance(v, (list, tuple)):
             for i, x in enumerate(v):
@@ -103,8 +103,8 @@ def luma(a: np.ndarray) -> np.ndarray:
 def seam_report(frames: np.ndarray, mask: Optional[np.ndarray] = None) -> dict:
     """How well a loop closes. `step` is the mean absolute difference (0-255 levels, over the mask) between neighbouring
     frames; `seam` is the same between the last frame and the first, the step the loop makes when it wraps. The ratio is
-    seam / typical step: about 1 for a loop that is continuous (the wrap is a step like any other), well above it for
-    a loop that jumps."""
+    seam / the steps beside the wrap: about 1 for a loop that is continuous (the wrap is a step like any other), well above
+    it for a loop that jumps."""
     f = frames.astype(np.float32)
     w = None if mask is None else (mask.astype(np.float32) / 255.0)
 
@@ -115,8 +115,12 @@ def seam_report(frames: np.ndarray, mask: Optional[np.ndarray] = None) -> dict:
     steps = [mad(f[i], f[i + 1]) for i in range(len(f) - 1)]
     typical = float(np.median(steps)) if steps else 0.0
     seam = mad(f[-1], f[0])
+    # the step the wrap should be, if the loop is continuous: the steps just before and just after it (motion speeds up and
+    # slows down, so the median step is the wrong yardstick at one particular place), never less than half a typical step
+    local = float(np.mean(steps[-2:] + steps[:2])) if len(steps) >= 4 else typical
+    ref = max(local, 0.5 * typical, 1e-3)
     return {"typical_step": round(typical, 3), "max_step": round(max(steps), 3) if steps else 0.0,
-            "seam": round(seam, 3), "ratio": round(seam / max(typical, 1e-3), 2), "frames": int(len(f))}
+            "seam": round(seam, 3), "ratio": round(seam / ref, 2), "frames": int(len(f))}
 
 
 def stabilise(frames: np.ndarray, ref: np.ndarray, keep: np.ndarray, log=print) -> tuple[np.ndarray, float]:
@@ -462,10 +466,11 @@ def build(project, ref: ImageInput, log: Callable[[str], None] = print, force: b
     sim.crop(box).save(crop_png)
 
     # ---- clip: the video model brings the crop to life
-    clip = work / "clip.mkv"
     ckey = {"v": VERSION, "crop": [file_key(still_path), box], "motion": motion_text(cg), "seconds": seconds, "seed": cg.seed,
             "model": model, "wan": wan if model == "wan" else None, "flf": flf, "size": [gw, gh]}
-    if only_cached and ctx.status("clip", ckey, [clip]) not in ("fresh", "migrated", "locked"):
+    cid = _digest(ckey)
+    clip = work / f"clip_{cid}.mkv"            # one file per variant, so going back to an earlier `loop` or `seconds` costs nothing
+    if only_cached and ctx.status(f"clip_{cid}", ckey, [clip]) not in ("fresh", "migrated", "locked"):
         return None
 
     def make_clip():
@@ -479,7 +484,7 @@ def build(project, ref: ImageInput, log: Callable[[str], None] = print, force: b
                                    if (ww, wh) < Image.open(p).size else cv2.INTER_CUBIC) for p in frames])
         write_lossless(arr, clip)
         shutil.rmtree(work / "frames", ignore_errors=True)
-    ctx.stage("clip", ckey, [clip], make_clip)
+    ctx.stage(f"clip_{cid}", ckey, [clip], make_clip)
     if plan is not None and not clip.exists():
         return None
 
@@ -493,13 +498,13 @@ def build(project, ref: ImageInput, log: Callable[[str], None] = print, force: b
     # ---- track: SAM 2.1 follows the moving thing through the clip
     tracked = None
     if cg.track:
-        tr = work / "track.npz"
+        tr = work / f"track_{cid}.npz"
         tkey = {"v": VERSION, "clip": ckey, "seed": hashlib.sha1(seed_c.tobytes()).hexdigest()[:12]}
 
         def run_track():
             _track(ctx, frames_raw, seed_c, tr, log)
         try:
-            ctx.stage("track", tkey, [tr], run_track)
+            ctx.stage(f"track_{cid}", tkey, [tr], run_track)
             if tr.exists():
                 tracked = np.load(tr)["union"]
         except BuildError as e:
@@ -538,7 +543,7 @@ def build(project, ref: ImageInput, log: Callable[[str], None] = print, force: b
         encode_h264(vid, mp4)
         save_mask(mask, wp)
         dec = read_video(mp4)                                   # measure what the page will play, not what we meant
-        outside = _outside_change(dec, mask)
+        outside = _outside_change(dec, still_c, mask)
         decoded = seam_report(dec, mask)
         motion = float(np.mean(np.std(seq.astype(np.float32), axis=0).mean(axis=-1)[mask > 127])) if (mask > 127).any() else 0.0
         report = {
@@ -549,24 +554,29 @@ def build(project, ref: ImageInput, log: Callable[[str], None] = print, force: b
             "mask": {"share_of_still": round(float((mask > 127).sum()) / sc / sc / (W * H), 4), **minfo,
                      "tracked": tracked is not None},
             "motion": {"temporal_std": round(motion, 2), "drift_px": round(drift, 2)},
-            "held": {"max_change_outside_mask": outside["max"], "share_changed": outside["share"]},
+            "held": {"max_change_outside_mask": outside["page"], "video_file_change_outside_mask": outside["file"]},
         }
         rep.write_text(json.dumps(report, indent=1))
-    ctx.stage("encode", ekey, [mp4, wp, rep], run_encode)
+    ctx.stage(f"encode_{out_id}", ekey, [mp4, wp, rep], run_encode)
     report = json.loads(rep.read_text())
     return Built(video=mp4, mask=wp, report=rep, data=report, box=[x0 / W, y0 / H, x1 / W, y1 / H], still=[W, H],
                  size=[ww, wh], poster_crop=crop_png, id=out_id)
 
 
-def _outside_change(dec: np.ndarray, mask: np.ndarray) -> dict:
-    """Over the decoded video, composited through the mask over its own first frame's pixels outside it: the largest change
-    of any pixel where the mask is zero. The page never shows the video there (the mask is zero), so this is a property of
-    the file too: the video holds the same still outside the mask, to within the codec."""
+def _outside_change(dec: np.ndarray, still: np.ndarray, mask: np.ndarray) -> dict:
+    """What is held still. `page`: the largest change from the still, in any frame, of any pixel where the mask is zero, in what
+    the page composes from the decoded video (poster x (1 - mask) + video x mask): 0 means those pixels are the still's own.
+    `file`: the same over the video file itself, which holds the still there too but through a lossy codec; it is never
+    shown where the mask is zero, and tells how clean the encode is next to the moving part."""
     z = mask == 0
     if not z.any():
-        return {"max": 0, "share": 0.0}
-    d = np.abs(dec[:, z].astype(np.int16) - dec[0:1, z].astype(np.int16))
-    return {"max": int(d.max()), "share": round(float((d.max(axis=(0, 2)) > 0).mean()), 4)}
+        return {"page": 0, "file": 0, "share": 0.0}
+    page = 0
+    for f in dec:
+        shown = page_composite(still, f, mask)
+        page = max(page, int(np.abs(shown[z].astype(np.int16) - still[z].astype(np.int16)).max()))
+    d = np.abs(dec[:, z].astype(np.int16) - still[z].astype(np.int16)[None])
+    return {"page": page, "file": int(d.max()), "share": round(float((d.max(axis=(0, 2)) > 0).mean()), 4)}
 
 
 def _track(ctx: BuildContext, frames: np.ndarray, seed: np.ndarray, out: Path, log) -> None:
@@ -580,7 +590,7 @@ def _track(ctx: BuildContext, frames: np.ndarray, seed: np.ndarray, out: Path, l
     s = min(1.0, 640 / max(H, W))
     tw, th = max(32, round(W * s / 2) * 2), max(32, round(H * s / 2) * 2)
     small = np.stack([cv2.resize(f, (tw, th), interpolation=cv2.INTER_AREA) for f in frames])
-    clip = ctx.work / "track_in.mp4"
+    clip = ctx.work / f"track_in_{out.stem[len('track_'):]}.mp4"
     encode_h264(small, clip, crf=12)
     sm = cv2.resize(seed, (tw, th), interpolation=cv2.INTER_LINEAR) > 127
     n, lab, stats, cent = cv2.connectedComponentsWithStats(sm.astype(np.uint8), connectivity=8)
