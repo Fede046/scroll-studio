@@ -118,6 +118,10 @@ the real first frames (same stages and caches), so approving them is not wasted 
 - The editor sees a padded crop around the region (`context`), so small regions get real detail; the instruction should
   say the colour, material and light you want (the seam is matched by the edit, the feather only hides the join).
   `scope: image` for a region that is most of the picture; `invert: true` to edit everything except the region.
+- A pose change (raised arms, a turn) cannot be a region edit: the mask is the subject's old outline. Use a plain edit
+  with `align: { subject: [x0, y0, x1, y1] }`: the editor's zoom, shift and turn are undone on everything outside the
+  subject and the source is kept there (`lock`), so every pose of one frame shares one camera. Read `edit_<digest>.align.json`
+  (residual under ~2 px is aligned) and compare with `edit_<digest>.raw.png`.
 - Look at the result with the outline on: `edit_<digest>.outline.png` / `.mask.png` beside the edit in
   `.build/_generated/`, the card in `studio storyboard`, or the **region** button in `--edit`. A wrong mask is fixed with
   `pick`, `within`, `points` / `negative_points`, `grow` (the boxes found are in `region_<digest>.boxes.jpg`), not by

@@ -111,6 +111,9 @@ def edit_path(project: Project, ref: ImageInput, srcs: list[Path]) -> Path:
     if e.region is not None:       # a region is part of the key only when set: edits made before it keep their images
         from .region import edit_key
         key.append(edit_key(e.region))
+    if e.align is not None:        # likewise: only an aligned edit's key changes
+        from .edit_align import VERSION as ALIGN_VERSION
+        key.append(["align", ALIGN_VERSION, stable_dump(e.align)])
     digest = hashlib.sha1(json.dumps(key).encode()).hexdigest()[:12]
     return project.build / "_generated" / f"edit_{digest}.png"
 
@@ -227,7 +230,13 @@ def _edit(project: Project, ref: ImageInput, log=print) -> Path:
         return out
     log(f"  editing image (Qwen-Image-Edit, seed {e.seed}): {e.instruction[:80]}")
     res = qwen(srcs[0])
-    shutil.move(str(res), out)
+    if e.align is not None:        # undo the editor's own re-framing (engine/edit_align.py)
+        from .edit_align import align_edit
+        raw = out.with_name(out.stem + ".raw.png")
+        shutil.move(str(res), raw)            # the editor's own result, kept beside the aligned one for review
+        align_edit(srcs[0], raw, e.align, out, log)
+    else:
+        shutil.move(str(res), out)
     comfy.free()
     return out
 

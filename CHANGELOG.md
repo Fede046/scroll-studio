@@ -10,6 +10,15 @@ Everything so far is version 1. On 2026-10-12 the releases first published as 2.
 
 Planned: see the [1.5 milestone](https://github.com/Okohedeki/scroll-studio/milestone/1).
 
+### Added
+- `edit.align` (`engine/edit_align.py`): undo the image editor's own re-framing. Qwen-Image-Edit often returns a
+  picture a few percent zoomed, shifted or turned, so one frame edited into several poses (a person at one mirror) gave
+  every key frame a different camera. The edit is now registered back onto its source on what should not change
+  (SIFT features outside `align.subject`, a RANSAC similarity) and, with `lock` (the default), the source's pixels are
+  kept outside the subject box. Measured on four pose edits of one 1920x1088 frame: the editor had moved the place by
+  12 to 113 px and up to 4% in scale; after alignment the place matches to under 2 px. For pose changes, where a
+  region edit cannot help (its mask is the subject's old outline). Part of the edit's cache key only when set.
+
 ### Changed
 - Map scenes preload their flight: while the loading screen is up the camera visits every stop (and the far point of
   each long move) and waits for its tiles, keeps them cached, and draws labels without fading, so the scroll never
