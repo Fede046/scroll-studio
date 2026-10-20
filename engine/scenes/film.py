@@ -219,7 +219,9 @@ def keyframe_digests(shot: dict, bkey: dict, variants: int = 1, work: Optional[P
             if d:
                 return {"depth": d}
         return bkey
-    return {f["name"]: hashlib.sha1(json.dumps({"b": world_of(f), "c": common, "f": f, "v": variants}, sort_keys=True,
+    def entry(f):      # by_depth: when the keyframe falls in the film does not change what it is painted over
+        return {k: v for k, v in f.items() if k != "t"} if common.get("by_depth") else f
+    return {f["name"]: hashlib.sha1(json.dumps({"b": world_of(f), "c": common, "f": entry(f), "v": variants}, sort_keys=True,
                                                default=str).encode()).hexdigest()[:16]
             for f in shot["keyframes"]["frames"]}
 
