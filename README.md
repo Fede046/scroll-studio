@@ -898,6 +898,9 @@ editor left to itself redraws the place (measured here: 11 to 16 px of drift at 
    (`structure.align: affine`; `flow` also pulls local structure in, which matches edges better but makes lines wobble; `none`
    measures only). A relight still over `structure.max_drift` is redone with another seed (`retries`) and the best kept.
    `structure.chain` relights each time from its neighbour nearer the world's time instead of the world, so neighbours agree more.
+   On the Quay House example (six times, seed 7 base): the editor moved the place 5 to 24 px (mean, at 1024 across) and left
+   0.0 to 4.4 px after its global move was undone; edge agreement went from 0.40-0.69 to 0.70-0.86 (what stays under 1.0 is the
+   light itself changing which edges exist at night). Night needed `strength: 0.96` to get dark; at 0.88 it stays a moonlit dusk.
 3. **Glide over what is left.** Between neighbouring times the build writes a flow texture of the structure that still differs;
    the page glides along it as the light changes, so edges slide into place instead of cross-fading doubled.
 
