@@ -74,6 +74,25 @@ Everything so far is version 1. On 2026-10-12 the releases first published as 2.
   reduced motion shows one still per step; without WebGL the stills are images, one per step. `studio light <project>` builds the
   section and writes `light/<id>/` (times sheet with measured drift, a frame strip across every transition, `light.json`);
   `studio light --presets` lists the named times. Example: `examples/harbour-light` (Quay House). Tests: `tests/test_light.py`.
+- The one-take page: `journey:` on a film section makes the whole landing page one camera journey through one generated world.
+  A journey is a `world` described once and ordered `stops` (places), each with its `blocks` (hero, intro, features, stats,
+  timeline, quote, faq, product, cta, gallery), a `hold` (screens of scroll the page rests there) and a `move` (how the camera
+  gets there). Two ways to make the film from the same spec: with a `blockout` (the world as rough shapes, as a take's) one
+  continuous take whose camera is a real 3D path that rests at every stop (`pose`, `move.path`), a picture of each stop painted
+  over the blockout's depth and the video model painting between them, cut at the middle of a hold; without one, a chain of
+  keyed camera moves between stop pictures (`move.into`, `move.via`) each followed by a frozen moment of the frame it arrived at,
+  so the camera flies only into what the picture before shows (measured in docs/ENGINE.md). The runtime maps scroll to the film
+  with a piecewise map (a move plays as you scroll through it, a hold is the page resting at a stop; nothing is snapped or
+  captured), blocks arrive as the camera slows into a stop and leave as it moves on, a rail names the places and scrolls to them,
+  `#stop-id` deep links land on a stop, a portrait phone crops the wide picture around each stop's `focus`. Where the blocks sit
+  is found from the stop's own picture (calmest side by gradient energy, alternating sides; light or dark lettering; a scrim
+  raised only until the lettering clears WCAG AA); `side`, `form` (`type`, `rail`, `cards`, `plaque`) and `surface` override it.
+  With reduced motion, without JavaScript or when the film fails the page is the stops as stills with their blocks in order and
+  no film is downloaded. `studio journey <project>` and the MCP tool `journey_plan` print the plan (film seconds and scroll
+  per move and hold, and where each stop's blocks were put); `studio build --plan`, `studio storyboard` and `studio inspect`
+  see a journey as the take or beats film it builds. Modules: `engine/journey.py`, `runtime/src/players/journey.ts`,
+  `engine/compile/templates/journey.html.j2`. Example: `examples/fenmoor`. A saved spec keeps only what was written (the derived
+  `beats`/`take`, `steps`, `length` are not dumped).
 - Style `stop-motion`: scrolling fires the shutter. Every 26-42 px is one exposure, poses change on twos, never faster than 12 a second, and nothing moves between exposures. Between sections the set is struck and dressed (cast lifted off, a bare set with tape crosses, the new set and cast placed). Clay letters, felt cards, masking-tape labels, a felt `theme.art`; poke a piece and it hops, an onion-skin switch shows the last exposure. Research in `docs/styles/styles-28-29.md`.
 - Style `paper-cut-out`: Lotte Reiniger and Terry Gilliam. The top sheet swings off its brass brad as you scroll and uncovers the next; words on paper strips, tags and snapshots hang on hinges and sway with scroll speed; feature cards fan from one pin, a folding rule opens, a mobile of tags turns; a jointed black paper arm (two-bone IK) points at what you have reached.
 - Direction boards: `studio directions <project> [--n 6] [--seed] [--brief] [--pick K] [--undo] [--reroll K] [--serve]`, MCP tools

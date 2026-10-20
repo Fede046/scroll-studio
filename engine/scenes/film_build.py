@@ -150,10 +150,20 @@ def stage_generate(shot, out, args):
         with open(state_path) as f:
             state = json.load(f)
 
+    seg_files = []        # the files a segment is made from (its resume key covers their content)
+
     def upload_still(src, name):
         dst = os.path.join(gdir, f"{name}_{shot['id']}_{w}x{h}.png")
         ff("-i", src, "-vf", f"scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h}", dst)
+        seg_files.append(dst)
         return ltx_comfy.upload(dst)
+
+    def digest_of(paths):
+        d = hashlib.sha1()
+        for q in paths:
+            with open(q, "rb") as f:
+                d.update(f.read())
+        return d.hexdigest()[:16]
 
     for si, seg in enumerate(segments):
         if args.segment and seg["id"] != args.segment:
@@ -184,6 +194,7 @@ def stage_generate(shot, out, args):
            "-frames:v", str(frames), "-c:v", "libx264", "-crf", "10", "-pix_fmt", "yuv420p", guide)
 
         first_name, guides, used = None, [], []
+        seg_files.clear()
         if si > 0 and seg.get("continue", True):
             prev = state.get(segments[si - 1]["id"])
             if not prev:
@@ -202,6 +213,8 @@ def stage_generate(shot, out, args):
                 local = -1
             else:
                 local = g - start
+                if frames <= local < frames + 8:      # snapped past the last latent frame of this stretch: pin that one
+                    local = ((frames - 1) // 8) * 8
                 if local < 0 or local >= frames or (local == 0 and first_name):
                     continue
             if not os.path.exists(src):
@@ -234,8 +247,23 @@ def stage_generate(shot, out, args):
                     json.dump(graph, f, indent=2)
                 print(f"  dry run: graph with {len(graph)} nodes -> {path}")
                 break
+            # resume: a segment whose prompt, settings, guide, first frame and keyframes are as they were is kept, so a crash
+            # in hour two of a long take (or an edit to one prompt) re-paints only what changed, and what follows it
+            rkey = hashlib.sha1(json.dumps([cfg, digest_of([guide, *seg_files]), tag, i], sort_keys=True, default=str).encode()).hexdigest()[:16]
+            keyfile = os.path.join(gdir, tag, "_resume.txt")
+            if (i == 0 and not args.force and os.path.exists(keyfile) and open(keyfile).read() == rkey
+                    and len(glob.glob(os.path.join(gdir, tag, "*.png"))) >= frames):
+                print(f"  [{seg['id']}] kept: nothing it is made from changed", flush=True)
+                if not args.seconds:
+                    state[seg["id"]] = os.path.join(gdir, tag)
+                    with open(state_path, "w") as f:
+                        json.dump(state, f, indent=2)
+                continue
             images = ltx_comfy.run(graph)
             fdir = ltx_comfy.fetch(images, os.path.join(gdir, tag))
+            if i == 0:
+                with open(keyfile, "w") as f:
+                    f.write(rkey)
             mp4 = os.path.join(gdir, f"{tag}.mp4")
             ff("-framerate", str(fps), "-i", os.path.join(fdir, "%04d.png"), "-c:v", "libx264", "-crf", "14",
                "-pix_fmt", "yuv420p", "-movflags", "+faststart", mp4)

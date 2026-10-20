@@ -271,24 +271,30 @@ def build_site(project: Project, log: Callable[[str], None] = print,
                 return block_image(img, 900) if isinstance(img, ImageInput) else publish(img)
             e["s"] = e["s"].model_copy(update={"items": [it.model_copy(update={"image": tile(it.image), "video": publish(it.video)})
                                                          for it in e["s"].items]})
-    for i, e in enumerate(sections):
-        s = e["s"]
-        e["first"] = i == 0   # only the opening section gets the page's h1
-        e["backdrop"] = block_image(getattr(s, "backdrop", None), 2400)
+    def block_media(s) -> dict:
+        """The media a block shows (images resized and written as WebP, files copied in), keyed as the templates read them."""
+        x = {"backdrop": block_image(getattr(s, "backdrop", None), 2400)}
         if s.type == "hero":
-            e["img"], e["video"] = block_image(s.image, 2400), publish(s.video)
-            e["screen"] = block_image(s.device.image, 800) if s.device and s.device.image else None
-            e["clip"] = publish(s.device.video) if s.device and s.device.video else None
+            x["img"], x["video"] = block_image(s.image, 2400), publish(s.video)
+            x["screen"] = block_image(s.device.image, 800) if s.device and s.device.image else None
+            x["clip"] = publish(s.device.video) if s.device and s.device.video else None
         elif s.type == "product":
             # a cinemagraph's video is the photograph as shot: whitening the still's studio background would put a box around it
             moving = isinstance(s.image, ImageInput) and s.image.cinemagraph is not None
-            e["img"] = block_image(s.image, 1600, knockout=s.knockout and s.surface != "dark" and not moving)
-            e["screen"] = block_image(s.device.image, 800) if s.device and s.device.image else None
-            e["clip"] = publish(s.device.video) if s.device and s.device.video else None
-            e["behind"] = block_image(s.behind.image, 800) if s.behind and s.behind.image else None
-            e["behind_clip"] = publish(s.behind.video) if s.behind and s.behind.video else None
+            x["img"] = block_image(s.image, 1600, knockout=s.knockout and s.surface != "dark" and not moving)
+            x["screen"] = block_image(s.device.image, 800) if s.device and s.device.image else None
+            x["clip"] = publish(s.device.video) if s.device and s.device.video else None
+            x["behind"] = block_image(s.behind.image, 800) if s.behind and s.behind.image else None
+            x["behind_clip"] = publish(s.behind.video) if s.behind and s.behind.video else None
         elif s.type == "strip":
-            e["imgs"] = [block_image(it.image, 900) for it in s.items]
+            x["imgs"] = [block_image(it.image, 900) for it in s.items]
+        return x
+    for i, e in enumerate(sections):
+        s = e["s"]
+        e["first"] = i == 0   # only the opening section gets the page's h1
+        e.update(block_media(s))
+        if getattr(s, "journey", None) is not None:      # a one-take page: the blocks inside its stops (engine/journey.py)
+            e["jx"] = {st.id: [block_media(b) for b in st.blocks] for st in s.journey.stops}
 
     # Stats bound to chart data: the number comes from the same file the chart draws
     charts = {e["s"].id: e for e in sections if e["scene"] and e["s"].type == "chart"}

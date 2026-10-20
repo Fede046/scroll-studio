@@ -928,6 +928,26 @@ def light(name: str, section: Optional[str] = typer.Option(None, help="The light
         typer.echo(f"[{sec.id}] report: {out / 'light.json'}")
 
 
+@app.command("journey")
+def journey_cmd(name: str, section: Optional[str] = typer.Option(None, help="The film section, when there is more than one journey"),
+                as_json: bool = typer.Option(False, "--json", help="Print the report as JSON")):
+    """The one-take page (`journey:` on a film): its approach, every move and hold with the film seconds and scroll they get,
+    and, once built, where each stop's blocks sit on its picture and the contrast they reach."""
+    from . import journey as jy
+    from .project import Project
+    rep = jy.report(Project(resolve(name)), section)
+    if as_json:
+        typer.echo(json.dumps(rep, indent=1))
+        return
+    for r in rep:
+        typer.echo(f"{r['section']}: {r['approach']}, {r['film_seconds']} s of film, {r['scroll_screens']} screens of scroll")
+        for g in r["segments"]:
+            where = r["placed"].get(g["stop"]) if g["kind"] == "hold" else None
+            extra = f"  blocks: {', '.join(g['blocks']) or 'none'}" + (f"; on the {where['side']}, {where['surface']} surface, "
+                                                                        f"scrim {where['scrim']}, contrast {where['contrast']}" if where else "") if g["kind"] == "hold" else ""
+            typer.echo(f"  {g['segment']:<22} {g['kind']:<5} {g['film_seconds']:>5.1f} s  {g['scroll_screens']:>5.2f} screens{extra}")
+
+
 @app.command()
 def schema():
     """Print the site.yaml JSON Schema."""

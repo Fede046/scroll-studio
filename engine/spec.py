@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 from typing import Annotated, Any, Literal, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_serializer, model_validator
 
 
 class Model(BaseModel):
@@ -1131,6 +1131,13 @@ class FilmScene(SceneBase):
     beat_restore: Optional[int] = Field(None, description="beats: run SeedVR2 over the finished film at this height "
                                                           "(e.g. 1088) to clean grain and redraw fine detail; slow")
     gop: int = 6
+    # ---- the one-take page (engine/journey.py)
+    journey: Optional["Journey"] = Field(None, description="The page as one camera journey (see Journey): the world "
+                                         "described once and an ordered list of stops, each a place in it that shows "
+                                         "its blocks (hero, features, stats, quote, faq, cta ...) laid out to sit with the "
+                                         "picture. The engine makes the `beats` (a frozen moment at every stop, a camera "
+                                         "move between stops), the scroll timing and the page markup from it; do not "
+                                         "write `beats`, `steps` or `length` yourself")
     # ---- reveal + faces
     reveal: Optional[Reveal] = Field(None, description="Scroll-driven colour: the film is full colour, the page shows the "
                                                        "`base` look and brings colour into tracked regions as you scroll")
@@ -1145,6 +1152,23 @@ class FilmScene(SceneBase):
     @classmethod
     def _faces_in(cls, v):
         return _faces(v)
+
+    @model_validator(mode="after")
+    def _journey_beats(self):
+        """A journey is written as stops; the film it plays is made of beats the engine derives from them (kept apart
+        from the spec as written: `model_dump` leaves them out, so saving a spec never freezes them into it)."""
+        if self.journey is not None:
+            from .journey import expand
+            expand(self)
+        return self
+
+    @model_serializer(mode="wrap")
+    def _journey_dump(self, handler, info):
+        d = handler(self)
+        if self.journey is not None and isinstance(d, dict) and info.include is None:   # a field list (the compiler's) keeps them
+            for k in ("beats", "steps", "length", "beat_fade", "beat_restore", "take"):
+                d.pop(k, None)
+        return d
 
 
 class ArtworkScene(SceneBase):
@@ -1952,6 +1976,191 @@ class FaqBlock(BlockBase):
     kicker: Optional[str] = None
     title: str = "Questions"
     items: list[FaqItem]
+
+
+# ---- the one-take page (engine/journey.py): kept together so it merges cleanly -----------------------------------
+
+JourneyBlock = Annotated[Union[IntroBlock, FeaturesBlock, StatsBlock, TimelineBlock, QuoteBlock, CtaBlock, GalleryBlock,
+                               HeroBlock, ProductBlock, FaqBlock], Field(discriminator="type")]
+JourneyBox = tuple[float, float, float, float]
+
+
+class JourneyPose(Model):
+    """Where the camera is and what it looks at, in the blockout's world units (metres, z up, y forward)."""
+    at: tuple[float, float, float] = Field(..., description="Camera position")
+    look: tuple[float, float, float] = Field(..., description="The point the camera looks at")
+
+
+class JourneyBlockout(Model):
+    """The world as rough shapes, as a take's: Blender renders their depth along the camera path, a still of every stop
+    is painted over that depth (Z-Image Turbo + depth ControlNet) and the video model paints the world between the stops
+    along the same depth (LTX-2.3). The camera is a real 3D path, so it can go through a door into a room the first
+    picture never showed; the price is describing the world's layout once, in shapes."""
+    objects: list[WorldObject] = Field(default_factory=list, description="Boxes, cylinders, blobs, planes, scatter: only "
+                                       "layout, scale and depth matter, the models paint the detail. Leave a gap in a wall "
+                                       "for a doorway (two boxes and a lintel)")
+    ground: Optional[WorldObject] = Field(None, description="A plane under everything (default: 400 x 400 at z = 0)")
+    sky: str = Field("#b9cde0", description="Colour of the sky in the blockout")
+    light: tuple[float, float, float] = Field((0.0, -0.4, 0.9), description="Light direction of the blockout preview")
+    lens: float = Field(28.0, description="Focal length in mm")
+    depth_far: float = Field(400.0, description="Depth guide far plane")
+    control_strength: float = Field(0.75, ge=0, le=1, description="How tightly each stop's picture follows the blockout's "
+                                    "depth (Z-Image depth ControlNet)")
+    keyframe_res: tuple[int, int] = Field((1536, 864), description="Size of each stop's picture")
+    ltx_res: tuple[int, int] = Field((1024, 576), description="Size the video model runs at (multiples of 64); the "
+                                     "film is scaled to the page. 1024x576 is the size it holds its look at")
+    guide_strength: float = Field(1.0, ge=0, le=2, description="How strongly the depth guide steers the video model")
+    guide_blur: float = Field(1.5, ge=0, le=12, description="Blur of the depth guide in pixels: keeps the camera and the "
+                              "big shapes, drops the blockout's hard edges so a box does not stay a box")
+    segment: float = Field(8.0, ge=3, le=10, description="Longest stretch the video model paints in one go, in seconds. "
+                           "The film is cut into stretches at the middle of each hold (the camera is at rest there, so "
+                           "the seam cannot show) and a longer one is split evenly")
+    keyframe_strength: float = Field(0.6, ge=0, le=1, description="How firmly each stop's picture is pinned in the film. Too firm (0.9 was measured) and the model, holding the picture before and the picture after, dissolves between them instead of travelling; about 0.5-0.6 lets the depth guide move the camera and still lands on the picture")
+    negative: Optional[str] = Field(None, description="What the video model must avoid (default: cuts, flicker, warped "
+                                                      "shapes, text, watermark, blur)")
+
+
+class JourneyMove(Model):
+    """How the camera gets from the stop before to this one: a keyed camera move on a moving shot (`camera:` of a beat),
+    flown through the picture the last stop left and painted by the video model, so the place it arrives at is the one
+    this stop's `place` describes, found inside the last picture and not cut to."""
+    into: Optional[JourneyBox] = Field(None, description="Chain (no `blockout`): the part of the previous stop's picture the camera travels "
+                                       "into: [x0, y0, x1, y1] in 0-1 of that picture, the doorway, the window, the "
+                                       "table. The camera arrives with this box filling the frame. Default: the middle "
+                                       "third")
+    via: list[JourneyBox] = Field(default_factory=list, description="Chain: boxes the camera passes on the way (a bend in the "
+                                  "path: past the fire and on to the stairs), evenly spaced in time")
+    path: list[JourneyPose] = Field(default_factory=list, description="With a `blockout`: poses the camera passes on the "
+                                    "way (evenly spaced in time), a bend in its path: round the table, through the arch")
+    seconds: float = Field(4.0, ge=1, le=20, description="Length of the move in the film (a chain: at most 10)")
+    scroll: Optional[float] = Field(None, ge=0.3, le=12, description="Scroll distance of the move, in screen heights "
+                                    "(default: half the seconds of film). The page lands on the stop at the end of it")
+    motion: Optional[str] = Field(None, description="What the move looks like, in words, for the video model: 'the "
+                                  "camera glides through the open door into the hall, firelight ahead'")
+    ease: FreezeEase = Field("inOutSine", description="How the camera travels (as `freeze.ease`); the default starts and "
+                             "ends at rest, so the page lands softly at the stop")
+    parallax: float = Field(0.5, ge=0, le=2, description="Depth effect of the guide (as `camera.parallax`)")
+    anchor: float = Field(0.6, ge=0, le=1, description="How firmly the pure-camera render of the picture is pinned along "
+                          "the way (as `camera.anchor`): more keeps the world the picture shows, less lets the model "
+                          "paint more of the place it arrives at")
+    guide_strength: float = Field(1.0, ge=0, le=2, description="How strongly the depth guide steers the model")
+    res: Optional[tuple[int, int]] = Field(None, description="Size the video model runs at (as `camera.res`)")
+    seed: Optional[int] = Field(None, description="Seed of the move (default: the stop's). With a `blockout` it re-rolls the "
+                                "stretch of the take that ends at this stop (and so the stretches after it, which continue from it)")
+
+
+class JourneyStop(Model):
+    """One place on the journey. The camera arrives (`move`), rests while the page holds (`hold`), shows its `blocks`
+    laid out to sit with the picture, and moves on."""
+    id: str = Field(..., description="Short name; the beats are called <id>-travel and <id>-hold")
+    label: Optional[str] = Field(None, description="Name of the place in the page's places rail (default: the id)")
+    world: Optional[str] = Field(None, description="Replaces `journey.world` in this stop's prompts: for a place the shared "
+                                 "world would mislead, such as the view out of a window in a journey described from inside")
+    place: str = Field(..., description="The place as a photograph: what the camera sees at rest here, in the world "
+                                        "described once at `journey.world`. The first stop's picture is made from it; "
+                                        "later stops arrive at it through `move` (it steers the video model toward the "
+                                        "place) and it names the picture for the reduced-motion page")
+    still: Optional[ImageRef] = Field(None, description="Use this picture for the stop instead (a file, or an image "
+                                      "input: generate:, edit:, beat_frame ...). For the first stop it replaces the "
+                                      "picture made from `place`; for a later one the hold freezes it instead of the "
+                                      "frame the camera arrived at")
+    edit: Optional[str] = Field(None, description="Make the stop's picture by editing the frame the camera arrived at "
+                                "(Qwen-Image-Edit): 'a wooden crate of jars stands on the table'. With `region` the "
+                                "rest of the frame is that frame, pixel for pixel, so the join stays invisible")
+    region: Optional[EditRegion] = Field(None, description="`edit`: where it may change the picture")
+    pose: Optional[JourneyPose] = Field(None, description="With a `blockout`: where the camera rests at this stop")
+    move: JourneyMove = Field(default_factory=JourneyMove, description="How the camera gets here (not used by the first stop)")
+    frame: Optional[JourneyBox] = Field(None, description="The framing the hold settles on, a box in 0-1 of the stop's "
+                                        "picture (default: a slow push-in of `breathe`). The hold starts and ends on the "
+                                        "whole picture, so it joins the moves before and after exactly")
+    breathe: float = Field(0.05, ge=0, le=0.3, description="How far the camera pushes in during the hold when `frame` is "
+                           "not set, as a share of the picture. The frozen moment keeps its parallax, so it lives")
+    seconds: float = Field(3.0, ge=1, le=20, description="Length of the hold in the film (chain: a frozen moment, no model, "
+                                                          "rendered offline in seconds; blockout: the camera at rest)")
+    hold: float = Field(1.4, ge=0.3, le=12, description="Scroll distance of the hold, in screen heights: how long the "
+                        "page stays at this place while its blocks are read")
+    parallax: float = Field(0.6, ge=0, le=2, description="Depth effect of the hold (as `freeze.parallax`)")
+    focus: Optional[tuple[float, float]] = Field(None, description="The point of the picture (0-1 across, 0-1 down) a "
+                                                  "portrait phone keeps in view when it crops the wide picture "
+                                                  "(default: the middle)")
+    blocks: list[JourneyBlock] = Field(default_factory=list, description="Content shown at this stop (hero, intro, "
+                                       "features, stats, quote, faq, product, cta ...): the same blocks as a section, "
+                                       "set as part of the place instead of over it")
+    side: Literal["auto", "left", "right", "center", "top", "bottom"] = Field(
+        "auto", description="Where the blocks sit on the picture. auto: the calmest part of the picture, found from "
+                            "the picture itself (least detail, so nothing important is covered), alternating sides")
+    form: Literal["auto", "type", "rail", "cards", "plaque"] = Field(
+        "auto", description="How the blocks are set. type: bare lettering with a soft scrim, as if written in the scene. "
+                            "rail: items in a column divided by hairlines, like a plan beside the place. cards: panels "
+                            "of glass. plaque: one framed plate with a rule inside, like an engraved sign. auto: each "
+                            "block type picks the one that suits it")
+    surface: Literal["auto", "light", "dark"] = Field(
+        "auto", description="light/dark: the picture under the blocks is light (dark lettering) or dark (light "
+                            "lettering). auto: measured from the picture where the blocks sit")
+    seed: Optional[int] = Field(None, description="Seed of this stop's picture and move (default: the journey's, plus the "
+                                                  "stop's position)")
+
+    @model_validator(mode="after")
+    def _edit_needs_source(self):
+        if self.region is not None and not self.edit:
+            raise ValueError(f"stop '{self.id}': `region` limits an `edit`; give the edit too")
+        if self.edit and self.still is not None:
+            raise ValueError(f"stop '{self.id}': `edit` and `still` both make the picture; use one")
+        return self
+
+
+class Journey(Model):
+    """The whole page as one camera journey through one generated world: each stop is a place in it, the camera
+    travels between them in one unbroken move and the page's content arrives at its stop.
+
+    The engine builds it from what it already does best: the first picture is generated from the world and the first
+    place; every later place is arrived at by a keyed camera move on a moving shot (flown through the picture before,
+    painted by the video model), then frozen as a moment with a slow parallax while the page holds. Every join is on
+    the same frame, so there is no cut, and every picture comes out of the one before, so there is no change of style.
+    The runtime maps scroll to the film: a move plays as you scroll through it, a stop holds while its blocks are read,
+    and the camera is at rest whenever the page is. On a phone the wide picture is cropped around `focus`; with reduced
+    motion (or no JavaScript) the page is the stops as stills with their blocks, in order."""
+    world: str = Field(..., description="The world, described once: the place, its materials, the light and the hour "
+                                        "('a stone farmhouse on a northern moor at dawn, blue mist, oak and slate, "
+                                        "firelight inside'). Added to the prompt of every picture and move, so the stops "
+                                        "are one place. Say nothing about people")
+    stops: list[JourneyStop] = Field(..., min_length=2, description="The places, in order")
+    pace: float = Field(1.0, gt=0.2, le=4, description="Scales every scroll distance (holds and moves): 0.8 is brisker")
+    rail: bool = Field(True, description="A rail of the places down the right edge: a mark per stop, the current one "
+                                         "named, each a link that scrolls to it")
+    seed: int = Field(11, description="Seed of the pictures and moves (each stop adds its position)")
+    fade: float = Field(0.25, ge=0, le=1, description="Seconds of cross-dissolve between the move and the hold on the "
+                        "same frame (invisible; it only hides the one-frame seam of two encodes)")
+    grain: float = Field(0.012, ge=0, le=0.2, description="Chain: film grain laid over the frozen holds so they match the "
+                         "generated moves on either side (as `freeze.grain`)")
+    blockout: Optional[JourneyBlockout] = Field(None, description="The generation approach. Unset: a chain of camera moves "
+                                                "between stop pictures (the camera flies through the picture the last stop "
+                                                "left, so every stop must be visible in the one before: a facade, a street, "
+                                                "a landscape). Set: one continuous take through a blockout of the world "
+                                                "(real 3D, so doors and rooms work); every stop then needs a `pose`")
+    restore: Optional[int] = Field(None, ge=360, le=2160, description="Run SeedVR2 over the finished film at this height "
+                                   "(e.g. 1080) to clean the video model's softness and redraw fine detail; slow")
+
+    @model_validator(mode="after")
+    def _unique_stops(self):
+        ids = [s.id for s in self.stops]
+        dup = sorted({i for i in ids if ids.count(i) > 1})
+        if dup:
+            raise ValueError(f"journey stop ids must be unique: {', '.join(dup)}")
+        for i, st in enumerate(self.stops):
+            if self.blockout is not None and st.pose is None:
+                raise ValueError(f"stop '{st.id}': with a `blockout` every stop needs a `pose` (where the camera rests)")
+            if self.blockout is None and (st.pose is not None or st.move.path):
+                raise ValueError(f"stop '{st.id}': `pose` and `move.path` place the camera in a `blockout`; without one the "
+                                 "camera flies through the pictures (`move.into`, `move.via`)")
+            if self.blockout is not None and i and (st.move.into or st.move.via):
+                raise ValueError(f"stop '{st.id}': `move.into` and `move.via` fly through a picture; with a `blockout` use `move.path`")
+            if self.blockout is None and i and st.move.seconds > 10:
+                raise ValueError(f"stop '{st.id}': a move in a chain is at most 10 seconds (one generated shot)")
+        return self
+
+
+FilmScene.model_rebuild()
 
 
 Section = Annotated[Union[

@@ -17,7 +17,7 @@ spec field, a cached builder, a runtime player where needed, CLI and MCP, docs a
 
 ## Wave 2
 
-- [ ] **The one-take page**: the whole page is one camera journey through one generated world; each section is a place
+- [x] **The one-take page** (`journey:`, `studio journey`, example `examples/fenmoor`): the whole page is one camera journey through one generated world; each section is a place
   in it (hero at the door, features as rooms, pricing at the window, the CTA at the view).
 - [x] **Cinemagraph pages**: stills where only one thing moves (steam, a curtain, light on water); a mask picks what
   moves and the rest is held perfectly still.

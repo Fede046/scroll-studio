@@ -264,6 +264,7 @@ let lenis: Lenis | null = null;
 function startSmoothScroll() {
   if (reducedMotion || debugP !== null || lenis) return;
   lenis = new Lenis({ lerp: Math.min(0.5, 0.1 * pace) });
+  (window as any).__ssLenis = lenis;   // players that scroll the page to a place (the one-take page's rail)
   const raf = (time: number) => { lenis!.raf(time); requestAnimationFrame(raf); };
   requestAnimationFrame(raf);
 }

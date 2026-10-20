@@ -255,7 +255,7 @@ def _restore_keyframe(project: Project, board: Board, node: Node, src: Path, log
             shot, bkey, legacy = film.blockout_key(sec, ctx)
     except Exception:
         return False
-    digests = film.keyframe_digests(shot, bkey, 1)
+    digests = film.keyframe_digests(shot, bkey, 1, ctx.work)
     name = node.extra["frame"]
     kdir = ctx.work / "keyframes"
     kdir.mkdir(parents=True, exist_ok=True)

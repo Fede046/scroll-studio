@@ -193,13 +193,36 @@ def generate(sec: FilmScene, ctx: BuildContext) -> Path:
     return film
 
 
-def keyframe_digests(shot: dict, bkey: dict, variants: int = 1) -> dict[str, str]:
+def _depth_digest(shot: dict, work: Path, f: dict) -> Optional[str]:
+    """Digest of the depth frame a keyframe is painted over (None before the blockout is rendered)."""
+    import glob
+    import hashlib
+    from . import film_build as fb
+    frames = sorted(glob.glob(str(work / "blockout" / "depth" / "*.png")))
+    if not frames:
+        return None
+    idx = fb.keyframe_index(f["t"], shot["fps"])
+    return hashlib.sha1(Path(frames[idx if idx < 0 else min(idx, len(frames) - 1)]).read_bytes()).hexdigest()[:16]
+
+
+def keyframe_digests(shot: dict, bkey: dict, variants: int = 1, work: Optional[Path] = None) -> dict[str, str]:
     """One digest per keyframe: the world it is painted over, the shared settings (model, res, seed...) and its own
     entry. The stage key covers every keyframe; these let a re-run redo only the keyframes that changed."""
     import hashlib
     import json
     common = {k: v for k, v in shot["keyframes"].items() if k != "frames"}
-    return {f["name"]: hashlib.sha1(json.dumps({"b": bkey, "c": common, "f": f, "v": variants}, sort_keys=True,
+
+    def world_of(f):
+        # `by_depth` (a journey's take): the world a keyframe depends on is the depth frame under it, so moving the camera at
+        # one stop repaints that stop's picture and no other
+        if common.get("by_depth") and work is not None:
+            d = _depth_digest(shot, work, f)
+            if d:
+                return {"depth": d}
+        return bkey
+    def entry(f):      # by_depth: when the keyframe falls in the film does not change what it is painted over
+        return {k: v for k, v in f.items() if k != "t"} if common.get("by_depth") else f
+    return {f["name"]: hashlib.sha1(json.dumps({"b": world_of(f), "c": common, "f": entry(f), "v": variants}, sort_keys=True,
                                                default=str).encode()).hexdigest()[:16]
             for f in shot["keyframes"]["frames"]}
 
@@ -213,7 +236,7 @@ def keyframes(shot: dict, bkey: dict, legacy: Optional[dict], ctx: BuildContext)
     names = [f["name"] for f in shot["keyframes"]["frames"]]
     outs = [kdir / f"{n}.png" for n in names]
     args = _args(ctx)
-    digests = keyframe_digests(shot, bkey, args.variants)
+    digests = keyframe_digests(shot, bkey, args.variants, ctx.work)
     record = kdir / "_frames.json"
 
     def run():
@@ -583,6 +606,9 @@ def build(sec: FilmScene, ctx: BuildContext, theme: dict) -> dict:
     # ---- type in the world (engine/world.py): depth, tracks and masks for the titles set inside the film
     if in_world:
         cfg["world"] = typeworld.build(sec, ctx, src, cfg)
+    if sec.journey is not None:    # the one-take page (engine/journey.py): stop stills, scroll-to-film map, block placement
+        from .. import journey
+        journey.build(sec, ctx, src, cfg, theme)
     if sec.take and sec.take.product and sec.take.product.credit:   # site.product's own credit is added site-wide
         cfg["credits"] = [sec.take.product.credit]
     return cfg
