@@ -213,6 +213,8 @@ def stage_generate(shot, out, args):
                 local = -1
             else:
                 local = g - start
+                if frames <= local < frames + 8:      # snapped past the last latent frame of this stretch: pin that one
+                    local = ((frames - 1) // 8) * 8
                 if local < 0 or local >= frames or (local == 0 and first_name):
                     continue
             if not os.path.exists(src):
