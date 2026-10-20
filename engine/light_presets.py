@@ -20,7 +20,7 @@ FRAME = ("Relight this exact photograph as {when}. Keep the scene identical: eve
 
 PRESETS: dict[str, dict] = {
     "dawn": {
-        "label": "Dawn", "clock": "05:50", "hours": 5.8, "haze": 0.55, "lit": True, "sun": "left",
+        "label": "Dawn", "clock": "05:50", "hours": 5.8, "haze": 0.3, "lit": True, "sun": "left",
         "prompt": "first light before sunrise: a pale peach and lilac sky glowing just above the horizon, the rest of the "
                   "sky soft blue-grey, cool dim blue light on the buildings, soft mist lying low on the water, very faint "
                   "long shadows, the street lamps still lit with a small warm glow and a few warm windows",
