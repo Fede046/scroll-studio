@@ -1602,6 +1602,7 @@ class DioramaScene(SceneBase):
                 if s.at is None:
                     w = b - a
                     s.at = (round(a + w * 0.12, 4), round(b - w * 0.12, 4))
+        return self
 
 
 # ---- light as the scroll (engine/scenes/light.py, engine/light.py, runtime/src/players/light.ts): kept together ------
