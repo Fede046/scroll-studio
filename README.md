@@ -18,7 +18,11 @@
   </p>
 </div>
 
-[![A tour: a miniature harbour, inside a mainboard, a harbour from dawn to night, a cinemagraph, one take through a farmhouse](docs/media/tour.gif)](https://okohedeki.github.io/scroll-studio-showcase/)
+<p align="center">
+  <a href="https://okohedeki.github.io/scroll-studio-showcase/">
+    <img src="docs/media/tour.webp" width="900" alt="A tour: a miniature harbour, inside a mainboard, a harbour from dawn to night, a cinemagraph, one take through a farmhouse" />
+  </a>
+</p>
 
 ## Your brand. Your scroll.
 
