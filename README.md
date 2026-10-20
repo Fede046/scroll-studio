@@ -67,28 +67,31 @@ hand-built page needs. A simpler hand-built scroll page lands at 10 to 30 times.
 spec rather than a rewrite, and the agent reads the skill once per session (about 1,100 tokens). Counted with
 tiktoken (`cl100k_base`) on the files in this repo; other tokenizers differ by roughly 10 to 20%.
 
-### New in 1.3
+### New in 1.4
 
+- **The one-take page** (`journey:` on a film section): the whole landing page is one camera move through one generated world; every section is a place in it (the door, the rooms, the table, the window, the view), the page's blocks arrive at their stop set as part of the picture, and the camera rests while they are read. ([The one-take page](#the-one-take-page-journey))
+- **Cinemagraphs** (`cinemagraph:` on any image): a still where only one thing moves (steam, a curtain, smoke, water);
+  everything outside the mask is held pixel for pixel and the loop is closed without a seam.
+  ([Cinemagraphs](#cinemagraphs-one-thing-moves-cinemagraph))
 - **Light as the scroll** (`type: light`): one place relit from dawn to night as you scroll. Each time of day is the same
   picture relit with the geometry measured and locked; a WebGL shader carries the light between them (a front of new light,
   windows and lamps coming on one by one, mist, a slow 2.5D drift) and the page's colours follow the sky.
   ([One place, dawn to night](#one-place-dawn-to-night-type-light))
-- **Direction boards** (`studio directions`): how a design studio pitches. One brief in, several complete art directions
-  out, side by side on one page, so you pick a direction in minutes before committing to a build. Pick one and it is
-  written into `site.yaml`. ([Direction boards](#direction-boards-pitch-it-before-you-build-it))
-- **Colour that follows the camera** (`reveal:` on a film section): render the film once in full colour; the page shows
-  it black and white (or dimmed, blurred, tinted) and brings colour into tracked regions as you scroll.
-  ([Colour that follows the camera](#colour-that-follows-the-camera-reveal))
-- **Face repair** for generated video (`faces: restore`, GFPGAN v1.4).
+- **Inside the product** (`type: inside`): a macro camera flies into the product's own 3D model, stopping at named
+  parts, with the parts in the way cut away. ([Inside the product](#inside-the-product-type-inside))
+- **Miniature worlds** (`type: diorama`): a tilt-shift diorama you orbit and dive into, live in the browser; every
+  section lives at a place on it. ([Miniature worlds](#miniature-worlds-diorama))
+- **Edited like a film** (`transition:` on any section): match cuts, irises, wipes, whips, hard cuts and carried
+  headlines between sections instead of fades. ([Edited like a film](#edited-like-a-film-transition))
 - **Type in the world** (`place: { kind: behind | surface | sky }` on a step): headlines that live inside the scene:
   set behind a pine so the camera passes them, painted on a deck in perspective, written in the haze with fog in front.
   ([Type in the world](#type-in-the-world-place))
-- **Five styles from classic animation.** `zoetrope`: the landing page is one wheel of cards you spin, land on and
-  open to read. `pop-up-book`: scenes fold up out of the gutter as the book opens. `flipbook`: one scroll notch, one
-  pencil page. `pinscreen`: a lamp-lit wall of pins rolling from picture to picture. `sand`: a backlit sand table swept
-  scene to scene. ([try them on Halcyon](https://okohedeki.github.io/scroll-studio-showcase/halcyon/looks/))
-- **Story films told in shots** (`film` with `beats:`): every sentence its own generated shot, with end frames, local
-  image edits and SeedVR2 clean-up. ([Feel](examples/feel/site.yaml), the showcase's front door)
+- **Direction boards** (`studio directions`): how a design studio pitches. One brief in, several complete art directions
+  out, side by side on one page, so you pick a direction in minutes before committing to a build. Pick one and it is
+  written into `site.yaml`. ([Direction boards](#direction-boards-pitch-it-before-you-build-it))
+- **Six more styles from classic animation:** `stop-motion`, `paper-cut-out`, `scratch-film`, `smears`
+  (Spider-Verse timing), `paint-on-glass` and `multiplane`. Thirty-two styles in all.
+  ([try them on Halcyon](https://okohedeki.github.io/scroll-studio-showcase/halcyon/looks/))
 - **Frozen moments** (`freeze:` on a beat): when time stops, stop generating. One frame, upscaled, with a 2.5D depth
   camera moving through it, rendered offline in seconds, so a crowd stands still while the camera visits a couple's
   hands and feet and every face stays the same face. `image: { beat_frame: ... }` chains the next shot onto its last frame.
@@ -98,8 +101,26 @@ tiktoken (`cl100k_base`) on the files in this repo; other tokenizers differ by r
   walking while the camera pushes from the wide street to one girl and back out. The camera is flown through the start
   image's depth into a guide video, with the walking people softened so they stay free, and the video model paints the
   shot along it (measured: the view stays within 1% of the keys).
+- **Colour that follows the camera** (`reveal:` on a film section): render the film once in full colour; the page shows
+  it black and white (or dimmed, blurred, tinted) and brings colour into tracked regions as you scroll.
+  ([Colour that follows the camera](#colour-that-follows-the-camera-reveal))
+- **Face repair** for generated video (`faces: restore`, GFPGAN v1.4).
+- **Storyboard first** (`studio storyboard`, `--edit`): sketches, stills and an animatic before any video render, with an
+  editor to redo one image at a time. ([Storyboard first](#storyboard-first))
+- **Polish report** (`studio inspect`): every film scored second by second for pops, softness, halos, style drift and
+  morphs. ([studio inspect](#find-the-polish-problems-before-the-owner-does-studio-inspect))
+- **Your product, declared once** (`site.product`, STEP/3MF), **launch trailers** (`studio trailer`) and **Wan 2.2** as a
+  second video model.
+
+### New in 1.3
+
+- **Five styles from classic animation.** `zoetrope`: the landing page is one wheel of cards you spin, land on and
+  open to read. `pop-up-book`: scenes fold up out of the gutter as the book opens. `flipbook`: one scroll notch, one
+  pencil page. `pinscreen`: a lamp-lit wall of pins rolling from picture to picture. `sand`: a backlit sand table swept
+  scene to scene. ([try them on Halcyon](https://okohedeki.github.io/scroll-studio-showcase/halcyon/looks/))
+- **Story films told in shots** (`film` with `beats:`): every sentence its own generated shot, with end frames, local
+  image edits and SeedVR2 clean-up. ([Feel](examples/feel/site.yaml), the showcase's front door)
 - **Fly through a codebase** (`code` scene): live 3D, real text, diffs applied as you scroll.
-- **The one-take page** (`journey:` on a film section): the whole landing page is one camera move through one generated world; every section is a place in it (the door, the rooms, the table, the window, the view), the page's blocks arrive at their stop set as part of the picture, and the camera rests while they are read. ([The one-take page](#the-one-take-page-journey))
 
 ### New in 1.2
 
@@ -137,33 +158,38 @@ The [showcase site](examples/showcase/site.yaml) puts every example on one page 
 
 Every example is a `site.yaml` in [`examples/`](examples/) and rebuilds with `studio build examples/<name>`.
 
-| Example | Domain | Scene type | What scrolling does |
+| Scene | Field | Example | What scrolling does |
 |---|---|---|---|
-| [Lodestar Orbital](examples/lodestar-orbital/site.yaml) | Aerospace | `film` | A rocket launch to orbit, generated locally with LTX-2.3, with live telemetry |
-| [Meridian](examples/meridian/site.yaml) | Private aviation | `film` | A jet descends through cloud over London; the altimeter counts down |
-| [Atelier Sfumato](examples/atelier-sfumato/site.yaml) | Art education | `artwork` | The Mona Lisa is drawn and painted in five lessons |
-| [Cellwright Bio](examples/cellwright-bio/site.yaml) | Biotech | `scene3d` | A zoom from tissue to a molecule docking on DNA |
-| [Northstar Observatory](examples/northstar-observatory/site.yaml) | Astronomy | `scene3d` | A fall from the whole galaxy to one living planet |
-| [Fischer & Vale](examples/fischer-vale/site.yaml) | Luxury goods | `sequence` | A glass chess set lifts off its board and settles back |
-| [FORM/26](examples/form-conference/site.yaml) | Events | `type` | A conference site told in kinetic type |
-| [Wunderkammer](examples/wunderkammer/site.yaml) | Museum | `vector` | Dürer's *Rhinoceros* (1515) re-cut line by line |
-| [Daybreak Institute](examples/daybreak-institute/site.yaml) | Research | `chart` | Real solar data (IRENA) told as a scrolling data story |
-| [Tidewater Lines](examples/tidewater-lines/site.yaml) | Logistics | `map` | Shanghai to Rotterdam, port by port, on a live map |
-| [Casa Alta](examples/casa-alta/site.yaml) | Hospitality | `parallax` | Generated photos of a cliff hotel in 2.5D (needs ComfyUI to build) |
-| [Tern House](examples/tern-house/site.yaml) | Hospitality | `cinemagraph:` | Stills in which one thing moves: a curtain, steam, a flame, smoke, water; everything else held still (needs ComfyUI) |
-| [Hushwell](examples/hushwell/site.yaml) | Healthcare | `stack` layout | Panels slide over each other: hero, product with phone, photo strip, orbit, FAQ |
-| [Hale & Rowe](examples/hale-rowe/site.yaml) | Architecture | `artwork` | A house drawn from construction lines to finished photo (needs ComfyUI) |
-| [Stillwater](examples/one-take/site.yaml) | Consumer product | `film` + `take` | One take from a mountain ridge down to a bottle on a lakeside table; the bottle is the real 3D model |
-| [Type in the world](examples/type-in-the-world/site.yaml) | Consumer product | `film` + `take` | The Stillwater world with every headline set in the scene: behind a spruce, painted on the deck, written in the haze |
-| [Type in the world, on photographs](examples/type-in-the-world-stills/site.yaml) | Hospitality | `parallax` | Casa Alta with its headlines behind the house and the olive tree, on a limewashed wall and in the dusk sky (needs ComfyUI to build) |
-| [Fenmoor](examples/fenmoor/site.yaml) | Hospitality | `film` + `journey` | The whole page is one take through a farmhouse: the door, the hearth room, the library, the table, the window, the view (needs ComfyUI, Blender; about two hours on an RTX 4090) |
-| [Hollis House](examples/hollis-house/site.yaml) | Real estate | `splat` | A walk through a scanned house, room by room |
-| [Pelorus](examples/pelorus/site.yaml) | Research | `chart` (bar) | The renewables share of electricity, every figure read from Our World in Data |
-| [Halcyon](examples/halcyon/site.yaml) | Software | blocks | One product page as twenty-one experiences (`studio looks`) |
-| [Harbourlight](examples/little-harbour/site.yaml) | Port software | `diorama` | A tiny harbour, tilt-shift and live in the page: scroll orbits it, dives to a lighthouse, a windmill, a crane, a customs house, a market stall, and lifts out again. No video, nothing to render |
-| [Halo Coffee](examples/film-cuts/site.yaml) | Coffee | `transition:` | A page edited like a film: a logo becomes the sun becomes a cup (designed match cuts), a whip pan, an iris, a carried figure, a wipe, a dissolve and a hard cut (needs ComfyUI to build; `studio cuts --strip` shows each cut) |
-| [Inside the mainboard](examples/inside-board/site.yaml) | Hardware | `inside` | The camera flies into the open-hardware Framework Laptop 12 mainboard: past the processor package, along the heat pipe, over the fan's blades, down the memory module, to a USB-C port; each feature is a stop, Cycles-rendered, macro lens |
-| [Quay House](examples/harbour-light/site.yaml) | Hospitality | `light` | One harbour from dawn to night; windows and lamps come on (needs ComfyUI to build) |
+| **One-take page** | `film` + `journey:` | [Fenmoor](examples/fenmoor/site.yaml) | The whole page is one camera journey through a farmhouse; each section waits at its stop |
+| **Cinemagraphs** | `cinemagraph:` | [Tern House](examples/tern-house/site.yaml) | Stills where one thing moves: steam, a curtain, smoke, water |
+| **Light as the scroll** | `light` | [Quay House](examples/harbour-light/site.yaml) | One harbour from dawn to night; windows and lamps come on |
+| **Inside the product** | `inside` | [Inside the mainboard](examples/inside-board/site.yaml) | A macro flight into the Framework Laptop 12 mainboard's 3D model |
+| **Miniature world** | `diorama` | [Harbourlight](examples/little-harbour/site.yaml) | A tilt-shift harbour you orbit; it dives to each place |
+| **Film cuts** | `transition:` | [Halo Coffee](examples/film-cuts/site.yaml) | A logo becomes the sun becomes a cup; iris, wipe, whip, carry |
+| **Type in the world (film)** | `place:` | [Stillwater](examples/type-in-the-world/site.yaml) | Headlines behind a spruce, painted on the deck, in the haze |
+| **Type in the world (photos)** | `place:` + `parallax` | [Casa Alta](examples/type-in-the-world-stills/site.yaml) | Headlines behind the house and the olive tree |
+| **Direction boards** | `studio directions` | [Kiln & Kettle](examples/kiln-and-kettle/site.yaml) | Six art directions for one brief, side by side |
+| **One take with a real product** | `film` + `take` | [Stillwater](examples/one-take/site.yaml) | A mountain ridge down to a bottle on a lakeside table; the bottle is its real 3D model |
+| **Story film** | `film` | [Lodestar Orbital](examples/lodestar-orbital/site.yaml) | A rocket launch to orbit, generated locally |
+| **Aerial film** | `film` | [Meridian](examples/meridian/site.yaml) | A jet descends through cloud over London |
+| **Story in shots** | `film` + `beats:` | [Feel](examples/feel/site.yaml) | A door opens onto an oasis; every sentence its own shot |
+| **Gaussian splat** | `splat` | [Hollis House](examples/hollis-house/site.yaml) | A walk through a scanned house, room by room |
+| **Product sequence** | `sequence` | [Fischer & Vale](examples/fischer-vale/site.yaml) | A glass chess set lifts off its board (Blender) |
+| **Artwork** | `artwork` | [Atelier Sfumato](examples/atelier-sfumato/site.yaml) | The Mona Lisa drawn and painted in five lessons |
+| **Construction drawing** | `artwork` | [Hale & Rowe](examples/hale-rowe/site.yaml) | A house drawn from construction lines to finished photo |
+| **Live 3D** | `scene3d` | [Cellwright Bio](examples/cellwright-bio/site.yaml) | From tissue to a molecule docking on DNA |
+| **Cosmic zoom** | `scene3d` | [Northstar Observatory](examples/northstar-observatory/site.yaml) | A fall from the whole galaxy to one living planet |
+| **Map journey** | `map` | [Tidewater Lines](examples/tidewater-lines/site.yaml) | Shanghai to Rotterdam, port by port |
+| **Charts from the data** | `chart` | [Pelorus](examples/pelorus/site.yaml) | Every figure read from Our World in Data at build time |
+| **Data story** | `chart` | [Daybreak Institute](examples/daybreak-institute/site.yaml) | Fifteen years of real solar data |
+| **Vector line art** | `vector` | [Wunderkammer](examples/wunderkammer/site.yaml) | Dürer's *Rhinoceros* re-cut line by line |
+| **Kinetic type** | `type` | [FORM/26](examples/form-conference/site.yaml) | A conference site told in moving type |
+| **Photo parallax** | `parallax` | [Casa Alta](examples/casa-alta/site.yaml) | A cliff hotel's photos given depth and a slow camera |
+| **Stacked panels** | `stack` layout | [Hushwell](examples/hushwell/site.yaml) | Full-screen panels slide over each other |
+| **Thirty-two styles** | `theme.style` | [Halcyon](examples/halcyon/site.yaml) | One product page as thirty-two experiences (`studio looks`) |
+
+The examples show what each scene does; they are not templates. Every one rebuilds with your own photos, footage,
+3D models, logo and copy, or from a brief.
 
 ## Quick start
 

@@ -6,7 +6,14 @@ commits it spans so you can check out any earlier state (`git checkout <commit>`
 Everything so far is version 1. On 2026-10-12 the releases first published as 2.0.0 and 3.0.0 were renumbered
 1.1.0 and 1.2.0 (tags `v1.1.0` and `v1.2.0`).
 
-## Unreleased
+## 1.4.0 · 2026-10-13 to 2026-10-20
+
+Commits after the `v1.3.0` tag to the `v1.4.0` tag.
+
+The headline: new ways to move through a page. The one-take page, cinemagraphs, light as the scroll, inside the
+product, miniature worlds, film cuts between sections, type in the world, direction boards and six more animation
+styles; plus frozen moments with deep zoom, keyed camera moves on generated video, scroll-driven colour,
+storyboards, a polish report, product integration, launch trailers and Wan 2.2.
 
 ### Added
 - Miniature worlds: scene type `diorama`, a tilt-shift diorama you orbit and dive into. `world` (kind `harbour`, `town`,
