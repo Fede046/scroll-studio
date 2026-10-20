@@ -55,7 +55,7 @@ def keyframe_info(project: Project, site, node: Node) -> tuple[Optional[str], Pa
             shot, bkey, _legacy = film.blockout_key(sec, ctx)
     except (WouldRender, BuildError, KeyError, OSError):
         return None, png, False
-    digest = film.keyframe_digests(shot, bkey, 1).get(name)
+    digest = film.keyframe_digests(shot, bkey, 1, ctx.work).get(name)
     ident = keyframe_ident(shot, bkey, name) if digest else None
     rec = ctx.work / "keyframes" / "_frames.json"
     try:

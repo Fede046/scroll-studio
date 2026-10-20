@@ -182,7 +182,8 @@ def _expand_take(sec) -> None:
         "duration": round(total, 3), "fps": 24, "sky": b.sky, "light": list(b.light),
         "ground": b.ground.model_dump(mode="json") if b.ground else None,
         "objects": [o.model_dump(mode="json") for o in b.objects], "camera": keys, "lens": b.lens, "depth_far": b.depth_far,
-        "keyframes": {"control_strength": b.control_strength, "res": list(b.keyframe_res), "seed": j.seed, "frames": frames},
+        "keyframes": {"control_strength": b.control_strength, "res": list(b.keyframe_res), "seed": j.seed, "by_depth": True,
+                      "frames": frames},
         "ltx": {"res": list(b.ltx_res), "seed": j.seed, "guide_strength": b.guide_strength, "guide_blur": b.guide_blur,
                 "sampler": "euler_cfg_pp", "negative_prompt": b.negative or NEGATIVE, "segments": segments},
         "restore": j.restore})

@@ -1374,7 +1374,7 @@ class JourneyBlockout(Model):
     segment: float = Field(8.0, ge=3, le=10, description="Longest stretch the video model paints in one go, in seconds. "
                            "The film is cut into stretches at the middle of each hold (the camera is at rest there, so "
                            "the seam cannot show) and a longer one is split evenly")
-    keyframe_strength: float = Field(0.9, ge=0, le=1, description="How firmly each stop's picture is pinned in the film")
+    keyframe_strength: float = Field(0.6, ge=0, le=1, description="How firmly each stop's picture is pinned in the film. Too firm (0.9 was measured) and the model, holding the picture before and the picture after, dissolves between them instead of travelling; about 0.5-0.6 lets the depth guide move the camera and still lands on the picture")
     negative: Optional[str] = Field(None, description="What the video model must avoid (default: cuts, flicker, warped "
                                                       "shapes, text, watermark, blur)")
 
