@@ -16,6 +16,7 @@ Use the MCP tools (`scroll-studio` server) when available, otherwise the `studio
 | science, scale, space, data, networks | `scene3d` | presets: cell-field, cell, nucleus, helix · galaxy, star-system, planet · network, lattice, particles · gltf |
 | a physical product with parts | `sequence` | a .glb/.obj/.fbx/.stl (file or https URL) |
 | a place: hotel, home, landscape, venue | `parallax` | one photo per step (`file:` or `generate:`) |
+| one place through a day: a harbour, a house, a hotel, a rooftop; each section a time of day | `light` | one picture of the place (`world:`), `times: [dawn, noon, golden-hour, night]`, steps pinned to times; `studio light` to look at drift and transitions |
 | a manifesto, event, agency, statement | `type` | text only |
 | a physical product the client owns, in a cinematic world | `film` + `take:` | the product's .glb (or a photo with TRELLIS) + rough world shapes and camera keys |
 | a real place: house, venue, shop (scanned) | `splat` | a Gaussian-splat scan (.ply or gsplat .pt) + camera keys |

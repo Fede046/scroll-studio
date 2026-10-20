@@ -52,6 +52,28 @@ Everything so far is version 1. On 2026-10-12 the releases first published as 2.
   `studio cinemagraph <project> [--only] [--force] [--list] [--check [--mobile]]`, MCP `cinemagraphs`, a measured report per
   cinemagraph (loop seam, share of the picture that moves, change outside the mask, bytes) and a Chrome check of the built page.
   `gallery` tiles now take any image input. Example: `examples/tern-house`. Module: `engine/cinemagraph.py`, `engine/cinemagraph_check.py`.
+- Light as the scroll: scene type `light`. One place relit from dawn to night as the page scrolls; each step is a time of day. The
+  world is one picture (a file, a generated image, an edit, or `scene:<id>`); `times:` are presets (dawn, sunrise, morning, noon,
+  afternoon, golden-hour, sunset, blue-hour, night, overcast, storm; `engine/light_presets.py`), free text, or `image:` pictures
+  of your own; `world_time:` names the one the world already is. Build (`engine/scenes/light.py`, `engine/light.py`; stages `world`,
+  `depth`, `sky`, `time_<id>`, `maps`, `web`, each cached, an unchanged spec renders nothing): every time is Qwen-Image-Edit asked to
+  change only the light, then measured against the world (light-invariant structure: band-passed log luminance with local contrast
+  normalisation, dense optical flow, edge F-score; drift in px at 1024 across), its global move (zoom, shear, shift: most of what
+  the editor does to a place) undone with a robust affine fit so nothing is bent, and retried with another seed when still too
+  far (`structure.align: affine | flow | none`, `max_drift`, `retries`); `flow` additionally pulls local structure in with
+  optical flow (matches edges better, bends lines). Between neighbouring times the build writes the low-frequency light-change
+  field (guided by the world's edges, log-encoded), a flow texture of the structure that remains different, and a lamp map (small
+  bright features the ambient change cannot explain, optionally confined to regions named in `lamps:` with Florence-2 + SAM 2.1
+  through `engine/region.py`, each light with its own delay and a halo). Play (`runtime/src/players/light.ts`): scroll moves
+  continuously through the day with a hold at each step (`hold`) and the change passing between headlines; a shader applies the
+  light change to both pictures, switches the rest with a front of new light spreading from the sun, glides along the flow so
+  edges slide into place instead of cross-fading doubled, pops windows and lamps on one by one with a halo, draws `haze` as
+  drifting mist thicker with distance, drifts the camera slowly through the depth map (`drift`), optionally travels a sun and
+  moon glow over the sky (`sun`), shows a clock and sun arc, and follows the sky with the section's colours (ink, accent, shade,
+  contrast-checked; each headline keeps the colours of its own time). Phones get a smaller picture set and a `focus` crop;
+  reduced motion shows one still per step; without WebGL the stills are images, one per step. `studio light <project>` builds the
+  section and writes `light/<id>/` (times sheet with measured drift, a frame strip across every transition, `light.json`);
+  `studio light --presets` lists the named times. Example: `examples/harbour-light` (Quay House). Tests: `tests/test_light.py`.
 - Style `stop-motion`: scrolling fires the shutter. Every 26-42 px is one exposure, poses change on twos, never faster than 12 a second, and nothing moves between exposures. Between sections the set is struck and dressed (cast lifted off, a bare set with tape crosses, the new set and cast placed). Clay letters, felt cards, masking-tape labels, a felt `theme.art`; poke a piece and it hops, an onion-skin switch shows the last exposure. Research in `docs/styles/styles-28-29.md`.
 - Style `paper-cut-out`: Lotte Reiniger and Terry Gilliam. The top sheet swings off its brass brad as you scroll and uncovers the next; words on paper strips, tags and snapshots hang on hinges and sway with scroll speed; feature cards fan from one pin, a folding rule opens, a mobile of tags turns; a jointed black paper arm (two-bone IK) points at what you have reached.
 - Direction boards: `studio directions <project> [--n 6] [--seed] [--brief] [--pick K] [--undo] [--reroll K] [--serve]`, MCP tools

@@ -19,6 +19,7 @@ MODULES = {
     "showroom": "showroom",
     "diorama": "diorama",
     "inside": "inside",
+    "light": "light",
 }
 
 

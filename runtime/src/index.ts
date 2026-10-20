@@ -32,6 +32,7 @@ const PLAYERS: Record<string, () => Promise<{ default: PlayerFactory }>> = {
   showroom: () => import("./players/showroom"),
   diorama: () => import("./players/diorama"),
   inside: () => import("./players/frames"),
+  light: () => import("./players/light"),
 };
 
 let mx = 0, my = 0;

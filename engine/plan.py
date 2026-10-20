@@ -52,13 +52,15 @@ DEFAULTS = {
     "sequence:encode": 1.0,     # per frame
     "inside:render": 0.55,      # per frame at 64 samples, 1600x900 (macro Cycles with a shared GPU)
     "inside:encode": 0.5,       # per frame (grade, desktop and phone WebP)
+    "light:align": 2.0,         # a time that is the world itself or a picture the spec gives (measured and aligned only)
+    "light:relight": 120.0,     # per time of day (Qwen-Image-Edit, measured and aligned; a drifting one is redone)
 }
 FLAT = 10.0                     # any other stage, per run
 IMAGES = {"beat frame": 3.0, "image": 15.0, "edit": 60.0, "product still": 25.0, "scene still": 150.0, "product model": 60.0,
           "download": 5.0, "art": 240.0, "stand-in": 5.0}
 # what counts as heavy GPU work (a video model, SeedVR2, a Cycles pass over every frame): the build lists these first
 HEAVY = ("film:generate", "film:generate_wan", "film:restore", "film:product", "film:beat", "film:camera", "film:keyframes",
-         "film:freeze_up", "film:freeze_zoom", "film:freeze_layers", "sequence:render", "inside:render", "film:reveal_track", "film:faces")
+         "film:freeze_up", "film:freeze_zoom", "film:freeze_layers", "sequence:render", "inside:render", "film:reveal_track", "film:faces", "light:relight")
 
 
 @dataclass
@@ -258,11 +260,17 @@ def units(sec, name: str) -> tuple[str, float]:
             return "sequence:render", sec.frames * (sec.samples / 96) * (w * h) / (1920 * 1080)
         if name == "encode":
             return "sequence:encode", float(sec.frames)
+    if t == "light" and name.startswith("time_"):    # one relight per time of day; the world's own time and a given picture are cheap
+        tm = next((x for x in sec.times if f"time_{x.id}" == name), None)
+        return ("light:relight" if tm is not None and tm.image is None and tm.id != sec.world_time else "light:align"), 1.0
     return f"{t}:{re.sub(r'[0-9]+$', '', name)}", 1.0
 
 
 def expected(sec, beats: Optional[set] = None) -> list[str]:
     """The stages a scene section runs, in order (films only; other builders report what they reach)."""
+    if sec.type == "light":     # engine/scenes/light.py: the world, its depth and sky, one relight per time, the maps, the web files
+        return (["world", "depth", "sky"] + [f"time_{t.id}" for t in sec.times if t.id != sec.world_time]
+                + (["time_" + sec.world_time] if sec.world_time else []) + ["maps", "web"])
     if sec.type != "film" or sec.video:
         return ((["faces"] if sec.faces else []) + ["encode"] + expected_reveal(sec) + expected_world(sec)) if sec.type == "film" else []
     if sec.beats:

@@ -14,10 +14,10 @@ from ..imagery import phrase, restyle
 from ..spec import Imagery
 from .brief import plain
 
-SCENES = {"film", "parallax", "artwork", "scene3d", "sequence", "showroom", "splat", "map", "chart", "code", "vector", "type"}
+SCENES = {"film", "parallax", "artwork", "scene3d", "sequence", "showroom", "splat", "map", "chart", "code", "vector", "type", "light"}
 WEIGHT = {"hero": 5, "film": 4, "parallax": 4, "artwork": 3, "sequence": 3, "showroom": 3, "product": 3, "gallery": 3,
           "strip": 3, "features": 2.5, "orbit": 2, "timeline": 2, "stats": 1, "quote": 1.5, "intro": 1.5, "cta": 1.5,
-          "faq": 0.5, "splat": 3, "map": 2, "scene3d": 2.5, "chart": 2, "vector": 2, "type": 1.5, "code": 2}
+          "faq": 0.5, "splat": 3, "map": 2, "scene3d": 2.5, "chart": 2, "vector": 2, "type": 1.5, "code": 2, "light": 4}
 FRAMING = {"hero": "wide establishing view", "detail": "closer view of a detail", "feature": "medium view", "closing": "quiet closing view"}
 NEUTRAL = Imagery(medium="x", light="x", lens="x")       # restyle() drops every medium, light and lens phrase
 

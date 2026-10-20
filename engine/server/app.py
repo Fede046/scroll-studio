@@ -42,6 +42,7 @@ SCENE_INFO = {
     "diorama": "A miniature world (tilt-shift diorama, live 3D): scroll orbits it, dives to a place for each step, lifts out and travels on.",
     "parallax": "Photos turned into 2.5D camera moves with estimated depth, one per step.",
     "type": "Kinetic typography: reveal, stack, swap or scale.",
+    "light": "One place relit from dawn to night as you scroll: each step a time of day, windows and lamps coming on.",
 }
 BLOCK_TYPES = ["intro", "features", "stats", "timeline", "quote", "cta", "gallery"]
 PRESETS_3D = ["cell-field", "cell", "nucleus", "helix", "galaxy", "star-system", "planet", "network", "lattice", "particles", "gltf"]

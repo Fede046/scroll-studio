@@ -399,8 +399,10 @@ QWEN_EDIT = {"unet": "qwen_image_edit_2511_fp8mixed.safetensors", "clip": "qwen_
              "vae": "qwen_image_vae.safetensors"}
 
 
-def build_qwen_edit_graph(images, instruction, seed, steps, prefix, megapixels=1.6, cfg=QWEN_EDIT):
-    """Qwen-Image-Edit: edit images[0] following `instruction`; images[1:] (up to two) are references it can use."""
+def build_qwen_edit_graph(images, instruction, seed, steps, prefix, megapixels=1.6, cfg=QWEN_EDIT, denoise=1.0):
+    """Qwen-Image-Edit: edit images[0] following `instruction`; images[1:] (up to two) are references it can use.
+    denoise < 1 starts the sampler from images[0]'s own latent, partly noised (SDEdit): the layout stays where it was, so a
+    relight cannot move the place (`light` scenes); 1 starts from pure noise, as every other edit does."""
     g = {
         "unet": {"class_type": "UNETLoader", "inputs": {"unet_name": cfg["unet"], "weight_dtype": "default"}},
         "clip": {"class_type": "CLIPLoader", "inputs": {"clip_name": cfg["clip"], "type": "qwen_image", "device": "default"}},
@@ -420,7 +422,7 @@ def build_qwen_edit_graph(images, instruction, seed, steps, prefix, megapixels=1
     g["lat"] = {"class_type": "VAEEncode", "inputs": {"pixels": ["sc0", 0], "vae": ["vae", 0]}}
     g["ks"] = {"class_type": "KSampler", "inputs": {
         "model": ["norm", 0], "positive": ["pos", 0], "negative": ["neg", 0], "latent_image": ["lat", 0],
-        "seed": seed, "steps": steps, "cfg": 4.0, "sampler_name": "euler", "scheduler": "simple", "denoise": 1.0}}
+        "seed": seed, "steps": steps, "cfg": 4.0, "sampler_name": "euler", "scheduler": "simple", "denoise": denoise}}
     g["dec"] = {"class_type": "VAEDecode", "inputs": {"samples": ["ks", 0], "vae": ["vae", 0]}}
     g["save"] = {"class_type": "SaveImage", "inputs": {"images": ["dec", 0], "filename_prefix": prefix}}
     return g
