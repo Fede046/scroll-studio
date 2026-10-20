@@ -48,7 +48,7 @@ one camera across the cut, start on the previous last frame and are graded towar
 - `spec_schema('<type>')` gives every field with descriptions. Pick a theme preset that fits the domain
   (night, brass, paper, lab, cosmos, studio, dusk, ink, blueprint) and override colours only if the brand needs it.
 - An experience in one word: `theme: { style: <name> }` changes how the site scrolls and reads (split-flap board,
-  comic pages, terminal session, game level, anime opening, ... the table in README.md). Pick by the brand's
+  comic pages, terminal session, game level, anime opening, ... the table in docs/styles.md). Pick by the brand's
   character, offer two or three, and show them with `studio looks <project> --styles a,b,c`.
 - Brand: `studio brand <project> --logo inputs/logo.png` sets contrast-checked colours from the client's logo.
 - Copy: short, specific, written for the reader. `<em>…</em>` marks the accent words in a title.
