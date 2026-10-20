@@ -1404,7 +1404,8 @@ class JourneyMove(Model):
                           "paint more of the place it arrives at")
     guide_strength: float = Field(1.0, ge=0, le=2, description="How strongly the depth guide steers the model")
     res: Optional[tuple[int, int]] = Field(None, description="Size the video model runs at (as `camera.res`)")
-    seed: Optional[int] = Field(None, description="Seed of the move (default: the stop's)")
+    seed: Optional[int] = Field(None, description="Seed of the move (default: the stop's). With a `blockout` it re-rolls the "
+                                "stretch of the take that ends at this stop (and so the stretches after it, which continue from it)")
 
 
 class JourneyStop(Model):

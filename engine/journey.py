@@ -177,7 +177,11 @@ def _expand_take(sec) -> None:
         motion = next((j.stops[k].move.motion for k in range(q, p, -1) if j.stops[k].move.motion), None)
         text = (f"{j.world}. One continuous smooth shot. The camera rests on {places[0]}"
                 + "".join(f", then glides on to {x}" for x in places[1:]) + f". {motion + '. ' if motion else ''}Steady, no cuts, photoreal, cinematic.")
-        segments.append({"id": f"seg{n + 1}", "range": [round(a, 3), round(z, 3)], "prompt": text})
+        seg = {"id": f"seg{n + 1}", "range": [round(a, 3), round(z, 3)], "prompt": text}
+        into = next((k for k in range(1, len(j.stops)) if abs(centre[k] - z) < 1e-6 or (k == len(j.stops) - 1 and z >= total - 1e-6)), None)
+        if into is not None and j.stops[into].move.seed is not None:      # a move's seed re-rolls the stretch that ends at its stop
+            seg["seed"] = j.stops[into].move.seed
+        segments.append(seg)
     sec.take = Take.model_validate({
         "duration": round(total, 3), "fps": 24, "sky": b.sky, "light": list(b.light),
         "ground": b.ground.model_dump(mode="json") if b.ground else None,
