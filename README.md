@@ -69,6 +69,9 @@ tiktoken (`cl100k_base`) on the files in this repo; other tokenizers differ by r
 
 ### New in 1.4
 
+Coming in 1.5: more customization (your own media everywhere, options for every style), better motion control and faster
+rendering. See the [1.5 milestone](https://github.com/Okohedeki/scroll-studio/milestone/1).
+
 - **The one-take page** (`journey:` on a film section): the whole landing page is one camera move through one generated world; every section is a place in it (the door, the rooms, the table, the window, the view), the page's blocks arrive at their stop set as part of the picture, and the camera rests while they are read. ([The one-take page](#the-one-take-page-journey))
 - **Cinemagraphs** (`cinemagraph:` on any image): a still where only one thing moves (steam, a curtain, smoke, water);
   everything outside the mask is held pixel for pixel and the loop is closed without a seam.

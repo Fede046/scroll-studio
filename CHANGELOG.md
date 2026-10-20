@@ -6,6 +6,10 @@ commits it spans so you can check out any earlier state (`git checkout <commit>`
 Everything so far is version 1. On 2026-10-12 the releases first published as 2.0.0 and 3.0.0 were renumbered
 1.1.0 and 1.2.0 (tags `v1.1.0` and `v1.2.0`).
 
+## Unreleased (1.5)
+
+Planned: see the [1.5 milestone](https://github.com/Okohedeki/scroll-studio/milestone/1).
+
 ## 1.4.0 · 2026-10-13 to 2026-10-20
 
 Commits after the `v1.3.0` tag to the `v1.4.0` tag.
