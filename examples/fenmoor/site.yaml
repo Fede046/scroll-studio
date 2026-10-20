@@ -91,7 +91,7 @@ sections:
       stops:
         - id: door
           label: The door
-          place: the view from just inside the open oak front door down the whole length of the long hall, flagstones, black beams, deep arched doorways one behind another, and a small bright window at the very end
+          place: the front of the farmhouse seen from the doorstep, its heavy oak door standing open and the whole length of the long hall visible through it, flagstones, black beams, deep arched doorways one behind another, and a small bright window at the very end
           pose: { at: [0.3, -4.2, 1.6], look: [0, 12, 1.3] }
           seconds: 3
           hold: 1.6
