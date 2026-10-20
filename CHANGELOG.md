@@ -10,6 +10,13 @@ Everything so far is version 1. On 2026-10-12 the releases first published as 2.
 
 Planned: see the [1.5 milestone](https://github.com/Okohedeki/scroll-studio/milestone/1).
 
+### Changed
+- Map scenes preload their flight: while the loading screen is up the camera visits every stop (and the far point of
+  each long move) and waits for its tiles, keeps them cached, and draws labels without fading, so the scroll never
+  waits on the network. Measured on Tidewater Lines in Chrome on the GPU: hitches over 50 ms went from 2-3 per
+  scroll (up to 150 ms) to none, for about 5 s more on the loading screen (capped at 10 s, 6 s on phones). Routes
+  are added once and revealed with a gradient instead of being rebuilt every frame.
+
 ## 1.4.0 · 2026-10-13 to 2026-10-20
 
 Commits after the `v1.3.0` tag to the `v1.4.0` tag.
