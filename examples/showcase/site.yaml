@@ -11,7 +11,6 @@ nav:
   links:
     - { label: New in 1.4, href: "#new" }
     - { label: Every scene, href: "#examples" }
-    - { label: Story, href: ../feel/dist/index.html }
     - { label: Concepts, href: ../concepts/dist/index.html }
   cta: { label: GitHub, href: "https://github.com/Okohedeki/scroll-studio" }
 sections:
@@ -45,6 +44,7 @@ sections:
       - { title: Gaussian splat, kicker: "splat · Hollis House, real estate", href: ../hollis-house/dist/index.html, image: previews/hollis-house.jpg, video: previews/hollis-house.mp4, body: "A walk through a real house, rebuilt as a Gaussian splat." }
       - { title: Charts from the data, kicker: "chart · Pelorus, research", href: ../pelorus/dist/index.html, image: previews/pelorus.jpg, video: previews/pelorus.mp4, body: "The renewables story with every figure read from the source data at build time." }
       - { title: Thirty-two styles, kicker: "theme.style · Halcyon, software", href: ../halcyon/dist/looks/index.html, image: previews/halcyon.jpg, video: previews/halcyon.mp4, body: "One product page as a departures board, a comic, a zoetrope, a stop-motion set, a paper theatre, a painting on glass and twenty-six more experiences." }
+      - { title: Story in shots, kicker: "film + beats · Feel", href: ../feel/dist/index.html, image: previews/feel.jpg, video: previews/feel.mp4, body: "A closed door opens onto an oasis, and every sentence is its own generated shot." }
       - { title: Story film, kicker: "film · Lodestar Orbital, aerospace", href: ../lodestar-orbital/dist/index.html, image: previews/lodestar-orbital.jpg, video: previews/lodestar-orbital.mp4, body: "A rocket launch to orbit, generated locally with LTX-2.3." }
       - { title: Product sequence, kicker: "sequence · Fischer & Vale, luxury goods", href: ../fischer-vale/dist/index.html, image: previews/fischer-vale.jpg, video: previews/fischer-vale.mp4, body: "A glass chess set rendered in Blender lifts off its board." }
       - { title: Artwork, kicker: "artwork · Atelier Sfumato, education", href: ../atelier-sfumato/dist/index.html, image: previews/atelier-sfumato.jpg, video: previews/atelier-sfumato.mp4, body: "The Mona Lisa, drawn and painted in five lessons." }
