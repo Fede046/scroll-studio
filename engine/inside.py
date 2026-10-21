@@ -490,8 +490,45 @@ def make_plan(sec: InsideScene, res: Resolution, aspect: float = 16 / 9) -> Plan
         frames.append({"k": k, "p": round(k / (n - 1), 6), "cam": _r(pose.cam), "target": _r(pose.target), "focus": _r(pose.focus),
                        "lens": round(pose.lens, 3), "fstop": round(pose.fstop, 3), "roll": round(pose.roll, 3),
                        "explode": round(pose.explode, 4), "off": round(pose.off, 4), "stop": int(near), "rest": seg.kind == "hold" and seg.stop >= 0})
+        if sec.light:            # only then: a flight with one light keeps the frames (and frame caches) it always had
+            frames[-1]["light"] = light_at(sec, k / (n - 1))
     windows, intro, outro = _windows(segs, stops, total, n, sec)
     return Plan(VERSION, frames, segs, total, stops, wide, windows, intro, outro, res.notes)
+
+
+def _hex_lin(h: str) -> np.ndarray:
+    c = np.array([int(h.lstrip("#")[i:i + 2], 16) / 255 for i in (0, 2, 4)])
+    return np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
+
+
+def _lin_hex(c: np.ndarray) -> str:
+    s = np.where(c <= 0.0031308, c * 12.92, 1.055 * np.clip(c, 0, None) ** (1 / 2.4) - 0.055)
+    return "#" + "".join(f"{int(round(float(np.clip(v, 0, 1)) * 255)):02x}" for v in s)
+
+
+def light_at(sec: InsideScene, p: float) -> dict:
+    """The flight's light at scene progress p: each value eased between the keys that set it (the scene's own value
+    where no key does), held before the first key and after the last. Colours blend in linear light."""
+    out = {}
+    for name in ("exposure", "ambient", "lamp", "rim", "lamp_color"):
+        keys = [(k.at, getattr(k, name)) for k in sec.light if getattr(k, name) is not None]
+        own = getattr(sec, name)
+        if not keys:
+            out[name] = own
+            continue
+        if name == "lamp_color":
+            keys = [(a, _hex_lin(v)) for a, v in keys]
+        if p <= keys[0][0]:
+            v = keys[0][1]
+        elif p >= keys[-1][0]:
+            v = keys[-1][1]
+        else:
+            i = next(j for j in range(1, len(keys)) if p <= keys[j][0])
+            (a0, v0), (a1, v1) = keys[i - 1], keys[i]
+            s = _smooth((p - a0) / max(a1 - a0, 1e-9))
+            v = v0 + (v1 - v0) * s
+        out[name] = _lin_hex(v) if name == "lamp_color" else round(float(v), 4)
+    return out
 
 
 def _r(v: np.ndarray) -> list[float]:

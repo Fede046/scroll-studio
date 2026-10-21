@@ -10,6 +10,11 @@ Everything so far is version 1. On 2026-10-12 the releases first published as 2.
 
 Planned: see the [1.5 milestone](https://github.com/Okohedeki/scroll-studio/milestone/1).
 
+### Added
+- Inside flights take `light:` keys over the scroll (exposure, ambient, lamp, rim, lamp colour, eased between keys),
+  so the light can change as the page goes: evening to lamplight to lights out. Frames are only redrawn where the
+  light changes.
+
 ### Changed
 - Map scenes preload their flight: while the loading screen is up the camera visits every stop (and the far point of
   each long move) and waits for its tiles, keeps them cached, and draws labels without fading, so the scroll never

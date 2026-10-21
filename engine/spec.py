@@ -1315,13 +1315,38 @@ class InsideScene(SceneBase):
                                                         "theme background)")
     vignette: float = Field(0.35, ge=0, le=1, description="Darkening towards the corners")
     grain: float = Field(0.02, ge=0, le=0.2, description="Film grain")
+    light: list["InsideLight"] = Field(default_factory=list, description="The light changing along the flight: keys over "
+                                       "the scene's progress (0-1, as `studio inside` prints the stops' rests), eased "
+                                       "between keys: evening to lamplight to lights out. A key sets any of exposure, "
+                                       "ambient, lamp, rim, lamp_color; what it leaves out stays the scene's. Empty: "
+                                       "one light for the whole flight")
 
     @model_validator(mode="after")
     def _stops(self):
         for i, st in enumerate(self.stops or []):
             if (st.part is None) == (st.point is None):
                 raise ValueError(f"inside '{self.id}': stop {i + 1} needs exactly one of `part` and `point`")
+        ats = [k.at for k in self.light]
+        if ats != sorted(ats):
+            raise ValueError(f"inside '{self.id}': light keys must go forward (`at` in increasing order)")
         return self
+
+
+class InsideLight(Model):
+    """One key of an inside flight's light, at a point of the scene's progress. Unset fields follow the scene's own."""
+    at: float = Field(..., ge=0, le=1, description="Scene progress, 0-1")
+    exposure: Optional[float] = Field(None, ge=-6, le=4, description="Exposure in stops")
+    ambient: Optional[float] = Field(None, ge=0, le=4, description="Strength of the studio light")
+    lamp: Optional[float] = Field(None, ge=0, le=10, description="Strength of the lamp that travels with the camera")
+    rim: Optional[float] = Field(None, ge=0, le=10, description="Strength of the light behind the stop's part")
+    lamp_color: Optional[str] = Field(None, description="Colour of the camera lamp, hex")
+
+    @field_validator("lamp_color")
+    @classmethod
+    def _hex(cls, v):
+        if v is not None and not re.fullmatch(r"#[0-9a-fA-F]{6}", v):
+            raise ValueError("lamp_color is a hex colour like #ffe2c0")
+        return v
 
 
 class ShowroomScene(SceneBase):
@@ -2162,6 +2187,7 @@ class Journey(Model):
 
 
 FilmScene.model_rebuild()
+InsideScene.model_rebuild()
 
 
 Section = Annotated[Union[

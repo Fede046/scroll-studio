@@ -284,6 +284,35 @@ def test_samples_and_size_are_part_of_every_frames_key_and_copy_is_not():
     assert hashes(s2, inside.make_plan(s2, inside.resolve(s2, speaker()))) == base      # copy and grade do not redraw
 
 
+def test_light_keys_ease_along_the_flight_and_leave_unset_values_to_the_scene():
+    s = scene_of(stops=[{"part": "Cone"}, {"part": "Magnet"}], density=10, exposure=0.5, rim=2.0,
+                 light=[{"at": 0.2, "exposure": 0.5, "lamp_color": "#ffffff"}, {"at": 0.8, "exposure": -2.5, "lamp_color": "#ff0000"}])
+    assert inside.light_at(s, 0.0) == {"exposure": 0.5, "ambient": 0.25, "lamp": 1.0, "rim": 2.0, "lamp_color": "#ffffff"}
+    assert inside.light_at(s, 1.0)["exposure"] == -2.5 and inside.light_at(s, 1.0)["lamp_color"] == "#ff0000"
+    mid = inside.light_at(s, 0.5)
+    assert mid["exposure"] == pytest.approx(-1.0, abs=1e-3) and mid["rim"] == 2.0
+    ex = [inside.light_at(s, p / 50)["exposure"] for p in range(51)]
+    assert all(b <= a + 1e-9 for a, b in zip(ex, ex[1:]))                                # eased, never back up
+    plan = inside.make_plan(s, inside.resolve(s, speaker()))
+    assert plan.frames[0]["light"]["exposure"] == 0.5 and plan.frames[-1]["light"]["exposure"] == -2.5
+
+
+def test_light_keys_must_go_forward_and_take_a_hex_colour():
+    with pytest.raises(ValidationError):
+        scene_of(light=[{"at": 0.6, "lamp": 1}, {"at": 0.2, "lamp": 2}])
+    with pytest.raises(ValidationError):
+        scene_of(light=[{"at": 0.5, "lamp_color": "warm"}])
+
+
+def test_a_flight_without_light_keys_keeps_its_frame_keys_and_light_redraws_them():
+    s = scene_of(stops=[{"part": "Cone"}, {"part": "Magnet"}], density=8)
+    plan = inside.make_plan(s, inside.resolve(s, speaker()))
+    assert "light" not in plan.frames[0]                                                 # old caches stay valid
+    s2 = scene_of(stops=[{"part": "Cone"}, {"part": "Magnet"}], density=8, light=[{"at": 1, "exposure": -2}])
+    lit = hashes(s2, inside.make_plan(s2, inside.resolve(s2, speaker())))
+    assert lit[-1] != hashes(s, plan)[-1]
+
+
 # ---------------------------------------------------------------- the builder (Blender replaced)
 
 @pytest.fixture

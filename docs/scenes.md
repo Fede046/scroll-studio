@@ -84,6 +84,12 @@ What the engine does with it (`engine/inside.py`, `engine/scenes/inside.py`, `ba
 - **A cutaway.** Parts between the camera and the stop (a fan cover, a heat spreader, a cabinet wall) dissolve for the
   frames the camera is behind them, so it can see and fly through a closed assembly. The dissolve is worked out with ray
   casts over the whole route and smoothed in time (it starts before the camera arrives and ends after it leaves). `cutaway: false` turns it off.
+- **Light along the flight.** `light:` keys change the light as the page scrolls: each key sets any of `exposure`,
+  `ambient`, `lamp`, `rim` and `lamp_color` at a point of the scene's progress (the rests `studio inside` prints), eased
+  between keys, the scene's own values wherever no key says otherwise. A night routine can go from evening to one lamp to
+  lights out:
+  `light: [{at: 0, exposure: 0.6}, {at: 0.5, lamp_color: "#ffc98a", ambient: 0.15}, {at: 1, exposure: -2.5, lamp: 0.4}]`.
+  Only frames whose light changes are redrawn; a flight without keys keeps its frames.
 - **The copy.** Steps without an `at` are placed on the route (intro steps over the wide shot, then one per stop while it
   rests, extra steps over the pull-back), and the subject sits off-centre (`offset`, towards `side`) so the words have the other half.
 - **Cache.** Every frame is keyed by its own camera and the frames around it that the dissolve looks at: change one stop's

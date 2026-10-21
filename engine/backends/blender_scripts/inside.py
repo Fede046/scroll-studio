@@ -6,6 +6,7 @@ job.json
   glb       the normalised product GLB (engine/product.py)
   size      [W, H]            samples   Cycles samples (denoised)
   hdri, ambient, lamp, lamp_color, rim, exposure, background   the look (see InsideScene)
+  frames[k].light   optional: that frame's exposure, ambient, lamp, rim, lamp_color (scene `light` keys)
   cutaway   dissolve the parts between the camera and the stop's part
   stops     [{"match": [globs], "focus": [globs], "extent": metres}]   for the dissolve and the focus
   frames    the whole route, one entry per frame (cam, target, focus, lens, fstop, roll, explode, stop, p), in metres
@@ -349,15 +350,19 @@ def place(fr, k):
     cam_data.dof.aperture_fstop = fr["fstop"] * radius
     d = max((fp - c).length, 0.01)
     k2 = (d / 3.2) ** 2          # the lamps keep the exposure of a subject at any distance
+    lt = {**{n: J.get(n) for n in ("exposure", "ambient", "lamp", "rim", "lamp_color")}, **(fr.get("light") or {})}
+    scene.view_settings.exposure = float(lt.get("exposure") or 0)       # the light along the flight (scene `light` keys)
+    bg_env.inputs["Strength"].default_value = float(lt.get("ambient", 0.25))
+    lamp.data.color = fill.data.color = hex_rgb(lt.get("lamp_color") or "#ffe8d0")
     aim_light(lamp, c + right * 0.34 * d + up * 0.3 * d - fwd * 0.05 * d, fp)
     lamp.data.size = 0.55 * d
-    lamp.data.energy = 170 * k2 * float(J.get("lamp", 1.0))
+    lamp.data.energy = 170 * k2 * float(lt.get("lamp", 1.0))
     aim_light(rim, t + fwd * 0.9 * d + up * 0.55 * d - right * 0.35 * d, t)
     rim.data.size = 0.5 * d
-    rim.data.energy = 520 * k2 * float(J.get("rim", 1.0))
+    rim.data.energy = 520 * k2 * float(lt.get("rim", 1.0))
     aim_light(fill, c - right * 0.2 * d - up * 0.1 * d, fp)
     fill.data.size = 0.5 * d
-    fill.data.energy = 36 * k2 * float(J.get("lamp", 1.0))
+    fill.data.energy = 36 * k2 * float(lt.get("lamp", 1.0))
     for o in meshes:
         o["ss_fade"] = FADE[o.name][k] if o.name in FADE else 0.0
     bpy.context.view_layer.update()
