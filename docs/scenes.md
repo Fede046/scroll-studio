@@ -449,28 +449,6 @@ edit's digest only when set, so nothing already rendered is redrawn. The region 
 cached by the source's content and what names the region), so changing only `seed`, `instruction`, `feather` or `grow`
 reuses it. `ComfyUI` needs the same nodes as `reveal` (`studio setup-comfy`).
 
-### Keep the camera still across edits (`edit.align`)
-
-A region edit keeps everything outside its mask, but its mask is the subject's old outline, so it cannot change a pose
-(raised arms fall outside it). A plain edit can, but Qwen-Image-Edit re-frames the picture as it goes: a few percent of
-zoom, a shift, a slight turn. Edit one frame into four poses and you get four cameras. `align` puts each edit back:
-
-```yaml
-end_image:
-  edit:
-    source: *room
-    instruction: "The same man now has both hands raised to his face, washing it ..."
-    align: { subject: [0.02, 0.0, 0.62, 1.0] }    # where the change is allowed; the rest must not move
-```
-
-The edit is matched to its source on everything outside `subject` (SIFT features, a ratio test, a RANSAC similarity:
-scale, turn and shift), warped back onto the source's frame and, with `lock: true` (the default), the source's own
-pixels are kept outside the subject box, feathered (`feather`, px) on the place side so no part of the subject is mixed
-with its old pose. The report (scale, turn, shift, matches, residual) is written beside the image as
-`.build/_generated/edit_<digest>.align.json`, and the editor's own result as `edit_<digest>.raw.png`. Measured on four
-pose edits of one 1920x1088 frame: the editor had moved the place 12 to 113 px and up to 4% in scale; aligned, it matches
-to under 2 px.
-
 ### Colour that follows the camera (`reveal:`)
 
 Say you want a black-and-white crowd with a couple in it, and colour that comes into exactly the part the camera looks

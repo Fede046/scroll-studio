@@ -289,18 +289,6 @@ class EditRegion(Model):
         return self
 
 
-class EditAlign(Model):
-    """Undo the editor's own re-framing. Qwen-Image-Edit often returns the picture a few percent zoomed, shifted or turned,
-    so two edits of one frame (the same man in two poses at one mirror) do not line up. The edit is registered back onto its
-    source on what should not have changed (everything outside `subject`) and, with `lock`, the source's own pixels are kept
-    there, so the place is pixel-identical across edits and only the subject differs."""
-    subject: Optional[tuple[float, float, float, float]] = Field(
-        None, description="[x0, y0, x1, y1] in 0-1 of the source: where the change is allowed (the person who moves). It is "
-                          "left out of the measurement, and with `lock` it is the only area taken from the edit")
-    lock: bool = Field(True, description="Outside `subject`, keep the source's pixels (feathered into the aligned edit)")
-    feather: int = Field(32, ge=0, le=200, description="Soft edge of the subject box, in pixels of the source")
-
-
 class ImageEdit(Model):
     """Derive an image from another with a local image editor (Qwen-Image-Edit): change one thing, keep the rest."""
     source: ImageRef = Field(..., description="The image to edit (a file, or another generated image)")
@@ -313,10 +301,6 @@ class ImageEdit(Model):
         None, description="Edit only inside this region of the source image (or, with `invert`, everywhere but inside it): "
                           "the rest of the result is the source, pixel for pixel, so consecutive versions of a frame "
                           "differ only where the edit is")
-    align: Optional[EditAlign] = Field(
-        None, description="Register the result back onto the source (undo the editor's zoom, shift and turn), measured "
-                          "outside `align.subject`; with `lock` the source is kept outside it. For a subject that has to move "
-                          "beyond its own outline (a pose change), where a region edit cannot")
 
 
 ImageInput.model_rebuild()
