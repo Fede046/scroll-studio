@@ -1,0 +1,296 @@
+{
+ "example": "one-take",
+ "root": {
+  "class": [
+   "mode-dark",
+   "layout-flow"
+  ]
+ },
+ "cuts": [],
+ "sections": [
+  {
+   "id": "take",
+   "type": "film",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-scene",
+      "ss-overlay",
+      "ss-side-right",
+      "ss-type-film",
+      "ss-shade-auto"
+     ],
+     "id": "take",
+     "data": {
+      "data-scene": "film"
+     },
+     "text": {
+      "kicker": "Stillwater",
+      "title": "Cold from the source.",
+      "title_tag": "h1"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-track"
+       ],
+       "style": {
+        "height": "600vh"
+       },
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-stage"
+         ],
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-shade"
+           ]
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-captions"
+           ],
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0.02",
+              "data-to": "0.22"
+             },
+             "text": {
+              "kicker": "Stillwater",
+              "title": "Cold from the source.",
+              "title_tag": "h1"
+             }
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0.3",
+              "data-to": "0.55"
+             },
+             "text": {
+              "kicker": "Dawn on the lake",
+              "title": "Down to the water.",
+              "title_tag": "h2"
+             }
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0.68",
+              "data-to": "0.98"
+             },
+             "text": {
+              "kicker": "The bottle",
+              "title": "Still cold at noon.",
+              "title_tag": "h2"
+             }
+            }
+           ]
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-cue"
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "sdata": {
+    "layout": "overlay",
+    "length": 6.0,
+    "steps": [
+     {
+      "kicker": "Stillwater",
+      "title": "Cold from <em>the source.</em>",
+      "body": null,
+      "fact": null,
+      "at": [
+       0.02,
+       0.22
+      ],
+      "length": 1.2,
+      "intro": true,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "Dawn on the lake",
+      "title": "Down to <em>the water.</em>",
+      "body": null,
+      "fact": null,
+      "at": [
+       0.3,
+       0.55
+      ],
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "The bottle",
+      "title": "Still cold <em>at noon.</em>",
+      "body": null,
+      "fact": null,
+      "at": [
+       0.68,
+       0.98
+      ],
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     }
+    ],
+    "hud": {
+     "kind": "none",
+     "fields": [],
+     "events": [],
+     "clock": null,
+     "scales": [],
+     "legend": []
+    }
+   }
+  },
+  {
+   "id": "order",
+   "type": "product",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-product",
+      "ss-product--left",
+      "ss-pose--beside"
+     ],
+     "id": "order",
+     "text": {
+      "kicker": "Stillwater 750",
+      "title": "Twenty-four hours cold.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-wrap",
+        "ss-product__in"
+       ],
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-product__media"
+         ],
+         "data": {
+          "data-float": ""
+         },
+         "children": [
+          {
+           "tag": "img",
+           "class": [
+            "ss-product__img"
+           ]
+          }
+         ]
+        },
+        {
+         "tag": "div",
+         "class": [
+          "ss-product__copy",
+          "ss-reveal"
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "stats",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-band"
+     ],
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-wrap",
+        "ss-stats",
+        "ss-stats--4"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "cta",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-cta"
+     ],
+     "text": {
+      "kicker": "Pre-orders open",
+      "title": "Yours this spring.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-cta__in"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

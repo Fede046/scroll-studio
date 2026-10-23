@@ -5,6 +5,7 @@ dist/
 storyboard/
 !engine/storyboard/
 snapshots/
+!tests/snapshots/
 recordings/
 # User projects live outside git by default (see studio.toml `projects`)
 projects/

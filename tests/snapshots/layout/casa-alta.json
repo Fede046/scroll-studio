@@ -1,0 +1,398 @@
+{
+ "example": "casa-alta",
+ "root": {
+  "class": [
+   "mode-dark",
+   "layout-flow"
+  ]
+ },
+ "cuts": [],
+ "sections": [
+  {
+   "id": "stay",
+   "type": "parallax",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-scene",
+      "ss-cards",
+      "ss-side-right",
+      "ss-type-parallax",
+      "ss-shade-auto"
+     ],
+     "id": "stay",
+     "data": {
+      "data-scene": "parallax"
+     },
+     "text": {
+      "kicker": "Casa Alta · Costa Vicentina",
+      "title": "Twelve rooms above the Atlantic.",
+      "title_tag": "h1"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-pin",
+        "ss-pin--full"
+       ],
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-shade"
+         ]
+        }
+       ]
+      },
+      {
+       "tag": "div",
+       "class": [
+        "ss-steps",
+        "ss-steps--over"
+       ],
+       "children": [
+        {
+         "tag": "article",
+         "class": [
+          "ss-step",
+          "ss-intro"
+         ],
+         "style": {
+          "--h": "120vh"
+         },
+         "text": {
+          "kicker": "Casa Alta · Costa Vicentina",
+          "title": "Twelve rooms above the Atlantic.",
+          "title_tag": "h1"
+         },
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-card"
+           ]
+          }
+         ]
+        },
+        {
+         "tag": "article",
+         "class": [
+          "ss-step"
+         ],
+         "style": {
+          "--h": "140vh"
+         },
+         "text": {
+          "kicker": "The terrace",
+          "title": "Breakfast at the edge.",
+          "title_tag": "h2"
+         },
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-card"
+           ]
+          }
+         ]
+        },
+        {
+         "tag": "article",
+         "class": [
+          "ss-step"
+         ],
+         "style": {
+          "--h": "140vh"
+         },
+         "text": {
+          "kicker": "The rooms",
+          "title": "Lime walls, cool floors.",
+          "title_tag": "h2"
+         },
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-card"
+           ]
+          }
+         ]
+        },
+        {
+         "tag": "article",
+         "class": [
+          "ss-step"
+         ],
+         "style": {
+          "--h": "160vh"
+         },
+         "text": {
+          "kicker": "The evening",
+          "title": "The pool at blue hour.",
+          "title_tag": "h2"
+         },
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-card"
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "sdata": {
+    "layout": "cards",
+    "length": 4.0,
+    "steps": [
+     {
+      "kicker": "Casa Alta · Costa Vicentina",
+      "title": "Twelve rooms <em>above the Atlantic.</em>",
+      "body": "A whitewashed house on the cliffs of southern Portugal, with nothing between you and the sea but a pool and the evening.",
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": true,
+      "hint": "Scroll to look around",
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": {
+       "file": null,
+       "generate": "Architectural photograph of a small whitewashed boutique hotel on a rugged cliff above the Atlantic ocean in southern Portugal at golden hour, infinity pool on a stone terrace in the foreground, dry grasses and agave plants, waves breaking on dark rocks far below, warm low sunlight, photorealistic, shot on a medium format camera, 35mm lens",
+       "gradient": null,
+       "product": null,
+       "scene": null,
+       "size": [
+        1920,
+        1088
+       ],
+       "seed": 21,
+       "crop": null,
+       "edit": null,
+       "beat_frame": null,
+       "match": null,
+       "credit": null,
+       "cinemagraph": null
+      },
+      "state": {}
+     },
+     {
+      "kicker": "The terrace",
+      "title": "Breakfast <em>at the edge.</em>",
+      "body": "Coffee, figs and warm bread served on the terrace from eight until the sun clears the cliff.",
+      "fact": null,
+      "at": null,
+      "length": 1.4,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": {
+       "file": null,
+       "generate": "Photograph of a sunlit stone terrace with a rustic wooden table set for breakfast, linen napkins, figs and bread, terracotta pots with olive trees, the deep blue Atlantic ocean and a rocky coastline behind, morning light, soft shadows, photorealistic, editorial travel photography",
+       "gradient": null,
+       "product": null,
+       "scene": null,
+       "size": [
+        1920,
+        1088
+       ],
+       "seed": 4,
+       "crop": null,
+       "edit": null,
+       "beat_frame": null,
+       "match": null,
+       "credit": null,
+       "cinemagraph": null
+      },
+      "state": {}
+     },
+     {
+      "kicker": "The rooms",
+      "title": "Lime walls, <em>cool floors.</em>",
+      "body": "Every room faces the water. Shutters, linen, a deep stone bath and a window seat big enough to sleep in.",
+      "fact": null,
+      "at": null,
+      "length": 1.4,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": {
+       "file": null,
+       "generate": "Interior photograph of a minimalist Mediterranean hotel bedroom with whitewashed lime plaster walls, a large arched window open to the ocean, white linen bed, terracotta tile floor, a woven chair, soft afternoon light and sheer curtains, photorealistic, architectural magazine style",
+       "gradient": null,
+       "product": null,
+       "scene": null,
+       "size": [
+        1920,
+        1088
+       ],
+       "seed": 9,
+       "crop": null,
+       "edit": null,
+       "beat_frame": null,
+       "match": null,
+       "credit": null,
+       "cinemagraph": null
+      },
+      "state": {}
+     },
+     {
+      "kicker": "The evening",
+      "title": "The pool <em>at blue hour.</em>",
+      "body": "Lanterns on the steps, the last light on the water, dinner when you are ready for it.",
+      "fact": null,
+      "at": null,
+      "length": 1.6,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": {
+       "file": null,
+       "generate": "Photograph of an infinity pool on a cliff at blue hour with warm lanterns along stone steps, a whitewashed house with glowing windows, the Atlantic ocean fading into dusk, first stars, calm water reflections, photorealistic, cinematic travel photography",
+       "gradient": null,
+       "product": null,
+       "scene": null,
+       "size": [
+        1920,
+        1088
+       ],
+       "seed": 33,
+       "crop": null,
+       "edit": null,
+       "beat_frame": null,
+       "match": null,
+       "credit": null,
+       "cinemagraph": null
+      },
+      "state": {}
+     }
+    ],
+    "hud": {
+     "kind": "none",
+     "fields": [],
+     "events": [],
+     "clock": null,
+     "scales": [],
+     "legend": []
+    }
+   }
+  },
+  {
+   "id": "house",
+   "type": "intro",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ],
+     "id": "house",
+     "text": {
+      "kicker": "The house",
+      "title": "Small on purpose.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-wrap",
+        "ss-intro2"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "features",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ],
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-features",
+        "ss-features--3"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "stats",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-band"
+     ],
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-wrap",
+        "ss-stats",
+        "ss-stats--4"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "reserve",
+   "type": "cta",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-cta"
+     ],
+     "id": "reserve",
+     "text": {
+      "kicker": "Open March to November",
+      "title": "Come for a week. Stay for the light.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-cta__bg"
+       ]
+      },
+      {
+       "tag": "div",
+       "class": [
+        "ss-cta__in"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

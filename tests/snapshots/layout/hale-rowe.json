@@ -1,0 +1,355 @@
+{
+ "example": "hale-rowe",
+ "root": {
+  "class": [
+   "mode-light",
+   "layout-flow"
+  ]
+ },
+ "cuts": [],
+ "sections": [
+  {
+   "id": "drawing",
+   "type": "artwork",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-scene",
+      "ss-split",
+      "ss-side-right",
+      "ss-type-artwork",
+      "ss-shade-auto"
+     ],
+     "id": "drawing",
+     "data": {
+      "data-scene": "artwork"
+     },
+     "text": {
+      "kicker": "Hale & Rowe Architects",
+      "title": "Every house starts as a few lines.",
+      "title_tag": "h1"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-split-grid"
+       ],
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-steps"
+         ],
+         "children": [
+          {
+           "tag": "article",
+           "class": [
+            "ss-step",
+            "ss-intro"
+           ],
+           "style": {
+            "--h": "100vh"
+           },
+           "text": {
+            "kicker": "Hale & Rowe Architects",
+            "title": "Every house starts as a few lines.",
+            "title_tag": "h1"
+           },
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-card"
+             ]
+            }
+           ]
+          },
+          {
+           "tag": "article",
+           "class": [
+            "ss-step"
+           ],
+           "style": {
+            "--h": "110vh"
+           },
+           "text": {
+            "kicker": "01 / 04",
+            "title": "Read the site",
+            "title_tag": "h2"
+           },
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-card"
+             ]
+            }
+           ]
+          },
+          {
+           "tag": "article",
+           "class": [
+            "ss-step"
+           ],
+           "style": {
+            "--h": "180vh"
+           },
+           "text": {
+            "kicker": "02 / 04",
+            "title": "Draw the idea",
+            "title_tag": "h2"
+           },
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-card"
+             ]
+            }
+           ]
+          },
+          {
+           "tag": "article",
+           "class": [
+            "ss-step"
+           ],
+           "style": {
+            "--h": "140vh"
+           },
+           "text": {
+            "kicker": "03 / 04",
+            "title": "Shape the light",
+            "title_tag": "h2"
+           },
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-card"
+             ]
+            }
+           ]
+          },
+          {
+           "tag": "article",
+           "class": [
+            "ss-step"
+           ],
+           "style": {
+            "--h": "160vh"
+           },
+           "text": {
+            "kicker": "04 / 04",
+            "title": "Build it well.",
+            "title_tag": "h2"
+           },
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-card"
+             ]
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "tag": "div",
+         "class": [
+          "ss-pin"
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "sdata": {
+    "layout": "split",
+    "length": 4.0,
+    "steps": [
+     {
+      "kicker": "Hale & Rowe Architects",
+      "title": "Every house starts as <em>a few lines.</em>",
+      "body": "Scroll through how we design: from the first construction lines on the site to the finished building at dusk.",
+      "fact": null,
+      "at": null,
+      "length": 1.0,
+      "intro": true,
+      "hint": "Scroll to draw",
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "01 / 04",
+      "title": "Read the site",
+      "body": "Before any building, the slope, the light and the view. We set the axis, the horizon and where the house will sit.",
+      "fact": "The hillside here falls 1 in 3. The house reaches out instead of digging in.",
+      "at": null,
+      "length": 1.1,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "02 / 04",
+      "title": "Draw the idea",
+      "body": "One clear line: a concrete base anchored to the rock, a timber box that floats out over the trees.",
+      "fact": "We still draw the first sketches by hand.",
+      "at": null,
+      "length": 1.8,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "03 / 04",
+      "title": "Shape the light",
+      "body": "Shadow studies for every hour of the year decide the overhangs, the glazing and where you will want to sit.",
+      "fact": "Deep eaves keep summer sun off the glass; winter sun comes in low.",
+      "at": null,
+      "length": 1.4,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "04 / 04",
+      "title": "Build it <em>well.</em>",
+      "body": "Local timber, board-marked concrete, and a builder we have worked with for fifteen years.",
+      "fact": null,
+      "at": null,
+      "length": 1.6,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     }
+    ],
+    "hud": {
+     "kind": "progress",
+     "fields": [],
+     "events": [],
+     "clock": null,
+     "scales": [
+      "Site survey"
+     ],
+     "legend": []
+    }
+   }
+  },
+  {
+   "id": "practice",
+   "type": "intro",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ],
+     "id": "practice",
+     "text": {
+      "kicker": "The practice",
+      "title": "Small team, difficult sites.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-wrap",
+        "ss-intro2"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "timeline",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ],
+     "text": {
+      "kicker": "How a project runs",
+      "title": "Two years, start to keys.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-timeline",
+        "ss-timeline--4"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "quote",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "contact",
+   "type": "cta",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-cta"
+     ],
+     "id": "contact",
+     "text": {
+      "kicker": "Taking on projects for next year",
+      "title": "Got a difficult site? Good.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-cta__in"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

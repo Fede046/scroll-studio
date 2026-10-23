@@ -1,0 +1,399 @@
+{
+ "example": "little-harbour",
+ "root": {
+  "class": [
+   "mode-light",
+   "layout-flow"
+  ]
+ },
+ "cuts": [],
+ "sections": [
+  {
+   "id": "harbour",
+   "type": "diorama",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-scene",
+      "ss-cards",
+      "ss-side-right",
+      "ss-type-diorama",
+      "ss-shade-none"
+     ],
+     "id": "harbour",
+     "data": {
+      "data-scene": "diorama"
+     },
+     "text": {
+      "kicker": "Harbourlight",
+      "title": "Run a whole port from one screen.",
+      "title_tag": "h1"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-pin",
+        "ss-pin--full"
+       ],
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-shade"
+         ]
+        }
+       ]
+      },
+      {
+       "tag": "div",
+       "class": [
+        "ss-steps",
+        "ss-steps--over"
+       ],
+       "children": [
+        {
+         "tag": "article",
+         "class": [
+          "ss-step",
+          "ss-intro"
+         ],
+         "style": {
+          "--h": "150vh"
+         },
+         "text": {
+          "kicker": "Harbourlight",
+          "title": "Run a whole port from one screen.",
+          "title_tag": "h1"
+         },
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-card"
+           ]
+          }
+         ]
+        },
+        {
+         "tag": "article",
+         "class": [
+          "ss-step"
+         ],
+         "style": {
+          "--h": "140vh"
+         },
+         "text": {
+          "kicker": "01 · Visibility",
+          "title": "See every ship, from the horizon in.",
+          "title_tag": "h2"
+         },
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-card"
+           ]
+          }
+         ]
+        },
+        {
+         "tag": "article",
+         "class": [
+          "ss-step"
+         ],
+         "style": {
+          "--h": "140vh"
+         },
+         "text": {
+          "kicker": "02 · Power",
+          "title": "The berth runs on the wind.",
+          "title_tag": "h2"
+         },
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-card"
+           ]
+          }
+         ]
+        },
+        {
+         "tag": "article",
+         "class": [
+          "ss-step"
+         ],
+         "style": {
+          "--h": "140vh"
+         },
+         "text": {
+          "kicker": "03 · The yard",
+          "title": "Every box, exactly where it is.",
+          "title_tag": "h2"
+         },
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-card"
+           ]
+          }
+         ]
+        },
+        {
+         "tag": "article",
+         "class": [
+          "ss-step"
+         ],
+         "style": {
+          "--h": "140vh"
+         },
+         "text": {
+          "kicker": "04 · Customs",
+          "title": "Paperwork that clears itself.",
+          "title_tag": "h2"
+         },
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-card"
+           ]
+          }
+         ]
+        },
+        {
+         "tag": "article",
+         "class": [
+          "ss-step"
+         ],
+         "style": {
+          "--h": "140vh"
+         },
+         "text": {
+          "kicker": "05 · The quay",
+          "title": "A port that is good to live next to.",
+          "title_tag": "h2"
+         },
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-card"
+           ]
+          }
+         ]
+        },
+        {
+         "tag": "article",
+         "class": [
+          "ss-step"
+         ],
+         "style": {
+          "--h": "120vh"
+         },
+         "text": {
+          "kicker": "Harbourlight",
+          "title": "All hands, one screen.",
+          "title_tag": "h2"
+         },
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-card"
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "sdata": {
+    "layout": "cards",
+    "length": 10.0,
+    "steps": [
+     {
+      "kicker": "Harbourlight",
+      "title": "Run a whole <em>port</em> from one screen.",
+      "body": "Berths, boxes, boats and paperwork, in the one place you can see them all.",
+      "fact": null,
+      "at": null,
+      "length": 1.5,
+      "intro": true,
+      "hint": "Scroll to sail in",
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "01 · Visibility",
+      "title": "See every ship, <em>from the horizon in.</em>",
+      "body": "Live arrivals from the first radar echo to the last mooring line. A delay shows up while there is still time to move a berth.",
+      "fact": "Positions refresh every 4 seconds",
+      "at": null,
+      "length": 1.4,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "02 · Power",
+      "title": "The berth runs on <em>the wind.</em>",
+      "body": "Shore power and crane draw are scheduled around what the turbines are giving you, so a calm afternoon never catches the quay by surprise.",
+      "fact": "Typical fuel saved at berth, 31%",
+      "at": null,
+      "length": 1.4,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "03 · The yard",
+      "title": "Every box, <em>exactly where it is.</em>",
+      "body": "Crane moves, stack heights and reefer plugs on one map. The next lift is always the right lift.",
+      "fact": "Moves per crane hour, up 18%",
+      "at": null,
+      "length": 1.4,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "04 · Customs",
+      "title": "Paperwork that <em>clears itself.</em>",
+      "body": "Manifests, declarations and holds reconcile while the ship is still sailing in, so the officer sees exceptions, not forms.",
+      "fact": "Median clearance, 11 minutes",
+      "at": null,
+      "length": 1.4,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "05 · The quay",
+      "title": "A port that is <em>good to live next to.</em>",
+      "body": "Noise, trucks and light are planned around the neighbours. The fish market gets a calendar, not a complaint.",
+      "fact": null,
+      "at": null,
+      "length": 1.4,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "Harbourlight",
+      "title": "All hands, <em>one screen.</em>",
+      "body": null,
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     }
+    ],
+    "hud": {
+     "kind": "none",
+     "fields": [],
+     "events": [],
+     "clock": null,
+     "scales": [],
+     "legend": []
+    }
+   }
+  },
+  {
+   "id": null,
+   "type": "stats",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-band"
+     ],
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-wrap",
+        "ss-stats",
+        "ss-stats--4"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "quote",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "demo",
+   "type": "cta",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-cta"
+     ],
+     "id": "demo",
+     "text": {
+      "kicker": "Thirty minutes, your port",
+      "title": "Come aboard. We will bring the map.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-cta__in"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

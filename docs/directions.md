@@ -5,7 +5,14 @@ engine does well (generated worlds and camera moves, depth and masks, type, real
 away from what it does badly (people acting, choreography, consistent characters). Each one is an engine feature: a
 spec field, a cached builder, a runtime player where needed, CLI and MCP, docs and a showcase spec.
 
-## Wave 1 (building)
+## 1.5 · Make it yours (building)
+
+One layout system for every scene: where things go (`at`), when they show (`show`, `enter`, `exit`), any block
+as a step, theme tokens for space, type, shade and motion, style options, your own CSS, blocks and styles, phone
+rules, placement measured from the picture, and `studio layout` to check it. Design:
+[design/1.5-make-it-yours.md](design/1.5-make-it-yours.md).
+
+## Wave 1
 
 - [x] **Direction boards** (`studio directions`): one brief in, six complete art directions out, side by side as
   storyboards (palette, type, imagery, motion, style). Pick one and it becomes the spec. How a studio pitches.

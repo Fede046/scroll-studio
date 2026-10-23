@@ -1,0 +1,411 @@
+{
+ "example": "atelier-sfumato",
+ "root": {
+  "class": [
+   "mode-light",
+   "layout-flow"
+  ]
+ },
+ "cuts": [],
+ "sections": [
+  {
+   "id": "studio",
+   "type": "artwork",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-scene",
+      "ss-split",
+      "ss-side-right",
+      "ss-type-artwork",
+      "ss-shade-auto"
+     ],
+     "id": "studio",
+     "data": {
+      "data-scene": "artwork"
+     },
+     "text": {
+      "kicker": "A lesson in five parts",
+      "title": "Paint the Mona Lisa with us, one layer a",
+      "title_tag": "h1"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-split-grid"
+       ],
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-steps"
+         ],
+         "children": [
+          {
+           "tag": "article",
+           "class": [
+            "ss-step",
+            "ss-intro"
+           ],
+           "style": {
+            "--h": "100vh"
+           },
+           "text": {
+            "kicker": "A lesson in five parts",
+            "title": "Paint the Mona Lisa with us, one layer a",
+            "title_tag": "h1"
+           },
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-card"
+             ]
+            }
+           ]
+          },
+          {
+           "tag": "article",
+           "class": [
+            "ss-step"
+           ],
+           "style": {
+            "--h": "110vh"
+           },
+           "text": {
+            "kicker": "Lesson 01 / 05",
+            "title": "Proportion",
+            "title_tag": "h2"
+           },
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-card"
+             ]
+            }
+           ]
+          },
+          {
+           "tag": "article",
+           "class": [
+            "ss-step"
+           ],
+           "style": {
+            "--h": "190vh"
+           },
+           "text": {
+            "kicker": "Lesson 02 / 05",
+            "title": "Line",
+            "title_tag": "h2"
+           },
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-card"
+             ]
+            }
+           ]
+          },
+          {
+           "tag": "article",
+           "class": [
+            "ss-step"
+           ],
+           "style": {
+            "--h": "140vh"
+           },
+           "text": {
+            "kicker": "Lesson 03 / 05",
+            "title": "Value",
+            "title_tag": "h2"
+           },
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-card"
+             ]
+            }
+           ]
+          },
+          {
+           "tag": "article",
+           "class": [
+            "ss-step"
+           ],
+           "style": {
+            "--h": "140vh"
+           },
+           "text": {
+            "kicker": "Lesson 04 / 05",
+            "title": "Underpainting",
+            "title_tag": "h2"
+           },
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-card"
+             ]
+            }
+           ]
+          },
+          {
+           "tag": "article",
+           "class": [
+            "ss-step"
+           ],
+           "style": {
+            "--h": "160vh"
+           },
+           "text": {
+            "kicker": "Lesson 05 / 05",
+            "title": "Colour",
+            "title_tag": "h2"
+           },
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-card"
+             ]
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "tag": "div",
+         "class": [
+          "ss-pin"
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "sdata": {
+    "layout": "split",
+    "length": 4.0,
+    "steps": [
+     {
+      "kicker": "A lesson in five parts",
+      "title": "Paint the <em>Mona Lisa</em> with us, one layer at a time.",
+      "body": "Scroll, and watch the most famous portrait in the world come together the way it was actually made: proportion, line, value, underpainting, then colour.",
+      "fact": null,
+      "at": null,
+      "length": 1.0,
+      "intro": true,
+      "hint": "Scroll to begin",
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "Lesson 01 / 05",
+      "title": "Proportion",
+      "body": "Before a single line, find the big shapes. A vertical axis, the head as an oval, the whole figure inside a triangle.",
+      "fact": "Leonardo set the two horizons at different heights. It makes her seem to rise out of the landscape.",
+      "at": null,
+      "length": 1.1,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "Lesson 02 / 05",
+      "title": "Line",
+      "body": "Now draw what you see, not what you know. Start where the viewer will look first, the face, then the hands, then everything else.",
+      "fact": "Keep the charcoal loose. Lines are questions until the value answers them.",
+      "at": null,
+      "length": 1.9,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "Lesson 03 / 05",
+      "title": "Value",
+      "body": "Squint until the detail disappears and only light and dark remain. Build the shadows in layers, following the form like a hand following a cheek.",
+      "fact": "Sfumato means 'gone up in smoke': edges that melt, never lines that stop.",
+      "at": null,
+      "length": 1.4,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "Lesson 04 / 05",
+      "title": "Underpainting",
+      "body": "Masters laid in the whole picture in one earth colour first. It settles every value before colour can confuse them.",
+      "fact": "Raw umber dries fast and stays warm under every glaze.",
+      "at": null,
+      "length": 1.4,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "Lesson 05 / 05",
+      "title": "Colour",
+      "body": "Thin, transparent glazes, dozens of them, each one barely there. Colour doesn't cover the drawing, it tints it.",
+      "fact": "Leonardo worked on this panel for well over a decade. You can take your time.",
+      "at": null,
+      "length": 1.6,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     }
+    ],
+    "hud": {
+     "kind": "progress",
+     "fields": [],
+     "events": [],
+     "clock": null,
+     "scales": [
+      "Blank canvas"
+     ],
+     "legend": []
+    }
+   }
+  },
+  {
+   "id": "method",
+   "type": "intro",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ],
+     "id": "method",
+     "text": {
+      "kicker": "The method",
+      "title": "Every masterpiece is five simple lessons",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-wrap",
+        "ss-intro2"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "courses",
+   "type": "features",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ],
+     "id": "courses",
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-features",
+        "ss-features--3"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "stats",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-band"
+     ],
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-wrap",
+        "ss-stats",
+        "ss-stats--4"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "quote",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "enrol",
+   "type": "cta",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-cta"
+     ],
+     "id": "enrol",
+     "text": {
+      "kicker": "Spring term",
+      "title": "Pick up the charcoal.We'll handle the re",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-cta__in"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}
