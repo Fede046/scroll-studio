@@ -1,0 +1,206 @@
+{
+ "example": "kiln-and-kettle",
+ "root": {
+  "class": [
+   "mode-light",
+   "layout-flow",
+   "hero-media"
+  ]
+ },
+ "cuts": [],
+ "sections": [
+  {
+   "id": null,
+   "type": "hero",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-hero",
+      "ss-hero--center",
+      "ss-surface-dark",
+      "ss-hero--media"
+     ],
+     "text": {
+      "title": "Made by hand, poured by hand.",
+      "title_tag": "h1"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-hero__media"
+       ]
+      },
+      {
+       "tag": "div",
+       "class": [
+        "ss-hero__shade"
+       ]
+      },
+      {
+       "tag": "div",
+       "class": [
+        "ss-hero__in"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "studio",
+   "type": "intro",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ],
+     "id": "studio",
+     "text": {
+      "kicker": "The studio",
+      "title": "Clay is a slow material.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-wrap",
+        "ss-intro2"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "strip",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-strip"
+     ],
+     "text": {
+      "kicker": "This week on the shelves",
+      "title": "Seven days, seven kinds of cup.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-wrap",
+        "ss-head",
+        "ss-strip__head",
+        "ss-reveal"
+       ]
+      },
+      {
+       "tag": "div",
+       "class": [
+        "ss-strip__track"
+       ],
+       "data": {
+        "data-strip": ""
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "features",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ],
+     "text": {
+      "kicker": "In the tea room",
+      "title": "Sit down and use it.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-features",
+        "ss-features--3"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "stats",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-band"
+     ],
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-wrap",
+        "ss-stats",
+        "ss-stats--4"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "quote",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "visit",
+   "type": "cta",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-cta"
+     ],
+     "id": "visit",
+     "text": {
+      "kicker": "Wednesday to Sunday, ten until five",
+      "title": "Come for tea. Stay for the clay.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-cta__in"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

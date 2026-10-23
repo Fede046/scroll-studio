@@ -1,0 +1,488 @@
+{
+ "example": "daybreak-institute",
+ "root": {
+  "class": [
+   "mode-light",
+   "layout-flow"
+  ]
+ },
+ "cuts": [],
+ "sections": [
+  {
+   "id": "solar",
+   "type": "chart",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-scene",
+      "ss-split",
+      "ss-side-right",
+      "ss-type-chart",
+      "ss-shade-auto"
+     ],
+     "id": "solar",
+     "data": {
+      "data-scene": "chart"
+     },
+     "text": {
+      "kicker": "Daybreak Institute · 2026 report",
+      "title": "The fastest energy build-out in history.",
+      "title_tag": "h1"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-split-grid"
+       ],
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-steps"
+         ],
+         "children": [
+          {
+           "tag": "article",
+           "class": [
+            "ss-step",
+            "ss-intro"
+           ],
+           "style": {
+            "--h": "120vh"
+           },
+           "text": {
+            "kicker": "Daybreak Institute · 2026 report",
+            "title": "The fastest energy build-out in history.",
+            "title_tag": "h1"
+           },
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-card"
+             ]
+            }
+           ]
+          },
+          {
+           "tag": "article",
+           "class": [
+            "ss-step"
+           ],
+           "style": {
+            "--h": "130vh"
+           },
+           "text": {
+            "kicker": "2000 – 2010",
+            "title": "A slow start.",
+            "title_tag": "h2"
+           },
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-card"
+             ]
+            }
+           ]
+          },
+          {
+           "tag": "article",
+           "class": [
+            "ss-step"
+           ],
+           "style": {
+            "--h": "130vh"
+           },
+           "text": {
+            "kicker": "2010 – 2025",
+            "title": "Then it went vertical.",
+            "title_tag": "h2"
+           },
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-card"
+             ]
+            }
+           ]
+          },
+          {
+           "tag": "article",
+           "class": [
+            "ss-step"
+           ],
+           "style": {
+            "--h": "130vh"
+           },
+           "text": {
+            "kicker": "Who built it",
+            "title": "Europe went first.",
+            "title_tag": "h2"
+           },
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-card"
+             ]
+            }
+           ]
+          },
+          {
+           "tag": "article",
+           "class": [
+            "ss-step"
+           ],
+           "style": {
+            "--h": "140vh"
+           },
+           "text": {
+            "kicker": "The turn",
+            "title": "Then China built half of it.",
+            "title_tag": "h2"
+           },
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-card"
+             ]
+            }
+           ]
+          },
+          {
+           "tag": "article",
+           "class": [
+            "ss-step"
+           ],
+           "style": {
+            "--h": "140vh"
+           },
+           "text": {
+            "kicker": "What's next",
+            "title": "India is the one to watch.",
+            "title_tag": "h2"
+           },
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-card"
+             ]
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "tag": "div",
+         "class": [
+          "ss-pin"
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "sdata": {
+    "layout": "split",
+    "length": 4.0,
+    "steps": [
+     {
+      "kicker": "Daybreak Institute · 2026 report",
+      "title": "The fastest energy build-out <em>in history.</em>",
+      "body": "Solar power went from a rounding error to the largest source of new electricity on Earth in fifteen years. Scroll through the numbers.",
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": true,
+      "hint": "Scroll through the numbers",
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {
+       "show": [
+        "World"
+       ],
+       "x": [
+        2000,
+        2025
+       ],
+       "y": [
+        0,
+        2600
+       ]
+      }
+     },
+     {
+      "kicker": "2000 – 2010",
+      "title": "A slow start.",
+      "body": "For a decade solar was expensive and small. By 2010 the whole world had 41 gigawatts installed, less than 2% of what it has today.",
+      "fact": null,
+      "at": null,
+      "length": 1.3,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {
+       "show": [
+        "World"
+       ],
+       "x": [
+        2000,
+        2012
+       ],
+       "y": [
+        0,
+        110
+       ],
+       "marks": [
+        {
+         "series": "World",
+         "x": 2010,
+         "label": "41 GW in 2010"
+        }
+       ]
+      }
+     },
+     {
+      "kicker": "2010 – 2025",
+      "title": "Then it went <em>vertical.</em>",
+      "body": "By 2025 the world had 2,397 GW, almost sixty times as much. The world added 514 GW in 2025 alone, more than its entire total at the end of 2018.",
+      "fact": null,
+      "at": null,
+      "length": 1.3,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {
+       "show": [
+        "World"
+       ],
+       "x": [
+        2000,
+        2025
+       ],
+       "y": [
+        0,
+        2600
+       ],
+       "marks": [
+        {
+         "series": "World",
+         "x": 2025,
+         "label": "2,397 GW in 2025"
+        }
+       ]
+      }
+     },
+     {
+      "kicker": "Who built it",
+      "title": "Europe <em>went first.</em>",
+      "body": "In 2010 Europe had three-quarters of the world's solar. German feed-in tariffs paid for the factories that brought prices down for everyone.",
+      "fact": null,
+      "at": null,
+      "length": 1.3,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {
+       "show": [
+        "Europe",
+        "China",
+        "United States",
+        "India"
+       ],
+       "focus": [
+        "Europe"
+       ],
+       "x": [
+        2005,
+        2015
+       ],
+       "y": "auto",
+       "marks": [
+        {
+         "series": "Europe",
+         "x": 2010,
+         "label": "31 of the world's 41 GW"
+        }
+       ]
+      }
+     },
+     {
+      "kicker": "The turn",
+      "title": "Then China built <em>half of it.</em>",
+      "body": "China went from 1 GW in 2010 to 1,202 GW in 2025, half of all the solar on the planet, and makes most of the panels everyone else installs.",
+      "fact": null,
+      "at": null,
+      "length": 1.4,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {
+       "show": [
+        "Europe",
+        "China",
+        "United States",
+        "India"
+       ],
+       "focus": [
+        "China"
+       ],
+       "x": [
+        2010,
+        2025
+       ],
+       "y": "auto",
+       "marks": [
+        {
+         "series": "China",
+         "x": 2025,
+         "label": "1,202 GW"
+        }
+       ]
+      }
+     },
+     {
+      "kicker": "What's next",
+      "title": "India is the one <em>to watch.</em>",
+      "body": "India passed 135 GW in 2025, up from under 6 GW in 2015. In 2025 it added more solar than the United States did.",
+      "fact": null,
+      "at": null,
+      "length": 1.4,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {
+       "show": [
+        "United States",
+        "India"
+       ],
+       "focus": [
+        "India"
+       ],
+       "x": [
+        2012,
+        2025
+       ],
+       "y": "auto",
+       "marks": [
+        {
+         "series": "India",
+         "x": 2025,
+         "label": "136 GW"
+        }
+       ]
+      }
+     }
+    ],
+    "hud": {
+     "kind": "none",
+     "fields": [],
+     "events": [],
+     "clock": null,
+     "scales": [],
+     "legend": []
+    }
+   }
+  },
+  {
+   "id": null,
+   "type": "stats",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-band"
+     ],
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-wrap",
+        "ss-stats",
+        "ss-stats--4"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "report",
+   "type": "intro",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ],
+     "id": "report",
+     "text": {
+      "kicker": "The 2026 report",
+      "title": "Every chart, every source.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-wrap",
+        "ss-intro2"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "cta",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-cta"
+     ],
+     "text": {
+      "kicker": "Independent and open",
+      "title": "Numbers you can check.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-cta__in"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

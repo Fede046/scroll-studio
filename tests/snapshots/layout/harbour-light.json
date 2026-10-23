@@ -1,0 +1,352 @@
+{
+ "example": "harbour-light",
+ "root": {
+  "class": [
+   "mode-dark",
+   "layout-flow"
+  ]
+ },
+ "cuts": [],
+ "sections": [
+  {
+   "id": "day",
+   "type": "light",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-scene",
+      "ss-overlay",
+      "ss-side-right",
+      "ss-type-light",
+      "ss-shade-auto"
+     ],
+     "id": "day",
+     "data": {
+      "data-scene": "light"
+     },
+     "text": {
+      "kicker": "Quay House · Vela",
+      "title": "The harbour wakes first.",
+      "title_tag": "h1"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-track"
+       ],
+       "style": {
+        "height": "0vh"
+       },
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-stage"
+         ],
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-shade"
+           ]
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-captions"
+           ],
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0",
+              "data-to": "1"
+             },
+             "text": {
+              "kicker": "Quay House · Vela",
+              "title": "The harbour wakes first.",
+              "title_tag": "h1"
+             }
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0",
+              "data-to": "1"
+             },
+             "text": {
+              "kicker": "Morning",
+              "title": "Coffee on the quay, before anyone.",
+              "title_tag": "h2"
+             }
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0",
+              "data-to": "1"
+             },
+             "text": {
+              "kicker": "Noon",
+              "title": "The water is for swimming.",
+              "title_tag": "h2"
+             }
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0",
+              "data-to": "1"
+             },
+             "text": {
+              "kicker": "Golden hour",
+              "title": "The whole town turns to brass.",
+              "title_tag": "h2"
+             }
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0",
+              "data-to": "1"
+             },
+             "text": {
+              "kicker": "Blue hour",
+              "title": "Then the lamps come on, one by one.",
+              "title_tag": "h2"
+             }
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0",
+              "data-to": "1"
+             },
+             "text": {
+              "kicker": "Night",
+              "title": "Stay for the part after dark.",
+              "title_tag": "h2"
+             }
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "sdata": {
+    "layout": "overlay",
+    "length": 0.0,
+    "steps": [
+     {
+      "kicker": "Quay House · Vela",
+      "title": "The harbour <em>wakes first.</em>",
+      "body": "Mist on the water, the quay lamps still burning, one boat already out. Five rooms, all facing it.",
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": true,
+      "hint": "Scroll to run the day",
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "Morning",
+      "title": "Coffee on the quay, <em>before anyone.</em>",
+      "body": "The sun clears the hill and reaches the stone steps first. Breakfast is bread, figs and whatever came in on the boat.",
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "Noon",
+      "title": "The water is <em>for swimming.</em>",
+      "body": "Walk down the steps and into the bay. The stone keeps its cool until three, and the shutters stay closed on the south side.",
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "Golden hour",
+      "title": "The whole town <em>turns to brass.</em>",
+      "body": "The light comes in low from the west and lies along the quay. Every room has a window for it.",
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "Blue hour",
+      "title": "Then the lamps <em>come on, one by one.</em>",
+      "body": "Window by window, lamp by lamp, until the water holds the whole town upside down.",
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "Night",
+      "title": "Stay for the part <em>after dark.</em>",
+      "body": "The harbour keeps its lights on all night. So do we, for you.",
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": {
+       "label": "Reserve a room",
+       "href": "#reserve"
+      },
+      "image": null,
+      "state": {}
+     }
+    ],
+    "hud": {
+     "kind": "none",
+     "fields": [],
+     "events": [],
+     "clock": null,
+     "scales": [],
+     "legend": []
+    }
+   },
+   "note": "the scene builder gives steps without `at` a window around the light's hold (engine/scenes/light.py)"
+  },
+  {
+   "id": "rooms",
+   "type": "intro",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ],
+     "id": "rooms",
+     "text": {
+      "kicker": "The house",
+      "title": "Five rooms, one view.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-wrap",
+        "ss-intro2"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "features",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ],
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-features",
+        "ss-features--3"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "reserve",
+   "type": "cta",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-cta"
+     ],
+     "id": "reserve",
+     "text": {
+      "kicker": "Rooms from 190 a night, breakfast on the",
+      "title": "Come for one day.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-cta__bg"
+       ]
+      },
+      {
+       "tag": "div",
+       "class": [
+        "ss-cta__in"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "note": "not fully covered without a render: day (see each section's note)"
+}

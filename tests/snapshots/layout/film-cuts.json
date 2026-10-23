@@ -1,0 +1,1082 @@
+{
+ "example": "film-cuts",
+ "root": {
+  "class": [
+   "mode-dark",
+   "layout-flow",
+   "hero-media"
+  ]
+ },
+ "cuts": [
+  {
+   "type": "match",
+   "hold": 0.15,
+   "at": 0.5,
+   "soft": 0.0,
+   "closing": false,
+   "blur": 1.0,
+   "shape": {
+    "prompt": "the white ring"
+   },
+   "becomes": {
+    "prompt": "the sun"
+   },
+   "zoom": 3.0,
+   "blend": 0.0,
+   "n": 0,
+   "a": 0,
+   "b": 1,
+   "length": 1.5,
+   "label": "mark -> sun"
+  },
+  {
+   "type": "match",
+   "hold": 0.15,
+   "at": 0.5,
+   "soft": 0.0,
+   "closing": false,
+   "blur": 1.0,
+   "shape": {
+    "prompt": "the sun disc"
+   },
+   "becomes": {
+    "prompt": "the rim of a coffee cup"
+   },
+   "zoom": 3.0,
+   "blend": 0.0,
+   "n": 1,
+   "a": 1,
+   "b": 2,
+   "length": 1.5,
+   "label": "sun -> cup"
+  },
+  {
+   "type": "whip",
+   "hold": 0.15,
+   "at": 0.5,
+   "direction": "left",
+   "soft": 0.0,
+   "closing": false,
+   "blur": 1.0,
+   "zoom": 3.0,
+   "blend": 0.0,
+   "n": 2,
+   "a": 2,
+   "b": 3,
+   "length": 1.1,
+   "label": "cup -> roastery"
+  },
+  {
+   "type": "iris",
+   "hold": 0.15,
+   "at": 0.5,
+   "soft": 0.03,
+   "origin": [
+    0.2,
+    0.5
+   ],
+   "closing": false,
+   "blur": 1.0,
+   "zoom": 3.0,
+   "blend": 0.0,
+   "n": 3,
+   "a": 3,
+   "b": 4,
+   "length": 1.4,
+   "label": "roastery -> app"
+  },
+  {
+   "type": "carry",
+   "hold": 0.15,
+   "at": 0.5,
+   "soft": 0.0,
+   "closing": false,
+   "blur": 1.0,
+   "zoom": 3.0,
+   "blend": 0.0,
+   "carry": {
+    "from": ".ss-product__stats .ss-stat:first-child .ss-v",
+    "to": ".ss-stat:first-child .ss-v",
+    "via": "dissolve"
+   },
+   "n": 4,
+   "a": 4,
+   "b": 5,
+   "length": 1.5,
+   "label": "app -> numbers"
+  },
+  {
+   "type": "wipe",
+   "hold": 0.15,
+   "at": 0.5,
+   "angle": 20.0,
+   "soft": 0.12,
+   "closing": false,
+   "blur": 1.0,
+   "zoom": 3.0,
+   "blend": 0.0,
+   "n": 5,
+   "a": 5,
+   "b": 6,
+   "length": 1.3,
+   "label": "numbers -> words"
+  },
+  {
+   "type": "dissolve",
+   "hold": 0.15,
+   "at": 0.5,
+   "soft": 0.0,
+   "closing": false,
+   "blur": 1.0,
+   "zoom": 3.0,
+   "blend": 0.0,
+   "n": 6,
+   "a": 6,
+   "b": 7,
+   "length": 1.2,
+   "label": "words -> how"
+  },
+  {
+   "type": "cut",
+   "hold": 0.15,
+   "at": 0.5,
+   "soft": 0.0,
+   "closing": false,
+   "blur": 1.0,
+   "zoom": 3.0,
+   "blend": 0.0,
+   "n": 7,
+   "a": 7,
+   "b": 8,
+   "length": 0.8,
+   "label": "how -> order"
+  }
+ ],
+ "sections": [
+  {
+   "id": "mark",
+   "type": "hero",
+   "markup": [
+    {
+     "tag": "div",
+     "class": [
+      "ss-cutw",
+      "ss-cutw--out"
+     ],
+     "data": {
+      "data-cut-out": "0"
+     },
+     "style": {
+      "--cut-l": "1.5"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-cutpin",
+        "ss-cutpin--out"
+       ],
+       "children": [
+        {
+         "tag": "section",
+         "class": [
+          "ss-block",
+          "ss-hero",
+          "ss-hero--left",
+          "ss-surface-dark",
+          "ss-hero--media"
+         ],
+         "id": "mark",
+         "text": {
+          "title": "Halo.",
+          "title_tag": "h1"
+         },
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-hero__media"
+           ]
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-hero__shade"
+           ]
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-hero__in"
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "tag": "div",
+       "class": [
+        "ss-cutgap"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "sun",
+   "type": "hero",
+   "markup": [
+    {
+     "tag": "div",
+     "class": [
+      "ss-cutw",
+      "ss-cutw--in"
+     ],
+     "data": {
+      "data-cut-in": "0"
+     },
+     "style": {
+      "--cut-l": "1.5"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-cutpin",
+        "ss-cutpin--in"
+       ],
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-cutw",
+          "ss-cutw--out"
+         ],
+         "data": {
+          "data-cut-out": "1"
+         },
+         "style": {
+          "--cut-l": "1.5"
+         },
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-cutpin",
+            "ss-cutpin--out"
+           ],
+           "children": [
+            {
+             "tag": "section",
+             "class": [
+              "ss-block",
+              "ss-hero",
+              "ss-hero--left",
+              "ss-surface-dark",
+              "ss-hero--media"
+             ],
+             "id": "sun",
+             "text": {
+              "title": "It starts before the sun.",
+              "title_tag": "h2"
+             },
+             "children": [
+              {
+               "tag": "div",
+               "class": [
+                "ss-hero__media"
+               ]
+              },
+              {
+               "tag": "div",
+               "class": [
+                "ss-hero__shade"
+               ]
+              },
+              {
+               "tag": "div",
+               "class": [
+                "ss-hero__in"
+               ]
+              }
+             ]
+            }
+           ]
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-cutgap"
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "tag": "div",
+       "class": [
+        "ss-cutgap"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "cup",
+   "type": "hero",
+   "markup": [
+    {
+     "tag": "div",
+     "class": [
+      "ss-cutw",
+      "ss-cutw--in"
+     ],
+     "data": {
+      "data-cut-in": "1"
+     },
+     "style": {
+      "--cut-l": "1.5"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-cutpin",
+        "ss-cutpin--in"
+       ],
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-cutw",
+          "ss-cutw--out"
+         ],
+         "data": {
+          "data-cut-out": "2"
+         },
+         "style": {
+          "--cut-l": "1.1"
+         },
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-cutpin",
+            "ss-cutpin--out"
+           ],
+           "children": [
+            {
+             "tag": "section",
+             "class": [
+              "ss-block",
+              "ss-hero",
+              "ss-hero--left",
+              "ss-surface-dark",
+              "ss-hero--media"
+             ],
+             "id": "cup",
+             "text": {
+              "title": "And ends in a cup.",
+              "title_tag": "h2"
+             },
+             "children": [
+              {
+               "tag": "div",
+               "class": [
+                "ss-hero__media"
+               ]
+              },
+              {
+               "tag": "div",
+               "class": [
+                "ss-hero__shade"
+               ]
+              },
+              {
+               "tag": "div",
+               "class": [
+                "ss-hero__in"
+               ]
+              }
+             ]
+            }
+           ]
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-cutgap"
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "tag": "div",
+       "class": [
+        "ss-cutgap"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "roastery",
+   "type": "parallax",
+   "markup": [
+    {
+     "tag": "div",
+     "class": [
+      "ss-cutw",
+      "ss-cutw--in"
+     ],
+     "data": {
+      "data-cut-in": "2"
+     },
+     "style": {
+      "--cut-l": "1.1"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-cutpin",
+        "ss-cutpin--in"
+       ],
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-cutw",
+          "ss-cutw--out"
+         ],
+         "data": {
+          "data-cut-out": "3"
+         },
+         "style": {
+          "--cut-l": "1.4"
+         },
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-cutpin",
+            "ss-cutpin--out"
+           ],
+           "children": [
+            {
+             "tag": "section",
+             "class": [
+              "ss-scene",
+              "ss-cards",
+              "ss-side-right",
+              "ss-type-parallax",
+              "ss-shade-auto"
+             ],
+             "id": "roastery",
+             "data": {
+              "data-scene": "parallax"
+             },
+             "text": {
+              "kicker": "The roastery",
+              "title": "Small batches, slow heat.",
+              "title_tag": "h1"
+             },
+             "children": [
+              {
+               "tag": "div",
+               "class": [
+                "ss-pin",
+                "ss-pin--full"
+               ],
+               "children": [
+                {
+                 "tag": "div",
+                 "class": [
+                  "ss-shade"
+                 ]
+                }
+               ]
+              },
+              {
+               "tag": "div",
+               "class": [
+                "ss-steps",
+                "ss-steps--over"
+               ],
+               "children": [
+                {
+                 "tag": "article",
+                 "class": [
+                  "ss-step",
+                  "ss-intro"
+                 ],
+                 "style": {
+                  "--h": "120vh"
+                 },
+                 "text": {
+                  "kicker": "The roastery",
+                  "title": "Small batches, slow heat.",
+                  "title_tag": "h1"
+                 },
+                 "children": [
+                  {
+                   "tag": "div",
+                   "class": [
+                    "ss-card"
+                   ]
+                  }
+                 ]
+                },
+                {
+                 "tag": "article",
+                 "class": [
+                  "ss-step"
+                 ],
+                 "style": {
+                  "--h": "120vh"
+                 },
+                 "text": {
+                  "kicker": "The cooling tray",
+                  "title": "Out at the first crack.",
+                  "title_tag": "h2"
+                 },
+                 "children": [
+                  {
+                   "tag": "div",
+                   "class": [
+                    "ss-card"
+                   ]
+                  }
+                 ]
+                }
+               ]
+              }
+             ]
+            }
+           ]
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-cutgap"
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "tag": "div",
+       "class": [
+        "ss-cutgap"
+       ]
+      }
+     ]
+    }
+   ],
+   "sdata": {
+    "layout": "cards",
+    "length": 4.0,
+    "steps": [
+     {
+      "kicker": "The roastery",
+      "title": "Small batches, <em>slow heat.</em>",
+      "body": "Twelve kilos at a time in a copper drum older than the building.",
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": true,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": {
+       "file": null,
+       "generate": "Interior photograph of a small coffee roastery at dawn, a copper roasting drum with a glowing amber flame, burlap sacks of green beans, warm light through tall windows, soft haze, photorealistic, editorial",
+       "gradient": null,
+       "product": null,
+       "scene": null,
+       "size": [
+        1920,
+        1088
+       ],
+       "seed": 5,
+       "crop": null,
+       "edit": null,
+       "beat_frame": null,
+       "match": null,
+       "credit": null,
+       "cinemagraph": null
+      },
+      "state": {}
+     },
+     {
+      "kicker": "The cooling tray",
+      "title": "Out at the first <em>crack.</em>",
+      "body": "The beans fall onto the tray at the moment the roast is finished, not a second after.",
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": {
+       "file": null,
+       "generate": "Close photograph of freshly roasted coffee beans pouring from a copper cooling tray, warm backlight, shallow depth of field, steam, photorealistic",
+       "gradient": null,
+       "product": null,
+       "scene": null,
+       "size": [
+        1920,
+        1088
+       ],
+       "seed": 8,
+       "crop": null,
+       "edit": null,
+       "beat_frame": null,
+       "match": null,
+       "credit": null,
+       "cinemagraph": null
+      },
+      "state": {}
+     }
+    ],
+    "hud": {
+     "kind": "none",
+     "fields": [],
+     "events": [],
+     "clock": null,
+     "scales": [],
+     "legend": []
+    }
+   }
+  },
+  {
+   "id": "app",
+   "type": "product",
+   "markup": [
+    {
+     "tag": "div",
+     "class": [
+      "ss-cutw",
+      "ss-cutw--in"
+     ],
+     "data": {
+      "data-cut-in": "3"
+     },
+     "style": {
+      "--cut-l": "1.4"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-cutpin",
+        "ss-cutpin--in"
+       ],
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-cutw",
+          "ss-cutw--out"
+         ],
+         "data": {
+          "data-cut-out": "4"
+         },
+         "style": {
+          "--cut-l": "1.5"
+         },
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-cutpin",
+            "ss-cutpin--out"
+           ],
+           "children": [
+            {
+             "tag": "section",
+             "class": [
+              "ss-block",
+              "ss-product",
+              "ss-product--left",
+              "ss-pose--beside"
+             ],
+             "id": "app",
+             "text": {
+              "kicker": "The subscription",
+              "title": "A bag at your door, before you wake.",
+              "title_tag": "h2"
+             },
+             "children": [
+              {
+               "tag": "div",
+               "class": [
+                "ss-wrap",
+                "ss-product__in"
+               ],
+               "children": [
+                {
+                 "tag": "div",
+                 "class": [
+                  "ss-product__media"
+                 ],
+                 "data": {
+                  "data-float": ""
+                 }
+                },
+                {
+                 "tag": "div",
+                 "class": [
+                  "ss-product__copy",
+                  "ss-reveal"
+                 ],
+                 "children": [
+                  {
+                   "tag": "div",
+                   "class": [
+                    "ss-product__stats"
+                   ]
+                  }
+                 ]
+                }
+               ]
+              }
+             ]
+            }
+           ]
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-cutgap"
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "tag": "div",
+       "class": [
+        "ss-cutgap"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "numbers",
+   "type": "stats",
+   "markup": [
+    {
+     "tag": "div",
+     "class": [
+      "ss-cutw",
+      "ss-cutw--in"
+     ],
+     "data": {
+      "data-cut-in": "4"
+     },
+     "style": {
+      "--cut-l": "1.5"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-cutpin",
+        "ss-cutpin--in"
+       ],
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-cutw",
+          "ss-cutw--out"
+         ],
+         "data": {
+          "data-cut-out": "5"
+         },
+         "style": {
+          "--cut-l": "1.3"
+         },
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-cutpin",
+            "ss-cutpin--out"
+           ],
+           "children": [
+            {
+             "tag": "section",
+             "class": [
+              "ss-block",
+              "ss-band"
+             ],
+             "id": "numbers",
+             "children": [
+              {
+               "tag": "div",
+               "class": [
+                "ss-wrap",
+                "ss-stats",
+                "ss-stats--4"
+               ]
+              }
+             ]
+            }
+           ]
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-cutgap"
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "tag": "div",
+       "class": [
+        "ss-cutgap"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "words",
+   "type": "quote",
+   "markup": [
+    {
+     "tag": "div",
+     "class": [
+      "ss-cutw",
+      "ss-cutw--in"
+     ],
+     "data": {
+      "data-cut-in": "5"
+     },
+     "style": {
+      "--cut-l": "1.3"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-cutpin",
+        "ss-cutpin--in"
+       ],
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-cutw",
+          "ss-cutw--out"
+         ],
+         "data": {
+          "data-cut-out": "6"
+         },
+         "style": {
+          "--cut-l": "1.2"
+         },
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-cutpin",
+            "ss-cutpin--out"
+           ],
+           "children": [
+            {
+             "tag": "section",
+             "class": [
+              "ss-block"
+             ],
+             "id": "words"
+            }
+           ]
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-cutgap"
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "tag": "div",
+       "class": [
+        "ss-cutgap"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "how",
+   "type": "timeline",
+   "markup": [
+    {
+     "tag": "div",
+     "class": [
+      "ss-cutw",
+      "ss-cutw--in"
+     ],
+     "data": {
+      "data-cut-in": "6"
+     },
+     "style": {
+      "--cut-l": "1.2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-cutpin",
+        "ss-cutpin--in"
+       ],
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-cutw",
+          "ss-cutw--out"
+         ],
+         "data": {
+          "data-cut-out": "7"
+         },
+         "style": {
+          "--cut-l": "0.8"
+         },
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-cutpin",
+            "ss-cutpin--out"
+           ],
+           "children": [
+            {
+             "tag": "section",
+             "class": [
+              "ss-block"
+             ],
+             "id": "how",
+             "text": {
+              "kicker": "How it works",
+              "title": "Tonight we roast, tomorrow you wake.",
+              "title_tag": "h2"
+             },
+             "children": [
+              {
+               "tag": "div",
+               "class": [
+                "ss-timeline",
+                "ss-timeline--3"
+               ]
+              }
+             ]
+            }
+           ]
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-cutgap"
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "tag": "div",
+       "class": [
+        "ss-cutgap"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "order",
+   "type": "cta",
+   "markup": [
+    {
+     "tag": "div",
+     "class": [
+      "ss-cutw",
+      "ss-cutw--in"
+     ],
+     "data": {
+      "data-cut-in": "7"
+     },
+     "style": {
+      "--cut-l": "0.8"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-cutpin",
+        "ss-cutpin--in"
+       ],
+       "children": [
+        {
+         "tag": "section",
+         "class": [
+          "ss-block",
+          "ss-cta"
+         ],
+         "id": "order",
+         "text": {
+          "kicker": "First bag free",
+          "title": "Wake up to something good.",
+          "title_tag": "h2"
+         },
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-cta__in"
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "tag": "div",
+       "class": [
+        "ss-cutgap"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "note": "match-cut anchors (where the shapes sit in the rendered frames) are found from renders and are not covered"
+}

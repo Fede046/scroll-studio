@@ -1,0 +1,248 @@
+{
+ "example": "tern-house",
+ "root": {
+  "class": [
+   "mode-dark",
+   "layout-flow",
+   "hero-media"
+  ]
+ },
+ "cuts": [],
+ "sections": [
+  {
+   "id": null,
+   "type": "hero",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-hero",
+      "ss-hero--left",
+      "ss-surface-dark",
+      "ss-hero--media"
+     ],
+     "text": {
+      "title": "Nine rooms, and the tide.",
+      "title_tag": "h1"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-hero__media"
+       ]
+      },
+      {
+       "tag": "div",
+       "class": [
+        "ss-hero__shade"
+       ]
+      },
+      {
+       "tag": "div",
+       "class": [
+        "ss-hero__in"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "intro",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ],
+     "text": {
+      "kicker": "The house",
+      "title": "A house that is mostly weather.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-wrap",
+        "ss-intro2"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "cafe",
+   "type": "product",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-product",
+      "ss-product--right",
+      "ss-pose--beside"
+     ],
+     "id": "cafe",
+     "text": {
+      "kicker": "Breakfast room",
+      "title": "Coffee at the window, until eleven.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-wrap",
+        "ss-product__in"
+       ],
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-product__media"
+         ],
+         "data": {
+          "data-float": ""
+         },
+         "children": [
+          {
+           "tag": "img",
+           "class": [
+            "ss-product__img"
+           ]
+          }
+         ]
+        },
+        {
+         "tag": "div",
+         "class": [
+          "ss-product__copy",
+          "ss-reveal"
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "strip",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-strip"
+     ],
+     "text": {
+      "kicker": "After dark",
+      "title": "Three small things, kept alive.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-wrap",
+        "ss-head",
+        "ss-strip__head",
+        "ss-reveal"
+       ]
+      },
+      {
+       "tag": "div",
+       "class": [
+        "ss-strip__track"
+       ],
+       "data": {
+        "data-strip": ""
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "features",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ],
+     "text": {
+      "kicker": "Staying",
+      "title": "Plain rooms, good weather.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-features",
+        "ss-features--3"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "quote",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "stay",
+   "type": "cta",
+   "markup": [
+    {
+     "tag": "div",
+     "class": [
+      "ss-backdrop",
+      "ss-surface-dark"
+     ],
+     "children": [
+      {
+       "tag": "section",
+       "class": [
+        "ss-block",
+        "ss-cta",
+        "ss-surface-dark"
+       ],
+       "id": "stay",
+       "text": {
+        "kicker": "October to March",
+        "title": "Come when it is quiet.",
+        "title_tag": "h2"
+       },
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-cta__in"
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

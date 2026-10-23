@@ -1,0 +1,363 @@
+{
+ "example": "meridian",
+ "root": {
+  "class": [
+   "mode-dark",
+   "layout-flow"
+  ]
+ },
+ "cuts": [],
+ "sections": [
+  {
+   "id": "descent",
+   "type": "film",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-scene",
+      "ss-overlay",
+      "ss-side-right",
+      "ss-type-film",
+      "ss-shade-auto"
+     ],
+     "id": "descent",
+     "data": {
+      "data-scene": "film"
+     },
+     "text": {
+      "kicker": "Meridian Private",
+      "title": "Leave the ordinary at forty thousand fee",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-track"
+       ],
+       "style": {
+        "height": "420vh"
+       },
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-stage"
+         ],
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-shade"
+           ]
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-captions"
+           ],
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0.02",
+              "data-to": "0.24"
+             },
+             "text": {
+              "kicker": "Meridian Private",
+              "title": "Leave the ordinary at forty thousand fee",
+              "title_tag": "h2"
+             }
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0.36",
+              "data-to": "0.6"
+             },
+             "text": {
+              "kicker": "The descent",
+              "title": "The city rises to meet you.",
+              "title_tag": "h2"
+             }
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0.74",
+              "data-to": "0.97"
+             },
+             "text": {
+              "kicker": "London",
+              "title": "Wheels down before the clock strikes.",
+              "title_tag": "h2"
+             }
+            }
+           ]
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-hud",
+            "ss-telemetry"
+           ]
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-cue"
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "sdata": {
+    "layout": "overlay",
+    "length": 4.2,
+    "steps": [
+     {
+      "kicker": "Meridian Private",
+      "title": "Leave the ordinary <em>at forty thousand feet.</em>",
+      "body": null,
+      "fact": null,
+      "at": [
+       0.02,
+       0.24
+      ],
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "The descent",
+      "title": "The city rises <em>to meet you.</em>",
+      "body": null,
+      "fact": null,
+      "at": [
+       0.36,
+       0.6
+      ],
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "London",
+      "title": "Wheels down <em>before the clock strikes.</em>",
+      "body": null,
+      "fact": null,
+      "at": [
+       0.74,
+       0.97
+      ],
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     }
+    ],
+    "hud": {
+     "kind": "telemetry",
+     "fields": [
+      {
+       "label": "Altitude",
+       "unit": "ft",
+       "from": 41000,
+       "to": 0,
+       "curve": 0.9,
+       "grouping": true
+      },
+      {
+       "label": "Ground speed",
+       "unit": "kt",
+       "from": 480,
+       "to": 140,
+       "curve": 1.0,
+       "decimals": 0
+      }
+     ],
+     "events": [
+      {
+       "at": 0.05,
+       "label": "Top of descent"
+      },
+      {
+       "at": 0.4,
+       "label": "Through the cloud"
+      },
+      {
+       "at": 0.7,
+       "label": "Thames in sight"
+      },
+      {
+       "at": 0.92,
+       "label": "Westminster"
+      }
+     ],
+     "clock": null,
+     "scales": [],
+     "legend": []
+    }
+   }
+  },
+  {
+   "id": "journey",
+   "type": "intro",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ],
+     "id": "journey",
+     "text": {
+      "kicker": "Door to door",
+      "title": "Twenty minutes ago you were above the cl",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-wrap",
+        "ss-intro2"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "features",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ],
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-features",
+        "ss-features--3"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "stats",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-band"
+     ],
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-wrap",
+        "ss-stats",
+        "ss-stats--4"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "fleet",
+   "type": "features",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ],
+     "id": "fleet",
+     "text": {
+      "kicker": "The fleet",
+      "title": "Choose your altitude.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-features",
+        "ss-features--3"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "request",
+   "type": "cta",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-cta"
+     ],
+     "id": "request",
+     "text": {
+      "kicker": "Membership",
+      "title": "Your city. Your hour.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-cta__bg"
+       ]
+      },
+      {
+       "tag": "div",
+       "class": [
+        "ss-cta__in"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

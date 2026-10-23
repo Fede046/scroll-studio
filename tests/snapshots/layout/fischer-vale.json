@@ -1,0 +1,330 @@
+{
+ "example": "fischer-vale",
+ "root": {
+  "class": [
+   "mode-dark",
+   "layout-flow"
+  ]
+ },
+ "cuts": [],
+ "sections": [
+  {
+   "id": "set",
+   "type": "sequence",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-scene",
+      "ss-cards",
+      "ss-side-right",
+      "ss-type-sequence",
+      "ss-shade-auto"
+     ],
+     "id": "set",
+     "data": {
+      "data-scene": "sequence"
+     },
+     "text": {
+      "kicker": "Fischer & Vale",
+      "title": "Thirty-two pieces. One opening move.",
+      "title_tag": "h1"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-pin",
+        "ss-pin--full"
+       ],
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-shade"
+         ]
+        }
+       ]
+      },
+      {
+       "tag": "div",
+       "class": [
+        "ss-steps",
+        "ss-steps--over"
+       ],
+       "children": [
+        {
+         "tag": "article",
+         "class": [
+          "ss-step",
+          "ss-intro"
+         ],
+         "style": {
+          "--h": "120vh"
+         },
+         "text": {
+          "kicker": "Fischer & Vale",
+          "title": "Thirty-two pieces. One opening move.",
+          "title_tag": "h1"
+         },
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-card"
+           ]
+          }
+         ]
+        },
+        {
+         "tag": "article",
+         "class": [
+          "ss-step"
+         ],
+         "style": {
+          "--h": "130vh"
+         },
+         "text": {
+          "kicker": "Walnut and maple",
+          "title": "The board comes first.",
+          "title_tag": "h2"
+         },
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-card"
+           ]
+          }
+         ]
+        },
+        {
+         "tag": "article",
+         "class": [
+          "ss-step"
+         ],
+         "style": {
+          "--h": "140vh"
+         },
+         "text": {
+          "kicker": "Blown glass",
+          "title": "Pieces you can see through.",
+          "title_tag": "h2"
+         },
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-card"
+           ]
+          }
+         ]
+        },
+        {
+         "tag": "article",
+         "class": [
+          "ss-step"
+         ],
+         "style": {
+          "--h": "140vh"
+         },
+         "text": {
+          "kicker": "Weighted and felted",
+          "title": "Set down without a sound.",
+          "title_tag": "h2"
+         },
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-card"
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "sdata": {
+    "layout": "cards",
+    "length": 4.0,
+    "steps": [
+     {
+      "kicker": "Fischer & Vale",
+      "title": "Thirty-two pieces. <em>One opening move.</em>",
+      "body": "Every set is turned, carved and blown by hand in our workshop, then played before it leaves.",
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": true,
+      "hint": "Scroll to lift the pieces",
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "Walnut and maple",
+      "title": "The board comes <em>first.</em>",
+      "body": "Sixty-four squares cut from a single board of each wood, so the grain runs unbroken from rank to rank.",
+      "fact": null,
+      "at": null,
+      "length": 1.3,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "Blown glass",
+      "title": "Pieces you can <em>see through.</em>",
+      "body": "Each piece is gathered from the furnace and shaped by eye. No two kings are quite the same height.",
+      "fact": "Lead-free crystal, annealed for 14 hours.",
+      "at": null,
+      "length": 1.4,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "Weighted and felted",
+      "title": "Set down <em>without a sound.</em>",
+      "body": "Brass weights under green baize: every piece sits square and stays there, even in a blitz.",
+      "fact": null,
+      "at": null,
+      "length": 1.4,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     }
+    ],
+    "hud": {
+     "kind": "none",
+     "fields": [],
+     "events": [],
+     "clock": null,
+     "scales": [],
+     "legend": []
+    }
+   }
+  },
+  {
+   "id": "craft",
+   "type": "intro",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ],
+     "id": "craft",
+     "text": {
+      "kicker": "The workshop",
+      "title": "Made slowly, played for generations.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-wrap",
+        "ss-intro2"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "features",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ],
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-features",
+        "ss-features--3"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "stats",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-band"
+     ],
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-wrap",
+        "ss-stats",
+        "ss-stats--4"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "commission",
+   "type": "cta",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-cta"
+     ],
+     "id": "commission",
+     "text": {
+      "kicker": "Commissions open",
+      "title": "Your move.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-cta__bg"
+       ]
+      },
+      {
+       "tag": "div",
+       "class": [
+        "ss-cta__in"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

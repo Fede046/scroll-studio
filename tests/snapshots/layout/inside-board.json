@@ -1,0 +1,331 @@
+{
+ "example": "inside-board",
+ "root": {
+  "class": [
+   "mode-dark",
+   "layout-flow"
+  ]
+ },
+ "cuts": [],
+ "sections": [
+  {
+   "id": "inside",
+   "type": "inside",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-scene",
+      "ss-overlay",
+      "ss-side-right",
+      "ss-type-inside",
+      "ss-shade-auto"
+     ],
+     "id": "inside",
+     "data": {
+      "data-scene": "inside"
+     },
+     "text": {
+      "kicker": "Framework Laptop 12 · open hardware",
+      "title": "Go inside the mainboard.",
+      "title_tag": "h1"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-track"
+       ],
+       "style": {
+        "height": "0vh"
+       },
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-stage"
+         ],
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-shade"
+           ]
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-captions"
+           ],
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0",
+              "data-to": "1"
+             },
+             "text": {
+              "kicker": "Framework Laptop 12 · open hardware",
+              "title": "Go inside the mainboard.",
+              "title_tag": "h1"
+             }
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0",
+              "data-to": "1"
+             },
+             "text": {
+              "kicker": "01 The board",
+              "title": "A computer on a card.",
+              "title_tag": "h2"
+             }
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0",
+              "data-to": "1"
+             },
+             "text": {
+              "kicker": "02 The road out",
+              "title": "Heat has a way to leave.",
+              "title_tag": "h2"
+             }
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0",
+              "data-to": "1"
+             },
+             "text": {
+              "kicker": "03 The fan",
+              "title": "One blower, 53 mm across.",
+              "title_tag": "h2"
+             }
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0",
+              "data-to": "1"
+             },
+             "text": {
+              "kicker": "04 The memory",
+              "title": "Memory in a socket.",
+              "title_tag": "h2"
+             }
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0",
+              "data-to": "1"
+             },
+             "text": {
+              "kicker": "05 The storage",
+              "title": "A drive the size of a stamp.",
+              "title_tag": "h2"
+             }
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0",
+              "data-to": "1"
+             },
+             "text": {
+              "kicker": "06 The ports",
+              "title": "Four ports. Your choice.",
+              "title_tag": "h2"
+             }
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0",
+              "data-to": "1"
+             },
+             "text": {
+              "kicker": "Open hardware",
+              "title": "The whole board, open.",
+              "title_tag": "h2"
+             }
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "sdata": {
+    "layout": "overlay",
+    "length": 0.0,
+    "steps": [
+     {
+      "kicker": "Framework Laptop 12 · open hardware",
+      "title": "Go <em>inside</em> the mainboard.",
+      "body": "A macro flight through the 3D model Framework publishes for anyone to build on.",
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": true,
+      "hint": "Scroll in",
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "01  The board",
+      "title": "A computer on a card.",
+      "body": "Processor, memory, storage, radio and four ports, on one board that lifts out of the laptop.",
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "02  The road out",
+      "title": "Heat has a way to leave.",
+      "body": "A copper heat pipe, 136 mm long, carries it from the processor to the fins.",
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "03  The fan",
+      "title": "One blower, <em>53 mm</em> across.",
+      "body": "It pushes air through the copper fins, and the cover is only a lid.",
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "04  The memory",
+      "title": "Memory in a socket.",
+      "body": "A DDR5 module in a standard socket, under a strip of amber film.",
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "05  The storage",
+      "title": "A drive the size of a stamp.",
+      "body": "An M.2 2230 SSD, 22 mm by 30 mm, one small step from the edge.",
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "06  The ports",
+      "title": "Four ports. Your choice.",
+      "body": "A USB-C connector in every corner takes an expansion card.",
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "Open hardware",
+      "title": "The whole board, <em>open.</em>",
+      "body": "The model is CC BY 4.0: take it apart, print a case for it, or build something on it.",
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": {
+       "label": "The files on GitHub",
+       "href": "https://github.com/FrameworkComputer/Framework-Laptop-12"
+      },
+      "image": null,
+      "state": {}
+     }
+    ],
+    "hud": {
+     "kind": "none",
+     "fields": [],
+     "events": [],
+     "clock": null,
+     "scales": [],
+     "legend": []
+    }
+   },
+   "note": "the scene builder schedules the steps' windows (`at`) along the route and sets the scroll length (engine/inside.py schedule_steps): shown as the spec leaves them"
+  }
+ ],
+ "note": "not fully covered without a render: inside (see each section's note)"
+}

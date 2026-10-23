@@ -1,0 +1,343 @@
+{
+ "example": "pelorus",
+ "root": {
+  "class": [
+   "mode-light",
+   "layout-flow"
+  ]
+ },
+ "cuts": [],
+ "sections": [
+  {
+   "id": "share",
+   "type": "chart",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-scene",
+      "ss-split",
+      "ss-side-right",
+      "ss-type-chart",
+      "ss-shade-auto"
+     ],
+     "id": "share",
+     "data": {
+      "data-scene": "chart"
+     },
+     "text": {
+      "kicker": "Pelorus · Energy desk",
+      "title": "A third of the world's electricity is no",
+      "title_tag": "h1"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-split-grid"
+       ],
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-steps"
+         ],
+         "children": [
+          {
+           "tag": "article",
+           "class": [
+            "ss-step",
+            "ss-intro"
+           ],
+           "style": {
+            "--h": "120vh"
+           },
+           "text": {
+            "kicker": "Pelorus · Energy desk",
+            "title": "A third of the world's electricity is no",
+            "title_tag": "h1"
+           },
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-card"
+             ]
+            }
+           ]
+          },
+          {
+           "tag": "article",
+           "class": [
+            "ss-step"
+           ],
+           "style": {
+            "--h": "120vh"
+           },
+           "text": {
+            "kicker": "2000 to 2025",
+            "title": "Slowly, then all at once.",
+            "title_tag": "h2"
+           },
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-card"
+             ]
+            }
+           ]
+          },
+          {
+           "tag": "article",
+           "class": [
+            "ss-step"
+           ],
+           "style": {
+            "--h": "120vh"
+           },
+           "text": {
+            "kicker": "China",
+            "title": "The biggest grid moved fastest.",
+            "title_tag": "h2"
+           },
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-card"
+             ]
+            }
+           ]
+          },
+          {
+           "tag": "article",
+           "class": [
+            "ss-step"
+           ],
+           "style": {
+            "--h": "120vh"
+           },
+           "text": {
+            "kicker": "Denmark",
+            "title": "What all the way looks like.",
+            "title_tag": "h2"
+           },
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-card"
+             ]
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "tag": "div",
+         "class": [
+          "ss-pin"
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "sdata": {
+    "layout": "split",
+    "length": 4.0,
+    "steps": [
+     {
+      "kicker": "Pelorus · Energy desk",
+      "title": "A third of the world's electricity <em>is now renewable.</em>",
+      "body": "Every number on this page is read from the source file when the page is built, not typed in.",
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": true,
+      "hint": "Scroll to read",
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {
+       "show": [
+        "World"
+       ],
+       "x": [
+        2000,
+        2025
+       ]
+      }
+     },
+     {
+      "kicker": "2000 to 2025",
+      "title": "Slowly, <em>then all at once.</em>",
+      "body": "Renewables held about a fifth of the world's electricity for a decade, then wind and solar changed the slope.",
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {
+       "show": [
+        "World"
+       ],
+       "x": [
+        2000,
+        2025
+       ],
+       "reveal": true
+      }
+     },
+     {
+      "kicker": "China",
+      "title": "The biggest grid <em>moved fastest.</em>",
+      "body": "China's renewable share doubled between 2010 and 2025, on the largest grid in the world.",
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {
+       "show": [
+        "World",
+        "China"
+       ],
+       "focus": [
+        "China"
+       ],
+       "x": [
+        2005,
+        2025
+       ]
+      }
+     },
+     {
+      "kicker": "Denmark",
+      "title": "What <em>all the way</em> looks like.",
+      "body": "Denmark now gets nine-tenths of its electricity from renewables, most of it wind. The world is on the same curve, just later.",
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {
+       "show": [
+        "World",
+        "China",
+        "United States",
+        "Denmark"
+       ],
+       "focus": [
+        "Denmark"
+       ],
+       "x": [
+        2000,
+        2025
+       ]
+      }
+     }
+    ],
+    "hud": {
+     "kind": "none",
+     "fields": [],
+     "events": [],
+     "clock": null,
+     "scales": [],
+     "legend": []
+    }
+   }
+  },
+  {
+   "id": "brief",
+   "type": "intro",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ],
+     "id": "brief",
+     "text": {
+      "kicker": "The brief",
+      "title": "The transition, in the data's own words.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-wrap",
+        "ss-intro2"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "stats",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-band"
+     ],
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-wrap",
+        "ss-stats",
+        "ss-stats--4"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "cta",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-cta"
+     ],
+     "text": {
+      "kicker": "Research desk",
+      "title": "Ask for the next brief.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-cta__in"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,339 @@
+{
+ "example": "northstar-observatory",
+ "root": {
+  "class": [
+   "mode-dark",
+   "layout-flow"
+  ]
+ },
+ "cuts": [],
+ "sections": [
+  {
+   "id": "zoom",
+   "type": "scene3d",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-scene",
+      "ss-cards",
+      "ss-side-right",
+      "ss-type-scene3d",
+      "ss-shade-auto"
+     ],
+     "id": "zoom",
+     "data": {
+      "data-scene": "scene3d"
+     },
+     "text": {
+      "kicker": "Northstar Observatory",
+      "title": "Three hundred billion stars. One evening",
+      "title_tag": "h1"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-pin",
+        "ss-pin--full"
+       ],
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-shade"
+         ]
+        },
+        {
+         "tag": "div",
+         "class": [
+          "ss-hud",
+          "ss-scalehud"
+         ]
+        }
+       ]
+      },
+      {
+       "tag": "div",
+       "class": [
+        "ss-steps",
+        "ss-steps--over"
+       ],
+       "children": [
+        {
+         "tag": "article",
+         "class": [
+          "ss-step",
+          "ss-intro"
+         ],
+         "style": {
+          "--h": "120vh"
+         },
+         "text": {
+          "kicker": "Northstar Observatory",
+          "title": "Three hundred billion stars. One evening",
+          "title_tag": "h1"
+         },
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-card"
+           ]
+          }
+         ]
+        },
+        {
+         "tag": "article",
+         "class": [
+          "ss-step"
+         ],
+         "style": {
+          "--h": "150vh"
+         },
+         "text": {
+          "kicker": "01 · The galaxy",
+          "title": "You are somewhere in here.",
+          "title_tag": "h2"
+         },
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-card"
+           ]
+          }
+         ]
+        },
+        {
+         "tag": "article",
+         "class": [
+          "ss-step"
+         ],
+         "style": {
+          "--h": "150vh"
+         },
+         "text": {
+          "kicker": "02 · One star",
+          "title": "A small, steady sun.",
+          "title_tag": "h2"
+         },
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-card"
+           ]
+          }
+         ]
+        },
+        {
+         "tag": "article",
+         "class": [
+          "ss-step"
+         ],
+         "style": {
+          "--h": "160vh"
+         },
+         "text": {
+          "kicker": "03 · Home",
+          "title": "Clouds, oceans, city lights.",
+          "title_tag": "h2"
+         },
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-card"
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "sdata": {
+    "layout": "cards",
+    "length": 4.0,
+    "steps": [
+     {
+      "kicker": "Northstar Observatory",
+      "title": "Three hundred billion stars. <em>One evening.</em>",
+      "body": "Our telescopes reach across the galaxy. Scroll down and fall with them: from the whole Milky Way to a single world.",
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": true,
+      "hint": "Scroll to fall inward",
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "01 · The galaxy",
+      "title": "You are <em>somewhere in here.</em>",
+      "body": "A barred spiral a hundred thousand light-years across. Our Sun sits two-thirds of the way out, in a quiet arm.",
+      "fact": "Light from the far side left before humans painted caves.",
+      "at": null,
+      "length": 1.5,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "02 · One star",
+      "title": "A small, <em>steady sun.</em>",
+      "body": "Eight planets, a belt of rubble and a long tail of ice. The third orbit is the one that matters to us.",
+      "fact": "One astronomical unit: 150 million kilometres.",
+      "at": null,
+      "length": 1.5,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "03 · Home",
+      "title": "Clouds, oceans, <em>city lights.</em>",
+      "body": "On the night side, the lights of eight billion people. Above them, a ring of satellites you can see from our roof.",
+      "fact": "On a clear night we track twenty satellites an hour by eye.",
+      "at": null,
+      "length": 1.6,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     }
+    ],
+    "hud": {
+     "kind": "scale",
+     "fields": [],
+     "events": [],
+     "clock": null,
+     "scales": [
+      "100,000 ly",
+      "40 AU",
+      "12,700 km"
+     ],
+     "legend": []
+    }
+   }
+  },
+  {
+   "id": "visit",
+   "type": "intro",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ],
+     "id": "visit",
+     "text": {
+      "kicker": "Evenings at Northstar",
+      "title": "Look up, with company.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-wrap",
+        "ss-intro2"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "timeline",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ],
+     "text": {
+      "kicker": "A night at the observatory",
+      "title": "From dusk to deep sky.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-timeline",
+        "ss-timeline--4"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "stats",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-band"
+     ],
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-wrap",
+        "ss-stats",
+        "ss-stats--4"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "cta",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-cta"
+     ],
+     "text": {
+      "kicker": "Clear skies forecast",
+      "title": "Come and see for yourself.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-cta__in"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}
