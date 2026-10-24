@@ -5,7 +5,7 @@
   <p>
     <a href="https://okohedeki.github.io/scroll-studio-showcase/">Showcase</a> ·
     <a href="#get-started">Get started</a> ·
-    <a href="#documentation">Docs</a> ·
+    <a href="https://okohedeki.github.io/scroll-studio/">Docs</a> ·
     <a href="docs/examples.md">Examples</a> ·
     <a href="https://github.com/Okohedeki/scroll-studio/releases/latest">Releases</a> ·
     <a href="CHANGELOG.md">Changelog</a>
@@ -13,6 +13,8 @@
   <p>
     <a href="https://github.com/Okohedeki/scroll-studio/releases/latest"><img src="https://img.shields.io/github/v/release/Okohedeki/scroll-studio" alt="Latest release" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="AGPL-3.0" /></a>
+    <a href="https://github.com/Okohedeki/scroll-studio/actions/workflows/tests.yml"><img src="https://github.com/Okohedeki/scroll-studio/actions/workflows/tests.yml/badge.svg" alt="Tests" /></a>
+    <a href="https://scorecard.dev/viewer/?uri=github.com/Okohedeki/scroll-studio"><img src="https://api.scorecard.dev/projects/github.com/Okohedeki/scroll-studio/badge" alt="OpenSSF Scorecard" /></a>
     <img src="https://img.shields.io/badge/models-local%20only-ff7a3d" alt="Local models only" />
     <img src="https://img.shields.io/badge/MCP-ready-8a5cff" alt="MCP ready" />
   </p>
@@ -110,10 +112,12 @@ The whole workflow is in the [guide](docs/guide.md).
 |---|---|
 | Setup | [Install](docs/INSTALL.md) · [What each machine can build](docs/INSTALL.md) |
 | What it can make | [Scenes](docs/scenes.md) · [Styles](docs/styles.md) · [Examples](docs/examples.md) · [Showcase](https://okohedeki.github.io/scroll-studio-showcase/) |
+| Reference | [site.yaml, CLI and MCP reference](https://okohedeki.github.io/scroll-studio/reference/), generated from the engine |
 | Making a site | [Guide](docs/guide.md): direction boards, storyboards, client copy decks, trailers, Claude |
 | Why it exists | [Local only, 10 to 30 times fewer tokens](docs/why.md) |
 | How it works | [Engine](docs/ENGINE.md) · [Style research](docs/styles/) · [Roadmap](docs/directions.md) |
-| Contributing | [How to contribute](CONTRIBUTING.md) · [Code of conduct](CODE_OF_CONDUCT.md) · [Security](SECURITY.md) |
+| Contributing | [How to contribute](CONTRIBUTING.md) · [Rules per area](CONTRIBUTING.md#rules-per-area) · [Code of conduct](CODE_OF_CONDUCT.md) · [Getting help](SUPPORT.md) |
+| The project | [Governance](GOVERNANCE.md) · [Maintainers](MAINTAINERS.md) · [Compatibility](docs/compatibility.md) · [Design proposals](docs/rfcs/README.md) · [Security](SECURITY.md) · [Threat model](docs/security/threat-model.md) |
 | Releases | [What's new](docs/whats-new.md) · [Changelog](CHANGELOG.md) · [1.5 milestone](https://github.com/Okohedeki/scroll-studio/milestone/1) |
 
 ## Licence

@@ -1,0 +1,58 @@
+# Weekly version updates, grouped so they arrive as a few pull requests rather than dozens. Security updates are
+# separate and immediate (repository settings). A new release has to be a week old before Dependabot proposes it,
+# which keeps freshly published (possibly hijacked) versions out. Major versions (and three.js minors, which break)
+# are planned upgrades with their own issue, never automatic pull requests. npm updates change the runtime bundle:
+# the maintainer rebuilds it on the Dependabot branch (docs/maintainers/triage.md).
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    labels: [dependencies, "area: packaging"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      python:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    labels: [dependencies, "area: runtime"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "three"
+        update-types: ["version-update:semver-minor"]
+      - dependency-name: "@types/three"
+        update-types: ["version-update:semver-minor"]
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      runtime-and-ui:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    labels: [dependencies, "area: ci"]
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      actions:
+        update-types: [major, minor, patch]

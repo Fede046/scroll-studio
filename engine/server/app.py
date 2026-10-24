@@ -9,7 +9,7 @@ import mimetypes
 import shutil
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 import yaml
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -18,9 +18,10 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ValidationError
 
 from ..config import ROOT, settings
-from ..project import Project
+from ..project import BuildError, Project, child, safe_name
 from ..spec import SCENE_TYPES, Site
 from .jobs import JobQueue, logger
+from .local_only import UI_DEV_PORTS, LocalOnly
 
 # Windows can map .js to text/plain from the registry, which breaks module scripts in the preview.
 for ext, typ in ((".js", "text/javascript"), (".mjs", "text/javascript"), (".css", "text/css"), (".webp", "image/webp"),
@@ -28,6 +29,7 @@ for ext, typ in ((".js", "text/javascript"), (".mjs", "text/javascript"), (".css
     mimetypes.add_type(typ, ext)
 
 app = FastAPI(title="Scroll Studio")
+app.add_middleware(LocalOnly, extra_ports=UI_DEV_PORTS)    # Host and Origin checks: see local_only.py
 jobs = JobQueue()
 PROJECTS = Path(settings()["projects"])
 EXAMPLES = ROOT / "examples"
@@ -48,12 +50,26 @@ BLOCK_TYPES = ["intro", "features", "stats", "timeline", "quote", "cta", "galler
 PRESETS_3D = ["cell-field", "cell", "nucleus", "helix", "galaxy", "star-system", "planet", "network", "lattice", "particles", "gltf"]
 
 
+MAX_UPLOAD = 4 * 2**30       # bytes per file: a long film or a big scan fits, a runaway upload does not
+
+
 def find(name: str) -> Project:
     for base in (PROJECTS, EXAMPLES):
-        p = Project(base / name)
+        try:
+            p = Project(child(base, name, "project name"))
+        except ValueError:
+            break
         if p.exists():
             return p
     raise HTTPException(404, f"no project '{name}'")
+
+
+def file_stem(text: Optional[str], default: str) -> str:
+    """A name from a request made safe to use inside a file name (a section id, say)."""
+    try:
+        return safe_name(text or default)
+    except ValueError:
+        raise HTTPException(400, f"{text!r} can't be used in a file name: use letters, digits, '-' and '_'")
 
 
 def summary(p: Project, kind: str) -> dict:
@@ -121,11 +137,17 @@ def create(req: NewProject):
     name = "".join(c for c in req.name.lower().replace(" ", "-") if c.isalnum() or c in "-_")
     if not name:
         raise HTTPException(400, "name is empty")
-    dst = PROJECTS / name
+    try:
+        dst = child(PROJECTS, name, "project name")
+        src = child(EXAMPLES, req.example, "example name") if req.example else None
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     if dst.exists():
         raise HTTPException(409, f"{name} already exists")
-    if req.example:
-        shutil.copytree(EXAMPLES / req.example, dst, ignore=shutil.ignore_patterns(".build", "dist", "snapshots", "recordings"))
+    if src is not None:
+        if not (src / "site.yaml").exists():
+            raise HTTPException(404, f"no example '{req.example}'")
+        shutil.copytree(src, dst, ignore=shutil.ignore_patterns(".build", "dist", "snapshots", "recordings"))
     else:
         (dst / "inputs").mkdir(parents=True)
         (dst / "site.yaml").write_text(STARTER, encoding="utf-8")
@@ -176,9 +198,20 @@ async def upload(name: str, files: list[UploadFile] = File(...)):
     p.inputs.mkdir(parents=True, exist_ok=True)
     saved = []
     for f in files:
-        dst = p.inputs / Path(f.filename).name
+        try:
+            name = child(p.inputs, Path(f.filename or "").name, "file name").name
+            dst = p.path(f"inputs/{name}")       # follows links: an input that is a link out of the project is refused
+        except (ValueError, BuildError) as e:
+            raise HTTPException(400, str(e))
+        written = 0
         with open(dst, "wb") as out:
-            shutil.copyfileobj(f.file, out)
+            while chunk := f.file.read(1 << 20):
+                written += len(chunk)
+                if written > MAX_UPLOAD:
+                    out.close()
+                    dst.unlink(missing_ok=True)
+                    raise HTTPException(413, f"{name} is larger than {MAX_UPLOAD // 2**30} GB: put it in the project's inputs/ folder yourself")
+                out.write(chunk)
         saved.append(f"inputs/{dst.name}")
     return {"saved": saved}
 
@@ -186,7 +219,10 @@ async def upload(name: str, files: list[UploadFile] = File(...)):
 @app.get("/files/{name}/{path:path}")
 def project_file(name: str, path: str):
     p = find(name)
-    f = p.path(path)
+    try:
+        f = p.path(path)
+    except BuildError:
+        raise HTTPException(403, "outside the project folder")
     if not f.is_file():
         raise HTTPException(404)
     return FileResponse(f)
@@ -280,11 +316,12 @@ class RecordReq(BaseModel):
 @app.post("/api/projects/{name}/record")
 def record(name: str, req: RecordReq):
     p = find(name)
+    stem = file_stem(req.section, "page")
     from ..record import record as rec
 
     def run(job):
         log, progress = logger(job)
-        out = p.root / "recordings" / f"{req.section or 'page'}-{int(time.time())}.mp4"
+        out = p.root / "recordings" / f"{stem}-{int(time.time())}.mp4"
         mp4 = rec(p.dist, out, section=req.section, size=(req.width, req.height), seconds=req.seconds, log=log, progress=progress)
         return {"video": f"/files/{name}/recordings/{mp4.name}"}
     return jobs.submit("record", name, f"Record {req.section or 'page'}", run).public()

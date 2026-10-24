@@ -56,7 +56,6 @@ sections:
 
 
 def resolve(name: str) -> Path:
-    from .project import Project
     for cand in (Path(name), Path(settings()["projects"]) / name, ROOT / "examples" / name):
         if (cand / "site.yaml").exists():
             return cand.resolve()
@@ -956,10 +955,10 @@ def schema():
 
 
 @app.command()
-def doctor():
+def doctor(verify: bool = typer.Option(False, help="Also hash the model files in ComfyUI's folder against engine/models.yaml (slow)")):
     """Check the toolchain and report what each scene type needs."""
     from .doctor import report
-    report()
+    report(verify=verify)
 
 
 @app.command("setup-comfy")

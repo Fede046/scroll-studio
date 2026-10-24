@@ -40,12 +40,20 @@ attribution notice verbatim, and you tell the user. Never remove or alter LICENS
 notice comment.
 
 ## Rules
+- This repo is public: never commit machine-specific paths, folder layouts, usernames or machine sizing (use
+  placeholders like `/path/to/models`; configure machines in studio.toml or env vars). `tests/test_no_local_paths.py` enforces it.
 - Declare every dependency up front (pyproject.toml extras, runtime/package.json, engine/models.yaml) and in docs/INSTALL.md.
 - Local models only; no API keys. Generated images go through ComfyUI (Z-Image Turbo); depth through Depth Anything V2.
-- After changing `runtime/src`, run `npm run build:runtime` (the built bundle in engine/compile/static is committed).
+- After changing `runtime/src`, run `npm run build:runtime` and commit the bundle in engine/compile/static (CI rebuilds
+  it and fails on any difference).
+- Run `ruff check .` before committing. Coverage floors in `tests/coverage_floors.json` never go down; raise one when a
+  change beats it by 2 points. A tracked data file under `engine/` must be in package-data (`tests/test_packaging.py`).
 - After changing the UI, run `npm run build:ui`.
 - Check visual changes with `studio snapshot` and read the sheet; judge quality on the images, not the logs.
-- `main` is protected: every change goes through a pull request with the `tests` check green (no direct pushes, no
-  force-push). Work on a branch, push it after each working unit, open a PR, merge when green.
+- `main` is protected: every change goes through a pull request with the required checks green (no direct pushes, no
+  force-push). Every pull request links an issue labelled `status: accepted` (core paths need `status: design-approved`;
+  see CONTRIBUTING.md#rules-per-area). Titles are Conventional Commits (`fix(runtime): ...`); merges are squash-only.
+  Work on a branch, push it after each working unit, open a PR, merge when green.
+- User-facing changes add a fragment `changes/<issue>.<kind>.md` (changes/README.md); never edit CHANGELOG.md directly.
 - Keep the consistency rules in CONTRIBUTING.md; `tests/test_conformance.py` checks every theme preset and style, and
   `tests/test_layout_snapshots.py` every example's layout (re-record on purpose with `UPDATE_LAYOUT_SNAPSHOTS=1`).
