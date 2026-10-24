@@ -275,6 +275,7 @@ class Feature(Model):
     body: Optional[str] = None
     meter: Optional[float] = Field(None, description="0-1 progress bar under the card")
     href: Optional[str] = Field(None, description="Make the whole card a link (a repository, a case study)")
+    image: Optional[str] = Field(None, description="A small round picture beside the tag (an avatar, a logo): a project file or URL")
 
 
 class FeaturesBlock(BlockBase):
@@ -530,6 +531,8 @@ class Site(Model):
     footer: Footer = Field(default_factory=Footer)
     pages: list[Page] = Field(default_factory=list, description="Plain Markdown pages beside the site (privacy, support)")
     translations: list[Translation] = Field(default_factory=list, description="The site in other languages (see Translation)")
+    css: Optional[str] = Field(None, description="A stylesheet in the project folder, added after the theme's own styles "
+                                                 "(ornaments, a drop cap: touches no theme or style has)")
 
 
 def is_scene(section) -> bool:

@@ -36,7 +36,8 @@
   <div class="ss-features ss-features--{{ b.items | length }}">
     {% for f in b.items %}
     {% if f.href %}<a class="ss-feature ss-feature--link ss-reveal" href="{{ f.href }}">{% else %}<div class="ss-feature ss-reveal">{% endif %}
-      {% if f.tag %}<span class="ss-tag">{{ f.tag }}</span>{% endif %}
+      {% if f.image %}<div class="ss-feature__top"><img class="ss-feature__img" src="{{ f.image }}" alt="" loading="lazy">{% if f.tag %}<span class="ss-tag">{{ f.tag }}</span>{% endif %}</div>
+      {% elif f.tag %}<span class="ss-tag">{{ f.tag }}</span>{% endif %}
       <div><h3>{{ f.title | rich }}</h3>{% if f.body %}<p>{{ f.body | rich }}</p>{% endif %}
       {% if f.meter is not none %}<div class="ss-meter"><i style="width: {{ (f.meter * 100) | round }}%"></i></div>{% endif %}</div>
     {% if f.href %}</a>{% else %}</div>{% endif %}
@@ -90,8 +91,7 @@
 
 {% elif b.type == "hero" %}
 {% set media = e.img or e.video %}
-<section class="ss-block ss-hero ss-hero--{{ b.align }}{{ band }}{% if media and not b.surface %} ss-surface-dark ss-hero--media{% endif %}{% if b.device %} ss-hero--device{% endif %}"{% if b.id %} id="{{ b.id }}"{% endif %}>
-  {% if media %}<div class="ss-hero__media">{% if e.video %}<video src="{{ e.video }}" autoplay muted loop playsinline{% if e.img %} poster="{{ e.img }}"{% endif %}></video>{% else %}<img src="{{ e.img }}" alt="" fetchpriority="high">{% endif %}</div><div class="ss-hero__shade"></div>{% endif %}
+<section class="ss-block ss-hero ss-hero--{{ b.align }}{{ band }}{% if media and not b.surface %} ss-surface-dark ss-hero--media{% endif %}{% if b.device %} ss-hero--device{% endif %}"{% if b.id %} id="{{ b.id }}"{% endif %}>  {% if media %}<div class="ss-hero__media">{% if e.video %}<video src="{{ e.video }}" autoplay muted loop playsinline{% if e.img %} poster="{{ e.img }}"{% endif %}></video>{% else %}<img src="{{ e.img }}" alt="" fetchpriority="high">{% endif %}</div><div class="ss-hero__shade"></div>{% endif %}
   <div class="ss-hero__in">
     {% if b.badge %}<span class="ss-badge">{{ b.badge }}</span>{% endif %}
     {% if e.first %}<h1 class="ss-h1">{{ b.title | rich }}</h1>{% else %}<h2 class="ss-h1">{{ b.title | rich }}</h2>{% endif %}

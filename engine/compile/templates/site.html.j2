@@ -45,6 +45,9 @@
   /* A feature card with an href is a link: an arrow after the title, the title takes the accent on hover. */
   .ss-feature--link h3::after { content: " ↗"; font-size: .7em; color: var(--ink-3); transition: color .3s; }
   .ss-feature--link:hover h3::after { color: var(--accent); }
+  /* A card's picture (Feature.image) sits round beside its tag, like an avatar. */
+  .ss-feature__top { display: flex; align-items: center; gap: 14px; }
+  .ss-feature__img { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; flex: none; border: 1px solid var(--line); }
   /* A phone can play a clip instead of showing a screenshot. */
   .ss-phone__screen > video { width: 100%; height: 100%; object-fit: cover; display: block; }
   /* Poses: how a product section's phone sits (ProductBlock.pose). The panel clips at its edges (overflow: clip), so a
@@ -123,7 +126,10 @@
 {% endif %}
   .ss-h1, .ss-display { text-wrap: balance; }
 </style>
-{% if site.loader.enabled %}
+{% if custom_css %}<style>
+{{ custom_css | safe }}
+</style>
+{% endif %}{% if site.loader.enabled %}
 <style>
   html.ss-loading, html.ss-loading body { overflow: hidden; height: 100%; }
   .ss-loader { position: fixed; inset: 0; z-index: 1000; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 22px;

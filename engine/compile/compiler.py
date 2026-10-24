@@ -184,6 +184,18 @@ def build_site(project: Project, log: Callable[[str], None] = print,
     font_css = fonts.vendor(links, dist, log)
     env = _env()
     css_vars = themes.css_vars(theme, log)
+    custom_css = ""
+    if site.css:
+        src = project.path(site.css)
+        if not src.exists():
+            raise BuildError(f"css: {site.css} not found")
+        # Project files the stylesheet uses (url(inputs/roots.svg)) are copied in like block media, as they are.
+        def asset(m):
+            ref = m.group(2)
+            if ref.startswith(("data:", "#")):
+                return m.group(0)
+            return f"url({m.group(1)}{publish(ref) or ref}{m.group(1)})"
+        custom_css = re.sub(r"""url\((['"]?)([^'")]+)\1\)""", asset, src.read_text(encoding="utf-8"))
     page_links = [{"label": p.title, "href": f"{p.slug}/"} for p in site.pages]
     languages = [{"lang": site.lang, "href": "index.html"}] + [{"lang": t.lang, "href": f"{t.lang}.html"} for t in site.translations]
 
@@ -217,6 +229,9 @@ def build_site(project: Project, log: Callable[[str], None] = print,
                 e["behind_clip"] = publish(b.behind.video) if b.behind and b.behind.video else None
             elif b.type == "strip":
                 e["imgs"] = [block_image(it.image, 900, credits) for it in b.items]
+            elif b.type == "features" and any(it.image for it in b.items):
+                e["s"] = b.model_copy(update={"items": [it.model_copy(update={"image": block_image(it.image, 160, credits)})
+                                                        for it in b.items]})
 
         # CTA backgrounds can borrow a scene's final frame
         finals = {e["s"].id: (e["config"] or {}).get("end") for e in sections if e["scene"]}
@@ -227,7 +242,7 @@ def build_site(project: Project, log: Callable[[str], None] = print,
 
         nav = nav_links(s) + [l for l, p in zip(page_links, s.pages) if p.nav]
         html = env.get_template("site.html.j2").render(
-            site=s, sections=sections, theme=theme, css_vars=css_vars, logo=logo,
+            site=s, sections=sections, theme=theme, css_vars=css_vars, custom_css=custom_css, logo=logo,
             font_css=font_css, font_links=[] if font_css else links, nav_links=nav, page_links=page_links, credits=credits,
             configs={e["s"].id: e["config"] for e in sections if e["scene"]},
             languages=[dict(l, current=l["lang"] == s.lang) for l in languages] if len(languages) > 1 else [],
