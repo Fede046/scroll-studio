@@ -266,7 +266,8 @@ describe("scroll reveals and count-ups", () => {
     expect(r[0].style.transform).toBe(`translateY(${((1 - k) * 22).toFixed(1)}px)`);
     r.forEach((e) => moveTo(e, 0));
     scrollToY(2); f.step();
-    for (const e of r) { expect(e.style.opacity).toBe("1"); expect(e.style.transform).toBe(""); }
+    // "none", not "": clearing the inline transform would let the stylesheet's translateY(22px) apply again (#122)
+    for (const e of r) { expect(e.style.opacity).toBe("1"); expect(e.style.transform).toBe("none"); }
   });
 
   it("count-ups finish before the number reaches the middle of the screen, easing out, keeping a <sup> and the decimals", async () => {
