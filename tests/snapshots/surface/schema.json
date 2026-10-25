@@ -590,6 +590,93 @@
    "title": "BeatFrame",
    "type": "object"
   },
+  "Brand": {
+   "additionalProperties": false,
+   "description": "A brand as tokens: what `theme.from` reads from a web page, a logo or a brand.yaml, or what you write yourself.\nMissing colours are derived from the ones given with the presets' contrast rules.",
+   "properties": {
+    "colors": {
+     "additionalProperties": {
+      "type": "string"
+     },
+     "description": "Brand colours as #hex: accent (the main brand colour) and any of accent2, bg, bg2, ink, accent_ink",
+     "title": "Colors",
+     "type": "object"
+    },
+    "fonts": {
+     "additionalProperties": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "$ref": "#/$defs/FontFile"
+       }
+      ]
+     },
+     "description": "Brand fonts by role (display, body, mono): a Google Fonts family or {file: ...} of the project's own",
+     "title": "Fonts",
+     "type": "object"
+    },
+    "logo": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The brand's logo (an image file in the project), shown in the nav when nav.logo is not set",
+     "title": "Logo"
+    },
+    "mode": {
+     "anyOf": [
+      {
+       "enum": [
+        "light",
+        "dark"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "light or dark (default: what the colours say)",
+     "title": "Mode"
+    },
+    "radius": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Corner radius of buttons and cards, e.g. 6px",
+     "title": "Radius"
+    },
+    "source": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Where these tokens were read from (written by `studio brand`)",
+     "title": "Source"
+    }
+   },
+   "title": "Brand",
+   "type": "object"
+  },
   "CameraKey": {
    "additionalProperties": false,
    "properties": {
@@ -3359,6 +3446,58 @@
     "id"
    ],
    "title": "FilmScene",
+   "type": "object"
+  },
+  "FontFile": {
+   "additionalProperties": false,
+   "description": "A font file of the project's own (a brand face that is not on Google Fonts), served from the site itself.",
+   "properties": {
+    "family": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The family name it is set in (default: from the file name, fonts/Brand-Sans.woff2 is 'Brand Sans')",
+     "title": "Family"
+    },
+    "file": {
+     "description": "The font file inside the project folder: .woff2 (best), .woff, .ttf or .otf",
+     "title": "File",
+     "type": "string"
+    },
+    "style": {
+     "default": "normal",
+     "description": "normal, or italic for an italic file",
+     "enum": [
+      "normal",
+      "italic"
+     ],
+     "title": "Style",
+     "type": "string"
+    },
+    "weight": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The weight the file holds, e.g. 400 or 700, or a range such as '100 900' for a variable font (default: every weight)",
+     "title": "Weight"
+    }
+   },
+   "required": [
+    "file"
+   ],
+   "title": "FontFile",
    "type": "object"
   },
   "Footer": {
@@ -7256,6 +7395,57 @@
    "title": "Marker",
    "type": "object"
   },
+  "MotionTokens": {
+   "additionalProperties": false,
+   "description": "How the page moves. Each value defaults to what the runtime has always used; `scroll.speed` still paces it.",
+   "properties": {
+    "ease": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Easing of transitions (default cubic-bezier(.22, .8, .2, 1))",
+     "title": "Ease"
+    },
+    "enter": {
+     "anyOf": [
+      {
+       "exclusiveMinimum": 0,
+       "maximum": 1,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Share of the screen height a block scrolls through while it arrives (default 0.2)",
+     "title": "Enter"
+    },
+    "follow": {
+     "anyOf": [
+      {
+       "exclusiveMinimum": 0,
+       "maximum": 0.5,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "How quickly smooth scrolling catches up with the wheel (default 0.1; 0.5 is nearly immediate)",
+     "title": "Follow"
+    }
+   },
+   "title": "MotionTokens",
+   "type": "object"
+  },
   "Nav": {
    "additionalProperties": false,
    "properties": {
@@ -9654,6 +9844,29 @@
    "title": "SequenceScene",
    "type": "object"
   },
+  "ShadeTokens": {
+   "additionalProperties": false,
+   "description": "The shade laid over a scene's picture so its captions stay readable.",
+   "properties": {
+    "strength": {
+     "anyOf": [
+      {
+       "maximum": 1,
+       "minimum": 0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "How strongly the shade fades the picture toward the background: 1 as designed (the default), 0 none",
+     "title": "Strength"
+    }
+   },
+   "title": "ShadeTokens",
+   "type": "object"
+  },
   "ShowroomScene": {
    "additionalProperties": false,
    "description": "The real product, live in the page: three.js renders the product's normalised GLB with studio environment\nlighting and a soft shadow; scroll turns, explodes and zooms it along `keys`, and the pointer nudges the view.",
@@ -9860,6 +10073,53 @@
     "id"
    ],
    "title": "ShowroomScene",
+   "type": "object"
+  },
+  "SpaceTokens": {
+   "additionalProperties": false,
+   "description": "Page spacing. Each value defaults to what the stylesheet has always used.",
+   "properties": {
+    "caption": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Width of the captions over a scene (default min(680px, 82vw))",
+     "title": "Caption"
+    },
+    "gutter": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Margin at the page's sides (default clamp(20px, 4vw, 64px))",
+     "title": "Gutter"
+    },
+    "max": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Widest the content runs (default 1600px)",
+     "title": "Max"
+    }
+   },
+   "title": "SpaceTokens",
    "type": "object"
   },
   "SplatKey": {
@@ -11021,11 +11281,53 @@
     },
     "fonts": {
      "additionalProperties": {
-      "type": "string"
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "$ref": "#/$defs/FontFile"
+       }
+      ],
+      "type": [
+       "string",
+       "object"
+      ]
      },
-     "description": "Google Fonts families: display, body, mono",
+     "description": "Fonts by role (display, body, mono): a Google Fonts family, or a file of the project's own ({file: fonts/Brand.woff2}), served from the site either way",
      "title": "Fonts",
      "type": "object"
+    },
+    "from": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "$ref": "#/$defs/Brand"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Wear a brand: a web page URL, a logo image or a brand.yaml in the project (read once and kept in .build/brand/), or the brand's tokens themselves (what `studio brand` writes). Its colours, fonts, radius and logo go over the preset and the style; anything else set on theme still wins",
+     "title": "From"
+    },
+    "grain": {
+     "anyOf": [
+      {
+       "maximum": 1,
+       "minimum": 0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Film grain over the whole page: 0 none (the default) to 1; 0.15-0.3 reads as print or film",
+     "title": "Grain"
     },
     "labels": {
      "anyOf": [
@@ -11061,6 +11363,33 @@
      "description": "Override the preset's light/dark mode (set it when colors flip it)",
      "title": "Mode"
     },
+    "motion": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/MotionTokens"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Easing, how blocks arrive and how smooth scrolling follows"
+    },
+    "phone": {
+     "anyOf": [
+      {
+       "maximum": 1600,
+       "minimum": 320,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Width in px below which the page takes its phone layout, for the stylesheet and the runtime alike. Unset keeps the built-in widths (900 for the layout, 760 for scenes, 700 for one-take pages)",
+     "title": "Phone"
+    },
     "preset": {
      "default": "night",
      "description": "night, brass, paper, lab, cosmos, studio, dusk, ink, blueprint, clinic (see engine/themes.yaml)",
@@ -11079,6 +11408,30 @@
      "default": null,
      "title": "Radius"
     },
+    "shade": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/ShadeTokens"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Strength of the shade over scene pictures"
+    },
+    "space": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/SpaceTokens"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Page spacing: gutter, max width, caption width"
+    },
     "style": {
      "anyOf": [
       {
@@ -11091,6 +11444,18 @@
      "default": null,
      "description": "An experience in one word: its own scroll mechanic, layout, transitions and look. particles, liquid-morph, holographic, neon-glow, wireframe-3d, glassmorphism, kinetic-type, isometric, clay-3d, ascii-art, gradient-mesh, comic-book, split-flap, retro-vhs, halftone, bauhaus, pixel-art, blueprint, art-deco, neo-brutalism, anime-intro, flipbook, pop-up-book, pinscreen, sand, zoetrope, stop-motion, paper-cut-out, scratch-film, smears, paint-on-glass, multiplane (see engine/styles/). Colours/fonts set here still win",
      "title": "Style"
+    },
+    "type": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/TypeTokens"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Type sizes: headline scale and running-text size"
     }
    },
    "title": "Theme",
@@ -12011,6 +12376,42 @@
     "id"
    ],
    "title": "TypeScene",
+   "type": "object"
+  },
+  "TypeTokens": {
+   "additionalProperties": false,
+   "description": "Type sizes. Each value defaults to what the stylesheet has always used.",
+   "properties": {
+    "body": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Size of running text (default 17px)",
+     "title": "Body"
+    },
+    "scale": {
+     "anyOf": [
+      {
+       "exclusiveMinimum": 0,
+       "maximum": 4,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Multiplies every headline size, on phones too (default 1: 1.15 is a seventh larger)",
+     "title": "Scale"
+    }
+   },
+   "title": "TypeTokens",
    "type": "object"
   },
   "VectorScene": {

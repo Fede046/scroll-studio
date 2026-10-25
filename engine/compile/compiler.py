@@ -351,14 +351,20 @@ def build_site(project: Project, log: Callable[[str], None] = print,
         if rt.exists():
             shutil.rmtree(rt)
         shutil.copytree(STATIC / "runtime", rt)
+        if theme["phone"]:
+            (rt / "studio.css").write_text(themes.phone_css((rt / "studio.css").read_text(encoding="utf-8"), theme["phone"]),
+                                           encoding="utf-8")
 
     # A nav logo given as an image file is copied in like any other media; SVG path data passes through.
-    logo = site.nav.logo
+    logo = site.nav.logo or theme["logo"]        # a brand's logo (theme.from) when the nav names none
     if logo and not logo.startswith("M"):
         logo = publish(logo)
 
     links = themes.font_links(theme)
     font_css = fonts.vendor(links, dist, log)
+    google = [] if font_css else links         # linked from Google when they could not be self-hosted
+    if theme["font_files"]:
+        font_css = fonts.own(project, theme["font_files"], dist, append=font_css is not None)
     sdir = themes.style_dir(theme["style"]) if theme["style"] else None
     env = _env(sdir)
     # theme.art: frames a style renders in its own medium (style templates see it as `art`)
@@ -392,10 +398,10 @@ def build_site(project: Project, log: Callable[[str], None] = print,
     nav = nav_links(site) + [l for l, p in zip(page_links, site.pages) if p.nav]
     html = env.get_template("site.html.j2").render(
         site=site, sections=sections, theme=theme, css_vars=css_vars, logo=logo,
-        font_css=font_css, font_links=[] if font_css else links, nav_links=nav, page_links=page_links, credits=credits,
+        font_css=font_css, font_links=google, nav_links=nav, page_links=page_links, credits=credits,
         concept=concept, product=site.product,
         configs={e["s"].id: e["config"] for e in sections if e["scene"]},
-        style_css=themes.style_css(theme["style"]) if theme["style"] else "",
+        style_css=themes.style_css(theme["style"], theme) if theme["style"] else "",
         style_blocks=bool(sdir and (sdir / "blocks.html.j2").exists()),
         style_chrome=bool(sdir and (sdir / "chrome.html.j2").exists()),
         style_scenes=bool(sdir and (sdir / "scenes.html.j2").exists()),
@@ -428,7 +434,7 @@ def build_site(project: Project, log: Callable[[str], None] = print,
                 site=site, page=p, icon=favicon(site, theme), body=Markup(body), theme=theme, css_vars=css_vars, base=base,
                 concept=concept, product=site.product,
                 logo=rebase(logo) if logo and not logo.startswith("M") else logo,
-                font_css=rebase(font_css) if font_css else None, font_links=[] if font_css else links,
+                font_css=rebase(font_css) if font_css else None, font_links=google,
                 nav_links=[{"label": l["label"], "href": rebase(l["href"])} for l in nav],
                 page_links=[{"label": l["label"], "href": rebase(l["href"])} for l in page_links],
             )

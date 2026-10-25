@@ -189,7 +189,7 @@ message naming the file and the rule.
 
 - Every preset sets `mode`, the colours `bg, bg2, ink, accent, accent2, accent_ink` (`#rrggbb`), and the fonts
   `display, body, mono` (Google Fonts families). Nothing else but the known keys (`display_weight, em_italic, radius,
-  display_em, labels, display_optical_size`).
+  display_em, labels, display_optical_size, space, type, shade, motion, grain, phone`).
 - `mode` matches the colours: `dark` means the background is darker than the ink.
 - Contrast: ink on `bg` at least **7:1**, ink on `bg2` at least 4.5:1, button text (`accent_ink` on `accent`) at least
   **4.5:1**.
@@ -202,7 +202,8 @@ A style is an **experience**: its own scroll mechanic, layout, transitions and p
 those with an existing one is a reskin and is not merged. The full contract is
 [engine/styles/README.md](engine/styles/README.md); in short:
 
-- **A complete folder:** `style.yaml` (label, about, mode, colours, fonts, `font_axes`, radius, optional `cuts`),
+- **A complete folder:** `style.yaml` (label, about, mode, colours, fonts, `font_axes`, radius, optional `cuts` and
+  `requires`: the tokens a brand may not change),
   `style.css`, `blocks.html.j2` (declaring the block types it renders), optional `chrome.html.j2`, and its runtime
   `runtime/src/styles/<name>.ts`. The folder name is lowercase words joined by hyphens.
 - **Tokens, checked like a preset's:** the same colour roles, mode and contrast rules; `font_axes` only for fonts it uses.

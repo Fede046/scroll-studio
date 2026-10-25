@@ -12,7 +12,7 @@ import re
 from dataclasses import dataclass
 from typing import Annotated, Any, Literal, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_serializer, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator, model_serializer, model_validator
 
 from .safety import CSS_NAME, FONT_NAME, SAFE_ID, check_url, css_value_ok
 
@@ -2341,7 +2341,135 @@ class Art(Model):
     video_model: Optional[VideoModel] = Field(None, description=VIDEO_MODEL_DOC)
 
 
+def _css_values(model: BaseModel) -> BaseModel:
+    """Theme token values end up inside the page's <style> block, so a string may only be a plain CSS value."""
+    for k, v in model:
+        if isinstance(v, str) and not css_value_ok(v):
+            raise ValueError(f"{k}: {v[:40]!r} is not a plain CSS value (a length such as 24px, or clamp(...), min(...))")
+    return model
+
+
+class SpaceTokens(Model):
+    """Page spacing. Each value defaults to what the stylesheet has always used."""
+    gutter: Optional[str] = Field(None, description="Margin at the page's sides (default clamp(20px, 4vw, 64px))")
+    max: Optional[str] = Field(None, description="Widest the content runs (default 1600px)")
+    caption: Optional[str] = Field(None, description="Width of the captions over a scene (default min(680px, 82vw))")
+
+    _plain = model_validator(mode="after")(_css_values)
+
+
+class TypeTokens(Model):
+    """Type sizes. Each value defaults to what the stylesheet has always used."""
+    scale: Optional[float] = Field(None, gt=0, le=4, description="Multiplies every headline size, on phones too "
+                                                                 "(default 1: 1.15 is a seventh larger)")
+    body: Optional[str] = Field(None, description="Size of running text (default 17px)")
+
+    _plain = model_validator(mode="after")(_css_values)
+
+
+class ShadeTokens(Model):
+    """The shade laid over a scene's picture so its captions stay readable."""
+    strength: Optional[float] = Field(None, ge=0, le=1, description="How strongly the shade fades the picture toward "
+                                                                    "the background: 1 as designed (the default), 0 none")
+
+
+class MotionTokens(Model):
+    """How the page moves. Each value defaults to what the runtime has always used; `scroll.speed` still paces it."""
+    ease: Optional[str] = Field(None, description="Easing of transitions (default cubic-bezier(.22, .8, .2, 1))")
+    enter: Optional[float] = Field(None, gt=0, le=1, description="Share of the screen height a block scrolls through "
+                                                                 "while it arrives (default 0.2)")
+    follow: Optional[float] = Field(None, gt=0, le=0.5, description="How quickly smooth scrolling catches up with the "
+                                                                    "wheel (default 0.1; 0.5 is nearly immediate)")
+
+    _plain = model_validator(mode="after")(_css_values)
+
+
+FONT_FILE_TYPES = (".woff2", ".woff", ".ttf", ".otf")
+
+
+class FontFile(Model):
+    """A font file of the project's own (a brand face that is not on Google Fonts), served from the site itself."""
+    file: str = Field(..., description="The font file inside the project folder: .woff2 (best), .woff, .ttf or .otf")
+    family: Optional[str] = Field(None, description="The family name it is set in (default: from the file name, "
+                                                    "fonts/Brand-Sans.woff2 is 'Brand Sans')")
+    weight: Optional[str] = Field(None, description="The weight the file holds, e.g. 400 or 700, or a range such as "
+                                                    "'100 900' for a variable font (default: every weight)")
+    style: Literal["normal", "italic"] = Field("normal", description="normal, or italic for an italic file")
+
+    @field_validator("file")
+    @classmethod
+    def _a_font_file(cls, v: str) -> str:
+        if not v.lower().endswith(FONT_FILE_TYPES):
+            raise ValueError(f"file {v[:40]!r} is not a font file ({', '.join(FONT_FILE_TYPES)})")
+        return v
+
+    @field_validator("family")
+    @classmethod
+    def _a_family_name(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and not FONT_NAME.fullmatch(v):
+            raise ValueError(f"family {v[:40]!r} is not a font family name (letters, digits, spaces and . + & ' -)")
+        return v
+
+    @field_validator("weight", mode="before")
+    @classmethod
+    def _a_weight(cls, v: Any) -> Optional[str]:      # `weight: 700` in YAML is a number
+        if v is not None and not re.fullmatch(r"[1-9]00( [1-9]00)?", str(v).strip()):
+            raise ValueError(f"weight {v[:20]!r} is a weight such as 400, or a range such as '100 900'")
+        return v if v is None else str(v).strip()
+
+
+def _fonts_schema(schema: dict) -> None:
+    """A role is a family name or a FontFile. `type` stays in the schema beside the union, widened rather than
+    dropped, so whatever read `type: string` here before still finds it."""
+    schema["additionalProperties"]["type"] = ["string", "object"]
+
+
+BRAND_COLOURS = ("bg", "bg2", "ink", "accent", "accent2", "accent_ink")
+
+
+class Brand(Model):
+    """A brand as tokens: what `theme.from` reads from a web page, a logo or a brand.yaml, or what you write yourself.
+    Missing colours are derived from the ones given with the presets' contrast rules."""
+    mode: Optional[Literal["light", "dark"]] = Field(None, description="light or dark (default: what the colours say)")
+    colors: dict[str, str] = Field(default_factory=dict, description="Brand colours as #hex: accent (the main brand "
+                                                                     "colour) and any of accent2, bg, bg2, ink, accent_ink")
+    fonts: dict[str, Union[str, FontFile]] = Field(default_factory=dict, description="Brand fonts by role (display, "
+                                                                                     "body, mono): a Google Fonts family "
+                                                                                     "or {file: ...} of the project's own")
+    radius: Optional[str] = Field(None, description="Corner radius of buttons and cards, e.g. 6px")
+    logo: Optional[str] = Field(None, description="The brand's logo (an image file in the project), shown in the nav "
+                                                  "when nav.logo is not set")
+    source: Optional[str] = Field(None, description="Where these tokens were read from (written by `studio brand`)")
+
+    @field_validator("colors")
+    @classmethod
+    def _brand_colours(cls, v: dict[str, str]) -> dict[str, str]:
+        for k, c in v.items():
+            if k not in BRAND_COLOURS or not re.fullmatch(r"#(?:[0-9a-fA-F]{3}){1,2}", c):
+                raise ValueError(f"colors.{k}: {c[:40]!r} is not allowed: brand colours are {', '.join(BRAND_COLOURS)}, "
+                                 "each a #hex colour")
+        return v
+
+    @field_validator("fonts")
+    @classmethod
+    def _brand_fonts(cls, v: dict) -> dict:
+        for k, f in v.items():
+            if k not in ("display", "body", "mono") or not (isinstance(f, FontFile) or FONT_NAME.fullmatch(f)):
+                raise ValueError(f"fonts.{k}: brand fonts are display, body and mono, each a family name or {{file: ...}}")
+        return v
+
+    @field_validator("radius")
+    @classmethod
+    def _brand_radius(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and not css_value_ok(v):
+            raise ValueError(f"radius {v[:40]!r} is not a CSS length such as 6px")
+        return v
+
+
 class Theme(Model):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    # the tokens of a `from:` source (a URL, image or brand.yaml), read by Project.load() (engine/brand.py)
+    _brand: Optional[dict] = PrivateAttr(None)
     preset: str = Field("night", description="night, brass, paper, lab, cosmos, studio, dusk, ink, blueprint, clinic (see engine/themes.yaml)")
     style: Optional[str] = Field(
         None, description="An experience in one word: its own scroll mechanic, layout, transitions and look. particles, "
@@ -2350,7 +2478,10 @@ class Theme(Model):
                           "art-deco, neo-brutalism, anime-intro, flipbook, pop-up-book, pinscreen, sand, zoetrope, stop-motion, paper-cut-out, scratch-film, smears, paint-on-glass, multiplane (see engine/styles/). Colours/fonts set here still win")
     mode: Optional[Literal["light", "dark"]] = Field(None, description="Override the preset's light/dark mode (set it when colors flip it)")
     colors: dict[str, str] = Field(default_factory=dict, description="Override tokens: bg, bg2, ink, accent, accent2")
-    fonts: dict[str, str] = Field(default_factory=dict, description="Google Fonts families: display, body, mono")
+    fonts: dict[str, Union[str, FontFile]] = Field(
+        default_factory=dict, json_schema_extra=_fonts_schema,
+        description="Fonts by role (display, body, mono): a Google Fonts family, or a file of the project's own "
+                    "({file: fonts/Brand.woff2}), served from the site either way")
     display_weight: Optional[int] = None
     display_italic_em: Optional[bool] = Field(None, description="Render <em> accent words in italic")
     display_em: Optional[Literal["accent", "bold", "heavy"]] = Field(
@@ -2367,6 +2498,21 @@ class Theme(Model):
     radius: Optional[str] = None
     art: Optional[Art] = Field(None, description="Artwork the style renders in its own medium (ascii-art: characters, "
                                                   "particles: points). A prompt or a file, optionally animated")
+    space: Optional[SpaceTokens] = Field(None, description="Page spacing: gutter, max width, caption width")
+    type: Optional[TypeTokens] = Field(None, description="Type sizes: headline scale and running-text size")
+    shade: Optional[ShadeTokens] = Field(None, description="Strength of the shade over scene pictures")
+    motion: Optional[MotionTokens] = Field(None, description="Easing, how blocks arrive and how smooth scrolling follows")
+    grain: Optional[float] = Field(None, ge=0, le=1, description="Film grain over the whole page: 0 none (the default) "
+                                                                  "to 1; 0.15-0.3 reads as print or film")
+    from_: Optional[Union[str, Brand]] = Field(
+        None, alias="from",
+        description="Wear a brand: a web page URL, a logo image or a brand.yaml in the project (read once and kept in "
+                    ".build/brand/), or the brand's tokens themselves (what `studio brand` writes). Its colours, fonts, "
+                    "radius and logo go over the preset and the style; anything else set on theme still wins")
+    phone: Optional[int] = Field(None, ge=320, le=1600, description="Width in px below which the page takes its phone "
+                                                                     "layout, for the stylesheet and the runtime alike. "
+                                                                     "Unset keeps the built-in widths (900 for the "
+                                                                     "layout, 760 for scenes, 700 for one-take pages)")
 
     @field_validator("colors")
     @classmethod
@@ -2378,10 +2524,21 @@ class Theme(Model):
 
     @field_validator("fonts")
     @classmethod
-    def _fonts_are_families(cls, v: dict[str, str]) -> dict[str, str]:
+    def _fonts_are_families(cls, v: dict[str, Union[str, FontFile]]) -> dict[str, Union[str, FontFile]]:
         for k, f in v.items():
-            if not CSS_NAME.fullmatch(k) or not FONT_NAME.fullmatch(f):
+            if not CSS_NAME.fullmatch(k) or not (isinstance(f, FontFile) or FONT_NAME.fullmatch(f)):
                 raise ValueError(f"fonts.{k}: {f[:40]!r} is not a Google Fonts family name (letters, digits, spaces and . + & ' -)")
+        return v
+
+    @field_validator("from_")
+    @classmethod
+    def _a_brand_source(cls, v: Union[str, Brand, None]) -> Union[str, Brand, None]:
+        if isinstance(v, str):
+            if v.startswith(("http://", "https://")):
+                check_url(v, "from")
+            elif not v.lower().endswith((".yaml", ".yml", ".html", ".htm", ".png", ".jpg", ".jpeg", ".webp", ".svg")):
+                raise ValueError(f"from {v[:60]!r}: give a web page (https://...), a page saved as .html, a logo image "
+                                 "(.png, .jpg, .webp, .svg) or a brand.yaml in the project, or the brand's tokens")
         return v
 
     @field_validator("radius")
