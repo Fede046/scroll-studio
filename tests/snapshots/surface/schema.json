@@ -541,11 +541,32 @@
        "$ref": "#/$defs/CameraMove"
       },
       {
+       "$ref": "#/$defs/CameraPreset"
+      },
+      {
+       "enum": [
+        "static",
+        "dolly-in",
+        "dolly-out",
+        "crash-zoom",
+        "dolly-zoom",
+        "orbit-left",
+        "orbit-right",
+        "crane-up",
+        "crane-down",
+        "fpv",
+        "whip-pan",
+        "push-through"
+       ],
+       "type": "string"
+      },
+      {
        "type": "null"
       }
      ],
      "default": null,
-     "description": "A keyed camera move on this moving beat (see CameraMove): `camera: {keys: [{t: 0, box: [0,0,1,1]}, {t: 0.5, box: [...]}, ...]}`. The crowd keeps moving, the camera does what the keys say. Needs an `image` (or a `prompt` to make one); not for a frozen moment"
+     "description": "A camera move on this moving beat: a named move (`camera: dolly-in`, or `{move: orbit-left, amount: 0.8}`, see CameraPreset) or keys (see CameraMove): `camera: {keys: [{t: 0, box: [0,0,1,1]}, {t: 0.5, box: [...]}, ...]}`. The crowd keeps moving, the camera does what the move or the keys say. Needs an `image` (or a `prompt` to make one); not for a frozen moment",
+     "title": "Camera"
     },
     "end_image": {
      "anyOf": [
@@ -1056,6 +1077,219 @@
     "keys"
    ],
    "title": "CameraMove",
+   "type": "object"
+  },
+  "CameraPreset": {
+   "additionalProperties": false,
+   "description": "A named camera move on a generated beat: `camera: dolly-in`, or `camera: {move: orbit-left, amount: 0.8, at: [0.4,\n0.5]}`. Everything a keyed move takes (backend, subjects, soften, guide_strength, res, anchor, match, seed) applies;\nthe camera path comes from the move instead of `keys`.",
+   "properties": {
+    "amount": {
+     "default": 1.0,
+     "description": "How far the move goes: 1 is the tested recipe, 0.5 half as far, 1.5 further (a deeper push, a wider arc, a faster zoom)",
+     "maximum": 2.0,
+     "minimum": 0.25,
+     "title": "Amount",
+     "type": "number"
+    },
+    "anchor": {
+     "anyOf": [
+      {
+       "maximum": 1,
+       "minimum": 0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "How firmly the pure-camera render is pinned along the way (as a keyed move's `anchor`). Default: the move's tested value, 0.6 for dollies, zooms, whip pans and static shots, 0.3 for moves that open gaps behind near things (orbit, crane, dolly zoom, fpv, push-through), which the model then repaints",
+     "title": "Anchor"
+    },
+    "at": {
+     "anyOf": [
+      {
+       "maxItems": 2,
+       "minItems": 2,
+       "prefixItems": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "number"
+        }
+       ],
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The point the move is about, x y in 0-1 of the start image (the subject): where a dolly or a zoom goes, what an orbit or a crane keeps still, what a dolly zoom keeps the same size. Default: the centre",
+     "title": "At"
+    },
+    "backend": {
+     "default": "auto",
+     "description": "What generates the beat along the guide: ltx (LTX-2.3 IC-LoRA depth control, the depth guide a take uses), wan (Wan 2.2 Fun Control, the guide as the control video) or uni3c (Wan Uni3C camera controlnet; needs a model file that is not installed by default). auto: the one measured to follow the keys best (see docs/ENGINE.md)",
+     "enum": [
+      "auto",
+      "ltx",
+      "wan",
+      "uni3c"
+     ],
+     "title": "Backend",
+     "type": "string"
+    },
+    "continues": {
+     "default": false,
+     "description": "Carry the previous beat's camera across the cut: this beat's camera starts where the previous camera beat ended, with the speed it ended at (no ease to a stop at the boundary), and it starts on that beat's last frame, graded to match",
+     "title": "Continues",
+     "type": "boolean"
+    },
+    "dolly": {
+     "anyOf": [
+      {
+       "maximum": 3,
+       "minimum": 0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Extra push-in of near things (default follows parallax)",
+     "title": "Dolly"
+    },
+    "ease": {
+     "default": "inOutSine",
+     "description": "How the camera travels between boxes (as `freeze.ease`; `flow` keeps moving through keys)",
+     "enum": [
+      "linear",
+      "inOutSine",
+      "inOutQuad",
+      "inOutCubic",
+      "inOutQuart",
+      "smoother",
+      "flow"
+     ],
+     "title": "Ease",
+     "type": "string"
+    },
+    "guide_strength": {
+     "default": 1.0,
+     "description": "How strongly the guide steers the model (LTX: the IC-LoRA guide strength; Wan: Fun Control has no scale, so this is the Uni3C strength)",
+     "maximum": 2,
+     "minimum": 0,
+     "title": "Guide Strength",
+     "type": "number"
+    },
+    "keys": {
+     "description": "Not used by a named move (its path is the move's): leave it out",
+     "items": {
+      "$ref": "#/$defs/FreezeKey"
+     },
+     "title": "Keys",
+     "type": "array"
+    },
+    "match": {
+     "anyOf": [
+      {
+       "maximum": 1,
+       "minimum": 0,
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "How far the generated frames are pulled back toward the base plate's tone and grain (the start image of the first beat of the chain, flown along the same camera): a video model drifts in contrast, haze and grain from clip to clip, and a cut shows it. 0 = off. Default: 0.7 for a beat in a chain of `continues` beats, else off",
+     "title": "Match"
+    },
+    "move": {
+     "description": "A named camera move (engine/camera_moves.py), flown through the start image's depth and followed by the video model like keyed moves: static (locked-off tripod), dolly-in / dolly-out (the camera travels toward or away from `at`, near things grow faster than far ones), crash-zoom (a sudden lens zoom into `at`, then a hold), dolly-zoom (vertigo: the subject keeps its size while the background swells), orbit-left / orbit-right (an arc around the subject, which stays put while the foreground and background slide past each other), crane-up / crane-down (the camera rises or sinks, tilting to keep the subject), fpv (a drone flying forward with a banking roll), whip-pan (a fast pan with motion blur), push-through (a deep push past the foreground into the scene beyond). See docs/scenes.md for which read clearly on LTX-2.3",
+     "enum": [
+      "static",
+      "dolly-in",
+      "dolly-out",
+      "crash-zoom",
+      "dolly-zoom",
+      "orbit-left",
+      "orbit-right",
+      "crane-up",
+      "crane-down",
+      "fpv",
+      "whip-pan",
+      "push-through"
+     ],
+     "title": "Move",
+     "type": "string"
+    },
+    "parallax": {
+     "default": 0.5,
+     "description": "Depth effect of the guide's camera (as `freeze.parallax`): near things shift against far ones as the camera moves, so the model sees a real camera move",
+     "maximum": 2,
+     "minimum": 0,
+     "title": "Parallax",
+     "type": "number"
+    },
+    "res": {
+     "anyOf": [
+      {
+       "maxItems": 2,
+       "minItems": 2,
+       "prefixItems": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "integer"
+        }
+       ],
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Size the video model runs at (the frames are scaled to beat_res; ltx: multiples of 64, wan/uni3c: multiples of 16). Default: ltx about 1024x576 (more pixels let the subjects drift in tests; `beat_restore` adds the detail back), wan ~1280x720",
+     "title": "Res"
+    },
+    "seed": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Seed for the generation (default: the beat's motion_seed, then seed)",
+     "title": "Seed"
+    },
+    "soften": {
+     "default": 0.045,
+     "description": "How far the subjects are softened in the guide, as a share of the frame width (a Gaussian blur of their own depth). 0 keeps their exact depth, which pins their silhouettes too (they only slide with the camera); larger frees them more but tells the model less about where they are",
+     "maximum": 0.3,
+     "minimum": 0,
+     "title": "Soften",
+     "type": "number"
+    },
+    "subjects": {
+     "default": "the people",
+     "description": "Who is free to move, as you would say it to a person (found by Florence-2, cut out by SAM 2.1). The guide fixes the camera and the static world and only hints at where these are. Empty: nothing is freed (the guide pins everything, people included)",
+     "title": "Subjects",
+     "type": "string"
+    }
+   },
+   "required": [
+    "move"
+   ],
+   "title": "CameraPreset",
    "type": "object"
   },
   "Carry": {
@@ -3505,6 +3739,18 @@
      "default": null,
      "description": "`restore`: repair the faces in the whole film (GFPGAN) before it is encoded; beats can set it per beat. Off by default"
     },
+    "finish": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/Finish"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "The finishing pass over the finished film (see Finish): SeedVR2 restore, deflicker, temporal denoise, sharpen, frame interpolation where motion is slow. `finish: true` for the defaults"
+    },
     "frame": {
      "anyOf": [
       {
@@ -3635,6 +3881,18 @@
      "title": "Steps",
      "type": "array"
     },
+    "subject": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/Subject"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "beats: the one subject the story is about, kept the same from shot to shot (see Subject): beats without an `image` start on a picture of it made from the reference by the image editor"
+    },
     "surface": {
      "anyOf": [
       {
@@ -3701,6 +3959,91 @@
     "id"
    ],
    "title": "FilmScene",
+   "type": "object"
+  },
+  "Finish": {
+   "additionalProperties": false,
+   "description": "The finishing pass over a finished film (engine/finish.py), after it is generated and joined and before it is\nencoded for the page: a SeedVR2 restore (grain and compression mush out, fine detail redrawn), a deflicker and a\nlight temporal denoise, an optional sharpen, and frame interpolation where the motion is slow. Each step is its own\ncached stage keyed by the film and its settings. `finish: true` takes every default.",
+   "properties": {
+    "batch": {
+     "default": 21,
+     "description": "SeedVR2 frames restored together (4n+1). More frames: steadier detail from frame to frame (less shimmer), more VRAM",
+     "maximum": 49,
+     "minimum": 5,
+     "title": "Batch",
+     "type": "integer"
+    },
+    "deflicker": {
+     "default": false,
+     "description": "Even out frame-to-frame brightness flicker (FFmpeg deflicker, over 5 frames). Off by default: on a moving camera it chases real changes of light and measured worse; turn it on for a clip that visibly pulses",
+     "title": "Deflicker",
+     "type": "boolean"
+    },
+    "denoise": {
+     "default": 0.25,
+     "description": "Temporal denoise: pixels that only shimmer from frame to frame are averaged with their neighbours in time (FFmpeg atadenoise; edges and real motion are kept by its thresholds). 0 = off, 1 = strong (can smear fine moving texture)",
+     "maximum": 1,
+     "minimum": 0,
+     "title": "Denoise",
+     "type": "number"
+    },
+    "interpolate": {
+     "default": "off",
+     "description": "Double the frame rate with a frame interpolator (smoother slow scrolling, twice the frames in the page's film). auto: only with a RIFE/FILM checkpoint in ComfyUI and only when the film's motion is slow (`slow`), where interpolation is clean; on: always, with FFmpeg's minterpolate when there is no checkpoint (it leaves halos along moving edges)",
+     "enum": [
+      "off",
+      "auto",
+      "on"
+     ],
+     "title": "Interpolate",
+     "type": "string"
+    },
+    "interpolator": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "A RIFE or FILM checkpoint in ComfyUI's models/frame_interpolation folder (ComfyUI's own FrameInterpolate node). Default: the first one ComfyUI lists",
+     "title": "Interpolator"
+    },
+    "restore": {
+     "anyOf": [
+      {
+       "maximum": 2160,
+       "minimum": 480,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": 1088,
+     "description": "Run SeedVR2 at this height (1088 keeps a 1920x1088 film's size and redraws its detail; 1440 or 2160 enlarge it). null skips it. Slow: about a minute and a half per second of film at 1088",
+     "title": "Restore"
+    },
+    "sharpen": {
+     "default": 0.3,
+     "description": "A light unsharp mask after the denoise (0 = off; 0.3, the default, gives back the fine detail the denoise softens without halos; higher shows halos)",
+     "maximum": 1,
+     "minimum": 0,
+     "title": "Sharpen",
+     "type": "number"
+    },
+    "slow": {
+     "default": 6.0,
+     "description": "interpolate auto: the most motion, in pixels a frame at 1920 wide (the film's median), that still counts as slow",
+     "exclusiveMinimum": 0,
+     "maximum": 60,
+     "title": "Slow",
+     "type": "number"
+    }
+   },
+   "title": "Finish",
    "type": "object"
   },
   "FontFile": {
@@ -12526,6 +12869,49 @@
     "image"
    ],
    "title": "StripItem",
+   "type": "object"
+  },
+  "Subject": {
+   "additionalProperties": false,
+   "description": "The one subject a story film is about (a person, a product, an animal), kept the same from shot to shot. Every\ngenerated beat without its own `image` starts on a picture made from this reference by the local image editor\n(Qwen-Image-Edit): the beat's `prompt` as the new scene, the subject kept as it is in the reference. Within a shot the\nvideo model starts on that picture, so the subject keeps its identity across the film.",
+   "properties": {
+    "image": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "$ref": "#/$defs/ImageInput"
+      }
+     ],
+     "description": "The reference: a file (inputs/hero.png) or an image input (generate:, a product still ...). A clear, well-lit picture of the subject alone works best",
+     "title": "Image"
+    },
+    "keep": {
+     "default": "face, hair, clothes, shape and colours",
+     "description": "What must not change from the reference",
+     "title": "Keep",
+     "type": "string"
+    },
+    "name": {
+     "default": "the subject",
+     "description": "What the subject is, as you would say it to a person: 'the woman in the red coat', 'the white ceramic cup'. The editor is told to keep exactly that",
+     "title": "Name",
+     "type": "string"
+    },
+    "steps": {
+     "default": 30,
+     "description": "Image editor steps per start picture",
+     "maximum": 60,
+     "minimum": 4,
+     "title": "Steps",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "image"
+   ],
+   "title": "Subject",
    "type": "object"
   },
   "Take": {

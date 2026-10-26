@@ -1654,12 +1654,75 @@ class CameraMove(Model):
         return {"keys": v} if isinstance(v, list) else v
 
 
+CameraMoveName = Literal["static", "dolly-in", "dolly-out", "crash-zoom", "dolly-zoom", "orbit-left", "orbit-right",
+                         "crane-up", "crane-down", "fpv", "whip-pan", "push-through"]
+
+CAMERA_MOVE_DOC = (
+    "A named camera move (engine/camera_moves.py), flown through the start image's depth and followed by the video model "
+    "like keyed moves: static (locked-off tripod), dolly-in / dolly-out (the camera travels toward or away from `at`, near "
+    "things grow faster than far ones), crash-zoom (a sudden lens zoom into `at`, then a hold), dolly-zoom (vertigo: the "
+    "subject keeps its size while the background swells), orbit-left / orbit-right (an arc around the subject, which stays "
+    "put while the foreground and background slide past each other), crane-up / crane-down (the camera rises or sinks, "
+    "tilting to keep the subject), fpv (a drone flying forward with a banking roll), whip-pan (a fast pan with motion "
+    "blur), push-through (a deep push past the foreground into the scene beyond). See docs/scenes.md for which read "
+    "clearly on LTX-2.3")
+
+
+class CameraPreset(CameraMove):
+    """A named camera move on a generated beat: `camera: dolly-in`, or `camera: {move: orbit-left, amount: 0.8, at: [0.4,
+    0.5]}`. Everything a keyed move takes (backend, subjects, soften, guide_strength, res, anchor, match, seed) applies;
+    the camera path comes from the move instead of `keys`."""
+    move: CameraMoveName = Field(..., description=CAMERA_MOVE_DOC)
+    keys: list[FreezeKey] = Field(default_factory=list, description="Not used by a named move (its path is the move's): "
+                                  "leave it out")
+    amount: float = Field(1.0, ge=0.25, le=2.0, description="How far the move goes: 1 is the tested recipe, 0.5 half as "
+                          "far, 1.5 further (a deeper push, a wider arc, a faster zoom)")
+    anchor: Optional[float] = Field(None, ge=0, le=1, description="How firmly the pure-camera render is pinned along the "
+                                    "way (as a keyed move's `anchor`). Default: the move's tested value, 0.6 for dollies, "
+                                    "zooms, whip pans and static shots, 0.3 for moves that open gaps behind near things "
+                                    "(orbit, crane, dolly zoom, fpv, push-through), which the model then repaints")
+    at: Optional[tuple[float, float]] = Field(None, description="The point the move is about, x y in 0-1 of the start image "
+                                              "(the subject): where a dolly or a zoom goes, what an orbit or a crane keeps "
+                                              "still, what a dolly zoom keeps the same size. Default: the centre")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _bare_name(cls, v):
+        return {"move": v} if isinstance(v, str) else v
+
+    @model_validator(mode="after")
+    def _named(self):
+        if self.keys:
+            raise ValueError(f"camera move '{self.move}': a named move has no `keys` (its path is the move's); write keys "
+                             "without `move` for a keyed camera")
+        if self.at is not None and not all(0 <= v <= 1 for v in self.at):
+            raise ValueError(f"camera move '{self.move}': `at` {list(self.at)} must be x y inside 0-1")
+        if self.continues:
+            raise ValueError(f"camera move '{self.move}': a named move starts its own shot; `continues` carries keyed "
+                             "cameras across a cut (write keys)")
+        return self
+
+
+def _camera_in(v):
+    """`camera:` as written: a move's name or a mapping with `move` is a named move, keys (a list or a mapping) a keyed
+    one."""
+    if isinstance(v, str) or (isinstance(v, dict) and "move" in v):
+        return CameraPreset.model_validate(v)
+    return v
+
+
 # ---------------------------------------------------------------------------------------------------------------
 
 
 def _check_camera(b) -> None:
     """Validate a generated beat's `camera:` (keys inside the frame, going forward in time)."""
     c = b.camera
+    if isinstance(c, CameraPreset):
+        if b.trim:
+            raise ValueError(f"beat '{b.id}': `trim` cannot be combined with `camera` (the move is timed over the whole clip)")
+        if b.end_image is not None:
+            raise ValueError(f"beat '{b.id}': `end_image` cannot be combined with `camera` (the camera path decides the last frame)")
+        return
     ks = c.keys
     for i, k in enumerate(ks):
         x0, y0, x1, y1 = k.box
@@ -1704,10 +1767,16 @@ class Beat(Model):
     freeze: Optional[Freeze] = Field(None, description="A frozen moment instead of a generated clip: one frame, upscaled, "
                                                        "with a 2.5D camera moving through it, rendered offline in seconds "
                                                        "(see Freeze). prompt, motion, image and end_image are not used")
-    camera: Optional[CameraMove] = Field(None, description="A keyed camera move on this moving beat (see CameraMove): "
-                                                         "`camera: {keys: [{t: 0, box: [0,0,1,1]}, {t: 0.5, box: [...]}, ...]}`. "
-                                                         "The crowd keeps moving, the camera does what the keys say. Needs an "
-                                                         "`image` (or a `prompt` to make one); not for a frozen moment")
+    camera: Optional[Union[CameraMove, CameraPreset, CameraMoveName]] = Field(
+        None, description="A camera move on this moving beat: a named move (`camera: dolly-in`, or `{move: orbit-left, "
+                          "amount: 0.8}`, see CameraPreset) or keys (see CameraMove): `camera: {keys: [{t: 0, box: "
+                          "[0,0,1,1]}, {t: 0.5, box: [...]}, ...]}`. The crowd keeps moving, the camera does what the move "
+                          "or the keys say. Needs an `image` (or a `prompt` to make one); not for a frozen moment")
+
+    @field_validator("camera", mode="before")
+    @classmethod
+    def _camera_named(cls, v):
+        return _camera_in(v)
 
     @model_validator(mode="after")
     def _generated_or_frozen(self):
@@ -1759,6 +1828,69 @@ class Beat(Model):
         return _faces(v)
 
 
+class Finish(Model):
+    """The finishing pass over a finished film (engine/finish.py), after it is generated and joined and before it is
+    encoded for the page: a SeedVR2 restore (grain and compression mush out, fine detail redrawn), a deflicker and a
+    light temporal denoise, an optional sharpen, and frame interpolation where the motion is slow. Each step is its own
+    cached stage keyed by the film and its settings. `finish: true` takes every default."""
+    restore: Optional[int] = Field(1088, ge=480, le=2160, description="Run SeedVR2 at this height (1088 keeps a 1920x1088 "
+                                   "film's size and redraws its detail; 1440 or 2160 enlarge it). null skips it. Slow: "
+                                   "about a minute and a half per second of film at 1088")
+    batch: int = Field(21, ge=5, le=49, description="SeedVR2 frames restored together (4n+1). More frames: steadier "
+                       "detail from frame to frame (less shimmer), more VRAM")
+    deflicker: bool = Field(False, description="Even out frame-to-frame brightness flicker (FFmpeg deflicker, over 5 "
+                            "frames). Off by default: on a moving camera it chases real changes of light and measured "
+                            "worse; turn it on for a clip that visibly pulses")
+    denoise: float = Field(0.25, ge=0, le=1, description="Temporal denoise: pixels that only shimmer from frame to frame "
+                           "are averaged with their neighbours in time (FFmpeg atadenoise; edges and real motion are kept "
+                           "by its thresholds). 0 = off, 1 = strong (can smear fine moving texture)")
+    sharpen: float = Field(0.3, ge=0, le=1, description="A light unsharp mask after the denoise (0 = off; 0.3, the default, "
+                           "gives back the fine detail the denoise softens without halos; higher shows halos)")
+    interpolate: Literal["off", "auto", "on"] = Field("off", description="Double the frame rate with a frame interpolator "
+                                                     "(smoother slow scrolling, twice the frames in the page's film). auto: "
+                                                     "only with a RIFE/FILM checkpoint in ComfyUI and only when the film's "
+                                                     "motion is slow (`slow`), where interpolation is clean; on: always, "
+                                                     "with FFmpeg's minterpolate when there is no checkpoint (it leaves "
+                                                     "halos along moving edges)")
+    slow: float = Field(6.0, gt=0, le=60, description="interpolate auto: the most motion, in pixels a frame at 1920 wide "
+                        "(the film's median), that still counts as slow")
+    interpolator: Optional[str] = Field(None, description="A RIFE or FILM checkpoint in ComfyUI's models/frame_interpolation "
+                                        "folder (ComfyUI's own FrameInterpolate node). Default: the first one ComfyUI lists")
+
+    @model_validator(mode="after")
+    def _batch_shape(self):
+        if (self.batch - 1) % 4:
+            raise ValueError(f"finish.batch {self.batch}: SeedVR2 restores 4n+1 frames together (5, 9, 13, 17, 21, 25 ...)")
+        return self
+
+
+class Subject(Model):
+    """The one subject a story film is about (a person, a product, an animal), kept the same from shot to shot. Every
+    generated beat without its own `image` starts on a picture made from this reference by the local image editor
+    (Qwen-Image-Edit): the beat's `prompt` as the new scene, the subject kept as it is in the reference. Within a shot the
+    video model starts on that picture, so the subject keeps its identity across the film."""
+    image: ImageRef = Field(..., description="The reference: a file (inputs/hero.png) or an image input (generate:, a "
+                                             "product still ...). A clear, well-lit picture of the subject alone works best")
+    name: str = Field("the subject", description="What the subject is, as you would say it to a person: 'the woman in the "
+                      "red coat', 'the white ceramic cup'. The editor is told to keep exactly that")
+    keep: str = Field("face, hair, clothes, shape and colours", description="What must not change from the reference")
+    steps: int = Field(30, ge=4, le=60, description="Image editor steps per start picture")
+
+
+def subject_instruction(subject: Subject, prompt: str) -> str:
+    """The editor's instruction for one beat's start picture."""
+    return (f"Show {subject.name} from this image in a new photograph: {prompt.rstrip('. ')}. Keep {subject.name} exactly "
+            f"as in the image (same {subject.keep}); everything else follows the description.")
+
+
+def _finish_in(v):
+    if v is True:
+        return {}
+    if v is False:
+        return None
+    return v
+
+
 class FilmScene(SceneBase):
     """AI film scrubbed by scroll. Blender blockout -> Z-Image keyframes -> LTX-2.3 -> encode. Or `beats`: a story told
     in separate shots, each a generated still animated by LTX-2.3, joined with short crossfades; steps can pin
@@ -1773,6 +1905,12 @@ class FilmScene(SceneBase):
     beat_fade: float = Field(0.4, ge=0, le=2, description="beats: crossfade between shots, in seconds")
     beat_restore: Optional[int] = Field(None, description="beats: run SeedVR2 over the finished film at this height "
                                                           "(e.g. 1088) to clean grain and redraw fine detail; slow")
+    finish: Optional[Finish] = Field(None, description="The finishing pass over the finished film (see Finish): SeedVR2 "
+                                     "restore, deflicker, temporal denoise, sharpen, frame interpolation where motion is "
+                                     "slow. `finish: true` for the defaults")
+    subject: Optional[Subject] = Field(None, description="beats: the one subject the story is about, kept the same from "
+                                       "shot to shot (see Subject): beats without an `image` start on a picture of it made "
+                                       "from the reference by the image editor")
     gop: int = 6
     # ---- the one-take page (engine/journey.py)
     journey: Optional["Journey"] = Field(None, description="The page as one camera journey (see Journey): the world "
@@ -1796,6 +1934,11 @@ class FilmScene(SceneBase):
     @classmethod
     def _faces_in(cls, v):
         return _faces(v)
+
+    @field_validator("finish", mode="before")
+    @classmethod
+    def _finish_true(cls, v):
+        return _finish_in(v)
 
     @model_validator(mode="after")
     def _pointer_on_film(self):

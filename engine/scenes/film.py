@@ -393,9 +393,12 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
                     from ..camera_beats import make_frames as camera_frames
                     from ..animate import NEGATIVE
                     seed = b.camera.seed if b.camera.seed is not None else b.seed if b.motion_seed is None else b.motion_seed
+                    from ..camera_moves import negative as move_negative, phrase as move_phrase
+                    said = move_phrase(b.camera)
                     frames = camera_frames(ctx.project, sec, bi, still, bdir,
-                                           f"{imagery.treat(ctx.project, b.prompt, video=True) or 'The subject of the image'}. {b.motion}. Smooth natural motion.",
-                                           NEGATIVE, seed, wan_settings(ctx.options.get("site_wan")), ctx.log)
+                                           f"{imagery.treat(ctx.project, b.prompt, video=True) or 'The subject of the image'}. {b.motion}. "
+                                           + (f"{said}. " if said else "") + "Smooth natural motion.",
+                                           move_negative(b.camera, NEGATIVE), seed, wan_settings(ctx.options.get("site_wan")), ctx.log)
                 else:
                     frames = animate(still, imagery.treat(ctx.project, b.prompt, video=True), b.motion, b.seconds, b.seed if b.motion_seed is None else b.motion_seed,
                                      bdir, ctx.log, size=(W, H), strength=b.strength, end_image=end, model=model, wan=wan)
@@ -425,6 +428,10 @@ def beats_film(sec: FilmScene, ctx: BuildContext) -> Path:
             key["camera"] = camera_key(sec, bi)
             if not b.image and b.camera.continues and bi > 0:
                 key["image"] = ref_key(start_ref(sec, bi, (W, H)))
+        if sec.subject is not None and not b.image and key["image"] is None:   # only then, so other beats keep their cache
+            key["image"] = ref_key(start_ref(sec, bi, (W, H)))
+            if isinstance(sec.subject.image, str) and not sec.subject.image.startswith("http"):
+                key["subject_file"] = ref_key(sec.subject.image)        # a new reference file re-makes the start pictures
         look = imagery.of(ctx.project)
         if look is not None:     # the site's `imagery:` treatment is part of the beat (only when set: other beats keep their cache)
             key["imagery"] = look.model_dump(mode="json")
@@ -599,6 +606,10 @@ def build(sec: FilmScene, ctx: BuildContext, theme: dict) -> dict:
         from .. import faces
         faces.preflight(ctx)
         src = faces.restore_film(sec, ctx, src)
+    # ---- finish (engine/finish.py): SeedVR2 restore, deflicker, temporal denoise, interpolation, before the encode
+    if sec.finish is not None:
+        from .. import finish
+        src = finish.run(sec, ctx, src)
     cfg = encode(src, ctx, sec.gop)
     # ---- reveal (engine/reveal.py): tracked masks and the scroll-driven colour config, from the same film file
     if sec.reveal:
