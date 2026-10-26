@@ -887,7 +887,8 @@ class Step(Model):
                                                      "last shot")
     badge: Optional[Union[str, Badge]] = Field(None, description="A small pill above the headline: words, or "
                                                "`{text, href, tag, icon}` for a link with a 'New' tag or a dot")
-    image: Optional[ImageRef] = Field(None, description="parallax: this step's photo")
+    image: Optional[ImageRef] = Field(None, description="parallax: this step's photo (a step without one is another "
+                                                        "caption over the photo before it)")
     state: dict[str, Any] = Field(default_factory=dict,
         description="Scene-specific state for this step. chart: {show, focus, x, y, reveal, marks}; map: {center, zoom, pitch, bearing, route, marker}")
     show: Optional[tuple[float, float]] = Field(None, description=SHOW_DOC)
@@ -2024,7 +2025,8 @@ class ShowroomScene(SceneBase):
 
 
 class ParallaxScene(SceneBase):
-    """Photos turned into 2.5D camera moves with an estimated depth map; one photo per step."""
+    """Photos turned into 2.5D camera moves with an estimated depth map; one photo per step, or several captions over
+    one photo (a step without an `image` keeps the photo before it)."""
     type: Literal["parallax"] = "parallax"
     layout: Literal["overlay", "split", "cards"] = "cards"
     move: Literal["dolly", "pan", "orbit", "rise"] = Field("dolly", description="Default camera move for each photo")
@@ -2490,6 +2492,17 @@ class Feature(Model):
     title: str
     body: Optional[str] = None
     meter: Optional[float] = Field(None, description="0-1 progress bar under the card")
+    image: Optional[ImageRef] = Field(None, description="An illustration at the top of the card: a file, URL or image "
+                                                        "input (generate:, ...). In a named medium (`imagery.medium`) it "
+                                                        "is drawn in it like every generated picture, and shown whole")
+
+    @model_serializer(mode="wrap")
+    def _late_fields(self, handler, info):
+        """`image` is left out of a dump while unset, so pages made before it existed stay the same."""
+        d = handler(self)
+        if isinstance(d, dict) and d.get("image", 0) is None:
+            d.pop("image")
+        return d
 
 
 class FeaturesBlock(BlockBase):

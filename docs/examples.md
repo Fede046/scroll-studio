@@ -25,7 +25,12 @@ Every example is a `site.yaml` in [`examples/`](../examples/) and rebuilds with 
 | **Film cuts** | `transition:` | [Halo Coffee](../examples/film-cuts/site.yaml) | A logo becomes the sun becomes a cup; iris, wipe, whip, carry |
 | **Type in the world (film)** | `place:` | [Stillwater](../examples/type-in-the-world/site.yaml) | Headlines behind a spruce, painted on the deck, in the haze |
 | **Type in the world (photos)** | `place:` + `parallax` | [Casa Alta](../examples/type-in-the-world-stills/site.yaml) | Headlines behind the house and the olive tree |
-| **One medium, art-directed** | `imagery.medium` | [Kitewell](../examples/kitewell/site.yaml) | A risograph hero in the brand's two inks, calm where the headline sits; a toile band to close |
+| **One medium, art-directed** | `imagery.medium` | [Kitewell](../examples/kitewell/site.yaml) | A fintech page in risograph: the hero in the brand's two inks, calm where the headline sits, illustrated product panels and feature cards, a toile band to close |
+| **A light in your hand** | `imagery.medium` + `pointer: light` | [Gloamery](../examples/gloamery/site.yaml) | An AI painting tool in gouache: the studio is dark and the lamplight follows your pointer; dust turns in the light (`live:`) |
+| **Colour under a lens** | two media + `pointer: lens` | [Tarnhollow](../examples/tarnhollow/site.yaml) | Walking holidays: one watercolour printed as an engraving, its colour showing through a lens that follows the pointer |
+| **Halftone on a deep colour** | `imagery.paper: bg` + light `inks` | [Tidelow](../examples/tidelow/site.yaml) | A sleep speaker printed as a negative halftone on indigo: cream and coral dots, a sea that breathes (`live: flow`), a line of type that grows heavier |
+| **Words in their slots** | `at: {grid}` + `code` | [Millrace](../examples/millrace/site.yaml) | A job queue in brush and ink: three captions take their own thirds of the grid over the mill race, then the change flies by as live code in a dark editor room |
+| **Remake, then art-direct** | `studio remake` + `imagery.medium` | [Bramblecote](../examples/bramblecote/site.yaml) | An invented seed company's plain landing page (in `inputs/source/`) read by `studio remake`, its words and brand kept, then repainted in gouache |
 | **Direction boards** | `studio directions` | [Kiln & Kettle](../examples/kiln-and-kettle/site.yaml) | Six art directions for one brief, side by side |
 | **One take with a real product** | `film` + `take` | [Stillwater](../examples/one-take/site.yaml) | A mountain ridge down to a bottle on a lakeside table; the bottle is its real 3D model |
 | **Story film** | `film` | [Lodestar Orbital](../examples/lodestar-orbital/site.yaml) | A rocket launch to orbit, generated locally |

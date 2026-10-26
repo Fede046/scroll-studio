@@ -326,15 +326,16 @@ def build_site(project: Project, log: Callable[[str], None] = print,
             e["s"] = tiles(e["s"])
     def block_media(s) -> dict:
         """The media a block shows (images resized and written as WebP, files copied in), keyed as the templates read them."""
-        x = {"backdrop": block_image(getattr(s, "backdrop", None), 2400)}
+        x = {"backdrop": block_image(getattr(s, "backdrop", None), 2560)}
         if s.type == "hero":
             from ..inputs import hero_image
             img, side = hero_image(project, s)
-            x["img"], x["video"] = block_image(img, 2400), publish(s.video)
+            x["img"], x["video"] = block_image(img, 2560), publish(s.video)
             if side and x["img"] and not s.video:      # words over a calm side: their colour from the picture
-                from ..medium import tone
+                from ..medium import phone_crop, tone
                 from PIL import Image
-                x["calm"] = {"side": side, "tone": tone(Image.open(media / Path(x["img"]).name), side)}
+                shown = Image.open(media / Path(x["img"]).name)
+                x["calm"] = {"side": side, "tone": tone(shown, side), "phone": phone_crop(shown, side)}
             x["screen"] = block_image(s.device.image, 800) if s.device and s.device.image else None
             x["clip"] = publish(s.device.video) if s.device and s.device.video else None
         elif s.type == "product":
@@ -350,6 +351,8 @@ def build_site(project: Project, log: Callable[[str], None] = print,
             x["behind"] = block_image(s.behind.image, 800) if s.behind and s.behind.image else None
             x["behind_clip"] = publish(s.behind.video) if s.behind and s.behind.video else None
         elif s.type == "strip":
+            x["imgs"] = [block_image(it.image, 900) for it in s.items]
+        elif s.type == "features" and any(it.image is not None for it in s.items):
             x["imgs"] = [block_image(it.image, 900) for it in s.items]
         row = s if s.type == "logos" else getattr(s, "logos", None)
         if row is not None:

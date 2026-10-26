@@ -270,6 +270,35 @@ def test_ink_is_black_line_work_with_washes_in_the_accent():
     assert hue.max() > 0.15 and acc[2] > acc[0]
 
 
+DEEP = {"bg": "#16142b", "ink": "#efe7da", "accent": "#ff7a59", "accent2": "#8fb8ff"}
+
+
+@pytest.mark.parametrize("name", ["halftone", "engraving", "toile", "ink", "risograph"])
+def test_light_inks_on_a_dark_paper_print_a_negative(name):
+    """`imagery.paper: bg` on a dark site with light inks: the inks cover the paper where the picture is light (opaque,
+    as a screen print on dark stock), instead of multiplying into it and vanishing."""
+    pal = medium.palette(name, DEEP, inks=["ink", "accent"], paper="bg")
+    assert medium.negative(pal) and pal["paper"] == medium.rgb(DEEP["bg"])
+    img = Image.new("RGB", (480, 272), (8, 8, 12))
+    ImageDraw.Draw(img).ellipse((300, 40, 420, 160), fill=(250, 248, 240))         # a white moon on a black sky
+    ImageDraw.Draw(img).rectangle((20, 20, 200, 120), fill=(28, 40, 108))             # and a deep blue wall
+    out = np.asarray(medium.apply(img, name, pal, grain=0), np.float32)
+    sky, moon = out[200:260, 20:200].reshape(-1, 3).mean(0), out[80:120, 340:380].reshape(-1, 3).mean(0)
+    paper = np.array(pal["paper"], np.float32)
+    assert np.abs(sky - paper).max() < 12, name                      # the dark of the picture is the bare paper
+    if name == "halftone":                                           # coloured or not: a dark colour is the stock too
+        assert np.abs(out[40:100, 40:180].reshape(-1, 3).mean(0) - paper).max() < 16
+    assert medium._lum(tuple(moon)) > medium._lum(tuple(paper)) * 8 and moon.min() > 150, name   # its light is the light ink
+
+
+def test_a_light_paper_prints_as_it_always_did():
+    pal = medium.palette("halftone", BRAND)
+    assert not medium.negative(pal)
+    layers = [(np.full((4, 4), 0.5, np.float32), pal["inks"][0])]
+    want = np.array(pal["paper"], np.float32) / 255 * (1 - 0.5 * (1 - np.array(pal["inks"][0], np.float32) / 255))
+    assert np.allclose(medium._print(pal["paper"], layers)[0, 0], want)
+
+
 def test_gouache_and_watercolour_lean_toward_the_brand():
     from skimage.color import rgb2lab
     for name in ("gouache", "watercolour"):
@@ -361,6 +390,51 @@ def test_finish_mirrors_or_regenerates_until_the_side_is_calm(tmp_path):
                          regenerate=lambda k: pytest.fail("regenerated"), log=logs.append).exists()
 
 
+def test_a_light_hero_keeps_a_dark_nav_over_it(tmp_path):
+    """A hero in a medium whose calm side came out light sets its words dark; the nav over it must not turn white."""
+    def hero_site(root, colour):
+        p = project(root, spec(sections=[{"type": "hero", "align": "left", "title": "Hello",
+                                          "image": {"file": "inputs/h.png", "medium": "engraving"}}]))
+        (p.root / "inputs").mkdir()
+        Image.new("RGB", (640, 360), colour).save(p.root / "inputs" / "h.png")
+        return compiler.build_site(p, log=lambda m: None).read_text(encoding="utf-8")
+    light = hero_site(tmp_path / "light", (250, 248, 240))
+    assert " hero-light" in light and " hero-media" not in light and "ss-surface-light ss-hero--media" in light
+    dark = hero_site(tmp_path / "dark", (10, 12, 20))
+    assert " hero-media" in dark and " hero-light" not in dark
+
+
+def test_a_phone_puts_the_words_where_its_column_of_the_picture_is_calm():
+    """A phone sees a narrow column of a hero's middle: calm at the top and busy lower down sends the words up."""
+    def picture(busy_rows):
+        im = Image.new("RGB", (1600, 900), (240, 236, 228))
+        d = ImageDraw.Draw(im)
+        rng = np.random.default_rng(2)
+        for _ in range(900):
+            x, y = rng.integers(560, 1040), rng.integers(*busy_rows)
+            d.rectangle((x, y, x + 12, y + 12), fill=(20, 20, 20))
+        return im
+    assert medium.phone_crop(picture((560, 900))) == {"x": 0.5, "place": "top"}    # a mill low in the middle: words above it
+    assert medium.phone_crop(picture((0, 220))) == {"x": 0.5, "place": "middle"}   # a kite up top: words stay centred
+    busy = picture((0, 900))                                          # busy all the way down the middle column
+    crop = medium.phone_crop(busy)
+    assert crop["x"] < 0.5                                            # the crop leans toward the calm left side
+    assert medium.phone_crop(busy, "right")["x"] > 0.5
+
+
+def test_a_full_bleed_print_is_made_at_the_width_the_page_serves(tmp_path):
+    """A picture with a calm side (a hero or a backdrop with words over it) is printed at PRINT_WIDTH, so a phone's narrow
+    crop shows the medium's own grain instead of a small print blown up; other pictures keep their size."""
+    p = project(tmp_path, spec())
+    src = p.root / "small.png"
+    fixture(960, 544).save(src)
+    pal = medium.palette("risograph", BRAND)
+    hero = Image.open(medium.finish(p, src, "risograph", pal, 7, None, "left", log=lambda m: None))
+    assert hero.size == (medium.PRINT_WIDTH, round(544 * medium.PRINT_WIDTH / 960))
+    plate = Image.open(medium.finish(p, src, "risograph", pal, 7, None, None, log=lambda m: None))
+    assert plate.size == (960, 544)
+
+
 def test_a_file_in_a_medium_resolves_through_the_recipe(tmp_path):
     p = project(tmp_path, spec())
     (p.root / "inputs").mkdir()
@@ -368,6 +442,28 @@ def test_a_file_in_a_medium_resolves_through_the_recipe(tmp_path):
     out = resolve_image(p, ImageInput(file="inputs/a.png", medium="toile"), log=lambda m: None)
     assert out.name.startswith("med_") and out.parent == p.build / "_generated"
     assert resolve_image(p, ImageInput(file="inputs/a.png"), log=lambda m: None).name == "a.png"
+
+
+# ---------------------------------------------------------------- illustrated feature cards
+
+def test_feature_cards_take_an_illustration_in_the_medium(tmp_path):
+    from engine.plan import image_refs
+    from engine.spec import Feature
+    assert "image" not in Feature(title="Plain").model_dump()          # old pages dump as they did
+    p = project(tmp_path, spec(sections=[{"type": "features", "title": "Three things", "items": [
+        {"title": "One", "body": "First.", "image": {"file": "inputs/a.png", "medium": "risograph"}},
+        {"title": "Two", "body": "Second.", "image": {"file": "inputs/a.png", "medium": "risograph"}},
+        {"title": "Three", "body": "Third."}]}]))
+    (p.root / "inputs").mkdir()
+    fixture().save(p.root / "inputs" / "a.png")
+    sec = p.load().sections[0]
+    assert [r[0] for r in image_refs(sec)] == ["card 1", "card 2"]
+    logs = []
+    html = compiler.build_site(p, log=logs.append).read_text(encoding="utf-8")
+    assert html.count('class="ss-feature__art"') == 2 and html.count("ss-feature--art") == 3
+    assert sum("medium: risograph" in m for m in logs) == 1             # the same file is printed once, then cached
+    plain = project(tmp_path / "plain", spec(sections=[{"type": "features", "items": [{"title": "One"}]}]))
+    assert "ss-feature__art" not in compiler.build_site(plain, log=lambda m: None).read_text(encoding="utf-8")
 
 
 # ---------------------------------------------------------------- the example
@@ -384,6 +480,7 @@ def test_the_example_builds_on_the_cpu_in_its_media(tmp_path):
     assert "ss-product__img--plate" in html
     assert any("composition: left side calm" in m for m in logs)
     assert any("medium: toile in #2f4fd8 on #f6f1e7" in m for m in logs)
-    assert sum("medium: risograph" in m for m in logs) == 2
-    for name in ("hero.jpg", "product.jpg", "band.jpg"):
+    assert sum("medium: risograph" in m for m in logs) == 6        # hero, two product panels, three feature cards
+    assert html.count('class="ss-feature__art"') == 3
+    for name in ("hero.jpg", "product.jpg", "invoices.jpg", "card-tax.jpg", "card-payroll.jpg", "card-cards.jpg", "band.jpg"):
         assert (root / "inputs" / name).stat().st_size < 1_500_000

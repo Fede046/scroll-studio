@@ -193,6 +193,9 @@ def test_type_rules():
     assert checks(fs) == [("warn", "hierarchy"), ("warn", "line-length"), ("warn", "line-length")]
     assert sorted(f["what"].split(" runs ")[1].split(" ")[0] for f in fs if f["check"] == "line-length") == ["22", "96"]
     assert M.type_findings("intro", "desktop", 60, 17, [], []) == []
+    pull = dict(narrow, size=30.0)                                    # a pull quote at display size: short lines are its measure
+    assert M.type_findings("quote", "phone", 0, 0, [pull], []) == []
+    assert checks(M.type_findings("quote", "phone", 0, 0, [dict(narrow, size=17.0)], [])) == [("warn", "line-length")]
 
     def head(n):
         return [{"text": "A long headline", "nlines": n, "lines": [10] * n}]
@@ -599,3 +602,185 @@ def test_a_page_that_never_gets_ready_says_so(chromium, tmp_path, monkeypatch):
     monkeypatch.setattr(pw.Page, "wait_for_function", lambda self, expr, timeout=None, **k: orig(self, expr, timeout=500, **k))
     with pytest.raises(P.Nothing, match="never became ready"):
         P.inspect_page(Project(tmp_path), log=lambda m: None)
+
+
+def test_a_tall_overlay_caption_on_a_phone_stops_below_the_nav(chromium, tmp_path):
+    """An overlay caption is centred a quarter of the way down a phone; a tall one used to grow up under the nav."""
+    from playwright.sync_api import sync_playwright
+
+    from engine.compile import compiler, fonts
+    from engine.serve import serve
+    root = tmp_path / "site"
+    root.mkdir()
+    spec = {"name": "Tall", "theme": {"preset": "paper"}, "sections": [
+        {"id": "desk", "type": "diorama", "layout": "overlay", "world": {"kind": "desk", "seed": 4},
+         "places": [{"name": "Notebook", "kind": "notebook"}],
+         "steps": [{"intro": True, "at": "left", "kicker": "Kicker", "title": "A headline long enough to take three lines",
+                    "body": LONG, "button": {"label": "Go", "href": "#"}}]},
+        {"type": "cta", "title": "End"}]}
+    (root / "site.yaml").write_text(yaml.safe_dump(spec, sort_keys=False), encoding="utf-8")
+    saved = fonts.vendor
+    fonts.vendor = lambda links, dist, log=print: None
+    try:
+        compiler.build_site(Project(root), log=lambda m: None)
+    finally:
+        fonts.vendor = saved
+    httpd = serve(root / "dist", 0, background=True)
+    try:
+        with sync_playwright() as p:
+            b = p.chromium.launch()
+            page = b.new_page(viewport={"width": 390, "height": 844}, reduced_motion="reduce")
+            page.goto(f"http://127.0.0.1:{httpd.server_address[1]}/", wait_until="load")
+            page.wait_for_timeout(800)
+            nav = page.eval_on_selector(".ss-nav", "e => e.getBoundingClientRect().bottom")
+            top = page.eval_on_selector("#desk .ss-caption", "e => e.getBoundingClientRect().top")
+            b.close()
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+    assert top >= nav, f"the caption starts at {top:.0f}px, under the nav that ends at {nav:.0f}px"
+
+
+def test_a_headline_in_a_narrow_grid_slot_fits_the_slot(chromium, tmp_path):
+    """A third of the grid is about 440 px on a laptop: a caption there sets its headline to the slot, not the screen."""
+    from playwright.sync_api import sync_playwright
+
+    from engine.compile import compiler, fonts
+    from engine.serve import serve
+    root = tmp_path / "site"
+    root.mkdir()
+    steps = [{"title": "Back-pressure at the door", "body": "Short.", "at": {"grid": f"{c} / span 4", "row": "top"},
+              "show": [0.05, 0.95]} for c in (1, 5, 9)]
+    spec = {"name": "Slots", "theme": {"preset": "paper"}, "sections": [
+        {"id": "desk", "type": "diorama", "layout": "overlay", "world": {"kind": "desk", "seed": 4},
+         "places": [{"name": "Notebook", "kind": "notebook"}], "steps": steps}, {"type": "cta", "title": "End"}]}
+    (root / "site.yaml").write_text(yaml.safe_dump(spec, sort_keys=False), encoding="utf-8")
+    saved = fonts.vendor
+    fonts.vendor = lambda links, dist, log=print: None
+    try:
+        compiler.build_site(Project(root), log=lambda m: None)
+    finally:
+        fonts.vendor = saved
+    httpd = serve(root / "dist", 0, background=True)
+    try:
+        with sync_playwright() as p:
+            b = p.chromium.launch()
+            page = b.new_page(viewport={"width": 1440, "height": 900}, reduced_motion="reduce")
+            page.goto(f"http://127.0.0.1:{httpd.server_address[1]}/", wait_until="load")
+            page.wait_for_timeout(500)
+            boxes = page.eval_on_selector_all("#desk .ss-captions--grid .ss-caption", """els => els.map(e => {
+                const h = e.querySelector('.ss-display');
+                return {slot: e.getBoundingClientRect().width, size: parseFloat(getComputedStyle(h).fontSize),
+                        right: h.getBoundingClientRect().right, edge: e.getBoundingClientRect().right};
+            })""")
+            b.close()
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+    assert len(boxes) == 3
+    for x in boxes:
+        assert x["size"] <= x["slot"] * 0.12 + 0.5, x            # the type follows the slot
+        assert x["right"] <= x["edge"] + 1, x                     # and the headline stays inside it
+
+
+def test_a_split_scene_with_its_picture_on_the_left_stacks_on_a_phone(chromium, tmp_path):
+    """`side: left` set two columns with a stronger rule than the phone's one column, so the picture and the copy were
+    squeezed side by side on a phone."""
+    from playwright.sync_api import sync_playwright
+
+    from engine.compile import compiler, fonts
+    from engine.serve import serve
+    root = tmp_path / "site"
+    (root / "inputs").mkdir(parents=True)
+    (root / "inputs" / "d.csv").write_text("year,value\n2020,1\n2021,3\n2022,2\n", encoding="utf-8")
+    spec = {"name": "Split", "theme": {"preset": "paper"}, "sections": [
+        {"id": "data", "type": "chart", "layout": "split", "side": "left", "data": "inputs/d.csv", "x": "year", "y": "value",
+         "steps": [{"title": "A line", "body": "It goes up and down."}]}, {"type": "cta", "title": "End"}]}
+    (root / "site.yaml").write_text(yaml.safe_dump(spec, sort_keys=False), encoding="utf-8")
+    saved = fonts.vendor
+    fonts.vendor = lambda links, dist, log=print: None
+    try:
+        compiler.build_site(Project(root), log=lambda m: None)
+    finally:
+        fonts.vendor = saved
+    httpd = serve(root / "dist", 0, background=True)
+    try:
+        with sync_playwright() as p:
+            b = p.chromium.launch()
+            page = b.new_page(viewport={"width": 390, "height": 844})
+            page.goto(f"http://127.0.0.1:{httpd.server_address[1]}/", wait_until="load")
+            tracks = page.eval_on_selector("#data .ss-split-grid", "e => getComputedStyle(e).gridTemplateColumns")
+            b.close()
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+    assert len(tracks.split()) == 1, tracks
+
+
+def test_a_grid_slot_in_the_middle_row_reads_on_a_phone(chromium, tmp_path):
+    """On a phone a slot caption reads where every caption does; a middle-row slot kept its wide-screen translate and
+    ran off the left edge."""
+    from playwright.sync_api import sync_playwright
+
+    from engine.compile import compiler, fonts
+    from engine.serve import serve
+    root = tmp_path / "site"
+    root.mkdir()
+    steps = [{"title": f"Slot in the {row} row", "body": "Short.", "at": {"grid": "1 / span 5", "row": row},
+              "show": [0.05, 0.95]} for row in ("top", "middle", "bottom")]
+    spec = {"name": "Rows", "theme": {"preset": "paper"}, "sections": [
+        {"id": "desk", "type": "diorama", "layout": "overlay", "world": {"kind": "desk", "seed": 4},
+         "places": [{"name": "Notebook", "kind": "notebook"}], "steps": steps}, {"type": "cta", "title": "End"}]}
+    (root / "site.yaml").write_text(yaml.safe_dump(spec, sort_keys=False), encoding="utf-8")
+    saved = fonts.vendor
+    fonts.vendor = lambda links, dist, log=print: None
+    try:
+        compiler.build_site(Project(root), log=lambda m: None)
+    finally:
+        fonts.vendor = saved
+    httpd = serve(root / "dist", 0, background=True)
+    try:
+        with sync_playwright() as p:
+            b = p.chromium.launch()
+            page = b.new_page(viewport={"width": 390, "height": 844}, reduced_motion="reduce")
+            page.goto(f"http://127.0.0.1:{httpd.server_address[1]}/", wait_until="load")
+            page.wait_for_timeout(400)
+            boxes = page.eval_on_selector_all("#desk .ss-captions--grid", "els => els.map(e => e.getBoundingClientRect().left)")
+            b.close()
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+    assert len(boxes) == 3 and all(x >= 0 for x in boxes), boxes
+
+
+def test_a_count_up_keeps_its_thousands_separators(chromium, tmp_path):
+    from playwright.sync_api import sync_playwright
+
+    from engine.compile import compiler, fonts
+    from engine.serve import serve
+    root = tmp_path / "site"
+    root.mkdir()
+    spec = {"name": "Figures", "theme": {"preset": "paper"}, "sections": [
+        {"type": "intro", "title": "Hello"},
+        {"type": "stats", "items": [{"value": "1,400", "label": "varieties"}, {"value": "96", "unit": "%", "label": "grow"}]}]}
+    (root / "site.yaml").write_text(yaml.safe_dump(spec, sort_keys=False), encoding="utf-8")
+    saved = fonts.vendor
+    fonts.vendor = lambda links, dist, log=print: None
+    try:
+        compiler.build_site(Project(root), log=lambda m: None)
+    finally:
+        fonts.vendor = saved
+    httpd = serve(root / "dist", 0, background=True)
+    try:
+        with sync_playwright() as p:
+            b = p.chromium.launch()
+            page = b.new_page(viewport={"width": 1440, "height": 900}, reduced_motion="reduce")
+            page.goto(f"http://127.0.0.1:{httpd.server_address[1]}/", wait_until="load")
+            page.evaluate("document.querySelector('.ss-stats').scrollIntoView()")
+            page.wait_for_timeout(500)
+            shown = page.eval_on_selector_all(".ss-stat .ss-v", "els => els.map(e => e.textContent.trim())")
+            b.close()
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+    assert shown == ["1,400", "96%"], shown

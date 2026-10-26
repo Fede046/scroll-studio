@@ -177,6 +177,9 @@ blockquote { hanging-punctuation: first last; }
 .ss-captions--grid.ss-captions--row-bottom { top: auto; bottom: 12%; }
 .ss-captions--grid .ss-caption { grid-column: var(--col); }
 :is(.ss-captions--top, .ss-captions--bottom, .ss-captions--box, .ss-captions--grid) .ss-caption { position: relative; top: auto; transform: none; }
+/* a caption in a grid slot or a box sets its headline to fit the slot, not the screen (a third of the grid is narrow) */
+:is(.ss-captions--box, .ss-captions--grid) .ss-caption { container-type: inline-size; }
+:is(.ss-captions--box, .ss-captions--grid) .ss-caption .ss-display { font-size: max(26px, min(calc(clamp(40px, 5.4vw, 86px) * var(--type-scale)), 12cqi)); }
 .ss-captions--align-right, .ss-at--align-right .ss-card { text-align: right; }
 .ss-captions--align-center, .ss-at--align-center .ss-card { text-align: center; }
 :is(.ss-captions--top, .ss-captions--bottom, .ss-captions--align-center) .ss-eyebrow { justify-content: center; }
@@ -267,6 +270,10 @@ blockquote { hanging-punctuation: first last; }
 .ss-tag { color: var(--ink-3); }
 .ss-feature h3 { font-family: var(--font-display); font-weight: var(--display-weight); font-size: 28px; letter-spacing: -.02em; line-height: 1.1; margin-bottom: 12px; }
 .ss-feature p { color: var(--ink-2); line-height: 1.6; font-size: 15px; }
+/* a card with an illustration (`features.items[].image`): the picture on top, the words under it, nothing pushed apart */
+.ss-feature--art { justify-content: flex-start; gap: 18px; padding-top: 20px; min-height: 0; }
+.ss-feature__art { margin: 0 -12px 6px; aspect-ratio: 4 / 3; overflow: hidden; border-radius: min(var(--radius), 10px); background: var(--bg-2); }
+.ss-feature__art img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .ss-meter { margin-top: 18px; height: 3px; background: var(--line); position: relative; }
 .ss-meter i { position: absolute; inset: 0 auto 0 0; background: var(--accent); box-shadow: 0 0 10px rgba(var(--accent-rgb), .6); }
 .ss-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px; }
@@ -326,6 +333,8 @@ blockquote { hanging-punctuation: first last; }
 .ss-panel::after { content: ""; position: absolute; inset: 0; background: #000; opacity: calc(var(--cover, 0) * .4); pointer-events: none; z-index: 5; }
 .layout-stack .ss-footer { position: relative; z-index: 1; background: var(--bg); }
 html.hero-media .ss-nav:not(.ss-solid) { --ink: #fff; --ink-rgb: 255, 255, 255; --ink-2: rgba(255, 255, 255, .82); color: #fff; }
+/* a hero whose picture is light (its words are dark) keeps a dark nav over it: the page's ink, or on a dark site its ground */
+html.mode-dark.hero-light .ss-nav:not(.ss-solid) { --ink: var(--bg); --ink-rgb: var(--bg-rgb); --ink-2: rgba(var(--bg-rgb), .82); color: var(--bg); }
 
 /* ---------------------------------------------------------------- hero */
 .ss-hero { position: relative; min-height: 100vh; min-height: 100svh; display: flex; align-items: center; justify-content: center;
@@ -337,17 +346,24 @@ html.hero-media .ss-nav:not(.ss-solid) { --ink: #fff; --ink-rgb: 255, 255, 255; 
   opacity: calc(1 - var(--hero-p, 0) * 1.4); transform: translateY(calc(var(--hero-p, 0) * -60px)); }
 .ss-hero--left { justify-content: flex-start; }
 /* A hero whose picture keeps one side calm for the words (engine/medium.py): a light scrim on that side only, no shade */
-.ss-hero--calm .ss-hero__shade { background: linear-gradient(90deg, color-mix(in srgb, var(--bg) 34%, transparent), transparent 58%); }
-.ss-hero--calm-right .ss-hero__shade { background: linear-gradient(270deg, color-mix(in srgb, var(--bg) 34%, transparent), transparent 58%); }
-.ss-hero--calm-center .ss-hero__shade, .ss-hero--calm-top .ss-hero__shade, .ss-hero--calm-bottom .ss-hero__shade {
-  background: radial-gradient(ellipse at 50% 50%, color-mix(in srgb, var(--bg) 26%, transparent), transparent 62%); }
+.ss-hero--calm { --calm-scrim: linear-gradient(90deg, color-mix(in srgb, var(--bg) 34%, transparent), transparent 58%); }
+.ss-hero--calm-right { --calm-scrim: linear-gradient(270deg, color-mix(in srgb, var(--bg) 34%, transparent), transparent 58%); }
+.ss-hero--calm-center, .ss-hero--calm-top, .ss-hero--calm-bottom {
+  --calm-scrim: radial-gradient(ellipse at 50% 50%, color-mix(in srgb, var(--bg) 26%, transparent), transparent 62%); }
+.ss-hero--calm .ss-hero__shade { background: var(--calm-scrim); }
 .ss-hero--calm.ss-hero--media .ss-h1 { text-shadow: none; }
 .ss-hero--left .ss-hero__in { align-items: flex-start; text-align: left; margin-right: auto; max-width: var(--max); }
+/* a calm-left hero keeps its copy on the calm half the picture left for it, so a long headline wraps before the subject */
+.ss-hero--calm-left .ss-hero__in { max-width: min(var(--max), 54vw); }
 .ss-hero .ss-h1 { margin: 0; }
 .ss-hero .ss-lede { max-width: 46ch; }
+/* over a calm picture (a light scrim, no shade) the lede is nearly the full ink: the running-text grey loses contrast on colour */
+.ss-hero--calm.ss-hero--media :is(.ss-lede, .ss-rating) { color: color-mix(in srgb, var(--ink) 92%, transparent); }
 .ss-hero--media .ss-h1 { text-shadow: 0 2px 40px rgba(0, 0, 0, .25); }
 .ss-badge { display: inline-flex; align-items: center; padding: 8px 16px; border-radius: 999px; font-size: 14px; font-weight: 500;
   background: rgba(var(--ink-rgb), .1); border: 1px solid rgba(var(--ink-rgb), .22); }
+/* over a picture the pill is frosted in the hero's own background, so it reads on whatever part of the picture it lands */
+.ss-hero--media .ss-badge, .ss-hero--media .ss-btn:not(.ss-btn--hot):not(:hover) { background: color-mix(in srgb, var(--bg) 62%, transparent); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
 .ss-btns { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; }
 .ss-hero:not(.ss-hero--left) .ss-btns { justify-content: center; }
 
@@ -459,6 +475,9 @@ a.ss-rating:hover .ss-rating__text { text-decoration: underline; text-underline-
 .ss-hero--kit.ss-hero--left.ss-hero--media .ss-hero__shade { opacity: var(--shade-strength); background:
   linear-gradient(90deg, rgba(0, 0, 0, .42), rgba(0, 0, 0, .14) 55%, rgba(0, 0, 0, 0) 80%),
   linear-gradient(180deg, rgba(0, 0, 0, .28), rgba(0, 0, 0, 0) 30%, rgba(0, 0, 0, 0) 66%, rgba(0, 0, 0, .34)); }
+/* a calm hero (a picture made with quiet space for the words) keeps its light scrim and its copy on the calm half */
+.ss-hero--kit.ss-hero--calm.ss-hero--media .ss-hero__shade { opacity: 1; background: var(--calm-scrim); }
+.ss-hero--kit.ss-hero--calm-left .ss-hero__in { max-width: min(var(--max), 54vw); }
 /* the framed card: the section inset on a border in the theme's accents (wide screens; --frame-w is 0 on a phone) */
 .ss-block.ss-hero.ss-frame-card { background: var(--frame-bg); isolation: isolate;
   padding-inline: calc(var(--gutter) + var(--frame-w)); padding-bottom: calc(clamp(36px, 6vh, 64px) + var(--frame-w)); }
@@ -582,13 +601,17 @@ html:not(.js) .ss-strip { overflow-x: auto; }
 @media (max-width: 900px) {
   .ss-nav__links { display: none; }
   .ss-intro2, .ss-features, .ss-features--2, .ss-features--4, .ss-timeline, .ss-timeline--3, .ss-timeline--4 { grid-template-columns: 1fr; }
+  .ss-feature { padding: 28px 22px 32px; }   /* one card per row: the full-width card keeps a reading measure inside it */
   .ss-timeline { gap: 32px; border-top: 0; }
   .ss-stats, .ss-stats--3 { grid-template-columns: 1fr 1fr; row-gap: 44px; }
   .ss-telemetry { top: auto; bottom: 14vh; transform: none; width: 170px; }
   .ss-telemetry .ss-events { display: none; }
   .ss-captions { top: 26%; }
+  /* a caption centred on that line grows both ways: a tall one stops at the nav instead of running up under it */
+  .ss-captions:not(:is(.ss-captions--top, .ss-captions--bottom, .ss-captions--box, .ss-captions--grid, .ss-captions--top-left,
+    .ss-captions--top-right, .ss-captions--bottom-left, .ss-captions--bottom-right)) > .ss-caption { transform: translateY(max(-50%, calc(96px - 26svh))); }
   .ss-overlay .ss-shade { background: linear-gradient(to bottom, rgba(var(--bg-rgb), .75), transparent 55%), linear-gradient(to top, rgba(var(--bg-rgb), .7), transparent 30%); }
-  .ss-split-grid { grid-template-columns: 1fr; }
+  .ss-split-grid, .ss-side-left .ss-split-grid { grid-template-columns: 1fr; }   /* the picture on the left stacks too */
   .ss-split .ss-pin { order: -1; height: 60svh; padding-top: 60px; gap: 8px; z-index: 5; background: linear-gradient(var(--bg) 96%, rgba(var(--bg-rgb), 0)); }   /* opaque under the chart's source line */
   .ss-split .ss-visual { height: calc(60svh - 96px); }
   .ss-split .ss-step { min-height: calc(var(--h, 120vh) * .7); }
@@ -602,6 +625,8 @@ html:not(.js) .ss-strip { overflow-x: auto; }
   /* a step's own place (`at`) is for wide screens: on a phone it reads where its layout puts every step */
   .ss-captions--box, .ss-captions--grid { left: var(--gutter); top: 26%; bottom: auto; width: var(--caption-w); min-height: 0;
     padding: 0; transform: none; display: block; }
+  /* the row rules are stronger than the one above: on a phone a middle or bottom slot must not keep its wide-screen shift */
+  .ss-captions--grid:is(.ss-captions--row-top, .ss-captions--row-middle, .ss-captions--row-bottom) { top: 26%; bottom: auto; transform: none; }
   .ss-steps--over .ss-step.ss-at--grid { display: block; }
   .ss-split .ss-step.ss-at .ss-card { top: 62svh; }
   .ss-steps--over .ss-step.ss-at .ss-card { top: auto; width: auto; max-width: none; margin-left: -16px; margin-right: -16px; }
@@ -610,6 +635,17 @@ html:not(.js) .ss-strip { overflow-x: auto; }
   .ss-product__media { min-height: 52vh; }
   .ss-product__img { max-height: 52vh; }
   .ss-hero { padding: 110px var(--gutter) 70px; }
+  .ss-hero--calm-left .ss-hero__in, .ss-hero--kit.ss-hero--calm-left .ss-hero__in { max-width: none; }
+  /* where the top of the phone's view of the picture is its calmest part (measured at build), the words go up into it */
+  .ss-hero--phone-top { align-items: flex-start; padding-top: 128px; }
+  .ss-hero--kit.ss-hero--phone-top .ss-hero__in { margin-block: 0 auto; }
+  /* and the crop leans toward the calm side as far as the build measured it must (--phone-x on the picture) */
+  .ss-hero__media img { object-position: var(--phone-x, 50%) 50%; }
+  /* on a phone the words run the full width, so a calm hero's light scrim follows them down the middle, not one side */
+  .ss-hero--calm-left, .ss-hero--calm-right { --calm-scrim: linear-gradient(180deg, transparent 6%,
+    color-mix(in srgb, var(--bg) 30%, transparent) 28%, color-mix(in srgb, var(--bg) 30%, transparent) 78%, transparent 96%); }
+  .ss-hero--phone-top { --calm-scrim: linear-gradient(180deg, transparent 4%,
+    color-mix(in srgb, var(--bg) 30%, transparent) 14%, color-mix(in srgb, var(--bg) 30%, transparent) 66%, transparent 86%); }
   /* phones get the static layout (rings need more room): circles in rows under the brand */
   .ss-orbit__stage { --s: 96px; width: 100%; aspect-ratio: auto; padding: 8px 0; gap: 12px; }
   .ss-orbit__center { margin-bottom: 8px; }

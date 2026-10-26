@@ -48,7 +48,7 @@ pages:
   - { slug: support, title: Support, source: pages/support.md, nav: true }
 ```
 
-A `product` block's phone can play a screen recording instead of showing a screenshot: `device: { video: inputs/clips/write.mp4, image: inputs/write.jpg }` (muted, looping; the image is the poster). `pose:` picks the composition so a run of product panels doesn't repeat one: `beside` (default), `rise` (centred under centred copy, cut off by the panel's bottom edge), `close` (larger, cut off below), `lean` (tilted out of the lower corner), `pair` (with a second phone, `behind: { video: …, image: … }`, the two swapping places on a loop), `turn` (turned in perspective towards the copy). `stats: [{value, label}]` shows big figures under the body instead of tags. A `hero` takes a `device:` too, rising from the bottom edge under the copy. `theme.display_em: bold` sets `<em>` words as bold italics in the text's own colour instead of the accent colour. `scroll: { speed: 1.2 }` paces the smooth scroll, anchor scrolls and scroll-driven reveals (1 is the default; 1.2 is a fifth faster).
+A `product` block's phone can play a screen recording instead of showing a screenshot: `device: { video: inputs/clips/write.mp4, image: inputs/write.jpg }` (muted, looping; the image is the poster). `pose:` picks the composition so a run of product panels doesn't repeat one: `beside` (default), `rise` (centred under centred copy, cut off by the panel's bottom edge), `close` (larger, cut off below), `lean` (tilted out of the lower corner), `pair` (with a second phone, `behind: { video: …, image: … }`, the two swapping places on a loop), `turn` (turned in perspective towards the copy). `stats: [{value, label}]` shows big figures under the body instead of tags. A `hero` takes a `device:` too, rising from the bottom edge under the copy. `theme.display_em: bold` sets `<em>` words as bold italics in the text's own colour instead of the accent colour. A `features` card takes an `image:` (a file or `generate:`): an illustration on top of the card, with the words under it, so a row of cards reads as a set of pictures instead of three empty boxes. `scroll: { speed: 1.2 }` paces the smooth scroll, anchor scrolls and scroll-driven reveals (1 is the default; 1.2 is a fifth faster).
 
 Any section can sit on a full-bleed `backdrop:` (in the stack layout, the panel's own), with `surface:` picking the
 text colour. A backdrop can be a file, a URL, a `generate:` prompt, or a `gradient:` rendered on the spot with no
@@ -97,6 +97,8 @@ always has ([Margin](../examples/margin-notes/site.yaml) uses all of them):
   or `"1 / 7"`, on the theme's 12 columns between the gutters; `row: top | middle | bottom`). Overlay scenes take all
   three; in `cards` the card goes there; in `split` the copy keeps its column, so `at` takes a spot (its side and height).
   On a phone a box or a grid slot reads where the layout puts every caption.
+  In a photo `parallax`, a step without an `image` of its own is another caption over the photo before it, so
+  several captions can take their own places over one picture.
 - **`show: [from, to]`** is the window of the scene's progress the step is on screen for (overlay scenes). Scenes
   that time their own copy (`inside`, `light`, `diorama`, `code` steps with `state.file`, `film` steps with
   `state.beat`) fill it in for steps that leave it out. In `split` and `cards` a step shows while it scrolls past, for
@@ -417,13 +419,13 @@ read as one hand:
 | `watercolour` | dark, accent, accent2 | The picture's white becomes the paper, pigment pools at the edge of each wash and granulates, colours lean toward the brand's |
 | `ink` | the dark and the accent | Black brush work where the ink is loaded, the washes in the accent |
 
-The paper is the theme's background when it is pale, else a warm off-white. A model asked for a print often draws the
+The paper is the theme's background when it is pale, else a warm off-white. On a dark site, `imagery.paper: bg` with light `inks` (`[ink, accent]`) prints on the dark itself: the print becomes a negative, the light inks laid opaque where the picture is light, like a screen print on dark stock (halftone, engraving, toile, ink and risograph). A model asked for a print often draws the
 sheet's margin too; it is cut away so the picture runs to the edges. Set the inks yourself with `imagery.inks` (#hex or
 theme roles: accent, accent2, ink, bg, bg2, dark) and `imagery.paper`; `imagery.grain` (0-1) sets how much paper and
 ink texture. The other `imagery:` parts (light, mood, palette in words) still apply.
 
 **Which pictures.** The site's medium reaches every `generate:` image (heroes, backdrops, product shots, strips,
-galleries, parallax photos, a film beat's first frame; a film's clip is phrased in the medium's words but its frames
+feature cards, galleries, parallax photos, a film beat's first frame; a film's clip is phrased in the medium's words but its frames
 are not re-processed). A file you supply is left as it is, unless it asks: any image takes its own `medium:`, which
 also works on a file (the post-process only), and `medium: none` leaves one image out.
 
@@ -438,7 +440,7 @@ spread, at 320 px wide so paper grain and dot screens count as tone. Above 0.06 
 is mirrored, then regenerated with the next seeds (seed + 1000, + 2000), and the calmest is kept; the build says what
 it did, and when nothing passed. A file is only checked. A hero in a named medium gets `calm:` from its `align` (left,
 or center), sets its words light or dark from what that side turned out to be, and trades the heavy shade for a light
-scrim on the headline side only. Product shots in a medium are shown as whole prints (no knockout, no feathered edge).
+scrim on the headline side only. A full-bleed picture with a calm side is printed at 2560 px wide, the width the page serves it at, so a phone's narrow crop shows the medium's own grain and dots rather than a small print blown up. Product shots in a medium are shown as whole prints (no knockout, no feathered edge).
 
 Pages and caches built before this are untouched: a site without a named medium sends the same prompts and builds the
 same pictures. Example: [Kitewell](../examples/kitewell/site.yaml), a risograph fintech hero with a toile closing band,
