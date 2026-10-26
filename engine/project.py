@@ -17,7 +17,7 @@ from typing import Any, Callable, Optional
 import yaml
 
 from .config import settings
-from .spec import Site, Translation
+from .spec import Site, Translation, View
 
 
 class BuildError(RuntimeError):
@@ -77,15 +77,34 @@ class Project:
     def load(self) -> Site:
         return Site.model_validate(self.raw())
 
+    def read_yaml(self, rel: str, what: str) -> dict:
+        src = self.path(rel)
+        if not src.exists():
+            raise BuildError(f"{what}: {rel} not found")
+        with open(src, encoding="utf-8") as f:
+            return yaml.safe_load(f) or {}
+
+    def translated(self, t: Translation) -> dict:
+        """site.yaml with a translation laid over it, as a plain spec dict."""
+        data = overlay(self.raw(), self.read_yaml(t.file, f"translation '{t.lang}'"))
+        data["lang"] = t.lang
+        return data
+
     def load_translation(self, t: Translation) -> Site:
         """The site in another language: the translation file laid over site.yaml."""
-        src = self.path(t.file)
-        if not src.exists():
-            raise BuildError(f"translation '{t.lang}': {t.file} not found")
-        with open(src, encoding="utf-8") as f:
-            over = yaml.safe_load(f) or {}
-        data = overlay(self.raw(), over)
-        data["lang"], data["translations"] = t.lang, []
+        data = self.translated(t)
+        data["translations"] = []
+        return Site.model_validate(data)
+
+    def load_view(self, view: View, t: Optional[Translation] = None) -> Site:
+        """A view as a site of its own: the site's spec (in t's language) with the view's sections, and anything else
+        its file sets, in place of the home page's; its translation for that language laid over it."""
+        base = self.translated(t) if t else self.raw()
+        page = self.read_yaml(view.file, f"view '{view.slug}'")
+        if t and t.lang in view.translations:
+            page = overlay(page, self.read_yaml(view.translations[t.lang], f"view '{view.slug}' ({t.lang})"))
+        data = overlay({k: v for k, v in base.items() if k != "sections"}, {k: v for k, v in page.items() if k != "sections"})
+        data["sections"], data["translations"], data["views"] = page.get("sections", []), [], []
         return Site.model_validate(data)
 
     def save(self, data: dict | Site) -> None:

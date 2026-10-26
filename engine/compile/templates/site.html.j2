@@ -150,7 +150,7 @@
 </script>
 {% endif %}
 </head>
-<body>
+<body data-page="{{ page_id or "home" }}">
 {% if site.loader.enabled %}
 <div class="ss-loader" id="ss-loader" role="status" aria-live="polite">
   <div class="ss-loader__name">{{ site.loader.label or site.name }}</div>
@@ -162,7 +162,7 @@
 {% import "scene.html.j2" as scene %}
 
 <header class="ss-nav" id="ss-nav"><div class="ss-nav__in">
-  <a class="ss-wordmark" href="#">
+  <a class="ss-wordmark" href="{{ home_href or "#" }}">
     {% if logo and logo.startswith("M") %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="{{ logo }}"/></svg>{% elif logo %}<img src="{{ logo }}" alt="">{% endif %}
     <span>{{ site.name }}</span>
   </a>

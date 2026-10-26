@@ -516,6 +516,18 @@ class Translation(Model):
     file: str = Field(..., description="Translation YAML relative to the project folder (site.en.yaml)")
 
 
+class View(Model):
+    """Another full page of the site (projects, a case study), written to <slug>.html beside index.html: its own
+    sections, in the site's theme, nav, footer and stylesheet. Its file holds the sections and anything else it
+    changes (description); content blocks only, no scenes. In each translation it is written to <slug>.<lang>.html."""
+    slug: str = Field(..., description="File name: 'projects' is written to projects.html")
+    file: str = Field(..., description="YAML with the page's sections, relative to the project folder (projects.yaml)")
+    nav_label: Optional[str] = Field(None, description="Link it from the nav of every page")
+    nav_after: Optional[str] = Field(None, description="Id of the home section whose nav link it follows (default: last)")
+    translations: dict[str, str] = Field(default_factory=dict, description="Its copy in other languages, {lang: file}, "
+                                                                           "laid over its file like a site translation")
+
+
 class Site(Model):
     name: str
     description: str = ""
@@ -531,6 +543,7 @@ class Site(Model):
     footer: Footer = Field(default_factory=Footer)
     pages: list[Page] = Field(default_factory=list, description="Plain Markdown pages beside the site (privacy, support)")
     translations: list[Translation] = Field(default_factory=list, description="The site in other languages (see Translation)")
+    views: list[View] = Field(default_factory=list, description="More full pages beside the home page (see View)")
     css: Optional[str] = Field(None, description="A stylesheet in the project folder, added after the theme's own styles "
                                                  "(ornaments, a drop cap: touches no theme or style has)")
 

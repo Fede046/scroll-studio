@@ -137,7 +137,18 @@ sections:
 
 A site can add its own stylesheet for touches no theme or style has (ornaments, a drop cap, a pattern behind the
 page): `css: style.css`, a file in the project folder, added after the theme's styles. Project files it uses with
-`url(...)` are copied into the site as they are, so an animated SVG keeps its animation.
+`url(...)` are copied into the site as they are, so an animated SVG keeps its animation. Every page's `<body>` names
+it (`data-page="home"`, or a view's slug), so the stylesheet can treat pages differently.
+
+A site can have more full pages beside the home page, for projects or a case study: views, written to
+`<slug>.html` in the site's theme, nav, footer and stylesheet. A view's file holds its sections (content blocks, no
+scenes) and anything else it changes; its nav link can sit after any home section, and its anchors back to the home
+page are rewritten. Each translation gets `<slug>.<lang>.html`, from the view's own translation file.
+
+```yaml
+views:
+  - { slug: projects, file: projects.yaml, nav_label: Projects, nav_after: path, translations: { it: projects.it.yaml } }
+```
 
 A `product` block's phone can play a screen recording instead of showing a screenshot: `device: { video: inputs/clips/write.mp4, image: inputs/write.jpg }` (muted, looping; the image is the poster). `pose:` picks the composition so a run of product panels doesn't repeat one: `beside` (default), `rise` (centred under centred copy, cut off by the panel's bottom edge), `close` (larger, cut off below), `lean` (tilted out of the lower corner), `pair` (with a second phone, `behind: { video: …, image: … }`, the two swapping places on a loop), `turn` (turned in perspective towards the copy). `stats: [{value, label}]` shows big figures under the body instead of tags. A product can also play a wide clip in a rounded frame instead of a shot, `video: inputs/demo.mp4`, re-encoded for the web (H.264, no sound) on the first build, and `frame: true` shows its image whole as a photograph in the same rounded frame (a portrait, a place) instead of a cut-out shot. A `features` card with an `href` becomes a link, for a repository or a case study, and an `image` sits round beside its tag (an avatar, a logo); a `cta` takes `buttons:` for a row of links (email, LinkedIn, Telegram). A `hero` takes a `device:` too, rising from the bottom edge under the copy. `theme.display_em: bold` sets `<em>` words as bold italics in the text's own colour instead of the accent colour. `scroll: { speed: 1.2 }` paces the smooth scroll, anchor scrolls and scroll-driven reveals (1 is the default; 1.2 is a fifth faster).
 

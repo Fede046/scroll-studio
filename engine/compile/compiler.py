@@ -199,8 +199,23 @@ def build_site(project: Project, log: Callable[[str], None] = print,
     page_links = [{"label": p.title, "href": f"{p.slug}/"} for p in site.pages]
     languages = [{"lang": site.lang, "href": "index.html"}] + [{"lang": t.lang, "href": f"{t.lang}.html"} for t in site.translations]
 
-    def render(s: Site, out: Path) -> list[dict]:
-        """One language's page from its spec: the scene configs built above, the blocks' media, the template."""
+    def site_nav(home: Site, prefix: str, view_file: Callable) -> list[dict]:
+        """The nav of any page: the home page's section links (prefix: "" on the home page itself, its file on a
+        view), with each view's link after the section it names."""
+        if home.nav.links:
+            links = [(None, {"label": l.label, "href": prefix + l.href if l.href.startswith("#") else l.href}) for l in home.nav.links]
+        else:
+            links = [(s.id, {"label": s.nav_label, "href": f"{prefix}#{s.id}"})
+                     for s in home.sections if getattr(s, "nav_label", None) and s.id]
+        for v in home.views:
+            if v.nav_label:
+                at = next((i + 1 for i, (sid, _) in enumerate(links) if sid and sid == v.nav_after), len(links))
+                links.insert(at, (None, {"label": v.nav_label, "href": view_file(v)}))
+        return [l for _, l in links] + [l for l, p in zip(page_links, home.pages) if p.nav]
+
+    def render(s: Site, out: Path, nav: list[dict], langs: list[dict] = languages, home_href: str = "#",
+               page_id: str = "home") -> list[dict]:
+        """One page from its spec: the scene configs built above, the blocks' media, the template."""
         sections, credits = [], []
         for i, sec in enumerate(s.sections):
             e = {"s": sec, "scene": is_scene(sec), "config": None, "sdata": None,
@@ -240,20 +255,36 @@ def build_site(project: Project, log: Callable[[str], None] = print,
             if e["s"].type == "cta" and bg:
                 e["bg"] = finals.get(bg[6:]) if bg.startswith("scene:") else publish(bg)
 
-        nav = nav_links(s) + [l for l, p in zip(page_links, s.pages) if p.nav]
         html = env.get_template("site.html.j2").render(
-            site=s, sections=sections, theme=theme, css_vars=css_vars, custom_css=custom_css, logo=logo,
+            site=s, sections=sections, theme=theme, css_vars=css_vars, custom_css=custom_css, logo=logo, home_href=home_href, page_id=page_id,
             font_css=font_css, font_links=[] if font_css else links, nav_links=nav, page_links=page_links, credits=credits,
             configs={e["s"].id: e["config"] for e in sections if e["scene"]},
-            languages=[dict(l, current=l["lang"] == s.lang) for l in languages] if len(languages) > 1 else [],
+            languages=[dict(l, current=l["lang"] == s.lang) for l in langs] if len(langs) > 1 else [],
         )
         out.write_text(html, encoding="utf-8")
         return nav
 
-    nav = render(site, dist / "index.html")
-    for t in site.translations:
-        render(project.load_translation(t), dist / f"{t.lang}.html")
-        log(f"{t.lang} -> {dist / f'{t.lang}.html'}")
+    # Every language: its home page, then its views (<slug>.html, <slug>.<lang>.html), which link back to the home
+    # page's sections and take its nav and footer.
+    homes = [(None, site, "index.html")] + [(t, project.load_translation(t), f"{t.lang}.html") for t in site.translations]
+    for t, home, home_file in homes:
+        view_file = (lambda v: f"{v.slug}.html") if t is None else (lambda v, lang=t.lang: f"{v.slug}.{lang}.html")
+        n = render(home, dist / home_file, site_nav(home, "", view_file))
+        if t is None:
+            nav = n
+        else:
+            log(f"{t.lang} -> {dist / home_file}")
+        for v in site.views:
+            page = project.load_view(v, t)
+            if any(is_scene(sec) for sec in page.sections):
+                raise BuildError(f"view '{v.slug}': only content blocks, no scenes")
+            if page.nav.cta and page.nav.cta.href.startswith("#"):   # the CTA's anchor is on the home page
+                page = page.model_copy(update={"nav": page.nav.model_copy(update={
+                    "cta": page.nav.cta.model_copy(update={"href": home_file + page.nav.cta.href})})})
+            view_langs = [{"lang": site.lang, "href": f"{v.slug}.html"}] + [
+                {"lang": tt.lang, "href": f"{v.slug}.{tt.lang}.html"} for tt in site.translations]
+            render(page, dist / view_file(v), site_nav(home, home_file, view_file), view_langs, home_href=home_file, page_id=v.slug)
+            log(f"view -> {dist / view_file(v)}")
 
     # Media left from earlier builds (a photo swapped, a crop changed, a clip re-encoded) would ship with the site.
     if media.exists():
