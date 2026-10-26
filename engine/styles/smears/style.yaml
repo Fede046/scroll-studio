@@ -1,0 +1,27 @@
+# Smears: tokens and fonts for theme.style: smears. See engine/styles/README.md for the contract and
+# docs/styles/styles-32-33.md section 2 for the research.
+label: Smears
+about: "Spider-Verse timing for a page. Everything holds on twos: the page is sampled twelve times a second, nothing glides, and in the one frame where a pose changes the headline, the cards and the buttons are drawn as a smear (stretched along the move, with colour plates trailing). Scroll faster and the smear becomes multiples; there is no blur anywhere, and out-of-focus things are the ones whose colour plates have slipped. Crossing into the next section while moving breaks the picture into one impact frame of flat colour and speed lines, and each section is a different dimension with its own print texture."
+mode: dark
+scene_blocks: [features, stats, quote, faq, gallery]   # drawn its own way as steps inside a scene; other types use the default markup there
+colors:
+  bg: '#12062b'
+  bg2: '#1b0a42'
+  ink: '#ffffff'
+  accent: '#ff3d9a'
+  accent2: '#17d4ff'
+  accent_ink: '#12062b'
+  accent_text: '#ff3d9a'
+fonts:
+  display: Anton
+  body: Archivo
+  mono: Space Mono
+font_axes:
+  Anton: ""
+  Archivo: "ital,wght@0,300..800;1,300..800"
+  Space Mono: "wght@400;700"
+display_weight: 400
+radius: 0px
+# What a brand (theme.from) cannot change here: the dark room its CSS is drawn for
+requires:
+  mode: dark

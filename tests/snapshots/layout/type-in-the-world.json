@@ -1,0 +1,334 @@
+{
+ "example": "type-in-the-world",
+ "root": {
+  "class": [
+   "mode-dark",
+   "layout-flow"
+  ]
+ },
+ "cuts": [],
+ "sections": [
+  {
+   "id": "take",
+   "type": "film",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-scene",
+      "ss-overlay",
+      "ss-side-right",
+      "ss-type-film",
+      "ss-shade-auto"
+     ],
+     "id": "take",
+     "data": {
+      "data-scene": "film"
+     },
+     "text": {
+      "kicker": "Stillwater",
+      "title": "Cold from the source.",
+      "title_tag": "h1"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-track"
+       ],
+       "style": {
+        "height": "600vh"
+       },
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-stage"
+         ],
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-shade"
+           ]
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-captions"
+           ],
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0.02",
+              "data-to": "0.22"
+             },
+             "text": {
+              "kicker": "Stillwater",
+              "title": "Cold from the source.",
+              "title_tag": "h1"
+             }
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption",
+              "ss-has-world"
+             ],
+             "data": {
+              "data-from": "0.44",
+              "data-to": "0.58",
+              "data-world": "1"
+             },
+             "text": {
+              "kicker": "Dawn on the lake",
+              "title": "Down to the water.",
+              "title_tag": "h2"
+             }
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption",
+              "ss-has-world"
+             ],
+             "data": {
+              "data-from": "0.58",
+              "data-to": "0.7",
+              "data-world": "2"
+             },
+             "text": {
+              "kicker": "The deck",
+              "title": "Stay cold.",
+              "title_tag": "h2"
+             }
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption",
+              "ss-has-world"
+             ],
+             "data": {
+              "data-from": "0.86",
+              "data-to": "0.99",
+              "data-world": "3"
+             },
+             "text": {
+              "kicker": "The bottle",
+              "title": "Still cold at noon.",
+              "title_tag": "h2"
+             }
+            }
+           ]
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-cue"
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "sdata": {
+    "layout": "overlay",
+    "length": 6.0,
+    "steps": [
+     {
+      "kicker": "Stillwater",
+      "title": "Cold from <em>the source.</em>",
+      "body": null,
+      "fact": null,
+      "at": [
+       0.02,
+       0.22
+      ],
+      "length": 1.2,
+      "intro": true,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "Dawn on the lake",
+      "title": "Down to <em>the water.</em>",
+      "body": null,
+      "fact": null,
+      "at": [
+       0.44,
+       0.58
+      ],
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": {
+       "kind": "behind",
+       "at": "the spruce tree",
+       "x": 0.5,
+       "y": 0.3,
+       "size": 0.62,
+       "lines": null,
+       "align": "center",
+       "caps": false,
+       "track": null,
+       "weight": null,
+       "color": "auto",
+       "anchor": null,
+       "gap": 0.05,
+       "follow": null,
+       "haze": null,
+       "fog": 0.55,
+       "blur": null,
+       "wear": 0.35,
+       "relief": 0.8,
+       "quad": null,
+       "angle": 0.0,
+       "slant": 1.0,
+       "track_model": null
+      },
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "The deck",
+      "title": "Stay <em>cold.</em>",
+      "body": null,
+      "fact": null,
+      "at": [
+       0.58,
+       0.7
+      ],
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": {
+       "kind": "surface",
+       "at": "the wooden deck floor",
+       "x": 0.34,
+       "y": 0.84,
+       "size": 0.44,
+       "lines": null,
+       "align": "center",
+       "caps": false,
+       "track": null,
+       "weight": null,
+       "color": "auto",
+       "anchor": {
+        "beat": null,
+        "t": 0.69,
+        "frame": null,
+        "seconds": null
+       },
+       "gap": 0.05,
+       "follow": null,
+       "haze": null,
+       "fog": 0.55,
+       "blur": null,
+       "wear": 0.35,
+       "relief": 0.8,
+       "quad": null,
+       "angle": 0.0,
+       "slant": 1.0,
+       "track_model": null
+      },
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "The bottle",
+      "title": "Still cold <em>at noon.</em>",
+      "body": null,
+      "fact": null,
+      "at": [
+       0.86,
+       0.99
+      ],
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": {
+       "kind": "sky",
+       "at": null,
+       "x": null,
+       "y": 0.24,
+       "size": 0.7,
+       "lines": null,
+       "align": "center",
+       "caps": true,
+       "track": 0.12,
+       "weight": null,
+       "color": "auto",
+       "anchor": null,
+       "gap": 0.05,
+       "follow": null,
+       "haze": 0.2,
+       "fog": 0.35,
+       "blur": null,
+       "wear": 0.35,
+       "relief": 0.8,
+       "quad": null,
+       "angle": 0.0,
+       "slant": 1.0,
+       "track_model": null
+      },
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     }
+    ],
+    "hud": {
+     "kind": "none",
+     "fields": [],
+     "events": [],
+     "clock": null,
+     "scales": [],
+     "legend": []
+    }
+   }
+  },
+  {
+   "id": "order",
+   "type": "cta",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-cta"
+     ],
+     "id": "order",
+     "text": {
+      "kicker": "Pre-orders open",
+      "title": "Yours this spring.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-cta__in"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,16 @@
+{# Smears furniture: a caption bar along the top (the site name in a yellow caption box, the sections as small captions, the
+   call to action a slanted sticker), the impact frame (one fixed overlay the runtime shows for two frames when a new
+   section is crossed at speed), the pointer's trail (multiples on ones) and the frame-rate readout. The overlay, trail and
+   readout only exist once the runtime is sampling. #}
+{% macro top(site, sections, nav_links) %}
+<header class="sa-head">
+  <a class="sa-head__mark" href="#"><span>{{ site.name }}</span></a>
+  {% if nav_links %}<nav class="sa-head__nav" aria-label="Sections">{% for l in nav_links %}<a href="{{ l.href }}"><span>{{ l.label }}</span></a>{% endfor %}</nav>{% endif %}
+  {% if site.nav.cta %}<a class="sa-head__cta" href="{{ site.nav.cta.href }}"><span>{{ site.nav.cta.label }}</span></a>{% endif %}
+</header>
+<div class="sa-impact" aria-hidden="true" hidden></div>
+<div class="sa-trail" aria-hidden="true" hidden><i></i><i></i><i></i></div>
+<p class="sa-rate" aria-hidden="true" hidden><b data-sa-rate>HOLD</b> <span data-sa-fps>12 · TWOS</span></p>
+{% endmacro %}
+
+{% macro bottom(site, sections) %}{% endmacro %}

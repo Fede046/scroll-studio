@@ -4,10 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>{{ page.title }} · {{ site.name }}</title>
+<link rel="icon" href="{{ icon }}">
 {% if page.summary or site.description %}<meta name="description" content="{{ page.summary or site.description }}">{% endif %}
 <meta name="generator" content="Scroll Studio">
 {% if font_css %}<link rel="stylesheet" href="{{ font_css }}">
-{% else %}<link rel="preconnect" href="https://fonts.googleapis.com">
+{% endif %}{% if font_links or not font_css %}<link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 {% for href in font_links %}<link rel="stylesheet" href="{{ href }}">
 {% endfor %}{% endif %}
@@ -62,6 +63,7 @@
 <footer class="ss-footer"><div class="ss-wrap ss-footer__in">
   <span>{{ (site.footer.left or ("© " ~ site.name)) | rich }}</span>
   <span>{% for l in page_links %}<a href="{{ l.href }}">{{ l.label }}</a> · {% endfor %}{{ (site.footer.right or "") | rich }}</span>
-</div></footer>
+{% if concept %}  <p class="ss-footer__concept">{{ concept }}{% if product.url %} The real {{ product.name }}: <a href="{{ product.url }}" rel="noopener">{{ product.url.split("//")[-1].split("/")[0] }}</a>.{% endif %}</p>
+{% endif %}</div></footer>
 </body>
 </html>

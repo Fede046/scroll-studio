@@ -11,7 +11,6 @@ import os
 import shutil
 import socket
 import subprocess
-import sys
 import tempfile
 import time
 from pathlib import Path
@@ -67,7 +66,10 @@ class CDP:
 
 def record(dist: Path, out: Path, section: Optional[str] = None, size=(1920, 1080), seconds: float = 12.0,
            fps: int = 24, settle: float = 0.2, gif: bool = False, out_width: Optional[int] = None, poster_at: float = 0.5,
-           log: Callable[[str], None] = print, progress: Callable[[float, str], None] = lambda f, m="": None) -> Path:
+           log: Callable[[str], None] = print, progress: Callable[[float, str], None] = lambda f, m="": None,
+           dpr: float = 1.0, mobile: bool = False, span: tuple[float, float] = (0.0, 1.0)) -> Path:
+    """size is the CSS viewport; dpr scales the captured pixels (a phone: size=(540, 960), dpr=2, mobile=True).
+    span records only that part (0-1) of the section's (or page's) scroll."""
     import requests
     W, H = size
     port, dbg = _free_port(), _free_port()
@@ -91,7 +93,7 @@ def record(dist: Path, out: Path, section: Optional[str] = None, size=(1920, 108
         if not ws_url:
             raise BuildError("could not connect to headless Chrome")
         cdp = CDP(ws_url)
-        cdp.call("Emulation.setDeviceMetricsOverride", width=W, height=H, deviceScaleFactor=1, mobile=False)
+        cdp.call("Emulation.setDeviceMetricsOverride", width=W, height=H, deviceScaleFactor=dpr, mobile=mobile)
         cdp.call("Page.enable")
         cdp.call("Page.navigate", url=f"http://127.0.0.1:{port}/index.html")
         for _ in range(120):
@@ -99,7 +101,7 @@ def record(dist: Path, out: Path, section: Optional[str] = None, size=(1920, 108
                 break
             time.sleep(0.25)
         for _ in range(240):   # the loading screen holds scrolling until every scene's media is in
-            if cdp.js("document.documentElement.dataset.ssReady === '1' || !document.getElementById('ss-loader')"):
+            if cdp.js("(document.documentElement.dataset.ssReady === '1' || !document.getElementById('ss-loader')) && (!document.documentElement.dataset.style || document.documentElement.dataset.ssStyle === 'ready')"):
                 break
             time.sleep(0.25)
         time.sleep(1.5)
@@ -108,6 +110,7 @@ def record(dist: Path, out: Path, section: Optional[str] = None, size=(1920, 108
             if (!s) return [0, document.documentElement.scrollHeight - innerHeight];
             const top = s.getBoundingClientRect().top + scrollY;
             return [top, top + s.offsetHeight - innerHeight]; }})()""")
+        start, end = start + (end - start) * span[0], start + (end - start) * span[1]
         log(f"recording {section or 'page'}: {start:.0f} -> {end:.0f}px, {n} frames at {W}x{H}")
         for i in range(n + hold):
             t = min(1.0, i / max(n - 1, 1))
@@ -125,7 +128,7 @@ def record(dist: Path, out: Path, section: Optional[str] = None, size=(1920, 108
     out = Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)
     src = str(frames_dir / "%05d.jpg")
-    ow = out_width or W
+    ow = out_width or round(W * dpr)
     ffmpeg("-framerate", str(fps), "-i", src, "-vf", f"scale={ow}:-2:flags=lanczos", "-c:v", "libx264",
            "-crf", "18", "-preset", "slow", "-pix_fmt", "yuv420p", "-movflags", "+faststart", out.with_suffix(".mp4"))
     if gif:

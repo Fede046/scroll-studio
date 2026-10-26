@@ -1,0 +1,132 @@
+{# The one-take page (engine/journey.py): a film section with `journey:`. Every stop is a place with its blocks set as part
+   of it. Without JavaScript (or with reduced motion) the stops are stills with their blocks, in order; the runtime
+   (runtime/src/players/journey.ts) turns them into one sticky stage the camera travels through. #}
+{% import "blocks.html.j2" as blocks %}
+
+{# One block, set for a stop. `form` is the stop's (auto: each block type picks the one that suits it). #}
+{% macro block(b, x, form, first) %}
+{% set f = form if form != "auto" else ({"hero": "type", "intro": "type", "quote": "type", "cta": "type", "features": "rail", "timeline": "rail", "stats": "rail", "faq": "cards", "gallery": "cards", "product": "plaque"}[b.type]) %}
+{% if b.type == "hero" %}
+<div class="jy-blk jy-hero jy-form-{{ f }}">
+  {% if b.badge %}<p class="jy-kicker jy-r" style="--i:0">{{ b.badge }}</p>{% endif %}
+  {% if first %}<h1 class="jy-display jy-r" style="--i:1">{{ b.title | rich }}</h1>{% else %}<h2 class="jy-display jy-r" style="--i:1">{{ b.title | rich }}</h2>{% endif %}
+  {% if b.body %}<p class="jy-lede jy-r" style="--i:2">{{ b.body | rich }}</p>{% endif %}
+  {% if b.buttons %}<div class="jy-r" style="--i:3">{{ blocks.buttons(b.buttons) }}</div>{% endif %}
+</div>
+{% elif b.type == "intro" %}
+<div class="jy-blk jy-intro jy-form-{{ f }}">
+  {% if b.kicker %}<p class="jy-kicker jy-r" style="--i:0">{{ b.kicker }}</p>{% endif %}
+  <h2 class="jy-display jy-r" style="--i:1">{{ b.title | rich }}</h2>
+  {% if b.body %}<p class="jy-lede jy-r" style="--i:2">{{ b.body | rich }}</p>{% endif %}
+  {% if b.button %}<p class="jy-r" style="--i:3"><a class="ss-btn ss-btn--hot" href="{{ b.button.href }}">{{ b.button.label }} <span class="ss-arrow">→</span></a></p>{% endif %}
+</div>
+{% elif b.type == "features" %}
+<div class="jy-blk jy-features jy-form-{{ f }}">
+  {% if b.kicker %}<p class="jy-kicker jy-r" style="--i:0">{{ b.kicker }}</p>{% endif %}
+  {% if b.title %}<h2 class="jy-title jy-r" style="--i:1">{{ b.title | rich }}</h2>{% endif %}
+  <ol class="jy-rows">
+    {% for it in b.items %}
+    <li class="jy-row jy-r" style="--i:{{ loop.index + 1 }}">
+      <span class="jy-no" aria-hidden="true">{{ "%02d" | format(loop.index) }}</span>
+      <div>{% if it.tag %}<span class="jy-tag">{{ it.tag }}</span>{% endif %}<h3>{{ it.title | rich }}</h3>{% if it.body %}<p>{{ it.body | rich }}</p>{% endif %}</div>
+    </li>
+    {% endfor %}
+  </ol>
+</div>
+{% elif b.type == "stats" %}
+<div class="jy-blk jy-stats jy-form-{{ f }}">
+  <dl class="jy-figures">
+    {% for st in b.items %}
+    <div class="jy-fig jy-r" style="--i:{{ loop.index0 }}"><dd class="jy-v">{{ st.value }}{% if st.unit %}<sup>{{ st.unit }}</sup>{% endif %}</dd><dt class="jy-l">{{ st.label }}</dt></div>
+    {% endfor %}
+  </dl>
+</div>
+{% elif b.type == "timeline" %}
+<div class="jy-blk jy-features jy-form-{{ f }}">
+  {% if b.kicker %}<p class="jy-kicker jy-r" style="--i:0">{{ b.kicker }}</p>{% endif %}
+  {% if b.title %}<h2 class="jy-title jy-r" style="--i:1">{{ b.title | rich }}</h2>{% endif %}
+  <ol class="jy-rows">
+    {% for t in b.items %}
+    <li class="jy-row jy-r" style="--i:{{ loop.index + 1 }}">
+      <span class="jy-no">{{ t.when }}</span>
+      <div><h3>{{ t.title | rich }}</h3>{% if t.body %}<p>{{ t.body | rich }}</p>{% endif %}</div>
+    </li>
+    {% endfor %}
+  </ol>
+</div>
+{% elif b.type == "quote" %}
+<figure class="jy-blk jy-quote jy-form-{{ f }}">
+  <blockquote class="jy-r" style="--i:0">{{ b.text | rich }}</blockquote>
+  {% if b.who %}<figcaption class="jy-cite jy-r" style="--i:1">{{ b.who }}</figcaption>{% endif %}
+</figure>
+{% elif b.type == "cta" %}
+<div class="jy-blk jy-cta jy-form-{{ f }}">
+  {% if b.kicker %}<p class="jy-kicker jy-r" style="--i:0">{{ b.kicker }}</p>{% endif %}
+  <h2 class="jy-display jy-r" style="--i:1">{{ b.title | rich }}</h2>
+  {% if b.button %}<p class="jy-r" style="--i:2"><a class="ss-btn ss-btn--hot" href="{{ b.button.href }}">{{ b.button.label }} <span class="ss-arrow">→</span></a></p>{% endif %}
+</div>
+{% elif b.type == "product" %}
+<div class="jy-blk jy-product jy-form-{{ f }}">
+  {% if x and x.img %}<img class="jy-product__img jy-r" style="--i:0" src="{{ x.img }}" alt="" loading="lazy">{% endif %}
+  {% if b.kicker %}<p class="jy-kicker jy-r" style="--i:0">{{ b.kicker }}</p>{% endif %}
+  <h2 class="jy-title jy-r" style="--i:1">{{ b.title | rich }}</h2>
+  {% if b.body %}<p class="jy-lede jy-r" style="--i:2">{{ b.body | rich }}</p>{% endif %}
+  {% if b.stats %}<dl class="jy-figures">{% for st in b.stats %}<div class="jy-fig jy-r" style="--i:{{ loop.index + 2 }}"><dd class="jy-v">{{ st.value }}{% if st.unit %}<sup>{{ st.unit }}</sup>{% endif %}</dd><dt class="jy-l">{{ st.label }}</dt></div>{% endfor %}</dl>
+  {% elif b.tags %}<ul class="jy-tags jy-r" style="--i:3">{% for t in b.tags %}<li>{{ t }}</li>{% endfor %}</ul>{% endif %}
+  {% if b.buttons %}<div class="jy-r" style="--i:4">{{ blocks.buttons(b.buttons) }}</div>{% endif %}
+  {% if b.note %}<p class="jy-note jy-r" style="--i:5">{{ b.note | rich }}</p>{% endif %}
+</div>
+{% elif b.type == "faq" %}
+<div class="jy-blk jy-faq jy-form-{{ f }}">
+  {% if b.kicker %}<p class="jy-kicker jy-r" style="--i:0">{{ b.kicker }}</p>{% endif %}
+  <h2 class="jy-title jy-r" style="--i:1">{{ b.title | rich }}</h2>
+  <div class="jy-qa">{% for it in b.items %}<details class="jy-r" style="--i:{{ loop.index + 1 }}"{% if loop.first %} open{% endif %}><summary>{{ it.q | rich }}</summary><p>{{ it.a | rich }}</p></details>{% endfor %}</div>
+</div>
+{% elif b.type == "gallery" %}
+<div class="jy-blk jy-features jy-form-{{ f }}">
+  {% if b.title %}<h2 class="jy-title jy-r" style="--i:1">{{ b.title | rich }}</h2>{% endif %}
+  <ol class="jy-rows">
+    {% for g in b.items %}
+    <li class="jy-row jy-r" style="--i:{{ loop.index + 1 }}"><span class="jy-no">{{ "%02d" | format(loop.index) }}</span>
+      <div>{% if g.kicker %}<span class="jy-tag">{{ g.kicker }}</span>{% endif %}<h3><a href="{{ g.href }}">{{ g.title | rich }}</a></h3>{% if g.body %}<p>{{ g.body | rich }}</p>{% endif %}</div></li>
+    {% endfor %}
+  </ol>
+</div>
+{% endif %}
+{% endmacro %}
+
+{# The scene. `cfg` has `journey` (stop windows, the analysis of each picture) once the film is built; `ex` is the
+   compiler's entry for this section (`ex.jx[stop id][i]`: media of the stop's blocks). #}
+{% macro render(s, cfg, sdata, ex, first) %}
+{% set j = s.journey %}
+{% set jc = cfg.journey if cfg and cfg.journey else none %}
+<section class="ss-scene ss-overlay ss-type-film jy-scene ss-shade-none" id="{{ s.id }}" data-scene="film"{% if jc %} style="--jy-ink-light: {{ jc.ink.light }}; --jy-ink-dark: {{ jc.ink.dark }}"{% endif %}>
+  <div class="ss-track" style="height: {{ s.length | vh }}">
+    <div class="ss-stage">
+      <div class="ss-visual">{% if cfg.poster %}<img class="ss-poster" src="{{ cfg.poster }}" alt="">{% endif %}</div>
+      <div class="jy-stops">
+        {% for stop in j.stops %}
+        {% set si = jc.stops[loop.index0] if jc else none %}
+        {% set side = stop_spot(stop, si) %}
+        {% set surface = si.surface if si else (stop.surface if stop.surface != "auto" else "dark") %}
+        <article class="jy-stop jy-side-{{ side }} jy-surface-{{ surface }}" id="{{ stop.id }}" data-stop="{{ stop.id }}"{% if si %} style="--jy-scrim: {{ si.scrim }}"{% endif %} aria-label="{{ stop.label or stop.id }}">
+          {% if si and si.still %}<figure class="jy-still"><img src="{{ si.still }}" alt="{{ stop.place }}" loading="{{ 'eager' if loop.first else 'lazy' }}"></figure>{% endif %}
+          <div class="jy-body">
+            {% set lp = loop %}
+            {% for b in stop.blocks %}{{ block(b, ex.jx[stop.id][loop.index0] if ex and ex.jx else none, stop.form, first and lp.first and loop.first) }}
+            {% endfor %}
+          </div>
+        </article>
+        {% endfor %}
+      </div>
+      {% if j.rail %}<nav class="jy-rail" aria-label="Places">
+        <ol>{% for stop in j.stops %}<li><a href="#{{ stop.id }}" data-stop="{{ stop.id }}"><span class="jy-rail__label">{{ stop.label or stop.id }}</span><i aria-hidden="true"></i></a></li>{% endfor %}</ol>
+      </nav>{% endif %}
+      {% if s.cue %}<div class="ss-cue">{{ s.cue }}</div>{% endif %}
+      <div class="ss-outro"></div>
+    </div>
+  </div>
+  <script type="application/json" class="ss-config">{{ cfg | tojson }}</script>
+  <script type="application/json" class="ss-section">{{ sdata | tojson }}</script>
+</section>
+{% endmacro %}

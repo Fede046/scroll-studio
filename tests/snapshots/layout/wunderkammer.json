@@ -1,0 +1,324 @@
+{
+ "example": "wunderkammer",
+ "root": {
+  "class": [
+   "mode-light",
+   "layout-flow"
+  ]
+ },
+ "cuts": [],
+ "sections": [
+  {
+   "id": "rhino",
+   "type": "vector",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-scene",
+      "ss-split",
+      "ss-side-right",
+      "ss-type-vector",
+      "ss-shade-auto"
+     ],
+     "id": "rhino",
+     "data": {
+      "data-scene": "vector"
+     },
+     "text": {
+      "kicker": "In the collection",
+      "title": "A rhinoceros no one had seen.",
+      "title_tag": "h1"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-split-grid"
+       ],
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-steps"
+         ],
+         "children": [
+          {
+           "tag": "article",
+           "class": [
+            "ss-step",
+            "ss-intro"
+           ],
+           "style": {
+            "--h": "120vh"
+           },
+           "text": {
+            "kicker": "In the collection",
+            "title": "A rhinoceros no one had seen.",
+            "title_tag": "h1"
+           },
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-card"
+             ]
+            }
+           ]
+          },
+          {
+           "tag": "article",
+           "class": [
+            "ss-step"
+           ],
+           "style": {
+            "--h": "220vh"
+           },
+           "text": {
+            "kicker": "01 · The line",
+            "title": "Cut by hand, line by line.",
+            "title_tag": "h2"
+           },
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-card"
+             ]
+            }
+           ]
+          },
+          {
+           "tag": "article",
+           "class": [
+            "ss-step"
+           ],
+           "style": {
+            "--h": "160vh"
+           },
+           "text": {
+            "kicker": "02 · The ink",
+            "title": "Armour that wasn't there.",
+            "title_tag": "h2"
+           },
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-card"
+             ]
+            }
+           ]
+          },
+          {
+           "tag": "article",
+           "class": [
+            "ss-step"
+           ],
+           "style": {
+            "--h": "120vh"
+           },
+           "text": {
+            "kicker": "03 · The legacy",
+            "title": "The most copied animal in art.",
+            "title_tag": "h2"
+           },
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-card"
+             ]
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "tag": "div",
+         "class": [
+          "ss-pin"
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "sdata": {
+    "layout": "split",
+    "length": 4.0,
+    "steps": [
+     {
+      "kicker": "In the collection",
+      "title": "A rhinoceros <em>no one had seen.</em>",
+      "body": "In 1515 a rhinoceros arrived in Lisbon, the first in Europe for twelve hundred years. Dürer never saw it. He drew it from a letter and a sketch, and this woodcut became the rhinoceros for the next three centuries.",
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": true,
+      "hint": "Scroll to cut the block",
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "01 · The line",
+      "title": "Cut by hand, <em>line by line.</em>",
+      "body": "Every line here was left standing by a woodcutter's knife; everything else was cut away. Watch them return in the order your eye finds them.",
+      "fact": "Pear wood block, about 21 × 30 cm. Printed in thousands of copies.",
+      "at": null,
+      "length": 2.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "02 · The ink",
+      "title": "Armour that <em>wasn't there.</em>",
+      "body": "Dürer gave it plates like a suit of armour, a scaly hide and a small extra horn on its back. None of them are real, and almost everyone believed them anyway.",
+      "fact": "Even school textbooks used Dürer's rhinoceros until the 1930s.",
+      "at": null,
+      "length": 1.6,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "03 · The legacy",
+      "title": "The most copied <em>animal in art.</em>",
+      "body": "It is in the museum in the original printing, alongside the letters that described the animal to him.",
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     }
+    ],
+    "hud": {
+     "kind": "progress",
+     "fields": [],
+     "events": [],
+     "clock": null,
+     "scales": [
+      "A blank block"
+     ],
+     "legend": []
+    }
+   }
+  },
+  {
+   "id": "collection",
+   "type": "intro",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ],
+     "id": "collection",
+     "text": {
+      "kicker": "The collection",
+      "title": "Objects that explained the world before ",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-wrap",
+        "ss-intro2"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "features",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ],
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-features",
+        "ss-features--3"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "stats",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-band"
+     ],
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-wrap",
+        "ss-stats",
+        "ss-stats--4"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "visit",
+   "type": "cta",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-cta"
+     ],
+     "id": "visit",
+     "text": {
+      "kicker": "Open Tuesday to Sunday",
+      "title": "Come and see the original.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-cta__in"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

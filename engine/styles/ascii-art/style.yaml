@@ -1,0 +1,29 @@
+# ASCII art: tokens and fonts for theme.style: ascii-art. The page is a terminal session on an amber phosphor screen:
+# every section's prompt types a command as you scroll and its output prints line by line, in quantised steps.
+label: ASCII art
+about: A terminal session. Scrolling types each section's command at the prompt and prints the reply line by line (features as --help flags, numbers as neofetch, steps as a boot log, questions as a man page), with a live ASCII render of the product, a tmux status bar and keyboard shortcuts.
+mode: dark
+cuts: false   # the style plays its own hand-over between sections: `transition:` is ignored (see engine/styles/README.md)
+scene_blocks: [features, product, stats, timeline, quote, faq, cta]   # drawn its own way as steps inside a scene; other types use the default markup there
+colors:
+  bg: '#0d0a04'
+  bg2: '#140f06'
+  ink: '#ffb000'
+  ink2: '#e8a33a'
+  ink3: '#c98a14'
+  accent: '#ffd27a'
+  accent2: '#ffd27a'
+  accent_ink: '#0d0a04'
+  line: 'rgba(255, 176, 0, .28)'
+fonts:
+  display: JetBrains Mono
+  body: JetBrains Mono
+  mono: JetBrains Mono
+font_axes:
+  JetBrains Mono: "wght@400;700;800"
+display_weight: 700
+radius: 0px
+# What a brand (theme.from) cannot change here: the dark room its CSS is drawn for, and its display, body, mono faces (a terminal is one monospace grid)
+requires:
+  mode: dark
+  fonts: { display: JetBrains Mono, body: JetBrains Mono, mono: JetBrains Mono }

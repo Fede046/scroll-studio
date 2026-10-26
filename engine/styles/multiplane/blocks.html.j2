@@ -1,0 +1,195 @@
+{# Multiplane: every section is a STACK of painted glass (the runtime paints the plates and puts them at depths; without it,
+   the CSS draws a still diorama of layered hills behind each section). A section is made of BEATS (.mp-beat, data-mp),
+   one per item for lists. A beat's words are PLANES (.mp-plane): the first is the copy at the focal distance, others
+   (data-mp-d) are props at their own distance (the phone, a picture): the runtime moves each plane by its real distance
+   from the lens as the camera trucks. In the live page planes are fixed layers over the scroll; the beat is only the
+   length of scroll its camera move takes. data-side is the side the words sit on. #}
+{% set types = ["hero", "intro", "features", "product", "stats", "timeline", "quote", "faq", "cta", "gallery", "strip", "orbit"] %}
+
+{% macro btns(list) %}{% if list %}<div class="mp-btns">{% for l in list %}<a class="mp-btn{% if loop.first %} mp-btn--hot{% endif %}" href="{{ l.href }}">{{ l.label }}</a>{% endfor %}</div>{% endif %}{% endmacro %}
+{% macro kicker(text) %}{% if text %}<p class="mp-kicker">{{ text }}</p>{% endif %}{% endmacro %}
+{% macro side(loop, k=0) %}{{ "l" if (loop.index0 + k) % 2 == 0 else "r" }}{% endmacro %}
+
+{% macro render(b, e, base, loop) %}
+{% set idattr %}{% if b.id %} id="{{ b.id }}"{% endif %}{% endset %}
+{% set sd = side(loop) | trim %}
+
+{# ---------------------------------------------------------------- hero #}
+{% if b.type == "hero" %}
+<section class="mp-sec mp-sec--hero"{{ idattr }}>
+  <div class="mp-beat mp-hero" data-mp="hero">
+    <div class="mp-plane mp-copy" data-side="l"><div class="mp-card">
+      {% if b.badge %}<p class="mp-badge">{{ b.badge }}</p>{% endif %}
+      {% if e.first %}<h1 class="mp-title">{{ b.title | rich }}</h1>{% else %}<h2 class="mp-title">{{ b.title | rich }}</h2>{% endif %}
+      {% if b.body %}<p class="mp-lede">{{ b.body | rich }}</p>{% endif %}
+      {{ btns(b.buttons) }}{{ base.hero_kit(b, e) }}
+    </div></div>
+    {% if b.device %}<div class="mp-plane mp-prop" data-mp-d="0.84" data-side="r">{{ base.phone(b.device, e.screen, e.clip) }}</div>
+    {% elif e.img %}<div class="mp-plane mp-prop" data-mp-d="1.16" data-side="r"><figure class="mp-cel"><img src="{{ e.img }}" alt="" fetchpriority="high"></figure></div>
+    {% elif e.video %}<div class="mp-plane mp-prop" data-mp-d="1.16" data-side="r"><figure class="mp-cel"><video src="{{ e.video }}" autoplay muted loop playsinline{% if e.img %} poster="{{ e.img }}"{% endif %}></video></figure></div>{% endif %}
+  </div>
+</section>
+
+{# ---------------------------------------------------------------- intro #}
+{% elif b.type == "intro" %}
+<section class="mp-sec"{{ idattr }}>
+  <div class="mp-beat" data-mp="intro">
+    <div class="mp-plane mp-copy" data-side="{{ sd }}"><div class="mp-card">
+      {{ kicker(b.kicker) }}
+      <h2 class="mp-title">{{ b.title | rich }}</h2>
+      {% if b.body %}<p class="mp-lede">{{ b.body | rich }}</p>{% endif %}
+      {% if b.button %}<div class="mp-btns"><a class="mp-btn mp-btn--hot" href="{{ b.button.href }}">{{ b.button.label }}</a></div>{% endif %}
+    </div></div>
+  </div>
+</section>
+
+{# ---------------------------------------------------------------- features: one stack, a beat per feature (a plate of trunks sweeps past between them) #}
+{% elif b.type == "features" %}
+{% set head = (b.title or b.kicker) %}
+<section class="mp-sec"{{ idattr }}>
+  {% if head %}<div class="mp-beat mp-beat--item" data-mp="features">
+    <div class="mp-plane mp-copy" data-side="{{ sd }}"><div class="mp-card">{{ kicker(b.kicker) }}{% if b.title %}<h2 class="mp-title">{{ b.title | rich }}</h2>{% endif %}</div></div>
+  </div>{% endif %}
+  {% for f in b.items %}
+  <div class="mp-beat mp-beat--item" data-mp="feat">
+    <div class="mp-plane mp-copy" data-side="{{ sd }}"><div class="mp-card">
+      {% if f.tag and (f.tag | length) > 3 %}<p class="mp-kicker">{{ f.tag }}</p>{% else %}<p class="mp-num" aria-hidden="true">{{ f.tag if f.tag else (loop.index0 + 1) }}</p>{% endif %}
+      <h3 class="mp-sub">{{ f.title | rich }}</h3>
+      {% if f.body %}<p class="mp-body">{{ f.body | rich }}</p>{% endif %}
+      {% if f.meter is not none %}<div class="mp-meter" role="img" aria-label="{{ (f.meter * 100) | round | int }}%"><i style="width: {{ (f.meter * 100) | round }}%"></i></div>{% endif %}
+    </div></div>
+  </div>
+  {% endfor %}
+</section>
+
+{# ---------------------------------------------------------------- product #}
+{% elif b.type == "product" %}
+<section class="mp-sec"{{ idattr }}>
+  <div class="mp-beat" data-mp="product">
+    <div class="mp-plane mp-copy" data-side="{{ 'l' if b.side == 'right' else 'r' }}"><div class="mp-card">
+      {{ kicker(b.kicker) }}
+      <h2 class="mp-title">{{ b.title | rich }}</h2>
+      {% if b.body %}<p class="mp-lede">{{ b.body | rich }}</p>{% endif %}
+      {% if b.stats %}<ul class="mp-tags">{% for st in b.stats %}<li><b>{{ st.value }}{% if st.unit %}<sup>{{ st.unit }}</sup>{% endif %}</b> {{ st.label }}</li>{% endfor %}</ul>
+      {% elif b.tags %}<ul class="mp-tags">{% for t in b.tags %}<li>{{ t }}</li>{% endfor %}</ul>{% endif %}
+      {{ btns(b.buttons) }}
+      {% if b.note %}<p class="mp-note">{{ b.note | rich }}</p>{% endif %}
+    </div></div>
+    {% if b.device or e.img %}<div class="mp-plane mp-prop" data-mp-d="0.84" data-side="{{ 'r' if b.side == 'right' else 'l' }}">
+      {% if e.img %}<figure class="mp-cel"><img src="{{ e.img }}" alt="" loading="lazy"></figure>{% endif %}
+      {% if b.device %}{{ base.phone(b.device, e.screen, e.clip) }}{% endif %}
+    </div>{% endif %}
+  </div>
+</section>
+
+{# ---------------------------------------------------------------- stats #}
+{% elif b.type == "stats" %}
+<section class="mp-sec"{{ idattr }}>
+  <div class="mp-beat" data-mp="stats">
+    <div class="mp-plane mp-copy" data-side="c"><div class="mp-card">
+      <ul class="mp-figs">
+        {% for st in b.items %}<li class="mp-fig"><b class="mp-fig__v">{{ st.value }}{% if st.unit %}<sup>{{ st.unit }}</sup>{% endif %}</b><span class="mp-fig__l">{{ st.label }}</span></li>{% endfor %}
+      </ul>
+    </div></div>
+  </div>
+</section>
+
+{# ---------------------------------------------------------------- timeline #}
+{% elif b.type == "timeline" %}
+{% set head = (b.title or b.kicker) %}
+<section class="mp-sec"{{ idattr }}>
+  {% if head %}<div class="mp-beat mp-beat--item" data-mp="timeline">
+    <div class="mp-plane mp-copy" data-side="{{ sd }}"><div class="mp-card">{{ kicker(b.kicker) }}{% if b.title %}<h2 class="mp-title">{{ b.title | rich }}</h2>{% endif %}</div></div>
+  </div>{% endif %}
+  {% for t in b.items %}
+  <div class="mp-beat mp-beat--item" data-mp="tl">
+    <div class="mp-plane mp-copy" data-side="c"><div class="mp-card">
+      <p class="mp-when">{{ t.when }}</p>
+      <h3 class="mp-sub">{{ t.title | rich }}</h3>
+      {% if t.body %}<p class="mp-body">{{ t.body | rich }}</p>{% endif %}
+    </div></div>
+  </div>
+  {% endfor %}
+</section>
+
+{# ---------------------------------------------------------------- quote #}
+{% elif b.type == "quote" %}
+<section class="mp-sec"{{ idattr }}>
+  <div class="mp-beat" data-mp="quote">
+    <div class="mp-plane mp-copy" data-side="c"><figure class="mp-card mp-quote">
+      <blockquote class="mp-saying">{{ b.text | rich }}</blockquote>
+      {% if b.who %}<figcaption class="mp-sign">{{ b.who }}</figcaption>{% endif %}
+    </figure></div>
+  </div>
+</section>
+
+{# ---------------------------------------------------------------- faq #}
+{% elif b.type == "faq" %}
+<section class="mp-sec"{{ idattr }}>
+  <div class="mp-beat mp-beat--item" data-mp="faq">
+    <div class="mp-plane mp-copy" data-side="{{ sd }}"><div class="mp-card">{{ kicker(b.kicker) }}<h2 class="mp-title">{{ b.title | rich }}</h2></div></div>
+  </div>
+  {% for it in b.items %}
+  <div class="mp-beat mp-beat--item" data-mp="qa">
+    <div class="mp-plane mp-copy" data-side="{{ sd }}"><div class="mp-card"><details class="mp-q" open><summary>{{ it.q | rich }}</summary><p>{{ it.a | rich }}</p></details></div></div>
+  </div>
+  {% endfor %}
+</section>
+
+{# ---------------------------------------------------------------- cta #}
+{% elif b.type == "cta" %}
+<section class="mp-sec mp-sec--end"{{ idattr }}>
+  <div class="mp-beat mp-beat--end" data-mp="cta">
+    <div class="mp-plane mp-copy" data-side="c"><div class="mp-card">
+      {{ kicker(b.kicker) }}
+      <h2 class="mp-title mp-title--end">{{ b.title | rich }}</h2>
+      {% if b.button %}<div class="mp-btns"><a class="mp-btn mp-btn--hot mp-btn--big" href="{{ b.button.href }}">{{ b.button.label }}</a></div>{% endif %}
+    </div></div>
+  </div>
+</section>
+
+{# ---------------------------------------------------------------- gallery #}
+{% elif b.type == "gallery" %}
+<section class="mp-sec"{{ idattr }}>
+  <div class="mp-beat" data-mp="gallery">
+    <div class="mp-plane mp-copy" data-side="c"><div class="mp-card mp-card--wide">
+      {{ kicker(b.kicker) }}{% if b.title %}<h2 class="mp-title">{{ b.title | rich }}</h2>{% endif %}
+      <div class="mp-cels">
+        {% for g in b.items %}
+        <a class="mp-cel mp-cel--tile" href="{{ g.href }}">
+          <span class="mp-cel__media">{% if g.video %}<video src="{{ g.video }}" muted loop playsinline preload="metadata"{% if g.image %} poster="{{ g.image }}"{% endif %}></video>{% elif g.image %}<img src="{{ g.image }}" alt="" loading="lazy">{% endif %}</span>
+          <span class="mp-cel__text">{% if g.kicker %}<small>{{ g.kicker }}</small>{% endif %}<b>{{ g.title | rich }}</b>{% if g.body %}<em>{{ g.body | rich }}</em>{% endif %}</span>
+        </a>
+        {% endfor %}
+      </div>
+    </div></div>
+  </div>
+</section>
+
+{# ---------------------------------------------------------------- strip #}
+{% elif b.type == "strip" %}
+<section class="mp-sec"{{ idattr }}>
+  <div class="mp-beat" data-mp="strip">
+    <div class="mp-plane mp-copy" data-side="c"><div class="mp-card mp-card--wide">
+      {{ kicker(b.kicker) }}{% if b.title %}<h2 class="mp-title">{{ b.title | rich }}</h2>{% endif %}
+      {% if b.body %}<p class="mp-lede">{{ b.body | rich }}</p>{% endif %}
+      <div class="mp-roll">{% for it in b.items %}<figure class="mp-cel"><img src="{{ e.imgs[loop.index0] }}" alt="{{ it.caption or '' }}" loading="lazy">{% if it.caption %}<figcaption>{{ it.caption }}</figcaption>{% endif %}</figure>{% endfor %}</div>
+    </div></div>
+  </div>
+</section>
+
+{# ---------------------------------------------------------------- orbit #}
+{% elif b.type == "orbit" %}
+<section class="mp-sec"{{ idattr }}>
+  <div class="mp-beat" data-mp="orbit">
+    <div class="mp-plane mp-copy" data-side="{{ sd }}"><div class="mp-card">
+      {{ kicker(b.kicker) }}<h2 class="mp-title">{{ b.title | rich }}</h2>
+      {% if b.body %}<p class="mp-lede">{{ b.body | rich }}</p>{% endif %}
+    </div></div>
+    <div class="mp-plane mp-prop" data-mp-d="0.9" data-side="{{ 'r' if sd == 'l' else 'l' }}">
+      <div class="mp-ring" style="--n: {{ b.items | length }}"><div class="mp-hub">{{ b.center }}</div>{% for it in b.items %}<div class="mp-moon" style="--i: {{ loop.index0 }}"><b>{{ it.label }}</b>{% if it.status %}<small>{{ it.status }}</small>{% endif %}</div>{% endfor %}</div>
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endmacro %}

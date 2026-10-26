@@ -1,0 +1,28 @@
+# Blueprint: tokens and fonts for theme.style: blueprint. See engine/styles/README.md for the contract and
+# docs/styles/styles-16-21.md section 3 for the research.
+label: Blueprint
+about: One living drawing sheet. A plotter pen at constant speed drafts the product as you scroll (construction lines, outlines, dimensions whose values are the claims, leaders to a bill of materials) while the camera pans from view to view; the title block counts the sheets and the finale is an APPROVED stamp.
+mode: dark
+scene_blocks: [features, product, timeline, quote, cta]   # drawn its own way as steps inside a scene; other types use the default markup there
+colors:
+  bg: '#11427a'
+  bg2: '#0e3a6b'
+  ink: '#e8f1ff'
+  accent: '#7fe3ff'
+  accent2: '#ff8a6b'
+  accent_ink: '#0b2f57'
+fonts:
+  display: Barlow Condensed
+  body: IBM Plex Sans Condensed
+  mono: IBM Plex Mono
+  hand: Architects Daughter
+font_axes:
+  Barlow Condensed: "wght@400;500;600;700"
+  IBM Plex Sans Condensed: "ital,wght@0,400;0,500;0,600;1,400"
+  IBM Plex Mono: "ital,wght@0,400;0,500;1,400"
+  Architects Daughter: ""
+display_weight: 600
+radius: 0px
+# What a brand (theme.from) cannot change here: the dark room its CSS is drawn for
+requires:
+  mode: dark

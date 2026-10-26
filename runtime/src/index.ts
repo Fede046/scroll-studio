@@ -4,11 +4,19 @@
  */
 import Lenis from "lenis";
 import "./styles.css";
-import { clamp, debugP, follow, params, reducedMotion, scaleAt } from "./lib/util";
+import { clamp, debugP, follow, params, reducedMotion, scaleAt, themeTokens } from "./lib/util";
 import { makeBlocks } from "./lib/blocks";
+import { Elements } from "./lib/elements";
 import type { FrameState, Player, PlayerFactory, SectionData } from "./lib/types";
 
 document.documentElement.classList.add("js");
+// A style's own experience (runtime/src/styles/<style>.ts): its scroll mechanics, transitions and interactions.
+const EXPERIENCES = import.meta.glob<{ default: () => void }>("./styles/[a-z]*.ts");
+const styleName = document.documentElement.dataset.style;
+if (styleName && EXPERIENCES[`./styles/${styleName}.ts`]) {
+  EXPERIENCES[`./styles/${styleName}.ts`]().then((m) => m.default())
+    .finally(() => { document.documentElement.dataset.ssStyle = "ready"; });
+} else if (styleName) document.documentElement.dataset.ssStyle = "ready";
 
 const PLAYERS: Record<string, () => Promise<{ default: PlayerFactory }>> = {
   film: () => import("./players/video"),
@@ -20,31 +28,17 @@ const PLAYERS: Record<string, () => Promise<{ default: PlayerFactory }>> = {
   vector: () => import("./players/vector"),
   chart: () => import("./players/chart"),
   map: () => import("./players/map"),
+  splat: () => import("./players/splat"),
+  code: () => import("./players/code"),
+  showroom: () => import("./players/showroom"),
+  diorama: () => import("./players/diorama"),
+  inside: () => import("./players/frames"),
+  light: () => import("./players/light"),
 };
 
 let mx = 0, my = 0;
 addEventListener("pointermove", (e) => { mx = e.clientX / innerWidth - 0.5; my = e.clientY / innerHeight - 0.5; }, { passive: true });
 const t0 = performance.now();
-
-// ---------------------------------------------------------------- word-rise captions
-function splitWords(el: HTMLElement) {
-  let i = 0;
-  const walk = (node: Node) => {
-    if (node.nodeType === 3) {
-      const frag = document.createDocumentFragment();
-      (node.textContent || "").split(/(\s+)/).forEach((part) => {
-        if (!part) return;
-        if (/^\s+$/.test(part)) { frag.appendChild(document.createTextNode(" ")); return; }
-        const w = document.createElement("span"); w.className = "ss-w";
-        const s = document.createElement("span"); s.textContent = part;
-        s.style.transitionDelay = (0.06 + i++ * 0.045).toFixed(3) + "s";
-        w.appendChild(s); frag.appendChild(w);
-      });
-      node.parentNode!.replaceChild(frag, node);
-    } else [...node.childNodes].forEach(walk);
-  };
-  [...el.childNodes].forEach(walk);
-}
 
 // ---------------------------------------------------------------- scene controller
 class Scene {
@@ -54,10 +48,11 @@ class Scene {
   cfg: any;
   player: Player | null = null;
   track: HTMLElement;
+  /** the scene's copy: captions and steps, their windows and motions (lib/elements.ts) */
+  els: Elements;
   stepEls: HTMLElement[];
   stepVals: number[];
   p = 0;
-  captions: { el: HTMLElement; from: number; to: number; state: string }[] = [];
   hud: Record<string, any> = {};
   scaleOverride: string | null = null;
   loaded = 0;
@@ -69,12 +64,9 @@ class Scene {
     this.cfg = JSON.parse(el.querySelector<HTMLScriptElement>(".ss-config")!.textContent || "{}");
     this.data = JSON.parse(el.querySelector<HTMLScriptElement>(".ss-section")!.textContent || "{}");
     this.track = el.querySelector<HTMLElement>(".ss-track") || el;
-    this.stepEls = [...el.querySelectorAll<HTMLElement>(".ss-step")];
-    this.stepVals = this.stepEls.map(() => 0);
-    el.querySelectorAll<HTMLElement>(".ss-caption").forEach((c) => {
-      c.querySelectorAll<HTMLElement>(".ss-split-words").forEach(splitWords);
-      this.captions.push({ el: c, from: +c.dataset.from!, to: +c.dataset.to!, state: "idle" });
-    });
+    this.els = new Elements(el, this.data);
+    this.stepEls = this.els.cards.map((c) => c.el);
+    this.stepVals = this.els.stepVals;
     const q = (s: string) => el.querySelectorAll<HTMLElement>(s);
     this.hud = {
       fields: [...q("[data-field]")], events: [...q(".ss-events li")], clock: el.querySelector("[data-clock]"),
@@ -113,45 +105,25 @@ class Scene {
     return clamp(-r.top / Math.max(1, r.height - innerHeight));
   }
 
-  stepProgress(el: HTMLElement): number {
-    const r = el.getBoundingClientRect();
-    return clamp((innerHeight * 0.5 - r.top) / Math.max(1, r.height));
-  }
-
   tick(t: number) {
     if (!this.near()) return;
     const layout = this.data.layout;
     let active = -1;
-    if (layout === "overlay") {
-      this.p += (this.rawProgress() - this.p) * follow;
-      if (Math.abs(this.rawProgress() - this.p) < 1e-4) this.p = this.rawProgress();
+    const held = cuts?.holding(this.el) ?? null;   // a cut is playing on this section (it moves its rectangle): progress stays where it was
+    if (held != null) {
+      active = this.els.lastActive;
+    } else if (layout === "overlay") {
+      const raw = this.rawProgress();
+      this.p += (raw - this.p) * follow;
+      if (Math.abs(raw - this.p) < 1e-4) this.p = raw;
     } else {
-      let total = 0, done = 0;
-      this.stepEls.forEach((s, i) => {
-        const target = this.stepProgress(s);
-        this.stepVals[i] += (target - this.stepVals[i]) * follow;
-        if (Math.abs(target - this.stepVals[i]) < 5e-4) this.stepVals[i] = target;
-        const on = target > 0 && target < 1;
-        s.classList.toggle("ss-active", on);
-        // card emphasis is a function of scroll position, not a timed fade, so it never trails a fast scroll
-        s.style.setProperty("--on", (clamp((target + 0.1) / 0.1) * clamp((1.1 - target) / 0.1)).toFixed(3));
-        if (on) active = i;
-        const h = this.data.steps[i]?.length || 1;
-        total += h; done += this.stepVals[i] * h;
-      });
-      this.p = total ? done / total : 0;
+      const m = this.els.measure(this.data.steps.map((s) => s.length));
+      this.p = m.p;
+      active = m.active;
     }
     const p = this.p;
-
-    for (const c of this.captions) {
-      const next = p >= c.from && p <= c.to ? "on" : p > c.to ? "off" : "idle";
-      if (next !== c.state) {
-        c.el.classList.toggle("ss-on", next === "on");
-        c.el.classList.toggle("ss-off", next === "off");
-        c.state = next;
-      }
-      if (next === "on") active = this.captions.indexOf(c);
-    }
+    const on = this.els.windows(p);       // the step whose caption is on screen (by its index in the spec)
+    if (on >= 0) active = on;
     this.updateHud(p, active);
     const state: FrameState = { p, steps: this.stepVals, active, t, mx, my };
     this.player?.update(state);
@@ -185,7 +157,7 @@ class Scene {
       const real = st && !st.intro;
       const done = p >= 0.999;
       if (H.pnum) H.pnum.textContent = real ? st!.kicker?.match(/\d+/)?.[0] ?? String(active) : done ? "✓" : "—";
-      if (H.ptitle) H.ptitle.textContent = real ? st!.title.replace(/<[^>]+>/g, "") : done ? "Complete" : (h.scales[0] || "");
+      if (H.ptitle) H.ptitle.textContent = real ? plainText(st!.title || "") : done ? "Complete" : (h.scales[0] || "");
       if (H.pbar) H.pbar.style.transform = `scaleX(${p})`;
       if (H.ppct) H.ppct.textContent = String(Math.round(p * 100));
     }
@@ -196,13 +168,50 @@ class Scene {
 const scenes = [...document.querySelectorAll<HTMLElement>("[data-scene]")].map((el) => new Scene(el));
 
 const nav = document.getElementById("ss-nav");
-const updateBlocks = makeBlocks();
+const updateBlocks = makeBlocks((el) => cuts?.holding(el) != null);
+// Film grammar between sections (`transition:`, lib/cuts.ts): loaded only by pages that carry cuts.
+let cuts: import("./lib/cuts").CutsApi | null = null;
+if (document.getElementById("ss-cuts")) import("./lib/cuts").then((m) => { cuts = m.makeCuts(); });
+// The nav reads in the colours of the section under it: a dark film on a light site gets a dark nav, and back.
+const surfaced = [...document.querySelectorAll<HTMLElement>("main [class*='ss-surface-']")]
+  .filter((el) => el.matches("section, .ss-panel, .ss-backdrop") && !el.closest(".ss-caption--block, .ss-card--block"));   // not a block shown as a step
+let navSurface = "";
+
+/** A title's words without its markup (`<em>` and the like), for a `textContent` slot. Tags are removed until none are
+ *  left, so a nested `<<em>em>` can't leave one behind. */
+function plainText(html: string): string {
+  let text = html;
+  let before;
+  do {
+    before = text;
+    text = text.replace(/<[^<>]*>/g, "");
+  } while (text !== before);
+  return text;
+}
+
+function surfaceUnderNav() {
+  if (!nav) return;
+  const y = nav.offsetHeight / 2;
+  let found = "";
+  for (const el of cuts ? [...surfaced].reverse() : surfaced) {   // during a cut the section on top is the later one
+    if (cuts && el.closest(".ss-cut-off")) continue;
+    const r = el.getBoundingClientRect();
+    if (r.top <= y && r.bottom > y) { found = (el.className.match(/ss-surface-(\w+)/) || [])[1] || ""; break; }
+  }
+  if (found !== navSurface) {
+    if (navSurface) nav.classList.remove("ss-surface-" + navSurface);
+    if (found) nav.classList.add("ss-surface-" + found);
+    navSurface = found;
+  }
+}
 function frame() {
   const t = (performance.now() - t0) / 1000;
+  cuts?.update();
   for (const s of scenes) s.tick(t);
   updateReveals();
   updateBlocks();
   nav?.classList.toggle("ss-solid", scrollY > 40);
+  surfaceUnderNav();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
@@ -220,7 +229,8 @@ const pace = Math.max(0.25, Number((window as any).__ssScroll?.speed) || 1);
 let lenis: Lenis | null = null;
 function startSmoothScroll() {
   if (reducedMotion || debugP !== null || lenis) return;
-  lenis = new Lenis({ lerp: Math.min(0.5, 0.1 * pace) });
+  lenis = new Lenis({ lerp: Math.min(0.5, (themeTokens.follow ?? 0.1) * pace) });
+  (window as any).__ssLenis = lenis;   // players that scroll the page to a place (the one-take page's rail)
   const raf = (time: number) => { lenis!.raf(time); requestAnimationFrame(raf); };
   requestAnimationFrame(raf);
 }
@@ -265,7 +275,9 @@ document.querySelectorAll<HTMLAnchorElement>('a[href^="#"]').forEach((a) => a.ad
   const target = document.querySelector(id);
   if (!target) return;
   e.preventDefault();
-  if (lenis) lenis.scrollTo(target as HTMLElement, { duration: 1.4 / pace });
+  const settled = cuts?.docTop(target);   // a section in a cut is reached where it sits with no cut holding it (after the cut that leads into it)
+  if (settled != null) { if (lenis) lenis.scrollTo(settled, { duration: 1.4 / pace }); else scrollTo(0, settled); }
+  else if (lenis) lenis.scrollTo(target as HTMLElement, { duration: 1.4 / pace });
   else target.scrollIntoView();
 }));
 
@@ -277,7 +289,7 @@ if (debugP !== null) {
     const id = params.get("s");
     const sc = (id && scenes.find((s) => s.el.id === id)) || scenes[0];
     if (!sc) return;
-    const top = sc.el.getBoundingClientRect().top + scrollY;
+    const top = cuts?.docTop(sc.el) ?? sc.el.getBoundingClientRect().top + scrollY;
     if (sc.data.layout === "overlay") {
       scrollTo(0, top + (sc.track.offsetHeight - innerHeight) * target);
     } else {
@@ -301,15 +313,17 @@ const reveals = [...document.querySelectorAll<HTMLElement>(".ss-reveal")].map((e
   counts: [...el.querySelectorAll<HTMLElement>("[data-count]")].map((v) => ({
     v, end: parseFloat(v.dataset.count!), sup: v.querySelector("sup")?.outerHTML || "",
     dec: (v.dataset.count!.split(".")[1] || "").length, k: -1,
+    group: /\d,\d{3}/.test(v.textContent || ""),          // written with thousands separators: count up with them
   })),
 }));
+const enterShare = themeTokens.enter ?? 0.2;     // theme.motion.enter: the share of the screen a block arrives over
 let revealY = NaN, revealH = NaN;
 function updateReveals() {
   if (scrollY === revealY && innerHeight === revealH) return;
   revealY = scrollY; revealH = innerHeight;
   for (const r of reveals) {
     const top = r.el.getBoundingClientRect().top;
-    const k = reducedMotion ? 1 : clamp((innerHeight * 0.98 - top) / (innerHeight * 0.2 / pace) - r.lag);
+    const k = reducedMotion ? 1 : clamp((innerHeight * 0.98 - top) / (innerHeight * enterShare / pace) - r.lag);
     if (k !== r.k) {
       r.k = k;
       r.el.style.opacity = k.toFixed(3);
@@ -319,7 +333,9 @@ function updateReveals() {
       const kc = reducedMotion ? 1 : clamp((innerHeight * 0.95 - top) / (innerHeight * 0.4 / pace));
       if (kc === c.k) continue;
       c.k = kc;
-      c.v.innerHTML = (c.end * (1 - Math.pow(1 - kc, 3))).toFixed(c.dec) + c.sup;
+      const n = c.end * (1 - Math.pow(1 - kc, 3));
+      c.v.innerHTML = (c.group ? n.toLocaleString("en-US", { minimumFractionDigits: c.dec, maximumFractionDigits: c.dec })
+        : n.toFixed(c.dec)) + c.sup;
     }
   }
 }
@@ -329,3 +345,8 @@ document.querySelectorAll<HTMLVideoElement>(".ss-tile video").forEach((v) => {
   tile.addEventListener("mouseenter", () => v.play().catch(() => {}));
   tile.addEventListener("mouseleave", () => v.pause());
 });
+
+// ---------------------------------------------------------------- cinemagraphs (image inputs with `cinemagraph:`)
+if (document.querySelector("[data-cine]")) import("./lib/cinemagraph").then((m) => m.start());
+// ---------------------------------------------------------------- living details (image inputs with `live:`)
+if (document.querySelector("[data-live]")) import("./players/liveStill").then((m) => m.start());

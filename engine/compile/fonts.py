@@ -1,4 +1,5 @@
-"""Self-hosted fonts: download a theme's Google Fonts once and serve them from the site itself.
+"""Self-hosted fonts: download a theme's Google Fonts once and serve them from the site itself, beside any font
+files of the project's own (`fonts: {display: {file: fonts/Brand.woff2}}`).
 
 Built sites make no third-party requests for type. Files are cached per URL under
 ~/.scroll-studio/cache/fonts, so only the first build of a theme needs the network. Without network and
@@ -7,8 +8,10 @@ without a cache, the site falls back to linking Google Fonts directly (and the b
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 import shutil
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -31,11 +34,10 @@ def _fetch(url: str, binary: bool):
     r = requests.get(url, headers=UA, timeout=30)
     r.raise_for_status()
     CACHE.mkdir(parents=True, exist_ok=True)
-    if binary:
-        path.write_bytes(r.content)
-        return r.content
-    path.write_text(r.text, encoding="utf-8")
-    return r.text
+    tmp = path.with_suffix(path.suffix + f".{os.getpid()}.tmp")        # written whole, then moved: a build running beside this one never reads half a file
+    tmp.write_bytes(r.content if binary else r.text.encode("utf-8"))
+    os.replace(tmp, path)
+    return r.content if binary else r.text
 
 
 def vendor(links: list[str], dist: Path, log: Callable[[str], None] = print) -> Optional[str]:
@@ -47,11 +49,10 @@ def vendor(links: list[str], dist: Path, log: Callable[[str], None] = print) -> 
     out = dist / "fonts"
     try:
         css = "\n".join(_fetch(u, binary=False) for u in links)
-        files = {}
-        for url in sorted(set(URL_RE.findall(css))):
-            name = _key(url) + ".woff2"
-            _fetch(url, binary=True)
-            files[url] = name
+        urls = sorted(set(URL_RE.findall(css)))
+        with ThreadPoolExecutor(16) as pool:        # a CJK face is a hundred unicode-range files: fetched side by side
+            list(pool.map(lambda u: _fetch(u, binary=True), urls))
+        files = {url: _key(url) + ".woff2" for url in urls}
     except Exception as e:  # offline and not cached yet
         log(f"  note: fonts not self-hosted ({e.__class__.__name__}); linking Google Fonts instead")
         return None
@@ -62,4 +63,29 @@ def vendor(links: list[str], dist: Path, log: Callable[[str], None] = print) -> 
         shutil.copy(CACHE / name, out / name)
     css = URL_RE.sub(lambda m: f"url({files[m.group(1)]})", css)
     (out / "fonts.css").write_text(css, encoding="utf-8")
+    return "fonts/fonts.css"
+
+
+FORMATS = {".woff2": "woff2", ".woff": "woff", ".ttf": "truetype", ".otf": "opentype"}
+
+
+def own(project, faces: list[dict], dist: Path, append: bool) -> str:
+    """Copy the project's own font files into dist/fonts/ and declare them in fonts.css (after the Google faces when
+    `append`, else on their own). Returns the stylesheet's site-relative path."""
+    from ..project import BuildError
+    out = dist / "fonts"
+    out.mkdir(parents=True, exist_ok=True)
+    rules = []
+    for f in faces:
+        src = project.path(f["file"])
+        if not src.is_file():
+            raise BuildError(f"theme font {f['file']} not found in the project folder")
+        data = src.read_bytes()
+        name = hashlib.sha1(data).hexdigest()[:16] + src.suffix.lower()     # a plain name: nothing from the spec in the CSS
+        (out / name).write_bytes(data)
+        rules.append(f'@font-face {{ font-family: "{f["family"]}"; src: url({name}) format("{FORMATS[src.suffix.lower()]}"); '
+                     f'font-weight: {f["weight"]}; font-style: {f["style"]}; font-display: swap; }}')
+    css = out / "fonts.css"
+    before = css.read_text(encoding="utf-8") + "\n" if append and css.exists() else ""
+    css.write_text(before + "\n".join(rules) + "\n", encoding="utf-8")
     return "fonts/fonts.css"

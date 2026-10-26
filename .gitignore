@@ -1,7 +1,11 @@
 # Per-project build cache, built sites, review output (regenerate with `studio build/snapshot/record`)
 .build/
 dist/
+# storyboards (`studio storyboard`): regenerate any time; the engine package is not one
+storyboard/
+!engine/storyboard/
 snapshots/
+!tests/snapshots/
 recordings/
 # User projects live outside git by default (see studio.toml `projects`)
 projects/
@@ -26,3 +30,21 @@ ui/dist/
 examples/showcase/previews/*
 !examples/showcase/previews/lodestar-orbital.mp4
 !examples/showcase/previews/lodestar-orbital.jpg
+
+examples/_assets/kitchen_test/
+examples/*/build.log
+
+# Coverage
+.coverage
+.coverage.*
+coverage.json
+coverage.xml
+runtime/coverage/
+htmlcov/
+build/
+
+# The docs site: built output and the reference pages generated from the engine (python -m engine.docsgen docs/reference)
+/site/
+docs/reference/spec/
+docs/reference/cli.md
+docs/reference/mcp.md

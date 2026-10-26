@@ -9,7 +9,6 @@ import json
 import os
 import shutil
 import subprocess
-import sys
 
 from ..backends import comfy as ltx_comfy
 from ..config import settings
@@ -26,8 +25,7 @@ def sh(cmd):
     if p.stdout.strip():
         print(p.stdout[-4000:], flush=True)
     if p.returncode != 0:
-        raise RuntimeError(f"{os.path.basename(str(cmd[0]))} failed ({p.returncode}):
-{(p.stderr or p.stdout)[-3000:]}")
+        raise RuntimeError(f"{os.path.basename(str(cmd[0]))} failed ({p.returncode}):\n{(p.stderr or p.stdout)[-3000:]}")
 
 
 def ff(*args):
@@ -40,9 +38,14 @@ def stage_blockout(shot, out):
     bl = shot.get("blockout", {})
     if bl.get("file"):   # user scene: its camera animation drives the shot
         cmd = [BLENDER, "-b", bl["file"], "--python-exit-code", "1", "--python", os.path.join(SCRIPTS, "file_blockout.py"), "--"]
+    elif bl.get("world"):   # a take: world described in the spec (take.json), rendered with its product in place
+        sh([BLENDER, "-b", "--factory-startup", "--python-exit-code", "1", "-P", os.path.join(SCRIPTS, "take.py"), "--",
+            "--take", bl["world"], "--pass", "world", "--out", bdir, "--res", f"{w}x{h}"])
+        cmd = None
     else:
         cmd = [BLENDER, "-b", "--factory-startup", "--python-exit-code", "1", "-P", os.path.join(SCRIPTS, "presets", bl.get("preset", "rocket_launch").replace("-", "_") + ".py"), "--"]
-    sh(cmd + ["--out", bdir, "--fps", shot["fps"], "--duration", shot["duration"], "--res", f"{w}x{h}"])
+    if cmd:
+        sh(cmd + ["--out", bdir, "--fps", shot["fps"], "--duration", shot["duration"], "--res", f"{w}x{h}"])
     frames = sorted(glob.glob(os.path.join(bdir, "frames", "*.png")))
     ff("-framerate", str(shot["fps"]), "-i", os.path.join(bdir, "frames", "%04d.png"),
        "-c:v", "libx264", "-crf", "16", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
@@ -74,7 +77,7 @@ def stage_keyframes(shot, out, args):
     """
     if not args.dry_run:
         ltx_comfy.free()
-    kcfg = shot["keyframes"]
+    kcfg = dict(ltx_comfy.ZIMAGE, **shot["keyframes"])   # model files default to engine/models.yaml's names
     w, h = kcfg.get("res", [1536, 864])
     bdir = os.path.join(out, "blockout")
     kdir = os.path.join(out, "keyframes")
@@ -84,6 +87,8 @@ def stage_keyframes(shot, out, args):
         name = spec["name"]
         if args.only and name != args.only:
             continue
+        if name in (getattr(args, "skip", None) or ()):
+            continue
         idx = keyframe_index(spec["t"], shot["fps"])
         depth_src = depth_frames[idx if idx < 0 else min(idx, len(depth_frames) - 1)]
         depth = os.path.join(kdir, f"depth_{name}_{w}x{h}.png")
@@ -92,7 +97,7 @@ def stage_keyframes(shot, out, args):
         depth_name = ltx_comfy.upload(depth)
         spec_cfg = dict(kcfg, control_strength=spec.get("control_strength", kcfg.get("control_strength", 0.8)))
         for i in range(args.variants):
-            seed = kcfg.get("seed", 7) + i
+            seed = spec.get("seed", kcfg.get("seed", 7)) + i   # a keyframe may pin its own seed
             graph = ltx_comfy.build_keyframe_graph(spec_cfg, spec["prompt"], depth_name, w, h, seed,
                                                    prefix=f"{shot['id']}/key_{name}")
             if args.dry_run:
@@ -117,7 +122,7 @@ def stage_generate(shot, out, args):
     """
     if not args.dry_run:
         ltx_comfy.free()
-    base = dict(shot["ltx"])
+    base = dict(ltx_comfy.LTX, **shot["ltx"])            # model files default to engine/models.yaml's names
     if args.res:
         base["res"] = [int(v) for v in args.res.split("x")]
     if args.upscale is not None:
@@ -144,10 +149,20 @@ def stage_generate(shot, out, args):
         with open(state_path) as f:
             state = json.load(f)
 
+    seg_files = []        # the files a segment is made from (its resume key covers their content)
+
     def upload_still(src, name):
         dst = os.path.join(gdir, f"{name}_{shot['id']}_{w}x{h}.png")
         ff("-i", src, "-vf", f"scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h}", dst)
+        seg_files.append(dst)
         return ltx_comfy.upload(dst)
+
+    def digest_of(paths):
+        d = hashlib.sha1()
+        for q in paths:
+            with open(q, "rb") as f:
+                d.update(f.read())
+        return d.hexdigest()[:16]
 
     for si, seg in enumerate(segments):
         if args.segment and seg["id"] != args.segment:
@@ -178,6 +193,7 @@ def stage_generate(shot, out, args):
            "-frames:v", str(frames), "-c:v", "libx264", "-crf", "10", "-pix_fmt", "yuv420p", guide)
 
         first_name, guides, used = None, [], []
+        seg_files.clear()
         if si > 0 and seg.get("continue", True):
             prev = state.get(segments[si - 1]["id"])
             if not prev:
@@ -196,6 +212,8 @@ def stage_generate(shot, out, args):
                 local = -1
             else:
                 local = g - start
+                if frames <= local < frames + 8:      # snapped past the last latent frame of this stretch: pin that one
+                    local = ((frames - 1) // 8) * 8
                 if local < 0 or local >= frames or (local == 0 and first_name):
                     continue
             if not os.path.exists(src):
@@ -228,8 +246,23 @@ def stage_generate(shot, out, args):
                     json.dump(graph, f, indent=2)
                 print(f"  dry run: graph with {len(graph)} nodes -> {path}")
                 break
+            # resume: a segment whose prompt, settings, guide, first frame and keyframes are as they were is kept, so a crash
+            # in hour two of a long take (or an edit to one prompt) re-paints only what changed, and what follows it
+            rkey = hashlib.sha1(json.dumps([cfg, digest_of([guide, *seg_files]), tag, i], sort_keys=True, default=str).encode()).hexdigest()[:16]
+            keyfile = os.path.join(gdir, tag, "_resume.txt")
+            if (i == 0 and not args.force and os.path.exists(keyfile) and open(keyfile).read() == rkey
+                    and len(glob.glob(os.path.join(gdir, tag, "*.png"))) >= frames):
+                print(f"  [{seg['id']}] kept: nothing it is made from changed", flush=True)
+                if not args.seconds:
+                    state[seg["id"]] = os.path.join(gdir, tag)
+                    with open(state_path, "w") as f:
+                        json.dump(state, f, indent=2)
+                continue
             images = ltx_comfy.run(graph)
             fdir = ltx_comfy.fetch(images, os.path.join(gdir, tag))
+            if i == 0:
+                with open(keyfile, "w") as f:
+                    f.write(rkey)
             mp4 = os.path.join(gdir, f"{tag}.mp4")
             ff("-framerate", str(fps), "-i", os.path.join(fdir, "%04d.png"), "-c:v", "libx264", "-crf", "14",
                "-pix_fmt", "yuv420p", "-movflags", "+faststart", mp4)
@@ -257,6 +290,265 @@ def stage_generate(shot, out, args):
     print(f"  gen.mp4: {n} frames from {len(segments)} segment(s)")
 
 
+PLATE_ENV_VERSION = 1
+COMPOSITE_VERSION = 3
+
+
+def _blender_pass(cmd, ctx, label):
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
+    tail = []
+    for line in p.stdout:
+        tail = (tail + [line])[-40:]
+        if line.startswith("FRAME ") and ctx is not None:
+            n, total = line.split()[1].split("/")
+            ctx.progress(int(n) / int(total) * 0.9, f"{label} frame {n}/{total}")
+    if p.wait() != 0:
+        raise RuntimeError(f"Blender {label} pass failed:\n" + "".join(tail))
+
+
+def stage_track(out, res):
+    """take.py --pass track: the camera per frame and the product's place on screen (product/track.json)."""
+    pdir = os.path.join(out, "product")
+    _blender_pass([BLENDER, "-b", "--factory-startup", "--python-exit-code", "1", "-P", os.path.join(SCRIPTS, "take.py"), "--",
+                   "--take", os.path.join(out, "take.json"), "--pass", "track", "--out", pdir, "--res", f"{res[0]}x{res[1]}"],
+                  None, "track")
+
+
+def stage_product(shot, out, res, samples, ctx, env=None):
+    """Cycles renders the product alone, RGBA with its shadow, through the take's camera (take.py --pass product),
+    lit by the plate environments (env.json) unless the layer names a studio `hdri`."""
+    pdir = os.path.join(out, "product")
+    shutil.rmtree(os.path.join(pdir, "frames"), ignore_errors=True)
+    cmd = [BLENDER, "-b", "--factory-startup", "--python-exit-code", "1", "-P", os.path.join(SCRIPTS, "take.py"), "--",
+           "--take", os.path.join(out, "take.json"), "--pass", "product", "--out", pdir,
+           "--res", f"{res[0]}x{res[1]}", "--samples", str(samples)]
+    if env:
+        cmd += ["--env", str(env)]
+    print("  $ blender take.py --pass product" + (" (plate light)" if env else ""), flush=True)
+    _blender_pass(cmd, ctx, "product")
+
+
+def _read_frame(film, t, w, h):
+    """One frame of the plate at t seconds, as float RGB 0-1 at w x h."""
+    import numpy as np
+    p = subprocess.run([FFMPEG, "-hide_banner", "-loglevel", "error", "-ss", f"{t:.3f}", "-i", str(film), "-frames:v", "1",
+                        "-vf", f"scale={w}:{h}:flags=lanczos", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+                       capture_output=True)
+    if p.returncode != 0 or len(p.stdout) < w * h * 3:
+        raise RuntimeError(f"could not read the plate at {t:.2f}s: {p.stderr.decode(errors='replace')[-400:]}")
+    return np.frombuffer(p.stdout[:w * h * 3], np.uint8).reshape(h, w, 3).astype(np.float32) / 255
+
+
+def _srgb_to_linear(x):
+    import numpy as np
+    return np.where(x <= 0.04045, x / 12.92, ((x + 0.055) / 1.055) ** 2.4)
+
+
+def env_from_frame(lin, M, lens, sensor, aspect, W=1024, H=512, lift=3.0):
+    """An equirect environment (Blender's layout, world axes, float linear RGB) from one frame seen by a camera.
+
+    lin: the frame as linear float RGB (h, w, 3); M: the camera's 4x4 matrix_world; lens/sensor in mm (sensor fit
+    AUTO); aspect: the frame's width / height. Directions inside the frame sample it (lightly blurred); outside,
+    its blurred edges continue and fade towards its own sky (top band) and ground (bottom band). Highlights are
+    lifted, since a plate is LDR and its bright sky stands in for the light sources."""
+    import cv2
+    import numpy as np
+    fh, fw = lin.shape[:2]
+    u = (np.arange(W) + 0.5) / W
+    v = 1 - (np.arange(H) + 0.5) / H
+    LON, LAT = np.meshgrid((u - 0.5) * 2 * np.pi, (v - 0.5) * np.pi)
+    dx, dy, dz = -np.cos(LAT) * np.cos(LON), np.cos(LAT) * np.sin(LON), np.sin(LAT)
+    R = np.array(M, dtype=np.float64)[:3, :3]
+    cx = R[0, 0] * dx + R[1, 0] * dy + R[2, 0] * dz
+    cy = R[0, 1] * dx + R[1, 1] * dy + R[2, 1] * dz
+    fwd = -(R[0, 2] * dx + R[1, 2] * dy + R[2, 2] * dz)
+    k = lens / sensor
+    safe = np.maximum(fwd, 1e-4)
+    if aspect >= 1:
+        px, py = 0.5 + k * cx / safe, 0.5 - k * aspect * cy / safe
+    else:
+        px, py = 0.5 + k / aspect * cx / safe, 0.5 - k * cy / safe
+    inside = (fwd > 0) & (px >= 0) & (px <= 1) & (py >= 0) & (py <= 1)
+    sky = lin[: max(1, fh // 6)].reshape(-1, 3).mean(0)
+    ground = lin[-max(1, fh // 6):].reshape(-1, 3).mean(0)
+    sharp = cv2.GaussianBlur(lin, (0, 0), 1.2)
+    soft = cv2.GaussianBlur(lin, (0, 0), 18 * max(fw, fh) / 480)
+    mx = (np.clip(px, 0, 1) * (fw - 1)).astype(np.float32)
+    my = (np.clip(py, 0, 1) * (fh - 1)).astype(np.float32)
+    a = cv2.remap(sharp, mx, my, cv2.INTER_LINEAR)
+    b = cv2.remap(soft, mx, my, cv2.INTER_LINEAR)
+    outside = np.maximum(np.maximum(-px, px - 1), np.maximum(-py, py - 1))
+    outside = np.where(fwd > 0, np.clip(outside, 0, None), 9.0)
+    horizon = np.clip(np.abs(dz) / 0.25, 0, 1)[..., None]
+    fall = np.where(dz[..., None] > 0, sky, ground) * horizon + ((sky + ground) / 2) * (1 - horizon)
+    wout = np.clip(outside / 0.6, 0, 1)[..., None]
+    env = np.where(inside[..., None], a, b * (1 - wout) + fall * wout)
+    env = cv2.GaussianBlur(env.astype(np.float32), (0, 0), 3)
+    lum = env @ np.array([0.2126, 0.7152, 0.0722], np.float32)
+    gain = 1 + lift * np.clip((lum - 0.55) / 0.45, 0, 1) ** 2
+    return (env * gain[..., None]).astype(np.float32)
+
+
+def env_sun(env):
+    """Direction (world, unit) and relative strength of the brightest region of an equirect environment."""
+    import cv2
+    import numpy as np
+    H, W = env.shape[:2]
+    lum = cv2.GaussianBlur(env @ np.array([0.2126, 0.7152, 0.0722], np.float32), (0, 0), 6)
+    lum[H // 2 + H // 20:] *= 0.2           # the light comes from above the horizon
+    y, x = np.unravel_index(int(np.argmax(lum)), lum.shape)
+    lon, lat = ((x + 0.5) / W - 0.5) * 2 * np.pi, ((1 - (y + 0.5) / H) - 0.5) * np.pi
+    lat = max(lat, np.radians(28))           # a window behind the subject still lights it from above, never below
+    d = [-np.cos(lat) * np.cos(lon), np.cos(lat) * np.sin(lon), np.sin(lat)]
+    contrast = float(lum.max() / max(float(np.median(lum)), 1e-4))
+    return [round(float(c), 4) for c in d], round(min(contrast, 8.0), 3)
+
+
+def stage_plate_env(film, track, env_json, fps, log=print):
+    """Environment maps made from the generated frames themselves, one every ~2.5 s of the take (env_from_frame),
+    cross-faded by take.py, plus the ground's colour under the product for the shadow catcher."""
+    import cv2
+    import numpy as np
+    with open(track, encoding="utf-8") as f:
+        T = json.load(f)
+    frames = T["frames"]
+    n = len(frames)
+    dur = n / fps
+    count = max(2, int(round(dur / 2.5)) + 1)
+    times = [min(dur - 1.0 / fps, i * dur / (count - 1)) for i in range(count)]
+    out_dir = os.path.dirname(str(env_json))
+    os.makedirs(out_dir, exist_ok=True)
+    fw, fh = 480, 270
+    sw, sh = T["size"]
+    keys, grounds = [], []
+    for i, t in enumerate(times):
+        rec = frames[min(n - 1, int(round(t * fps)))]
+        lin = _srgb_to_linear(_read_frame(film, t, fw, fh)).astype(np.float32)
+        if rec.get("visible") and rec.get("base"):
+            bx, by = rec["base"]
+            x, y = int(np.clip(bx * fw, 4, fw - 5)), int(np.clip(by * fh + fh * 0.03, 4, fh - 5))
+            patch = lin[max(0, y - 8):y + 8, max(0, x - 16):x + 16].reshape(-1, 3)
+            if len(patch):
+                grounds.append(patch.mean(0))
+        env = env_from_frame(lin, rec["camera"], float(T["lens"]), float(T["sensor"]), sw / sh)
+        path = os.path.join(out_dir, f"env_{i:02d}.hdr")
+        cv2.imwrite(path, env[..., ::-1])
+        keys.append({"t": round(t, 3), "file": path})
+    ground = (np.median(np.array(grounds), axis=0) if grounds else np.array([0.18, 0.18, 0.18])).tolist()
+    with open(env_json, "w", encoding="utf-8") as f:
+        json.dump({"keys": keys, "ground": [round(c, 4) for c in ground], "strength": 1.0}, f, indent=1)
+    log(f"  plate light: {len(keys)} environments from the generated frames")
+
+
+class PlateMatch:
+    """Grades a product pass to its plate, frame after frame: black level, white balance and saturation from the
+    plate (smoothed over time so nothing flickers), the plate's softness and grain, and a light wrap of the plate's
+    colour at the product's rim. The shadow (alpha over black RGB) takes the plate's black level."""
+
+    def __init__(self, grade=True, grain=None, soften=0.0, seed=7, tint=0.25):
+        import numpy as np
+        self.grade, self.sigma, self.soften, self.tint = grade, grain, soften, tint
+        self.state = None
+        self.rng = np.random.default_rng(seed)
+        self.luma = np.array([0.2126, 0.7152, 0.0722], np.float32)
+
+    def apply(self, plate, rgba):
+        """plate: float RGB 0-1 (h, w, 3); rgba: float straight-alpha RGBA 0-1, same size. Returns float RGB."""
+        import cv2
+        import numpy as np
+        rgb, al = rgba[..., :3], rgba[..., 3:4]
+        if self.grade:
+            luma = self.luma
+            small = cv2.resize(plate, (160, 90), interpolation=cv2.INTER_AREA).reshape(-1, 3)
+            lum = small @ luma
+            black = np.percentile(small, 1.0, axis=0)
+            mid = small[(lum > np.percentile(lum, 25)) & (lum < np.percentile(lum, 85))]
+            mean = mid.mean(0) if len(mid) else small.mean(0)
+            tint = mean / max(float(mean @ luma), 1e-3)
+            sat = float(np.mean(small.max(1) - small.min(1)))
+            if self.sigma is None:
+                g = cv2.cvtColor((plate * 255).astype(np.uint8), cv2.COLOR_RGB2GRAY).astype(np.float32)
+                hp = g - cv2.GaussianBlur(g, (0, 0), 1.5)
+                self.sigma = float(np.clip(np.median(np.abs(hp)) * 1.4826, 0, 6))
+            cur = np.concatenate([black, tint, [sat]])
+            self.state = cur if self.state is None else self.state * 0.92 + cur * 0.08
+            black, tint, sat = self.state[:3], self.state[3:6], self.state[6]
+            # white balance a quarter of the way to the plate's mid-tone tint (the plate light already colours
+            # it), saturation nudged towards the plate's
+            rgb = rgb * (1 + self.tint * (tint - 1))
+            solid = al[..., 0] > 0.5
+            prod_sat = float(np.mean((rgb.max(2) - rgb.min(2))[solid])) if solid.any() else sat
+            k = float(np.clip(sat / max(prod_sat, 1e-3), 0.75, 1.1))
+            y = (rgb @ luma)[..., None]
+            rgb = y + (rgb - y) * k
+            rgb = black + (1 - black) * np.clip(rgb, 0, 1)            # lift blacks to the plate's black level
+            if self.soften > 0.05:
+                rgb = cv2.GaussianBlur(rgb, (0, 0), self.soften)
+                al = cv2.GaussianBlur(al[..., 0], (0, 0), self.soften * 0.8)[..., None]
+            blur_pl = cv2.GaussianBlur(plate, (0, 0), 6)
+            edge = np.clip(al[..., 0] - cv2.erode(al[..., 0], np.ones((5, 5), np.uint8)), 0, 1)[..., None]
+            rgb = rgb * (1 - 0.35 * edge) + blur_pl * 0.35 * edge
+            if self.sigma:
+                rgb = rgb + self.rng.normal(0, self.sigma / 255, rgb.shape[:2] + (1,)).astype(np.float32)
+        return plate * (1 - al) + np.clip(rgb, 0, 1) * al
+
+
+def read_rgba(path, size):
+    """A product frame as float straight-alpha RGBA at size (w, h), or None when it is empty."""
+    import cv2
+    import numpy as np
+    rgba = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
+    if rgba is None or rgba.ndim < 3 or rgba.shape[2] < 4 or not rgba[..., 3].any():
+        return None
+    rgba = cv2.cvtColor(rgba, cv2.COLOR_BGRA2RGBA).astype(np.float32) / (65535 if rgba.dtype == np.uint16 else 255)
+    if rgba.shape[1::-1] != tuple(size):
+        rgba = cv2.resize(rgba, tuple(size), interpolation=cv2.INTER_AREA)
+    return rgba
+
+
+def plate_softness(film, height):
+    """Blur (px) that matches a crisp render to a plate upscaled from a lower resolution."""
+    src_h = int(subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=height",
+                                "-of", "csv=p=0", str(film)], capture_output=True, text=True).stdout.strip() or height)
+    return max(0.0, 0.45 * (height / max(src_h, 1) - 1))
+
+
+def stage_composite(film, pdir, dst, fps, res, grade=True, grain=None, track=None, log=print):
+    """The product frames over the generated world, graded to it (PlateMatch), encoded for the film stages."""
+    import numpy as np
+    w, h = res
+    pngs = sorted(glob.glob(os.path.join(pdir, "frames", "*.png")))
+    match = PlateMatch(grade, grain, plate_softness(film, h) if grade else 0.0)
+    dec = subprocess.Popen([FFMPEG, "-hide_banner", "-loglevel", "error", "-i", str(film),
+                            "-vf", f"scale={w}:{h}:flags=lanczos,fps={fps}", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+                           stdout=subprocess.PIPE)
+    enc = subprocess.Popen([FFMPEG, "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24",
+                            "-s", f"{w}x{h}", "-r", str(fps), "-i", "-", "-c:v", "libx264", "-crf", "12", "-preset", "medium",
+                            "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(dst)], stdin=subprocess.PIPE)
+    count = 0
+    for path in pngs:
+        raw = dec.stdout.read(w * h * 3)
+        if len(raw) < w * h * 3:
+            break
+        rgba = read_rgba(path, (w, h))
+        if rgba is None:
+            enc.stdin.write(raw)
+        else:
+            plate = np.frombuffer(raw, np.uint8).reshape(h, w, 3).astype(np.float32) / 255
+            out = match.apply(plate, rgba)
+            enc.stdin.write((np.clip(out, 0, 1) * 255 + 0.5).astype(np.uint8).tobytes())
+        count += 1
+    # the film ends with the product pass (LTX's 8k+1 frames leave one plate frame over): never a frame without it
+    dec.stdout.close()
+    dec.kill()
+    enc.stdin.close()
+    if enc.wait() != 0:
+        raise RuntimeError("compositing the take failed (ffmpeg)")
+    dec.wait()
+    print(f"  take.mp4: world + product ({count} frames) at {w}x{h}"
+          + (f", graded to the plate (grain {match.sigma or 0:.1f}, soften {match.soften:.2f}px)" if grade else ""), flush=True)
+
+
 def stage_upscale(shot, out, args):
     """Upscale the finished film in overlapping, cross-faded chunks.
 
@@ -267,7 +559,7 @@ def stage_upscale(shot, out, args):
     """
     import numpy as np
     from PIL import Image
-    ucfg = dict(shot["ltx"], **shot.get("upscale", {}))
+    ucfg = dict(ltx_comfy.LTX, **shot["ltx"], **shot.get("upscale", {}))
     ucfg.pop("segments", None)
     method = ucfg.get("method", "seedvr2")
     fps = shot["fps"]
@@ -362,3 +654,96 @@ def stage_upscale(shot, out, args):
        "-pix_fmt", "yuv420p", "-movflags", "+faststart", dst)
     w, h = Image.open(os.path.join(final, "00001.png")).size
     print(f"  {os.path.basename(dst)}: {len(os.listdir(final))} frames at {w}x{h}")
+
+
+def stage_generate_wan(shot, out, wout, args, log=print):
+    """A take's world painted by Wan 2.2 Fun Control (`video_model: wan`): the Blender depth guide is the control
+    video, so the world follows the exact camera the product is rendered through.
+
+    Same segments and prompts as `ltx:`. Wan runs at 16 fps in clips of <= 81 frames: a longer segment is split
+    into even clips. The first clip starts on the keyframe at its start time (if any; also a segment with
+    `continue: false`); every later clip starts on the previous clip's real last frame, so the joins are seamless. Each clip also gets a reference still (the keyframe inside
+    its range, else the first keyframe) that steers the look. The joined 16 fps frames are retimed to the take's fps
+    (FFmpeg minterpolate by default) so frame i matches the product pass frame i. Writes <wout>/gen/gen.mp4.
+    """
+    import time
+    from pathlib import Path
+    from ..animate import retime, wan_size, wan_split
+    wan = dict(shot.get("wan") or {})
+    ltx = shot["ltx"]
+    fps, wfps = shot["fps"], ltx_comfy.WAN_FPS
+    pw, ph = shot["preview_res"]
+    w, h = wan_size(pw, ph, wan.get("res"))
+    bdir = os.path.join(out, "blockout")
+    kdir = os.path.join(out, "keyframes")
+    gdir = os.path.join(wout, "gen")
+    os.makedirs(gdir, exist_ok=True)
+    seed0 = wan.get("seed", ltx.get("seed", 42))
+    neg = wan.get("negative_prompt") or ltx.get("negative_prompt", "")
+    blur = wan["guide_blur"] if wan.get("guide_blur") is not None else ltx.get("guide_blur", 0)
+    keys = []
+    for spec in shot.get("keyframes", {}).get("frames", []):
+        t = shot["duration"] if spec["t"] == "end" else float(spec["t"])
+        src = os.path.join(kdir, f"{spec['name']}.png")
+        if os.path.exists(src):
+            keys.append((t, src))
+    keys.sort()
+
+    # clips: (prompt, first 16 fps frame, frame count), segment by segment
+    clips = []
+    segments = ltx.get("segments") or [{"id": "main", "range": [0, shot["duration"]], "prompt": ltx.get("prompt", "")}]
+    if args.seconds:
+        segments = [dict(segments[0], range=[segments[0]["range"][0], segments[0]["range"][0] + args.seconds])]
+    for seg in segments:
+        a = int(round(seg["range"][0] * wfps))
+        n = max(5, (int(round(seg["range"][1] * wfps)) - a) // 4 * 4 + 1)
+        for k in wan_split(n, int(wan.get("max_frames", ltx_comfy.WAN_MAX_FRAMES))):
+            fresh = not clips or (a == int(round(seg["range"][0] * wfps)) and not seg.get("continue", True))
+            clips.append((seg.get("prompt") or ltx.get("prompt", ""), a, k, seg["id"], fresh))
+            a += k - 1
+
+    def still(src, name):
+        dst = os.path.join(gdir, f"{name}_{w}x{h}.png")
+        ff("-i", src, "-vf", f"scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h}", dst)
+        return ltx_comfy.upload(dst)
+
+    raw = os.path.join(gdir, "frames16")
+    shutil.rmtree(raw, ignore_errors=True)
+    os.makedirs(raw)
+    ltx_comfy.free()
+    n_out, start = 0, None
+    for ci, (prompt, a, k, sid, fresh) in enumerate(clips):
+        t0, t1 = a / wfps, (a + k - 1) / wfps
+        if fresh:   # the take's first clip (or a segment with continue: false) starts on its keyframe, if one is there
+            at = [src for t, src in keys if abs(t - t0) <= 0.5 / wfps]
+            start = still(at[0], f"start{ci}") if at else None
+        inside = [src for t, src in keys if t0 <= t <= t1]
+        ref_src = inside[0] if inside else (keys[0][1] if keys else None)
+        ref = still(ref_src, f"ref{ci}") if ref_src and wan.get("ref", True) else None
+        guide = os.path.join(gdir, f"guide{ci}_{w}x{h}_{a}_{k}_b{blur}.mp4")
+        vf = [f"fps={wfps}", f"trim=start_frame={a}", "setpts=PTS-STARTPTS",
+              f"scale={w}:{h}:force_original_aspect_ratio=increase:flags=lanczos", f"crop={w}:{h}"]
+        if blur:
+            vf.append(f"gblur=sigma={blur}")
+        vf += ["tpad=stop_mode=clone:stop=32"]
+        ff("-i", os.path.join(bdir, "depth.mp4"), "-vf", ",".join(vf), "-frames:v", str(k),
+           "-c:v", "libx264", "-crf", "10", "-pix_fmt", "yuv420p", "-r", str(wfps), guide)
+        log(f"  [wan {sid} {ci + 1}/{len(clips)}] {t0:.2f}-{t1:.2f}s, {k} frames at {w}x{h} | start: "
+            f"{'none' if not start else 'keyframe' if fresh else 'previous clip'} | ref: "
+            f"{os.path.basename(ref_src) if ref else 'none'}")
+        t = time.time()
+        graph = ltx_comfy.build_wan_graph(wan, prompt, neg, w, h, k, seed0 + ci, prefix=f"{shot['id']}/wan_{ci:02d}",
+                                          start_image=start, control_video=ltx_comfy.upload(guide), ref_image=ref)
+        cdir = ltx_comfy.fetch(ltx_comfy.run(graph), os.path.join(gdir, f"_c{ci:02d}"))
+        pngs = sorted(glob.glob(os.path.join(cdir, "*.png")))
+        for p in pngs[1 if ci else 0:]:
+            n_out += 1
+            shutil.move(p, os.path.join(raw, f"{n_out:04d}.png"))
+        shutil.rmtree(cdir, ignore_errors=True)
+        log(f"  clip {ci + 1}: {k} frames in {time.time() - t:.0f}s")
+        start = still(os.path.join(raw, f"{n_out:04d}.png"), f"chain{ci}")
+    ltx_comfy.free()
+    frames = retime(Path(raw), Path(gdir) / "frames24", wfps, fps, None, wan.get("interpolate", "mci"), log)
+    ff("-framerate", str(fps), "-i", os.path.join(gdir, "frames24", "%04d.png"), "-c:v", "libx264", "-crf", "14",
+       "-pix_fmt", "yuv420p", "-movflags", "+faststart", os.path.join(gdir, "gen.mp4" if not args.seconds else "gen_test.mp4"))
+    log(f"  gen.mp4 (wan): {n_out} frames at {wfps} fps -> {len(frames)} at {fps} fps")

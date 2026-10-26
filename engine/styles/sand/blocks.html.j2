@@ -1,0 +1,169 @@
+{# Sand: every section is a scene drawn in the same sand on one light table. A scene is a scroll spacer with a stage
+   that holds its copy; the runtime fixes the stage over the table and composes the scene's sand from the stage:
+     data-sand="write"   a crisp HTML headline, written onto the glass as the fingers go (sand spilled along it)
+     data-sand="pour"    display numerals poured in dark sand from a pinch of fingers (the DOM text stays, transparent)
+     data-sand="carve"   glyphs cleared through a layer of sand with a fingertip (decorative)
+     data-sand="dunes|disc|ripples|phone|sil|art|path|iris|column|ring"   sand shapes
+     data-step="k"       belongs to step k of a multi-step scene (absent = every step)
+     data-mode="draw"    steps keep drawing into the same picture (stats, timeline) instead of a new sweep
+   Copy (.sd-ink, the headlines) sits on clean glass: the sand under it is kept swept away.
+   Without JavaScript the scenes are ordinary sections in reading order on a printed sand table. #}
+{% set types = ["hero", "intro", "features", "product", "stats", "timeline", "quote", "faq", "cta"] %}
+
+{% macro btns(list) %}{% if list %}<div class="sd-btns sd-ink">{% for l in list %}<a class="sd-btn{% if loop.first %} sd-btn--hot{% endif %}" href="{{ l.href }}">{{ l.label }}</a>{% endfor %}</div>{% endif %}{% endmacro %}
+{% macro kicker(text) %}<p class="sd-kicker sd-ink">{{ text }}</p>{% endmacro %}
+
+{% macro render(b, e, base, loop) %}
+{% set idattr %}{% if b.id %} id="{{ b.id }}"{% endif %}{% endset %}
+
+{% if b.type == "hero" %}
+<section class="sd-scene sd-hero{% if e.img or art or b.device %} sd-hero--pic{% endif %}" data-sd="hero" data-steps="1"{{ idattr }}>
+  <div class="sd-stage">
+    <div class="sd-dunes" data-sand="dunes" aria-hidden="true"></div>
+    <div class="sd-hero__copy">
+      {% if b.badge %}{{ kicker(b.badge) }}{% endif %}
+      {% if e.first %}<h1 class="sd-head sd-hero__title" data-sand="write">{{ b.title | rich }}</h1>{% else %}<h2 class="sd-head sd-hero__title" data-sand="write">{{ b.title | rich }}</h2>{% endif %}
+      {% if b.body %}<p class="sd-lede sd-ink">{{ b.body | rich }}</p>{% endif %}
+      {{ btns(b.buttons) }}{{ base.hero_kit(b, e) }}
+    </div>
+    {% if b.device %}<div class="sd-phone" data-sand="phone">{{ base.phone(b.device, e.screen, e.clip) }}</div>
+    {% elif e.img %}<figure class="sd-pic" data-sand="sil"><img src="{{ e.img }}" alt="" fetchpriority="high"></figure>
+    {% elif art %}<figure class="sd-pic" data-sand="art" role="img" aria-label="{{ art.label }}"></figure>{% endif %}
+  </div>
+</section>
+
+{% elif b.type == "intro" %}
+<section class="sd-scene sd-intro" data-sd="intro" data-steps="1"{{ idattr }}>
+  <div class="sd-stage">
+    <div class="sd-ripples" data-sand="ripples" aria-hidden="true"></div>
+    <div class="sd-intro__copy">
+      {% if b.kicker %}{{ kicker(b.kicker) }}{% endif %}
+      <h2 class="sd-head sd-intro__title" data-sand="write">{{ b.title | rich }}</h2>
+      <div class="sd-ink">
+        {% if b.body %}<p class="sd-lede">{{ b.body | rich }}</p>{% endif %}
+        {% if b.button %}<div class="sd-btns"><a class="sd-btn sd-btn--hot" href="{{ b.button.href }}">{{ b.button.label }}</a></div>{% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+
+{% elif b.type == "features" %}
+{% set off = 1 if (b.title or b.kicker) else 0 %}
+<section class="sd-scene sd-features" data-sd="features" data-steps="{{ b.items | length + off }}"{{ idattr }}>
+  <div class="sd-stage">
+    {% if off %}<div class="sd-step-wrap sd-features__head" data-step="0">
+      <div class="sd-spiral" data-sand="spiral" aria-hidden="true"></div>
+      <div class="sd-features__copy">
+        {% if b.kicker %}{{ kicker(b.kicker) }}{% endif %}
+        {% if b.title %}<h2 class="sd-head sd-features__title" data-sand="write">{{ b.title | rich }}</h2>{% endif %}
+      </div>
+    </div>{% endif %}
+    <ol class="sd-feats">
+      {% for f in b.items %}
+      {% set short = f.tag and (f.tag | length) <= 3 %}
+      <li class="sd-step-wrap sd-feat" data-step="{{ loop.index0 + off }}">
+        <div class="sd-feat__disc" data-sand="disc" aria-hidden="true"><span class="sd-poured" data-sand="pour">{{ f.tag if short else loop.index }}</span></div>
+        <div class="sd-feat__text">
+          {% if f.tag and not short %}{{ kicker(f.tag) }}{% else %}<p class="sd-kicker sd-ink">{{ loop.index }} of {{ b.items | length }}</p>{% endif %}
+          <h3 class="sd-head sd-feat__title" data-sand="write">{{ f.title | rich }}</h3>
+          {% if f.body %}<p class="sd-feat__body sd-ink">{{ f.body | rich }}</p>{% endif %}
+          {% if f.meter is not none %}<div class="sd-meter sd-ink" role="img" aria-label="{{ (f.meter * 100) | round | int }}%"><i style="width: {{ (f.meter * 100) | round }}%"></i></div>{% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ol>
+  </div>
+</section>
+
+{% elif b.type == "product" %}
+<section class="sd-scene sd-product sd-product--{{ b.side }}" data-sd="product" data-steps="1"{{ idattr }}>
+  <div class="sd-stage">
+    <div class="sd-product__media">
+      {% if b.device %}<div class="sd-phone" data-sand="phone">{{ base.phone(b.device, e.screen, e.clip) }}</div>
+      {% elif e.img %}<figure class="sd-pic" data-sand="sil"><img src="{{ e.img }}" alt="" loading="lazy"></figure>{% endif %}
+    </div>
+    <div class="sd-product__copy">
+      {% if b.kicker %}{{ kicker(b.kicker) }}{% endif %}
+      <h2 class="sd-head sd-product__title" data-sand="write">{{ b.title | rich }}</h2>
+      <div class="sd-ink">
+        {% if b.body %}<p class="sd-lede">{{ b.body | rich }}</p>{% endif %}
+        {% if b.stats %}<dl class="sd-pstats">{% for st in b.stats %}<div><dd>{{ st.value }}{% if st.unit %}<small>{{ st.unit }}</small>{% endif %}</dd><dt>{{ st.label }}</dt></div>{% endfor %}</dl>
+        {% elif b.tags %}<ul class="sd-tags">{% for t in b.tags %}<li>{{ t }}</li>{% endfor %}</ul>{% endif %}
+      </div>
+      {{ btns(b.buttons) }}
+      {% if b.note %}<p class="sd-note sd-ink">{{ b.note | rich }}</p>{% endif %}
+    </div>
+  </div>
+</section>
+
+{% elif b.type == "stats" %}
+{% set ns = namespace(c=2) %}{% for st in b.items %}{% set ns.c = [ns.c, (st.value | length) + ((st.unit or "") | length) * 0.5] | max %}{% endfor %}
+<section class="sd-scene sd-stats sd-stats--{{ [b.items | length, 5] | min }}" style="--chars: {{ ns.c | round(1) }}" data-sd="stats" data-mode="draw" data-steps="{{ b.items | length }}"{{ idattr }}>
+  <div class="sd-stage">
+    <div class="sd-dunes sd-dunes--low" data-sand="dunes" aria-hidden="true"></div>
+    <dl class="sd-figs">
+      {% for st in b.items %}
+      <div class="sd-fig" data-step="{{ loop.index0 }}">
+        <dd class="sd-poured sd-fig__v" data-sand="pour">{{ st.value }}{% if st.unit %}<small>{{ st.unit }}</small>{% endif %}</dd>
+        <dt class="sd-fig__l sd-ink">{{ st.label }}</dt>
+      </div>
+      {% endfor %}
+    </dl>
+  </div>
+</section>
+
+{% elif b.type == "timeline" %}
+{% set n = b.items | length %}
+<section class="sd-scene sd-timeline" data-sd="timeline" data-mode="draw" data-steps="{{ n }}"{{ idattr }}>
+  <div class="sd-stage">
+    {% if b.title or b.kicker %}<header class="sd-timeline__head">
+      {% if b.kicker %}{{ kicker(b.kicker) }}{% endif %}
+      {% if b.title %}<h2 class="sd-head sd-timeline__title" data-sand="write">{{ b.title | rich }}</h2>{% endif %}
+    </header>{% endif %}
+    <ol class="sd-walk" data-sand="path" style="--n: {{ n }}">
+      {% for t in b.items %}
+      <li class="sd-walk__item" data-step="{{ loop.index0 }}">
+        <span class="sd-stop" aria-hidden="true"></span>
+        <div class="sd-ink sd-walk__text"><span class="sd-walk__when">{{ t.when }}</span><h3>{{ t.title | rich }}</h3>{% if t.body %}<p>{{ t.body | rich }}</p>{% endif %}</div>
+      </li>
+      {% endfor %}
+    </ol>
+  </div>
+</section>
+
+{% elif b.type == "quote" %}
+<section class="sd-scene sd-quote" data-sd="quote" data-steps="1"{{ idattr }}>
+  <div class="sd-stage">
+    <div class="sd-iris" data-sand="iris" aria-hidden="true"></div>
+    <span class="sd-glyph sd-quote__mark" data-sand="carve" aria-hidden="true">“</span>
+    <figure class="sd-quote__fig sd-ink">
+      <blockquote>{{ b.text | rich }}</blockquote>
+      {% if b.who %}<figcaption>{{ b.who }}</figcaption>{% endif %}
+    </figure>
+  </div>
+</section>
+
+{% elif b.type == "faq" %}
+<section class="sd-scene sd-faq" data-sd="faq" data-steps="1"{{ idattr }}>
+  <div class="sd-stage">
+    <div class="sd-column" data-sand="column" aria-hidden="true"><span class="sd-glyph sd-faq__q" data-sand="carve">?</span></div>
+    <div class="sd-faq__copy">
+      {% if b.kicker %}{{ kicker(b.kicker) }}{% endif %}
+      <h2 class="sd-head sd-faq__title" data-sand="write">{{ b.title | rich }}</h2>
+      <div class="sd-faq__list sd-ink">
+        {% for it in b.items %}<details{% if loop.first %} open{% endif %}><summary>{{ it.q | rich }}</summary><p>{{ it.a | rich }}</p></details>{% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+
+{% elif b.type == "cta" %}
+<section class="sd-scene sd-cta" data-sd="cta" data-steps="1"{{ idattr }}>
+  <div class="sd-stage">
+    {% if b.kicker %}{{ kicker(b.kicker) }}{% endif %}
+    <h2 class="sd-head sd-cta__title" data-sand="write">{{ b.title | rich }}</h2>
+    {% if b.button %}<div class="sd-cta__well" data-sand="ring"><a class="sd-btn sd-btn--hot sd-btn--big" href="{{ b.button.href }}">{{ b.button.label }}</a></div>{% endif %}
+  </div>
+</section>
+{% endif %}
+{% endmacro %}

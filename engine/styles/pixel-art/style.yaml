@@ -1,0 +1,28 @@
+# Pixel art: tokens and fonts for theme.style: pixel-art. The site is a game: a title screen, then scrolling walks a
+# sprite through a side-scrolling level where every section is a stop (signs, ? blocks, NPCs, a flagpole).
+label: Pixel art
+about: The site is a side-scrolling game. A title screen says PRESS START; each scroll notch walks a sprite through the level in whole pixels, features pop out of ? blocks as ITEM GET! cards, the testimonial is an NPC whose dialog advances a notch at a time, stats are an RPG status sheet and the call to action is COURSE CLEAR and a CONTINUE? menu. A READ AS PAGE switch shows it as a plain manual.
+mode: dark
+cuts: false   # the style plays its own hand-over between sections: `transition:` is ignored (see engine/styles/README.md)
+scene_blocks: [features, product, stats, timeline, quote, faq, cta]   # drawn its own way as steps inside a scene; other types use the default markup there
+colors:
+  bg: '#1d2b53'
+  bg2: '#111a36'
+  ink: '#fff1e8'
+  accent: '#ffec27'
+  accent2: '#00e436'
+  accent_ink: '#1d2b53'
+fonts:
+  display: Press Start 2P
+  body: Pixelify Sans
+  mono: Silkscreen
+font_axes:
+  Press Start 2P: ""
+  Pixelify Sans: "wght@400..700"
+  Silkscreen: "wght@400;700"
+display_weight: 400
+radius: 0px
+# What a brand (theme.from) cannot change here: the dark room its CSS is drawn for, and its display, body, mono faces (the pixel grid is set in its pixel faces)
+requires:
+  mode: dark
+  fonts: { display: Press Start 2P, body: Pixelify Sans, mono: Silkscreen }

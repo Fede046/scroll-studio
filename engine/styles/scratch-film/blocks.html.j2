@@ -1,0 +1,207 @@
+{# Scratch film: every section is a REEL, a stretch of film run through the gate. The reel's text is printed in the film:
+   lettering scratched straight onto the picture (.sf-title), intertitle plates of black leader (.sf-plate), frames of the
+   strip with sprocket edges (.sf-fr), slates of tape (.sf-slate). Whatever stock is in the gate shows round them (the
+   projection is a canvas behind the page, or a still CSS background without JavaScript). .sf-cut marks things that are cut
+   in with a short wipe as they reach the gate. Reading order is the HTML order; edge print is aria-hidden. #}
+{% set types = ["hero", "intro", "features", "product", "stats", "timeline", "quote", "faq", "cta", "gallery", "strip", "orbit"] %}
+{% set tones = ["leader", "dye", "leader", "pressed", "dye", "leader", "pressed"] %}
+{% set dyes = ["cyan", "magenta", "yellow", "orange", "green"] %}
+
+{% macro slate(text, cls="") %}{% if text %}<p class="sf-slate sf-cut {{ cls }}">{{ text }}</p>{% endif %}{% endmacro %}
+
+{% macro head(b, e, kicker=None, cls="") %}
+{% set tag = "h1" if e.first else "h2" %}
+{{ slate(kicker if kicker is not none else b.kicker) }}
+{% if b.title %}<{{ tag }} class="sf-title {{ cls }}">{{ b.title | rich }}</{{ tag }}>{% endif %}
+{% endmacro %}
+
+{% macro btns(list) %}{% if list %}<div class="sf-btns">{% for l in list %}<a class="sf-btn sf-cut{% if loop.first %} sf-btn--hot{% endif %}" href="{{ l.href }}"><i class="sf-btn__perfs" aria-hidden="true"></i>{{ l.label }}{% if loop.first %} <span class="sf-arrow" aria-hidden="true">&rarr;</span>{% endif %}</a>{% endfor %}</div>{% endif %}{% endmacro %}
+
+{# a frame of the strip: sprocket edges, an edge number, the picture #}
+{% macro frame(n, cls="") %}<figure class="sf-fr sf-cut {{ cls }}"><span class="sf-fr__no" aria-hidden="true">{{ n }}</span><div class="sf-fr__pic">{{ caller() }}</div></figure>{% endmacro %}
+
+{# the optical soundtrack: a variable-area track whose bars come from the characters of the text, as a hand-drawn track would #}
+{% macro wave(seed) %}<svg class="sf-wave" viewBox="0 0 280 40" preserveAspectRatio="none" aria-hidden="true">{% for k in range(40) %}{% set hh = 3 + ((k * k * 7 + k * 13 + seed * 29) % 34) %}<rect x="{{ k * 7 }}" y="{{ 20 - hh / 2 }}" width="5" height="{{ hh }}"/>{% endfor %}</svg>{% endmacro %}
+
+{% macro reel(b, kind, loop, e, extra="") %}
+<section class="sf-reel sf-reel--{{ kind }}{{ extra }}" data-kind="{{ kind }}" data-tone="{{ 'leader' if loop.first else tones[loop.index0 % (tones | length)] }}" data-dye="{{ dyes[loop.index0 % (dyes | length)] }}"{% if b.id %} id="{{ b.id }}"{% endif %}>
+  {% if not loop.first %}<i class="sf-splice" aria-hidden="true"></i>{% endif %}
+  <p class="sf-edge" aria-hidden="true">REEL {{ '%02d' % loop.index }} · {{ kind | upper }}</p>
+  <div class="sf-in">{{ caller() }}</div>
+</section>
+{% endmacro %}
+
+{% macro render(b, e, base, loop) %}
+
+{# ---------------------------------------------------------------- hero #}
+{% if b.type == "hero" %}
+{% call reel(b, "hero", loop, e) %}
+  <div class="sf-hero__text">
+    {{ slate(b.badge, "sf-slate--badge") }}
+    {{ head(b, e, "", "sf-title--hero") }}
+    {% if b.body %}<div class="sf-plate sf-cut sf-lede"><p>{{ b.body | rich }}</p></div>{% endif %}
+    {{ btns(b.buttons) }}{{ base.hero_kit(b, e) }}
+  </div>
+  <div class="sf-hero__prop">
+    {% if e.img or e.video %}
+    {% call frame("A 001") %}{% if e.video %}<video src="{{ e.video }}" autoplay muted loop playsinline{% if e.img %} poster="{{ e.img }}"{% endif %}></video>{% else %}<img src="{{ e.img }}" alt="" fetchpriority="high">{% endif %}{% endcall %}
+    {% elif b.device %}
+    {% call frame("A 001", "sf-fr--phone") %}{{ base.phone(b.device, e.screen, e.clip) }}{% endcall %}
+    {% elif art %}<div class="sf-art sf-cut" data-sf-art role="img" aria-label="{{ art.label }}" style="--ar: {{ art.w }} / {{ art.h }}"><canvas aria-hidden="true"></canvas></div>
+    {% endif %}
+  </div>
+{% endcall %}
+
+{# ---------------------------------------------------------------- intro #}
+{% elif b.type == "intro" %}
+{% call reel(b, "intro", loop, e) %}
+  <div class="sf-intro__title">{{ head(b, e, b.kicker) }}</div>
+  <div class="sf-intro__copy">
+    {% if b.body %}<div class="sf-plate sf-cut sf-lede"><p>{{ b.body | rich }}</p></div>{% endif %}
+    {% if b.button %}<div class="sf-btns"><a class="sf-btn sf-btn--hot sf-cut" href="{{ b.button.href }}"><i class="sf-btn__perfs" aria-hidden="true"></i>{{ b.button.label }} <span class="sf-arrow" aria-hidden="true">&rarr;</span></a></div>{% endif %}
+  </div>
+{% endcall %}
+
+{# ---------------------------------------------------------------- features: frames of a strip #}
+{% elif b.type == "features" %}
+{% set n = b.items | length %}
+{% call reel(b, "features", loop, e, " sf-n" ~ n) %}
+  <div class="sf-features__head">{{ head(b, e, b.kicker) }}</div>
+  <ul class="sf-roll" style="--n: {{ n }}">
+    {% for f in b.items %}
+    <li class="sf-cut sf-frame-item" style="--i: {{ loop.index0 }}">
+      <article class="sf-fr sf-fr--card"><span class="sf-fr__no" aria-hidden="true">{{ '%03d' % loop.index }}</span>
+        <div class="sf-fr__pic">
+          <span class="sf-tag" aria-hidden="true">{{ f.tag or loop.index }}</span>
+          <h3>{{ f.title | rich }}</h3>
+          {% if f.body %}<p>{{ f.body | rich }}</p>{% endif %}
+          {% if f.meter is not none %}<span class="sf-meter" aria-hidden="true"><i style="width: {{ (f.meter * 100) | round }}%"></i></span>{% endif %}
+        </div>
+      </article>
+    </li>
+    {% endfor %}
+  </ul>
+{% endcall %}
+
+{# ---------------------------------------------------------------- product #}
+{% elif b.type == "product" %}
+{% call reel(b, "product", loop, e, " sf-side--" ~ b.side) %}
+  <div class="sf-product__prop">
+    {% if e.img %}{% call frame("B 014") %}<img src="{{ e.img }}" alt="" loading="lazy">{% endcall %}{% endif %}
+    {% if b.device %}{% call frame("B 015", "sf-fr--phone") %}{{ base.phone(b.device, e.screen, e.clip) }}{% endcall %}{% endif %}
+  </div>
+  <div class="sf-product__copy">
+    {{ head(b, e, b.kicker) }}
+    {% if b.body %}<div class="sf-plate sf-cut sf-lede"><p>{{ b.body | rich }}</p></div>{% endif %}
+    {% if b.stats %}<ul class="sf-edgeprint">{% for st in b.stats %}<li class="sf-cut"><b>{{ st.value }}{% if st.unit %}<sup>{{ st.unit }}</sup>{% endif %}</b> {{ st.label }}</li>{% endfor %}</ul>
+    {% elif b.tags %}<ul class="sf-edgeprint">{% for t in b.tags %}<li class="sf-cut">{{ t }}</li>{% endfor %}</ul>{% endif %}
+    {{ btns(b.buttons) }}
+    {% if b.note %}<p class="sf-small sf-cut">{{ b.note | rich }}</p>{% endif %}
+  </div>
+{% endcall %}
+
+{# ---------------------------------------------------------------- stats: numerals over a drawn soundtrack #}
+{% elif b.type == "stats" %}
+{% set n = b.items | length %}
+{% call reel(b, "stats", loop, e, " sf-n" ~ n) %}
+  <ul class="sf-sounds" style="--n: {{ n }}">
+    {% for st in b.items %}
+    <li class="sf-sound sf-cut" style="--i: {{ loop.index0 }}">
+      {{ wave((st.value | string | length) * 7 + (st.label | string | length) + loop.index0 * 5) }}
+      <b class="sf-sound__v">{{ st.value }}{% if st.unit %}<sup>{{ st.unit }}</sup>{% endif %}</b>
+      <span class="sf-plate sf-sound__l">{{ st.label }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+{% endcall %}
+
+{# ---------------------------------------------------------------- timeline: a bar sheet #}
+{% elif b.type == "timeline" %}
+{% set n = b.items | length %}
+{% call reel(b, "timeline", loop, e, " sf-n" ~ n) %}
+  <div class="sf-timeline__head">{{ head(b, e, b.kicker) }}</div>
+  <ol class="sf-bars" style="--n: {{ n }}">
+    {% for t in b.items %}
+    <li class="sf-bar sf-cut" style="--i: {{ loop.index0 }}">
+      <span class="sf-bar__no" aria-hidden="true">BAR {{ '%02d' % ((loop.index0 * 4) + 1) }}</span>
+      <div class="sf-plate sf-bar__body"><span class="sf-when">{{ t.when }}</span><h3>{{ t.title | rich }}</h3>{% if t.body %}<p>{{ t.body | rich }}</p>{% endif %}</div>
+    </li>
+    {% endfor %}
+  </ol>
+{% endcall %}
+
+{# ---------------------------------------------------------------- quote: an intertitle card #}
+{% elif b.type == "quote" %}
+{% call reel(b, "quote", loop, e) %}
+  <figure class="sf-card">
+    <blockquote class="sf-plate sf-cut sf-quote">{{ b.text | rich }}</blockquote>
+    {% if b.who %}<figcaption class="sf-slate sf-cut">{{ b.who }}</figcaption>{% endif %}
+  </figure>
+{% endcall %}
+
+{# ---------------------------------------------------------------- faq: film cans with tape labels #}
+{% elif b.type == "faq" %}
+{% set n = b.items | length %}
+{% call reel(b, "faq", loop, e, " sf-n" ~ n) %}
+  <div class="sf-faq__head">{{ head(b, e, b.kicker) }}</div>
+  <div class="sf-cans">
+    {% for it in b.items %}
+    <details class="sf-can sf-cut">
+      <summary><span class="sf-can__no" aria-hidden="true">{{ '%02d' % loop.index }}</span><span class="sf-can__q">{{ it.q | rich }}</span><i class="sf-can__lid" aria-hidden="true"></i></summary>
+      <p class="sf-can__a">{{ it.a | rich }}</p>
+    </details>
+    {% endfor %}
+  </div>
+{% endcall %}
+
+{# ---------------------------------------------------------------- cta: the tail leader and an iris #}
+{% elif b.type == "cta" %}
+{% call reel(b, "cta", loop, e) %}
+  <div class="sf-iris">
+    {{ head(b, e, b.kicker, "sf-title--cta") }}
+    {% if b.button %}<div class="sf-btns"><a class="sf-btn sf-btn--hot sf-btn--big sf-cut" href="{{ b.button.href }}"><i class="sf-btn__perfs" aria-hidden="true"></i>{{ b.button.label }} <span class="sf-arrow" aria-hidden="true">&rarr;</span></a></div>{% endif %}
+  </div>
+  <p class="sf-end" aria-hidden="true">END</p>
+{% endcall %}
+
+{# ---------------------------------------------------------------- gallery: a contact strip #}
+{% elif b.type == "gallery" %}
+{% set n = b.items | length %}
+{% call reel(b, "gallery", loop, e, " sf-n" ~ n) %}
+  <div class="sf-gallery__head">{{ head(b, e, b.kicker) }}</div>
+  <div class="sf-contact" style="--n: {{ n }}">
+    {% for g in b.items %}
+    <a class="sf-fr sf-fr--print sf-cut" href="{{ g.href }}" style="--i: {{ loop.index0 }}"><span class="sf-fr__no" aria-hidden="true">{{ '%03d' % loop.index }}</span>
+      <span class="sf-fr__pic">{% if g.video %}<video src="{{ g.video }}" muted loop playsinline preload="metadata"{% if g.image %} poster="{{ g.image }}"{% endif %}></video>{% elif g.image %}<img src="{{ g.image }}" alt="" loading="lazy">{% endif %}
+      <span class="sf-fr__cap">{% if g.kicker %}<small>{{ g.kicker }}</small>{% endif %}<b>{{ g.title | rich }}</b>{% if g.body %}<em>{{ g.body | rich }}</em>{% endif %}</span></span></a>
+    {% endfor %}
+  </div>
+{% endcall %}
+
+{# ---------------------------------------------------------------- strip: frames in a column #}
+{% elif b.type == "strip" %}
+{% set n = b.items | length %}
+{% call reel(b, "strip", loop, e, " sf-n" ~ n) %}
+  <div class="sf-strip__head">{{ head(b, e, b.kicker) }}{% if b.body %}<div class="sf-plate sf-cut sf-lede"><p>{{ b.body | rich }}</p></div>{% endif %}</div>
+  <div class="sf-contact sf-contact--strip" style="--n: {{ n }}">
+    {% for it in b.items %}
+    <figure class="sf-fr sf-fr--print sf-cut" style="--i: {{ loop.index0 }}"><span class="sf-fr__no" aria-hidden="true">{{ '%03d' % loop.index }}</span>
+      <div class="sf-fr__pic"><img src="{{ e.imgs[loop.index0] }}" alt="{{ it.caption or '' }}" loading="lazy">{% if it.caption %}<figcaption class="sf-fr__cap"><b>{{ it.caption }}</b></figcaption>{% endif %}</div></figure>
+    {% endfor %}
+  </div>
+{% endcall %}
+
+{# ---------------------------------------------------------------- orbit: a reel with the items around its rim #}
+{% elif b.type == "orbit" %}
+{% set n = b.items | length %}
+{% call reel(b, "orbit", loop, e, " sf-n" ~ n) %}
+  <div class="sf-orbit__copy">{{ head(b, e, b.kicker) }}{% if b.body %}<div class="sf-plate sf-cut sf-lede"><p>{{ b.body | rich }}</p></div>{% endif %}</div>
+  <div class="sf-orbit__stage">
+    <span class="sf-wheel" aria-hidden="true"></span>
+    <span class="sf-orbit__center sf-plate">{{ b.center }}</span>
+    <ul class="sf-orbit__ring" style="--n: {{ n }}">{% for it in b.items %}<li class="sf-plate sf-spoke" style="--i: {{ loop.index0 }}"><b>{{ it.label }}</b>{% if it.status %}<small>{{ it.status }}</small>{% endif %}</li>{% endfor %}</ul>
+  </div>
+{% endcall %}
+
+{% endif %}
+{% endmacro %}

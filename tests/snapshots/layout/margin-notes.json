@@ -1,0 +1,551 @@
+{
+ "example": "margin-notes",
+ "root": {
+  "class": [
+   "mode-light",
+   "layout-flow"
+  ]
+ },
+ "cuts": [],
+ "sections": [
+  {
+   "id": "desk",
+   "type": "diorama",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-scene",
+      "ss-overlay",
+      "ss-side-right",
+      "ss-type-diorama",
+      "ss-shade-none"
+     ],
+     "id": "desk",
+     "data": {
+      "data-scene": "diorama"
+     },
+     "text": {
+      "kicker": "Margin",
+      "title": "Your best ideas are in the margins.",
+      "title_tag": "h1"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-track"
+       ],
+       "style": {
+        "height": "1000vh"
+       },
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-stage"
+         ],
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-shade"
+           ]
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-captions"
+           ],
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0.0165",
+              "data-to": "0.1211"
+             },
+             "text": {
+              "kicker": "Margin",
+              "title": "Your best ideas are in the margins.",
+              "title_tag": "h1"
+             }
+            }
+           ]
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-captions",
+            "ss-captions--grid",
+            "ss-captions--row-top"
+           ],
+           "style": {
+            "--col": "8 / span 5"
+           },
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption",
+              "ss-surface-light"
+             ],
+             "data": {
+              "data-from": "0.153",
+              "data-to": "0.2506",
+              "data-enter": "wipe"
+             },
+             "text": {
+              "kicker": "01 · Capture",
+              "title": "Write anywhere on the page.",
+              "title_tag": "h2"
+             }
+            }
+           ]
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-captions",
+            "ss-captions--bottom-left"
+           ],
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption",
+              "ss-surface-light"
+             ],
+             "data": {
+              "data-from": "0.2815",
+              "data-to": "0.3791",
+              "data-enter": "type-on",
+              "data-exit": "fade"
+             },
+             "text": {
+              "kicker": "02 · Sync",
+              "title": "Pick up where the pen stopped.",
+              "title_tag": "h2"
+             }
+            }
+           ]
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-captions",
+            "ss-captions--box",
+            "ss-captions--align-right"
+           ],
+           "style": {
+            "--x": "0.56",
+            "--y": "0.58",
+            "--w": "0.36"
+           },
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption",
+              "ss-surface-light"
+             ],
+             "data": {
+              "data-from": "0.4099",
+              "data-to": "0.5075",
+              "data-enter": "scale"
+             },
+             "text": {
+              "kicker": "03 · Calm",
+              "title": "Nothing pings. Nothing nags.",
+              "title_tag": "h2"
+             }
+            }
+           ]
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-captions",
+            "ss-captions--top-left"
+           ],
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption",
+              "ss-surface-light"
+             ],
+             "data": {
+              "data-from": "0.5383",
+              "data-to": "0.636",
+              "data-enter": "fade",
+              "data-exit": "wipe"
+             },
+             "text": {
+              "kicker": "04 · Shelf",
+              "title": "Every note, on its own shelf.",
+              "title_tag": "h2"
+             }
+            }
+           ]
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-captions",
+            "ss-captions--grid",
+            "ss-captions--row-bottom"
+           ],
+           "style": {
+            "--col": "2 / span 7"
+           },
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption",
+              "ss-caption--block",
+              "ss-caption--stats"
+             ],
+             "data": {
+              "data-from": "0.6657",
+              "data-to": "0.7563",
+              "data-enter": "rise"
+             },
+             "children": [
+              {
+               "tag": "section",
+               "class": [
+                "ss-block",
+                "ss-band"
+               ],
+               "children": [
+                {
+                 "tag": "div",
+                 "class": [
+                  "ss-wrap",
+                  "ss-stats",
+                  "ss-stats--3"
+                 ]
+                }
+               ]
+              }
+             ]
+            }
+           ]
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-captions",
+            "ss-captions--box"
+           ],
+           "style": {
+            "--x": "0.07",
+            "--y": "0.16",
+            "--w": "0.38"
+           },
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption",
+              "ss-caption--block",
+              "ss-caption--quote"
+             ],
+             "data": {
+              "data-from": "0.785",
+              "data-to": "0.8756",
+              "data-enter": "fade",
+              "data-exit": "fade"
+             },
+             "children": [
+              {
+               "tag": "section",
+               "class": [
+                "ss-block"
+               ]
+              }
+             ]
+            }
+           ]
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-captions",
+            "ss-captions--center"
+           ],
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0.9031",
+              "data-to": "0.9868",
+              "data-enter": "rise"
+             },
+             "text": {
+              "kicker": "Margin",
+              "title": "Bring your own margins.",
+              "title_tag": "h2"
+             }
+            }
+           ]
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-cue"
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "sdata": {
+    "layout": "overlay",
+    "length": 10.0,
+    "steps": [
+     {
+      "kicker": "Margin",
+      "title": "Your best ideas are <em>in the margins.</em>",
+      "body": "A notes app that keeps the asides, the arrows and the questions you scribble beside the work.",
+      "fact": null,
+      "at": [
+       0.0165,
+       0.1211
+      ],
+      "length": 1.5,
+      "intro": true,
+      "hint": "Scroll to sit down",
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "01 · Capture",
+      "title": "Write <em>anywhere</em> on the page.",
+      "body": "Beside a paragraph, under a sketch, across a photo. Notes stay pinned to what they are about.",
+      "fact": null,
+      "at": {
+       "grid": "8 / span 5",
+       "row": "top",
+       "align": "left"
+      },
+      "length": 1.4,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": "light",
+      "button": null,
+      "image": null,
+      "state": {},
+      "show": [
+       0.153,
+       0.2506
+      ],
+      "enter": "wipe"
+     },
+     {
+      "kicker": "02 · Sync",
+      "title": "Pick up <em>where the pen stopped.</em>",
+      "body": "The laptop has the note you started on the train, with the arrow still pointing where you meant.",
+      "fact": null,
+      "at": "bottom-left",
+      "length": 1.4,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": "light",
+      "button": null,
+      "image": null,
+      "state": {},
+      "show": [
+       0.2815,
+       0.3791
+      ],
+      "enter": "type-on",
+      "exit": "fade"
+     },
+     {
+      "kicker": "03 · Calm",
+      "title": "Nothing pings. <em>Nothing nags.</em>",
+      "body": "No streaks, no badges. Margin waits on the desk until you come back to it.",
+      "fact": null,
+      "at": {
+       "x": 0.56,
+       "y": 0.58,
+       "w": 0.36,
+       "h": null,
+       "align": "right"
+      },
+      "length": 1.4,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": "light",
+      "button": null,
+      "image": null,
+      "state": {},
+      "show": [
+       0.4099,
+       0.5075
+      ],
+      "enter": "scale"
+     },
+     {
+      "kicker": "04 · Shelf",
+      "title": "Every note, <em>on its own shelf.</em>",
+      "body": "Notebooks file themselves by what they are about, not by the day you happened to write them.",
+      "fact": null,
+      "at": "top-left",
+      "length": 1.4,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": "light",
+      "button": null,
+      "image": null,
+      "state": {},
+      "show": [
+       0.5383,
+       0.636
+      ],
+      "enter": "fade",
+      "exit": "wipe"
+     },
+     {
+      "block": "stats",
+      "at": {
+       "grid": "2 / span 7",
+       "row": "bottom",
+       "align": "left"
+      },
+      "show": [
+       0.6657,
+       0.7563
+      ],
+      "enter": "rise",
+      "length": 1.3,
+      "state": {
+       "wide": true
+      },
+      "id": null,
+      "band": false,
+      "surface": null,
+      "items": [
+       {
+        "value": "0",
+        "unit": null,
+        "label": "notifications, ever",
+        "data": null
+       },
+       {
+        "value": "1",
+        "unit": "s",
+        "label": "from the dock to a blank page",
+        "data": null
+       },
+       {
+        "value": "100",
+        "unit": "%",
+        "label": "of it works offline",
+        "data": null
+       }
+      ]
+     },
+     {
+      "block": "quote",
+      "at": {
+       "x": 0.07,
+       "y": 0.16,
+       "w": 0.38,
+       "h": null,
+       "align": "left"
+      },
+      "show": [
+       0.785,
+       0.8756
+      ],
+      "enter": "fade",
+      "exit": "fade",
+      "length": 1.3,
+      "state": {
+       "wide": true
+      },
+      "id": null,
+      "band": false,
+      "surface": null,
+      "text": "I stopped losing the <em>half-thoughts.</em> They are right where I left them.",
+      "who": "A reader in the Margin beta"
+     },
+     {
+      "kicker": "Margin",
+      "title": "Bring your <em>own margins.</em>",
+      "body": null,
+      "fact": null,
+      "at": "center",
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {},
+      "show": [
+       0.9031,
+       0.9868
+      ],
+      "enter": "rise"
+     }
+    ],
+    "hud": {
+     "kind": "none",
+     "fields": [],
+     "events": [],
+     "clock": null,
+     "scales": [],
+     "legend": []
+    }
+   }
+  },
+  {
+   "id": "start",
+   "type": "cta",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-cta"
+     ],
+     "id": "start",
+     "text": {
+      "kicker": "Free on every device",
+      "title": "Start a page. Leave room at the edge.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-cta__in"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,27 @@
+# Pop-up book: tokens and fonts for theme.style: pop-up-book. See engine/styles/README.md for the contract and
+# docs/styles/styles-26-27.md section 1 for the research.
+label: Pop-up book
+about: A 90-degree stage pop-up book on a lamp-lit table. Scrolling turns the board pages, and the opening angle drives every paper mechanism, so each scene folds up out of the gutter on parallel folds while the one before folds flat behind the turning leaf. Pull-tabs raise the figures, a wheel turns the timeline, flaps lift for answers, and the button is the last tab.
+mode: dark
+cuts: false   # the style plays its own hand-over between sections: `transition:` is ignored (see engine/styles/README.md)
+scene_blocks: [features, product, stats, timeline, quote, faq, cta]   # drawn its own way as steps inside a scene; other types use the default markup there
+colors:
+  bg: '#2a2421'
+  bg2: '#211c1a'
+  ink: '#f4ecdc'
+  accent: '#e0553a'
+  accent2: '#f0b54a'
+  accent_ink: '#000000'
+fonts:
+  display: Caprasimo
+  body: Literata
+  mono: Courier Prime
+font_axes:
+  Caprasimo: ""
+  Literata: "ital,opsz,wght@0,7..72,200..900;1,7..72,200..900"
+  Courier Prime: "ital,wght@0,400;0,700;1,400"
+display_weight: 400
+radius: 0px
+# What a brand (theme.from) cannot change here: the dark room its CSS is drawn for
+requires:
+  mode: dark

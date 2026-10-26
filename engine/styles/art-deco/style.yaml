@@ -1,0 +1,27 @@
+# Art deco: an opening night. See docs/styles/styles-16-21.md section 4 for the research.
+label: Art deco
+about: An opening night. Scroll parts gold-lacquered doors on the centre axis to reveal a spotlit headline under a fanning sunburst; every scene unfolds symmetrically from the centre, features are dealt in mirrored pairs, stats are billed on a marquee with chasing bulbs, an elevator dial sweeps floor by floor, and doors close and reopen between scenes until the ADMIT ONE invitation.
+mode: dark
+scene_blocks: [features, quote, faq]   # drawn its own way as steps inside a scene; other types use the default markup there
+colors:
+  bg: '#0b0b0c'
+  bg2: '#121110'
+  ink: '#ede1c3'
+  accent: '#c9a227'
+  accent2: '#e9d18b'
+  accent_ink: '#0b0b0c'
+fonts:
+  display: Limelight
+  body: Josefin Sans
+  mono: Federo
+  marquee: Monoton
+font_axes:
+  Limelight: ""
+  Josefin Sans: "ital,wght@0,100..700;1,100..700"
+  Federo: ""
+  Monoton: ""
+display_weight: 400
+radius: 0px
+# What a brand (theme.from) cannot change here: the dark room its CSS is drawn for
+requires:
+  mode: dark

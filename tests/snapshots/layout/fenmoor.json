@@ -1,0 +1,423 @@
+{
+ "example": "fenmoor",
+ "root": {
+  "class": [
+   "mode-dark",
+   "layout-flow"
+  ]
+ },
+ "cuts": [],
+ "sections": [
+  {
+   "id": "stay",
+   "type": "film",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-scene",
+      "ss-overlay",
+      "ss-type-film",
+      "jy-scene",
+      "ss-shade-none"
+     ],
+     "id": "stay",
+     "data": {
+      "data-scene": "film"
+     },
+     "text": {
+      "kicker": "Four rooms · North York Moors",
+      "title": "Come in. The door is open.",
+      "title_tag": "h1"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-track"
+       ],
+       "style": {
+        "height": "2260vh"
+       },
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-stage"
+         ],
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "jy-stops"
+           ],
+           "children": [
+            {
+             "tag": "article",
+             "class": [
+              "jy-stop",
+              "jy-side-left",
+              "jy-surface-dark"
+             ],
+             "id": "door",
+             "data": {
+              "data-stop": "door"
+             },
+             "text": {
+              "kicker": "Four rooms · North York Moors",
+              "title": "Come in. The door is open.",
+              "title_tag": "h1"
+             },
+             "children": [
+              {
+               "tag": "div",
+               "class": [
+                "jy-body"
+               ],
+               "children": [
+                {
+                 "tag": "div",
+                 "class": [
+                  "jy-blk",
+                  "jy-hero",
+                  "jy-form-type"
+                 ],
+                 "text": {
+                  "kicker": "Four rooms · North York Moors",
+                  "title": "Come in. The door is open.",
+                  "title_tag": "h1"
+                 }
+                }
+               ]
+              }
+             ]
+            },
+            {
+             "tag": "article",
+             "class": [
+              "jy-stop",
+              "jy-side-left",
+              "jy-surface-dark"
+             ],
+             "id": "hearth",
+             "data": {
+              "data-stop": "hearth"
+             },
+             "text": {
+              "kicker": "The hearth room",
+              "title": "Rooms that keep the morning.",
+              "title_tag": "h2"
+             },
+             "children": [
+              {
+               "tag": "div",
+               "class": [
+                "jy-body"
+               ],
+               "children": [
+                {
+                 "tag": "div",
+                 "class": [
+                  "jy-blk",
+                  "jy-features",
+                  "jy-form-rail"
+                 ],
+                 "text": {
+                  "kicker": "The hearth room",
+                  "title": "Rooms that keep the morning.",
+                  "title_tag": "h2"
+                 }
+                }
+               ]
+              }
+             ]
+            },
+            {
+             "tag": "article",
+             "class": [
+              "jy-stop",
+              "jy-side-left",
+              "jy-surface-dark"
+             ],
+             "id": "library",
+             "data": {
+              "data-stop": "library"
+             },
+             "children": [
+              {
+               "tag": "div",
+               "class": [
+                "jy-body"
+               ],
+               "children": [
+                {
+                 "tag": "figure",
+                 "class": [
+                  "jy-blk",
+                  "jy-quote",
+                  "jy-form-type"
+                 ]
+                },
+                {
+                 "tag": "div",
+                 "class": [
+                  "jy-blk",
+                  "jy-stats",
+                  "jy-form-rail"
+                 ]
+                }
+               ]
+              }
+             ]
+            },
+            {
+             "tag": "article",
+             "class": [
+              "jy-stop",
+              "jy-side-left",
+              "jy-surface-dark"
+             ],
+             "id": "table",
+             "data": {
+              "data-stop": "table"
+             },
+             "text": {
+              "kicker": "From the larder",
+              "title": "The Fenmoor Larder Box.",
+              "title_tag": "h2"
+             },
+             "children": [
+              {
+               "tag": "div",
+               "class": [
+                "jy-body"
+               ],
+               "children": [
+                {
+                 "tag": "div",
+                 "class": [
+                  "jy-blk",
+                  "jy-product",
+                  "jy-form-plaque"
+                 ],
+                 "text": {
+                  "kicker": "From the larder",
+                  "title": "The Fenmoor Larder Box.",
+                  "title_tag": "h2"
+                 }
+                }
+               ]
+              }
+             ]
+            },
+            {
+             "tag": "article",
+             "class": [
+              "jy-stop",
+              "jy-side-left",
+              "jy-surface-dark"
+             ],
+             "id": "window",
+             "data": {
+              "data-stop": "window"
+             },
+             "text": {
+              "kicker": "Rates",
+              "title": "Priced by the night, never by the head.",
+              "title_tag": "h2"
+             },
+             "children": [
+              {
+               "tag": "div",
+               "class": [
+                "jy-body"
+               ],
+               "children": [
+                {
+                 "tag": "div",
+                 "class": [
+                  "jy-blk",
+                  "jy-features",
+                  "jy-form-rail"
+                 ],
+                 "text": {
+                  "kicker": "Rates",
+                  "title": "Priced by the night, never by the head.",
+                  "title_tag": "h2"
+                 }
+                }
+               ]
+              }
+             ]
+            },
+            {
+             "tag": "article",
+             "class": [
+              "jy-stop",
+              "jy-side-top",
+              "jy-surface-dark"
+             ],
+             "id": "view",
+             "data": {
+              "data-stop": "view"
+             },
+             "text": {
+              "kicker": "Open from March",
+              "title": "Come for the light.",
+              "title_tag": "h2"
+             },
+             "children": [
+              {
+               "tag": "div",
+               "class": [
+                "jy-body"
+               ],
+               "children": [
+                {
+                 "tag": "div",
+                 "class": [
+                  "jy-blk",
+                  "jy-cta",
+                  "jy-form-type"
+                 ],
+                 "text": {
+                  "kicker": "Open from March",
+                  "title": "Come for the light.",
+                  "title_tag": "h2"
+                 }
+                }
+               ]
+              }
+             ]
+            }
+           ]
+          },
+          {
+           "tag": "nav",
+           "class": [
+            "jy-rail"
+           ],
+           "children": [
+            {
+             "tag": "a",
+             "class": [],
+             "data": {
+              "data-stop": "door"
+             },
+             "children": [
+              {
+               "tag": "span",
+               "class": [
+                "jy-rail__label"
+               ]
+              }
+             ]
+            },
+            {
+             "tag": "a",
+             "class": [],
+             "data": {
+              "data-stop": "hearth"
+             },
+             "children": [
+              {
+               "tag": "span",
+               "class": [
+                "jy-rail__label"
+               ]
+              }
+             ]
+            },
+            {
+             "tag": "a",
+             "class": [],
+             "data": {
+              "data-stop": "library"
+             },
+             "children": [
+              {
+               "tag": "span",
+               "class": [
+                "jy-rail__label"
+               ]
+              }
+             ]
+            },
+            {
+             "tag": "a",
+             "class": [],
+             "data": {
+              "data-stop": "table"
+             },
+             "children": [
+              {
+               "tag": "span",
+               "class": [
+                "jy-rail__label"
+               ]
+              }
+             ]
+            },
+            {
+             "tag": "a",
+             "class": [],
+             "data": {
+              "data-stop": "window"
+             },
+             "children": [
+              {
+               "tag": "span",
+               "class": [
+                "jy-rail__label"
+               ]
+              }
+             ]
+            },
+            {
+             "tag": "a",
+             "class": [],
+             "data": {
+              "data-stop": "view"
+             },
+             "children": [
+              {
+               "tag": "span",
+               "class": [
+                "jy-rail__label"
+               ]
+              }
+             ]
+            }
+           ]
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-cue"
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "sdata": {
+    "layout": "overlay",
+    "length": 22.6,
+    "steps": [],
+    "hud": {
+     "kind": "none",
+     "fields": [],
+     "events": [],
+     "clock": null,
+     "scales": [],
+     "legend": []
+    }
+   },
+   "note": "a journey stop with side/surface `auto` takes them from its rendered picture (engine/journey.py measurement); the snapshot shows the fallback: left, dark"
+  }
+ ],
+ "note": "not fully covered without a render: stay (see each section's note)"
+}

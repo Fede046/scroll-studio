@@ -1,0 +1,36 @@
+/* Film grammar between sections (`transition:`; engine/cuts.py, runtime/src/lib/cuts.ts).
+ *
+ * A join with a transition is two pins and a gap of scroll. The section above is pinned bottom-aligned (it sticks
+ * when its last screen is in view) and held for the gap; the section below is pulled up over it (negative margin) and
+ * pinned at the top for the same stretch. For that stretch both pictures are on screen and the runtime plays the cut
+ * on the two pins (transform, clip-path, mask, filter, opacity), driven by how far the gap has scrolled.
+ * Everything here applies only once the runtime has switched it on (html.ss-cuts-on): without scripts, and with
+ * reduced motion, the sections simply follow one another, which is a plain cut. */
+
+.ss-cutgap { display: none; }
+
+html.ss-cuts-on .ss-cutw { position: relative; }
+html.ss-cuts-on .ss-cutpin { position: sticky; top: 0; min-height: 100vh; min-height: 100svh; display: flex; flex-direction: column;
+  justify-content: center; background: var(--bg); color: var(--ink); }
+/* the pin above holds by its bottom edge: --cut-h is its own height, measured by the runtime */
+html.ss-cuts-on .ss-cutpin--out { top: min(0px, calc(100vh - var(--cut-h, 100vh))); top: min(0px, calc(100svh - var(--cut-h, 100svh)));
+  transform-origin: 50% calc(100% - 50vh); transform-origin: 50% calc(100% - 50svh); }
+html.ss-cuts-on .ss-cutpin--in { transform-origin: 50% 50vh; transform-origin: 50% 50svh; }
+html.ss-cuts-on .ss-cutgap { display: block; height: calc(var(--cut-l, 1) * 100vh); height: calc(var(--cut-l, 1) * 100svh); }
+/* the section below starts one screen plus the gap early, so its first screen lands exactly when the section above is held */
+html.ss-cuts-on .ss-cutw--in { margin-top: calc(-1 * (var(--cut-l, 1) + 1) * 100vh); margin-top: calc(-1 * (var(--cut-l, 1) + 1) * 100svh); }
+html.ss-cuts-on .ss-cutpin > section, html.ss-cuts-on .ss-cutpin > .ss-backdrop, html.ss-cuts-on .ss-cutpin > .ss-cutw { width: 100%; }
+
+/* a pin that is not part of the cut yet or any more is out of the picture and out of reach */
+.ss-cutpin.ss-cut-off { visibility: hidden; pointer-events: none; }
+
+/* carried elements and the ghost layer they travel in */
+.ss-cutghost { position: fixed; inset: 0; z-index: 40; pointer-events: none; overflow: hidden; contain: layout paint; }
+.ss-cutghost > * { position: absolute; margin: 0; transform-origin: 0 0; will-change: transform, opacity; }
+.ss-cut-carried { visibility: hidden !important; }
+/* the words of a section while a match cut scales its picture */
+.ss-cut-faded { opacity: var(--cut-fade, 1) !important; }
+
+
+/* a scene that hands over with a transition does not also fade itself to the page colour at its end: the cut is its ending */
+html.ss-cuts-on .ss-cutpin--out .ss-outro { opacity: 0 !important; }

@@ -1,0 +1,408 @@
+{
+ "example": "lodestar-orbital",
+ "root": {
+  "class": [
+   "mode-dark",
+   "layout-flow"
+  ]
+ },
+ "cuts": [],
+ "sections": [
+  {
+   "id": "launch",
+   "type": "film",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-scene",
+      "ss-overlay",
+      "ss-side-right",
+      "ss-type-film",
+      "ss-shade-auto"
+     ],
+     "id": "launch",
+     "data": {
+      "data-scene": "film"
+     },
+     "text": {
+      "kicker": "Lodestar Orbital",
+      "title": "Every mission starts on the ground.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-track"
+       ],
+       "style": {
+        "height": "700vh"
+       },
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-stage"
+         ],
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-shade"
+           ]
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-captions"
+           ],
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0.01",
+              "data-to": "0.13"
+             },
+             "text": {
+              "kicker": "Lodestar Orbital",
+              "title": "Every mission starts on the ground.",
+              "title_tag": "h2"
+             }
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0.22",
+              "data-to": "0.4"
+             },
+             "text": {
+              "kicker": "Ascent",
+              "title": "Through the weather. Past the noise.",
+              "title_tag": "h2"
+             }
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0.56",
+              "data-to": "0.72"
+             },
+             "text": {
+              "kicker": "Separation",
+              "title": "When the fairing opens, the work begins.",
+              "title_tag": "h2"
+             }
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0.84",
+              "data-to": "0.99"
+             },
+             "text": {
+              "kicker": "On station",
+              "title": "Your satellite, exactly where it belongs",
+              "title_tag": "h2"
+             }
+            }
+           ]
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-hud",
+            "ss-telemetry"
+           ]
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-cue"
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "sdata": {
+    "layout": "overlay",
+    "length": 7.0,
+    "steps": [
+     {
+      "kicker": "Lodestar Orbital",
+      "title": "Every mission starts <em>on the ground.</em>",
+      "body": null,
+      "fact": null,
+      "at": [
+       0.01,
+       0.13
+      ],
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "Ascent",
+      "title": "Through the weather. <em>Past the noise.</em>",
+      "body": null,
+      "fact": null,
+      "at": [
+       0.22,
+       0.4
+      ],
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "Separation",
+      "title": "When the fairing opens, <em>the work begins.</em>",
+      "body": null,
+      "fact": null,
+      "at": [
+       0.56,
+       0.72
+      ],
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "On station",
+      "title": "Your satellite, <em>exactly where it belongs.</em>",
+      "body": null,
+      "fact": null,
+      "at": [
+       0.84,
+       0.99
+      ],
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     }
+    ],
+    "hud": {
+     "kind": "telemetry",
+     "fields": [
+      {
+       "label": "Altitude",
+       "unit": "km",
+       "to": 550,
+       "curve": 1.6,
+       "decimals": 1
+      },
+      {
+       "label": "Velocity",
+       "unit": "km/s",
+       "to": 7.6,
+       "curve": 1.25,
+       "decimals": 2
+      }
+     ],
+     "events": [
+      {
+       "at": 0.09,
+       "label": "Lift-off"
+      },
+      {
+       "at": 0.3,
+       "label": "Max-Q"
+      },
+      {
+       "at": 0.44,
+       "label": "Cloud break"
+      },
+      {
+       "at": 0.66,
+       "label": "Stage separation"
+      },
+      {
+       "at": 0.76,
+       "label": "Fairing separation"
+      },
+      {
+       "at": 0.86,
+       "label": "Array deploy"
+      }
+     ],
+     "clock": {
+      "prefix": "T",
+      "start": -3,
+      "end": 540,
+      "zero": 0.083
+     },
+     "scales": [],
+     "legend": []
+    }
+   }
+  },
+  {
+   "id": "mission",
+   "type": "intro",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ],
+     "id": "mission",
+     "text": {
+      "kicker": "Mission",
+      "title": "One team from the pad to on-station.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-wrap",
+        "ss-intro2"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "services",
+   "type": "features",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ],
+     "id": "services",
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-features",
+        "ss-features--3"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "record",
+   "type": "stats",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-band"
+     ],
+     "id": "record",
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-wrap",
+        "ss-stats",
+        "ss-stats--4"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "timeline",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ],
+     "text": {
+      "kicker": "A typical mission",
+      "title": "Twelve weeks, start to station.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-timeline",
+        "ss-timeline--5"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "book",
+   "type": "cta",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-cta"
+     ],
+     "id": "book",
+     "text": {
+      "kicker": "Next window",
+      "title": "Your payload.Our countdown.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-cta__bg"
+       ]
+      },
+      {
+       "tag": "div",
+       "class": [
+        "ss-cta__in"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

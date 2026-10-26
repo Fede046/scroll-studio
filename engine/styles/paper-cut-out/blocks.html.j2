@@ -1,0 +1,196 @@
+{# Paper cut-out: every section is a SHEET of coloured paper on an animation stand, held to the stack by a brass brad in one
+   corner. Pieces lie on the sheet (.pc-p): cut paper with a thin shadow, headlines whose words hang from their own pins,
+   typewritten labels, cut-out photographs with a white margin, cards that fan from one pin, flaps that swing aside, a folding
+   rule. Without JavaScript (and with reduced motion) the sheets are laid down the page one after another as flat paper, every
+   piece at rest; runtime/src/styles/paper-cut-out.ts stacks them on the stand, swings the top sheet aside on its brad as you
+   scroll, lets every piece hang and swing with the speed of the scroll, and gives the page a jointed paper arm that points. #}
+{% set types = ["hero", "intro", "features", "product", "stats", "timeline", "quote", "faq", "cta", "gallery", "strip", "orbit"] %}
+{% set tones = ["vermilion", "bone", "ultramarine", "ochre", "night", "sage", "rose"] %}
+{% set pins = ["tl", "tr", "br", "bl"] %}
+
+{% macro label(text, cls="") %}{% if text %}<p class="pc-p pc-label {{ cls }}" data-pc="note" data-from="l">{{ text }}</p>{% endif %}{% endmacro %}
+
+{% macro head(b, e, kicker=None, cls="") %}
+{% set tag = "h1" if e.first else "h2" %}
+{{ label(kicker if kicker is not none else b.kicker) }}
+{% if b.title %}<{{ tag }} class="pc-title {{ cls }}" data-pc="words">{{ b.title | rich }}</{{ tag }}>{% endif %}
+{% endmacro %}
+
+{# a cut-paper ticket for a button: a notch each side, a pull-string #}
+{% macro btns(list) %}{% if list %}<div class="pc-btns">{% for l in list %}<a class="pc-p pc-btn{% if loop.first %} pc-btn--hot{% endif %}" data-pc="note" data-from="b" href="{{ l.href }}"><span>{{ l.label }}</span>{% if loop.first %}<i class="pc-arrow" aria-hidden="true">&rarr;</i>{% endif %}</a>{% endfor %}</div>{% endif %}{% endmacro %}
+
+{# the art, if the site has any, is cut from black paper (Reiniger's silhouettes) and its frames are swapped as the page scrolls #}
+{% macro silhouette(cls="") %}{% if art %}<div class="pc-p pc-sil {{ cls }}" data-pc="note" data-from="b" data-pc-art role="img" aria-label="{{ art.label }}" style="--ar: {{ art.w }} / {{ art.h }}"><canvas aria-hidden="true"></canvas></div>{% endif %}{% endmacro %}
+
+{% macro sheet(b, kind, loop, hold=1.0, extra="") %}
+<section class="pc-sheet pc-sheet--{{ kind }}{{ extra }}" data-kind="{{ kind }}" data-hold="{{ hold }}" data-tone="{{ 'vermilion' if loop.first else tones[loop.index0 % (tones | length)] }}" data-pin="{{ pins[loop.index0 % 4] }}"{% if b.id %} id="{{ b.id }}"{% endif %}>
+  <div class="pc-paper" aria-hidden="true"></div>
+  <div class="pc-cast"><div class="pc-in">{{ caller() }}</div></div>
+  <i class="pc-brad" aria-hidden="true"></i>
+</section>
+{% endmacro %}
+
+{% macro render(b, e, base, loop) %}
+
+{# ---------------------------------------------------------------- hero: the cover sheet #}
+{% if b.type == "hero" %}
+{% call sheet(b, "hero", loop, 0.6) %}
+  <div class="pc-hero__text">
+    {{ label(b.badge) }}
+    {{ head(b, e, "", "pc-title--hero") }}
+    {% if b.body %}<p class="pc-p pc-note pc-lede" data-pc="note" data-from="r">{{ b.body | rich }}</p>{% endif %}
+    {{ btns(b.buttons) }}{{ base.hero_kit(b, e) }}
+  </div>
+  <div class="pc-hero__prop">
+    {% if e.img or e.video %}
+    <figure class="pc-p pc-photo" data-pc="photo" data-from="r"><i class="pc-corner pc-corner--a" aria-hidden="true"></i><i class="pc-corner pc-corner--b" aria-hidden="true"></i>{% if e.video %}<video src="{{ e.video }}" autoplay muted loop playsinline{% if e.img %} poster="{{ e.img }}"{% endif %}></video>{% else %}<img src="{{ e.img }}" alt="" fetchpriority="high">{% endif %}</figure>
+    {% elif b.device %}
+    <div class="pc-p pc-phone" data-pc="photo" data-from="b">{{ base.phone(b.device, e.screen, e.clip) }}</div>
+    {% elif art %}{{ silhouette("pc-sil--hero") }}
+    {% else %}<span class="pc-p pc-moon" data-pc="photo" data-from="t" aria-hidden="true"></span>{% endif %}
+  </div>
+{% endcall %}
+
+{# ---------------------------------------------------------------- intro #}
+{% elif b.type == "intro" %}
+{% call sheet(b, "intro", loop, 0.5) %}
+  <div class="pc-intro__title">{{ head(b, e, b.kicker) }}</div>
+  <div class="pc-intro__copy">
+    {% if b.body %}<p class="pc-p pc-note pc-lede" data-pc="note" data-from="r">{{ b.body | rich }}</p>{% endif %}
+    {% if b.button %}<div class="pc-btns"><a class="pc-p pc-btn pc-btn--hot" data-pc="note" data-from="b" href="{{ b.button.href }}"><span>{{ b.button.label }}</span><i class="pc-arrow" aria-hidden="true">&rarr;</i></a></div>{% endif %}
+  </div>
+{% endcall %}
+
+{# ---------------------------------------------------------------- features: a fan of cards on one pin #}
+{% elif b.type == "features" %}
+{% set n = b.items | length %}
+{% call sheet(b, "features", loop, 0.5 + n * 0.45, " pc-n" ~ n) %}
+  <div class="pc-features__head">{{ head(b, e, b.kicker) }}</div>
+  <ul class="pc-fan pc-fan--{{ n }}" style="--n: {{ n }}">
+    {% for f in b.items %}
+    <li class="pc-p pc-card pc-feature" data-pc="fan" style="--i: {{ loop.index0 }}">
+      <span class="pc-badge" aria-hidden="true">{{ f.tag or loop.index }}</span>
+      <h3>{{ f.title | rich }}</h3>
+      {% if f.body %}<p>{{ f.body | rich }}</p>{% endif %}
+      {% if f.meter is not none %}<span class="pc-meter" aria-hidden="true"><i style="width: {{ (f.meter * 100) | round }}%"></i></span>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+{% endcall %}
+
+{# ---------------------------------------------------------------- product #}
+{% elif b.type == "product" %}
+{% set opts = (b.device.options | length) if b.device else 0 %}
+{% call sheet(b, "product", loop, ([opts, 1] | max) * 0.4 + 0.4, " pc-side--" ~ b.side) %}
+  <div class="pc-product__prop">
+    {% if e.img %}<figure class="pc-p pc-photo pc-photo--product" data-pc="photo" data-from="l"><i class="pc-corner pc-corner--a" aria-hidden="true"></i><i class="pc-corner pc-corner--b" aria-hidden="true"></i><img src="{{ e.img }}" alt="" loading="lazy"></figure>{% endif %}
+    {% if b.device %}<div class="pc-p pc-phone" data-pc="photo" data-from="b">{{ base.phone(b.device, e.screen, e.clip) }}</div>{% endif %}
+    {% if not e.img and not b.device %}<span class="pc-p pc-moon" data-pc="photo" data-from="t" aria-hidden="true"></span>{% endif %}
+  </div>
+  <div class="pc-product__copy">
+    {{ head(b, e, b.kicker) }}
+    {% if b.body %}<p class="pc-p pc-note pc-lede" data-pc="note" data-from="r">{{ b.body | rich }}</p>{% endif %}
+    {% if b.stats %}<ul class="pc-pills">{% for st in b.stats %}<li class="pc-p pc-pill" data-pc="note" data-from="b"><b>{{ st.value }}{% if st.unit %}<sup>{{ st.unit }}</sup>{% endif %}</b> {{ st.label }}</li>{% endfor %}</ul>
+    {% elif b.tags %}<ul class="pc-pills">{% for t in b.tags %}<li class="pc-p pc-pill" data-pc="note" data-from="b">{{ t }}</li>{% endfor %}</ul>{% endif %}
+    {{ btns(b.buttons) }}
+    {% if b.note %}<p class="pc-p pc-label pc-label--small" data-pc="note" data-from="l">{{ b.note | rich }}</p>{% endif %}
+  </div>
+{% endcall %}
+
+{# ---------------------------------------------------------------- stats: a mobile, tags hung from a rod #}
+{% elif b.type == "stats" %}
+{% set n = b.items | length %}
+{% call sheet(b, "stats", loop, 0.8, " pc-n" ~ n) %}
+  <div class="pc-mobile" style="--n: {{ n }}">
+    <i class="pc-mobile__string" aria-hidden="true"></i>
+    <div class="pc-p pc-rod" data-pc="rod"><i class="pc-rod__bar" aria-hidden="true"></i>
+      <ul class="pc-tags">{% for st in b.items %}
+        <li class="pc-tagwrap" style="--i: {{ loop.index0 }}"><i class="pc-tagwrap__string" aria-hidden="true"></i><div class="pc-p pc-tag" data-pc="tag"><b class="pc-tag__v">{{ st.value }}{% if st.unit %}<sup>{{ st.unit }}</sup>{% endif %}</b><span class="pc-tag__l">{{ st.label }}</span></div></li>
+      {% endfor %}</ul>
+    </div>
+  </div>
+{% endcall %}
+
+{# ---------------------------------------------------------------- timeline: a folding rule that opens #}
+{% elif b.type == "timeline" %}
+{% set n = b.items | length %}
+{% call sheet(b, "timeline", loop, 0.7 + n * 0.3, " pc-n" ~ n) %}
+  <div class="pc-timeline__head">{{ head(b, e, b.kicker) }}</div>
+  <ol class="pc-rule" style="--n: {{ n }}">
+    {% for t in b.items %}
+    <li class="pc-p pc-link" data-pc="link" style="--i: {{ loop.index0 }}"><span class="pc-when">{{ t.when }}</span><h3>{{ t.title | rich }}</h3>{% if t.body %}<p>{{ t.body | rich }}</p>{% endif %}<i class="pc-hinge" aria-hidden="true"></i></li>
+    {% endfor %}
+  </ol>
+{% endcall %}
+
+{# ---------------------------------------------------------------- quote: a balloon on two strings #}
+{% elif b.type == "quote" %}
+{% call sheet(b, "quote", loop, 0.5) %}
+  <figure class="pc-quote">
+    <div class="pc-p pc-balloon" data-pc="tag"><i class="pc-balloon__s pc-balloon__s--a" aria-hidden="true"></i><i class="pc-balloon__s pc-balloon__s--b" aria-hidden="true"></i><blockquote>{{ b.text | rich }}</blockquote></div>
+    {% if b.who %}<figcaption class="pc-p pc-label" data-pc="note" data-from="r">{{ b.who }}</figcaption>{% endif %}
+  </figure>
+{% endcall %}
+
+{# ---------------------------------------------------------------- faq: flaps that swing aside #}
+{% elif b.type == "faq" %}
+{% set n = b.items | length %}
+{% call sheet(b, "faq", loop, 0.6 + n * 0.5, " pc-n" ~ n) %}
+  <div class="pc-faq__head">{{ head(b, e, b.kicker) }}</div>
+  <div class="pc-flaps pc-flaps--{{ n }}" style="--n: {{ n }}">
+    {% for it in b.items %}
+    <details class="pc-p pc-flap" data-pc="flap" style="--i: {{ loop.index0 }}">
+      <summary><span class="pc-flap__no" aria-hidden="true">{{ loop.index }}</span><span class="pc-flap__q">{{ it.q | rich }}</span></summary>
+      <p class="pc-flap__a">{{ it.a | rich }}</p>
+    </details>
+    {% endfor %}
+  </div>
+{% endcall %}
+
+{# ---------------------------------------------------------------- cta #}
+{% elif b.type == "cta" %}
+{% call sheet(b, "cta", loop, 0.5) %}
+  <div class="pc-cta__in">
+    {{ head(b, e, b.kicker, "pc-title--cta") }}
+    {% if b.button %}<div class="pc-btns"><a class="pc-p pc-btn pc-btn--hot pc-btn--big" data-pc="note" data-from="b" href="{{ b.button.href }}"><span>{{ b.button.label }}</span><i class="pc-arrow" aria-hidden="true">&rarr;</i></a></div>{% endif %}
+  </div>
+  {% if art %}<div class="pc-cta__prop">{{ silhouette("pc-sil--cta") }}</div>{% endif %}
+{% endcall %}
+
+{# ---------------------------------------------------------------- gallery: photographs pinned on the sheet #}
+{% elif b.type == "gallery" %}
+{% set n = b.items | length %}
+{% call sheet(b, "gallery", loop, 0.6 + n * 0.2, " pc-n" ~ n) %}
+  <div class="pc-gallery__head">{{ head(b, e, b.kicker) }}</div>
+  <div class="pc-pinboard pc-pinboard--{{ n }}" style="--n: {{ n }}">
+    {% for g in b.items %}
+    <a class="pc-p pc-snap" data-pc="tag" href="{{ g.href }}" style="--i: {{ loop.index0 }}"><i class="pc-pin" aria-hidden="true"></i>
+      <span class="pc-snap__img">{% if g.video %}<video src="{{ g.video }}" muted loop playsinline preload="metadata"{% if g.image %} poster="{{ g.image }}"{% endif %}></video>{% elif g.image %}<img src="{{ g.image }}" alt="" loading="lazy">{% endif %}</span>
+      <span class="pc-snap__cap">{% if g.kicker %}<small>{{ g.kicker }}</small>{% endif %}<b>{{ g.title | rich }}</b>{% if g.body %}<em>{{ g.body | rich }}</em>{% endif %}</span></a>
+    {% endfor %}
+  </div>
+{% endcall %}
+
+{# ---------------------------------------------------------------- strip #}
+{% elif b.type == "strip" %}
+{% set n = b.items | length %}
+{% call sheet(b, "strip", loop, 0.6 + n * 0.25, " pc-n" ~ n) %}
+  <div class="pc-strip__head">{{ head(b, e, b.kicker) }}{% if b.body %}<p class="pc-p pc-note pc-lede" data-pc="note" data-from="r">{{ b.body | rich }}</p>{% endif %}</div>
+  <div class="pc-band"><div class="pc-band__reel">
+    {% for it in b.items %}<figure class="pc-p pc-cut" data-pc="note" data-from="r"><img src="{{ e.imgs[loop.index0] }}" alt="{{ it.caption or '' }}" loading="lazy">{% if it.caption %}<figcaption>{{ it.caption }}</figcaption>{% endif %}</figure>{% endfor %}
+  </div></div>
+{% endcall %}
+
+{# ---------------------------------------------------------------- orbit: arms on one pin #}
+{% elif b.type == "orbit" %}
+{% set n = b.items | length %}
+{% call sheet(b, "orbit", loop, 0.6 + n * 0.25, " pc-n" ~ n) %}
+  <div class="pc-orbit__copy">{{ head(b, e, b.kicker) }}{% if b.body %}<p class="pc-p pc-note pc-lede" data-pc="note" data-from="r">{{ b.body | rich }}</p>{% endif %}</div>
+  <div class="pc-wheel" style="--n: {{ n }}">
+    <span class="pc-p pc-hub" data-pc="note" data-from="b">{{ b.center }}</span>
+    <ul class="pc-spokes">{% for it in b.items %}<li class="pc-p pc-spoke" data-pc="spoke" style="--i: {{ loop.index0 }}"><i class="pc-spoke__arm" aria-hidden="true"></i><span class="pc-spoke__disc"><b>{{ it.label }}</b>{% if it.status %}<small>{{ it.status }}</small>{% endif %}</span></li>{% endfor %}</ul>
+  </div>
+{% endcall %}
+
+{% endif %}
+{% endmacro %}

@@ -1,0 +1,29 @@
+# Flipbook: tokens and fonts for theme.style: flipbook. The page is one pad of animation paper clipped to a peg bar on
+# a dark desk. Each wheel notch lets go of one page; each section is a run of pages whose pencil drawing animates
+# as you thumb through, with the headline lettered in a few letters per page.
+label: Flipbook
+about: A pad of animation paper. Every notch of the wheel releases one page, which curls up and over; each section is a run of pages whose pencil drawing animates as you thumb through and whose headline is lettered in by hand. Grab the corner to flip a page yourself.
+mode: dark
+cuts: false   # the style plays its own hand-over between sections: `transition:` is ignored (see engine/styles/README.md)
+scene_blocks: []   # drawn its own way as steps inside a scene; other types use the default markup there
+colors:
+  bg: '#1f2427'
+  bg2: '#262c30'
+  ink: '#ece6d8'
+  accent: '#c4452e'
+  accent2: '#e0a24a'
+  accent_ink: '#fff7ee'
+  accent_text: '#f0b464'
+fonts:
+  display: Caveat
+  body: Kalam
+  mono: Courier Prime
+font_axes:
+  Caveat: "wght@400..700"
+  Kalam: "wght@300;400;700"
+  Courier Prime: "ital,wght@0,400;0,700;1,400"
+display_weight: 700
+radius: 3px
+# What a brand (theme.from) cannot change here: the dark room its CSS is drawn for
+requires:
+  mode: dark

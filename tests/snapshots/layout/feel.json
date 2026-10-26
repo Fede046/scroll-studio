@@ -1,0 +1,431 @@
+{
+ "example": "feel",
+ "root": {
+  "class": [
+   "mode-dark",
+   "layout-flow"
+  ]
+ },
+ "cuts": [],
+ "sections": [
+  {
+   "id": "story",
+   "type": "film",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-scene",
+      "ss-overlay",
+      "ss-side-right",
+      "ss-type-film",
+      "ss-shade-auto"
+     ],
+     "id": "story",
+     "data": {
+      "data-scene": "film"
+     },
+     "text": {
+      "title": "A landing page is a door.",
+      "title_tag": "h1"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-track"
+       ],
+       "style": {
+        "height": "2600vh"
+       },
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-stage"
+         ],
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-shade"
+           ]
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-captions"
+           ],
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0",
+              "data-to": "1"
+             },
+             "text": {
+              "title": "A landing page is a door.",
+              "title_tag": "h1"
+             }
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0",
+              "data-to": "1"
+             },
+             "text": {
+              "title": "Make it open onto a world.",
+              "title_tag": "h2"
+             }
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0",
+              "data-to": "1"
+             },
+             "text": {
+              "title": "Don't hand them a page. Tell them a stor",
+              "title_tag": "h2"
+             }
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0",
+              "data-to": "1"
+             },
+             "text": {
+              "title": "Make them feel joy.",
+              "title_tag": "h2"
+             }
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0",
+              "data-to": "1"
+             },
+             "text": {
+              "title": "Make it ache.",
+              "title_tag": "h2"
+             }
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0",
+              "data-to": "1"
+             },
+             "text": {
+              "title": "Make them fall in love.",
+              "title_tag": "h2"
+             }
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0",
+              "data-to": "1"
+             },
+             "text": {
+              "title": "Make them curious.",
+              "title_tag": "h2"
+             }
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0",
+              "data-to": "1"
+             },
+             "text": {
+              "title": "Make them feel something they didn't exp",
+              "title_tag": "h2"
+             }
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0",
+              "data-to": "1"
+             },
+             "text": {
+              "title": "Show them what's missing.",
+              "title_tag": "h2"
+             }
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-caption"
+             ],
+             "data": {
+              "data-from": "0",
+              "data-to": "1"
+             },
+             "text": {
+              "title": "That's what Scroll Studio does.",
+              "title_tag": "h2"
+             }
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "sdata": {
+    "layout": "overlay",
+    "length": 26.0,
+    "steps": [
+     {
+      "kicker": null,
+      "title": "A landing page is <em>a door.</em>",
+      "body": null,
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": true,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {
+       "beat": "door",
+       "part": [
+        0,
+        0.5
+       ]
+      }
+     },
+     {
+      "kicker": null,
+      "title": "Make it open onto <em>a world.</em>",
+      "body": null,
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {
+       "beat": "door",
+       "part": [
+        0.5,
+        1
+       ]
+      }
+     },
+     {
+      "kicker": null,
+      "title": "Don't hand them a page. <em>Tell them a story.</em>",
+      "body": null,
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {
+       "beat": "book"
+      }
+     },
+     {
+      "kicker": null,
+      "title": "Make them feel <em>joy.</em>",
+      "body": null,
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {
+       "beat": "laugh"
+      }
+     },
+     {
+      "kicker": null,
+      "title": "Make it <em>ache.</em>",
+      "body": null,
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {
+       "beat": "hurt"
+      }
+     },
+     {
+      "kicker": null,
+      "title": "Make them fall <em>in love.</em>",
+      "body": null,
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {
+       "beat": "love"
+      }
+     },
+     {
+      "kicker": null,
+      "title": "Make them <em>curious.</em>",
+      "body": null,
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {
+       "beat": "curious"
+      }
+     },
+     {
+      "kicker": null,
+      "title": "Make them feel something <em>they didn't expect.</em>",
+      "body": null,
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {
+       "beat": "feel"
+      }
+     },
+     {
+      "kicker": null,
+      "title": "Show them <em>what's missing.</em>",
+      "body": null,
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {
+       "beat": "missing"
+      }
+     },
+     {
+      "kicker": null,
+      "title": "That's what <em>Scroll Studio</em> does.",
+      "body": null,
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {
+       "beat": "screen"
+      }
+     }
+    ],
+    "hud": {
+     "kind": "none",
+     "fields": [],
+     "events": [],
+     "clock": null,
+     "scales": [],
+     "legend": []
+    }
+   },
+   "note": "steps pinned to a beat (`state.beat`) get their window from the beat's span in the joined film (engine/scenes/film.py pin_steps), known only once the beats are rendered"
+  },
+  {
+   "id": null,
+   "type": "cta",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-cta"
+     ],
+     "text": {
+      "kicker": "Every frame above was made on one local ",
+      "title": "See what it can do.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-cta__in"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "note": "not fully covered without a render: story (see each section's note)"
+}

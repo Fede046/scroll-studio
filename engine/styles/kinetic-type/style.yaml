@@ -1,0 +1,28 @@
+# Kinetic type: tokens and fonts for theme.style: kinetic-type. See engine/styles/README.md for the contract and
+# docs/styles/styles-06-10.md section 2 for the research.
+label: Kinetic type
+about: An instrument made of letters. Giant words inflate on their width and weight as they arrive and condense as they leave, lines skew and stretch with your scroll speed, marquees surge and reverse, and sections cut by colour inversion.
+mode: light
+scene_blocks: [product, faq, cta]   # drawn its own way as steps inside a scene; other types use the default markup there
+colors:
+  bg: '#f2efe8'
+  bg2: '#e7e3da'
+  ink: '#0a0a0a'
+  accent: '#0a0a0a'
+  accent2: '#d4ff3a'
+  accent_ink: '#d4ff3a'
+fonts:
+  display: Anybody
+  body: Anybody
+  mono: JetBrains Mono
+  accent: Instrument Serif
+font_axes:
+  Anybody: "ital,wdth,wght@0,50..150,100..900;1,50..150,100..900"
+  JetBrains Mono: "wght@100..800"
+  Instrument Serif: "ital@0;1"
+display_weight: 800
+radius: 0px
+# What a brand (theme.from) cannot change here: the light room its CSS is drawn for, and its display, body faces (the words breathe on Anybody's width axis)
+requires:
+  mode: light
+  fonts: { display: Anybody, body: Anybody }

@@ -9,7 +9,7 @@ import mimetypes
 import shutil
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 import yaml
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -18,9 +18,10 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ValidationError
 
 from ..config import ROOT, settings
-from ..project import Project
-from ..spec import SCENE_TYPES, Site
+from ..project import BuildError, Project, child, safe_name
+from ..spec import SCENE_TYPES, Site, deprecations
 from .jobs import JobQueue, logger
+from .local_only import UI_DEV_PORTS, LocalOnly
 
 # Windows can map .js to text/plain from the registry, which breaks module scripts in the preview.
 for ext, typ in ((".js", "text/javascript"), (".mjs", "text/javascript"), (".css", "text/css"), (".webp", "image/webp"),
@@ -28,6 +29,7 @@ for ext, typ in ((".js", "text/javascript"), (".mjs", "text/javascript"), (".css
     mimetypes.add_type(typ, ext)
 
 app = FastAPI(title="Scroll Studio")
+app.add_middleware(LocalOnly, extra_ports=UI_DEV_PORTS)    # Host and Origin checks: see local_only.py
 jobs = JobQueue()
 PROJECTS = Path(settings()["projects"])
 EXAMPLES = ROOT / "examples"
@@ -38,19 +40,36 @@ SCENE_INFO = {
     "artwork": "Any image drawn and painted in stages: guides, contour lines, graphite, underpainting, colour.",
     "scene3d": "Live 3D zoom journey through levels: cells → DNA, galaxy → planet, networks, lattices, your glTF.",
     "sequence": "A 3D model rendered by Blender into frames: turntable, explode and reassemble.",
+    "showroom": "The site's product live in the page (three.js): scroll turns, explodes and zooms the real model.",
+    "diorama": "A miniature world (tilt-shift diorama, live 3D): scroll orbits it, dives to a place for each step, lifts out and travels on.",
     "parallax": "Photos turned into 2.5D camera moves with estimated depth, one per step.",
     "type": "Kinetic typography: reveal, stack, swap or scale.",
+    "light": "One place relit from dawn to night as you scroll: each step a time of day, windows and lamps coming on.",
 }
 BLOCK_TYPES = ["intro", "features", "stats", "timeline", "quote", "cta", "gallery"]
 PRESETS_3D = ["cell-field", "cell", "nucleus", "helix", "galaxy", "star-system", "planet", "network", "lattice", "particles", "gltf"]
 
 
+MAX_UPLOAD = 4 * 2**30       # bytes per file: a long film or a big scan fits, a runaway upload does not
+
+
 def find(name: str) -> Project:
     for base in (PROJECTS, EXAMPLES):
-        p = Project(base / name)
+        try:
+            p = Project(child(base, name, "project name"))
+        except ValueError:
+            break
         if p.exists():
             return p
     raise HTTPException(404, f"no project '{name}'")
+
+
+def file_stem(text: Optional[str], default: str) -> str:
+    """A name from a request made safe to use inside a file name (a section id, say)."""
+    try:
+        return safe_name(text or default)
+    except ValueError:
+        raise HTTPException(400, f"{text!r} can't be used in a file name: use letters, digits, '-' and '_'")
 
 
 def summary(p: Project, kind: str) -> dict:
@@ -118,11 +137,17 @@ def create(req: NewProject):
     name = "".join(c for c in req.name.lower().replace(" ", "-") if c.isalnum() or c in "-_")
     if not name:
         raise HTTPException(400, "name is empty")
-    dst = PROJECTS / name
+    try:
+        dst = child(PROJECTS, name, "project name")
+        src = child(EXAMPLES, req.example, "example name") if req.example else None
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     if dst.exists():
         raise HTTPException(409, f"{name} already exists")
-    if req.example:
-        shutil.copytree(EXAMPLES / req.example, dst, ignore=shutil.ignore_patterns(".build", "dist", "snapshots", "recordings"))
+    if src is not None:
+        if not (src / "site.yaml").exists():
+            raise HTTPException(404, f"no example '{req.example}'")
+        shutil.copytree(src, dst, ignore=shutil.ignore_patterns(".build", "dist", "snapshots", "recordings"))
     else:
         (dst / "inputs").mkdir(parents=True)
         (dst / "site.yaml").write_text(STARTER, encoding="utf-8")
@@ -146,7 +171,7 @@ def put_spec(name: str, req: SpecUpdate):
     p = find(name)
     try:
         data = yaml.safe_load(req.yaml) if req.yaml is not None else req.data
-        Site.model_validate(data)
+        site = Site.model_validate(data)
     except ValidationError as e:
         return JSONResponse({"ok": False, "errors": [{"loc": ".".join(map(str, er["loc"])), "msg": er["msg"]} for er in e.errors()]}, 422)
     except yaml.YAMLError as e:
@@ -155,7 +180,7 @@ def put_spec(name: str, req: SpecUpdate):
         p.spec_path.write_text(req.yaml, encoding="utf-8")
     else:
         p.save(data)
-    return {"ok": True, "modified": p.spec_path.stat().st_mtime}
+    return {"ok": True, "modified": p.spec_path.stat().st_mtime, "deprecations": [d.as_dict() for d in deprecations(site)]}
 
 
 @app.get("/api/projects/{name}/inputs")
@@ -173,9 +198,20 @@ async def upload(name: str, files: list[UploadFile] = File(...)):
     p.inputs.mkdir(parents=True, exist_ok=True)
     saved = []
     for f in files:
-        dst = p.inputs / Path(f.filename).name
+        try:
+            name = child(p.inputs, Path(f.filename or "").name, "file name").name
+            dst = p.path(f"inputs/{name}")       # follows links: an input that is a link out of the project is refused
+        except (ValueError, BuildError) as e:
+            raise HTTPException(400, str(e))
+        written = 0
         with open(dst, "wb") as out:
-            shutil.copyfileobj(f.file, out)
+            while chunk := f.file.read(1 << 20):
+                written += len(chunk)
+                if written > MAX_UPLOAD:
+                    out.close()
+                    dst.unlink(missing_ok=True)
+                    raise HTTPException(413, f"{name} is larger than {MAX_UPLOAD // 2**30} GB: put it in the project's inputs/ folder yourself")
+                out.write(chunk)
         saved.append(f"inputs/{dst.name}")
     return {"saved": saved}
 
@@ -183,7 +219,10 @@ async def upload(name: str, files: list[UploadFile] = File(...)):
 @app.get("/files/{name}/{path:path}")
 def project_file(name: str, path: str):
     p = find(name)
-    f = p.path(path)
+    try:
+        f = p.path(path)
+    except BuildError:
+        raise HTTPException(403, "outside the project folder")
     if not f.is_file():
         raise HTTPException(404)
     return FileResponse(f)
@@ -216,10 +255,32 @@ def build(name: str, req: BuildReq):
     from ..compile.compiler import build_site
 
     def run(job):
+        from ..plan import announce
         log, progress = logger(job)
+        announce(p, only=[req.section] if req.section else None, force=req.force, options={"draft": req.draft}, log=log)
         build_site(p, log=log, progress=progress, only=req.section, force=req.force, options={"draft": req.draft})
         return {"preview": f"/preview/{name}/index.html?t={int(time.time())}"}
     return jobs.submit("build", name, f"Build {req.section or 'site'}" + (" (draft)" if req.draft else ""), run).public()
+
+
+class StoryboardReq(BaseModel):
+    level: str = "stills"
+    only: list[str] = []
+    motion: bool = False
+
+
+@app.post("/api/projects/{name}/storyboard")
+def storyboard(name: str, req: StoryboardReq):
+    """`studio storyboard` as a job: the result has the sheet, the storyboard page and the stand-in site."""
+    p = find(name)
+
+    def run(job):
+        from ..storyboard import storyboard as run_sb
+        log, progress = logger(job)
+        res = run_sb(p, level=req.level, only=req.only or None, motion=req.motion, log=log, progress=progress)
+        return {k: v for k, v in res.items() if k in ("sheet", "html", "site", "animatic", "shots", "changed",
+                                                       "render_estimate", "seconds")}
+    return jobs.submit("storyboard", name, f"Storyboard ({req.level})", run).public()
 
 
 class SnapReq(BaseModel):
@@ -255,11 +316,12 @@ class RecordReq(BaseModel):
 @app.post("/api/projects/{name}/record")
 def record(name: str, req: RecordReq):
     p = find(name)
+    stem = file_stem(req.section, "page")
     from ..record import record as rec
 
     def run(job):
         log, progress = logger(job)
-        out = p.root / "recordings" / f"{req.section or 'page'}-{int(time.time())}.mp4"
+        out = p.root / "recordings" / f"{stem}-{int(time.time())}.mp4"
         mp4 = rec(p.dist, out, section=req.section, size=(req.width, req.height), seconds=req.seconds, log=log, progress=progress)
         return {"video": f"/files/{name}/recordings/{mp4.name}"}
     return jobs.submit("record", name, f"Record {req.section or 'page'}", run).public()
@@ -283,6 +345,15 @@ def job(jid: str):
     if jid not in jobs.jobs:
         raise HTTPException(404)
     return jobs.jobs[jid].public()
+
+
+# ---------------------------------------------------------------- storyboard editor
+
+from ..storyboard.edit.api import make_router as _sb_router   # noqa: E402  /sb/<project> and /api/sb/<project>/...
+app.include_router(_sb_router(find, jobs))
+
+from ..directions.api import make_router as _dir_router   # noqa: E402  /dir/<project> and /api/dir/<project>/... (direction boards)
+app.include_router(_dir_router(find))
 
 
 # ---------------------------------------------------------------- UI

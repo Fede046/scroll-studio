@@ -1,0 +1,25 @@
+# Isometric: tokens and fonts for theme.style: isometric. See engine/styles/README.md for the contract and
+# docs/styles/styles-06-10.md section 3 for the research.
+label: Isometric
+about: A fixed-angle drone over a tiny model world that builds itself. Every section is a district on one map; the camera glides diagonally between them while tiles drop in and buildings extrude, stats rise as towers, a token drives the road between steps, and the last district holds a keycap button.
+mode: light
+scene_blocks: [quote, cta]   # drawn its own way as steps inside a scene; other types use the default markup there
+colors:
+  bg: '#cfe8f3'
+  bg2: '#bfdcea'
+  ink: '#1d2b3a'
+  accent: '#d24a28'
+  accent2: '#21998e'
+  accent_ink: '#000000'
+fonts:
+  display: Sora
+  body: Sora
+  mono: DM Mono
+font_axes:
+  Sora: "wght@100..800"
+  DM Mono: "ital,wght@0,300;0,400;0,500;1,400"
+display_weight: 700
+radius: 3px
+# What a brand (theme.from) cannot change here: the light room its CSS is drawn for
+requires:
+  mode: light

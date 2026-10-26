@@ -1,0 +1,15 @@
+{# Sand furniture: the light table (one fixed canvas under every scene) and its walnut rim. The rim carries the
+   wordmark, the site's nav links and its CTA (the default nav is hidden) and, bottom left, the scene counter written
+   in the margin. #}
+{% macro top(site, sections, nav_links) %}
+<div class="sd-table" aria-hidden="true"><canvas class="sd-canvas"></canvas></div>
+<div class="sd-rim" aria-hidden="true"></div>
+<header class="sd-top">
+  <a class="sd-mark" href="#">{{ site.name }}</a>
+  {% if nav_links %}<nav class="sd-links" aria-label="Scenes">{% for l in nav_links %}<a href="{{ l.href }}">{{ l.label }}</a>{% endfor %}</nav>{% endif %}
+  {% if site.nav.cta %}<a class="sd-top__cta" href="{{ site.nav.cta.href }}">{{ site.nav.cta.label }}</a>{% endif %}
+</header>
+<p class="sd-count" aria-hidden="true">scene <b data-sd-scene>1</b> of {{ sections | length }}</p>
+{% endmacro %}
+
+{% macro bottom(site, sections) %}{% endmacro %}

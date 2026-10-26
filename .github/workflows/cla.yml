@@ -1,0 +1,43 @@
+# Contributor Licence Agreement (CLA.md). On a contributor's first pull request the check asks every commit author to
+# sign by commenting a sentence; signatures are kept in signatures/cla.json on the `cla-signatures` branch. The
+# maintainer and bots don't sign. A pull request is merged only once every author has signed (CONTRIBUTING.md).
+# The logic is .github/scripts/cla.js, loaded from the default branch; the pull request's code is never checked out.
+name: cla
+
+on:
+  pull_request_target:  # zizmor: ignore[dangerous-triggers] base-branch code only; the pull request is never checked out
+    types: [opened, reopened, synchronize]
+  issue_comment:
+    types: [created]
+
+permissions: {}
+
+concurrency:
+  group: cla-${{ github.event.pull_request.number || github.event.issue.number }}
+
+jobs:
+  cla:
+    if: >-
+      github.event_name == 'pull_request_target' ||
+      (github.event.issue.pull_request && (github.event.comment.body == 'recheck' ||
+      startsWith(github.event.comment.body, 'I have read the CLA Document and I hereby sign the CLA')))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write        # re-run the pull request's check after someone signs
+      contents: write       # record signatures on the cla-signatures branch
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          sparse-checkout: .github/scripts
+          persist-credentials: false
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            await require("./.github/scripts/cla.js").run({ github, context, core });

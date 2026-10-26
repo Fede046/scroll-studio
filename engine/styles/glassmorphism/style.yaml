@@ -1,0 +1,24 @@
+# Glassmorphism: windows over a living world. See docs/styles/styles-06-10.md section 1 for the research.
+label: Glassmorphism
+about: Windows over a living world. Every word sits on frosted glass while a saturated colour world drifts behind at its own speed and changes hue section by section; a pinned glass lens holds still while the product turns beneath it, and feature layers fan apart in depth.
+mode: dark
+scene_blocks: [stats, quote, faq, cta]   # drawn its own way as steps inside a scene; other types use the default markup there
+colors:
+  bg: '#0b0b1a'
+  bg2: '#13112e'
+  ink: '#ffffff'
+  accent: '#ffffff'
+  accent2: '#d9dcff'
+  accent_ink: '#0b0b1a'
+fonts:
+  display: Plus Jakarta Sans
+  body: Plus Jakarta Sans
+  mono: DM Mono
+font_axes:
+  Plus Jakarta Sans: "ital,wght@0,200..800;1,200..800"
+  DM Mono: "ital,wght@0,300;0,400;0,500;1,400"
+display_weight: 500
+radius: 28px
+# What a brand (theme.from) cannot change here: the dark room its CSS is drawn for
+requires:
+  mode: dark

@@ -1,0 +1,30 @@
+# Halftone: reading a freshly printed paper. See docs/styles/styles-11-15.md section 5 for the research.
+label: Halftone
+about: Reading a freshly printed paper. A front page with a masthead and a lead story in columns; pictures that resolve from coarse dots to a fine screen as they reach reading position, with a printer's loupe on hover; section fronts that print plate by plate in CMYK; classifieds, dot-field infographics, letters to the editor and a clip-out coupon.
+mode: light
+scene_blocks: [features, product, stats, timeline, quote, faq, cta, gallery]   # drawn its own way as steps inside a scene; other types use the default markup there
+colors:
+  bg: '#f3efe6'
+  bg2: '#ebe5d8'
+  ink: '#141414'
+  accent: '#ec008c'
+  accent2: '#00aeef'
+  accent_ink: '#000000'
+  accent_text: '#141414'
+fonts:
+  display: Playfair Display
+  body: Libre Caslon Text
+  mono: Libre Franklin
+  masthead: UnifrakturMaguntia
+  kicker: Oswald
+font_axes:
+  Playfair Display: "ital,wght@0,400..900;1,400..900"
+  Libre Caslon Text: "ital,wght@0,400;0,700;1,400"
+  Libre Franklin: "ital,wght@0,100..900;1,100..900"
+  UnifrakturMaguntia: ""
+  Oswald: "wght@200..700"
+display_weight: 800
+radius: 0px
+# What a brand (theme.from) cannot change here: the light room its CSS is drawn for
+requires:
+  mode: light

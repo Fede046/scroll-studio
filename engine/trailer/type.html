@@ -1,0 +1,146 @@
+<!doctype html>
+<!-- Scroll Studio by Edeki Okoh: https://github.com/Okohedeki/scroll-studio (GNU AGPL-3.0). The trailer's type layer:
+     captions, callouts and the end card, set in the site's own fonts and colours, drawn at time t by seek(t). -->
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="fonts/fonts.css">
+<style>/*VARS*/</style>
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  html, body { background: transparent; overflow: hidden; }
+  body { width: var(--W); height: var(--H); position: relative; font-family: var(--font-body);
+         -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+  .layer { position: absolute; inset: 0; opacity: 0; }
+  .scrim { background: var(--scrim); }
+  .cap { position: absolute; left: var(--padL); right: var(--padR); bottom: var(--padB); color: var(--on-film);
+         text-shadow: 0 2px 30px rgba(0, 0, 0, .35); }
+  .k { font-family: var(--font-label); text-transform: var(--label-case); letter-spacing: var(--label-track);
+       font-size: var(--kicker); font-weight: 500; margin-bottom: .85em; display: block; color: var(--on-film-2); }
+  .t { font-family: var(--font-display); font-weight: var(--display-weight); font-size: var(--title); line-height: 1.04;
+       letter-spacing: -.015em; max-width: var(--measure); text-wrap: balance; font-optical-sizing: auto; }
+  .t em { font-style: var(--em-style); color: var(--em-film); font-weight: var(--em-weight); }
+  .call .t { font-size: var(--callout); line-height: .98; letter-spacing: -.025em; font-weight: var(--callout-weight); }
+  .call .n { font-family: var(--font-label); font-size: var(--kicker); letter-spacing: .12em; color: var(--on-film-2);
+             margin-top: .9em; display: block; font-variant-numeric: tabular-nums; }
+  .w { display: inline-block; white-space: pre; will-change: transform, opacity; }
+  .card { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+          text-align: center; padding: var(--safeT) var(--padR) var(--safeB) var(--padR); color: var(--ink); }
+  .card .t { font-size: var(--card); max-width: var(--card-measure); }
+  .card .t em { color: var(--em-card); }
+  .end { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+         text-align: center; padding: var(--safeT) var(--padR) var(--safeB) var(--padR); color: var(--ink); }
+  .end .logo { width: var(--logo); height: var(--logo); margin-bottom: calc(var(--logo) * .45); color: var(--accent); }
+  .end .name { font-family: var(--font-display); font-weight: var(--display-weight); font-size: var(--end-title);
+               line-height: .98; letter-spacing: -.025em; max-width: var(--card-measure); text-wrap: balance; }
+  .end .name em { font-style: var(--em-style); color: var(--em-card); font-weight: var(--em-weight); }
+  .end .tag { font-family: var(--font-body); font-size: var(--tagline); line-height: 1.35; color: var(--ink-2);
+              max-width: var(--tag-measure); margin-top: .9em; text-wrap: balance; }
+  .end .tag em { font-style: var(--em-style); color: var(--em-card); }
+  .end .cta { margin-top: calc(var(--tagline) * 1.5); display: inline-flex; align-items: center; gap: .6em;
+              background: var(--accent); color: var(--accent-ink); font-family: var(--font-body); font-weight: 600;
+              font-size: var(--cta); padding: .62em 1.25em; border-radius: var(--pill); }
+  .end .url { margin-top: .9em; font-family: var(--font-label); font-size: var(--url); letter-spacing: .06em; color: var(--ink-2); }
+  .end .disc { position: absolute; left: var(--padR); right: var(--padR); bottom: var(--discB); font-size: var(--disc);
+               color: var(--ink-3); font-family: var(--font-body); letter-spacing: .01em; }
+</style></head>
+<body>
+<script>
+const TL = /*TIMELINE*/null;
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const outExpo = x => x >= 1 ? 1 : 1 - Math.pow(2, -10 * x);
+const outBack = x => { const c = 1.5; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+const inCubic = x => x * x * x;
+
+// split every text node of el into word spans (inside <em> too), so words can move one by one
+function words(el) {
+  const out = [];
+  const walk = node => {
+    for (const ch of [...node.childNodes]) {
+      if (ch.nodeType === 3) {
+        const frag = document.createDocumentFragment();
+        for (const part of ch.textContent.split(/(\s+)/)) {
+          if (!part) continue;
+          if (/^\s+$/.test(part)) { frag.appendChild(document.createTextNode(" ")); continue; }
+          const s = document.createElement("span"); s.className = "w"; s.textContent = part; frag.appendChild(s); out.push(s);
+        }
+        node.replaceChild(frag, ch);
+      } else if (ch.nodeType === 1 && ch.tagName !== "BR") walk(ch);
+    }
+  };
+  walk(el);
+  return out;
+}
+
+const items = [];
+function el(html) { const d = document.createElement("div"); d.innerHTML = html.trim(); return d.firstElementChild; }
+for (const it of TL.items) {
+  let node;
+  if (it.kind === "scrim") node = el(`<div class="layer scrim"></div>`);
+  else if (it.kind === "caption") node = el(`<div class="layer"><div class="cap">${it.kicker ? `<span class="k">${it.kicker}</span>` : ""}<div class="t">${it.title}</div></div></div>`);
+  else if (it.kind === "callout") node = el(`<div class="layer call"><div class="cap">${it.kicker ? `<span class="k">${it.kicker}</span>` : ""}<div class="t">${it.title}</div>${it.count ? `<span class="n">${it.count}</span>` : ""}</div></div>`);
+  else if (it.kind === "card") node = el(`<div class="layer"><div class="card">${it.kicker ? `<span class="k">${it.kicker}</span>` : ""}<div class="t">${it.title}</div></div></div>`);
+  else if (it.kind === "end") node = el(`<div class="layer"><div class="end">
+      ${it.logo ? `<svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="${it.logo}"/></svg>` : ""}
+      <div class="name">${it.title}</div>
+      ${it.tagline ? `<div class="tag">${it.tagline}</div>` : ""}
+      ${it.cta ? `<div class="cta">${it.cta}</div>` : ""}
+      ${it.url ? `<div class="url">${it.url}</div>` : ""}
+      ${it.disclaimer ? `<div class="disc">${it.disclaimer}</div>` : ""}</div></div>`);
+  document.body.appendChild(node);
+  const t = node.querySelector(".t, .name");
+  items.push({ it, node, words: t ? words(t) : [], k: node.querySelector(".k"), parts: [...node.querySelectorAll(".logo, .tag, .cta, .url, .disc, .n")] });
+}
+
+const r3 = v => Math.round(v * 1000) / 1000;
+// draw time t; returns a signature of everything drawn, so identical frames are captured once
+window.seek = function (t) {
+  const sig = [];
+  for (const { it, node, words, k, parts } of items) {
+    const local = t - it.t0, left = it.t1 - t;
+    if (local < 0 || left <= 0) { node.style.opacity = 0; continue; }
+    const fadeIn = it.fade_in ?? 0.3, fadeOut = it.fade_out ?? 0.3;
+    let o = Math.min(clamp(local / fadeIn), clamp(left / fadeOut));
+    if (it.kind === "scrim") { node.style.opacity = r3(o); sig.push(r3(o)); continue; }
+    const out = 1 - clamp(left / fadeOut);           // 0 -> 1 over the exit
+    const lift = -0.14 * inCubic(out);
+    node.style.opacity = r3(1 - inCubic(out));
+    sig.push(it.kind, r3(1 - inCubic(out)));
+    const stagger = it.kind === "callout" ? 0.035 : it.kind === "end" ? 0.06 : 0.05;
+    const dur = it.kind === "callout" ? 0.32 : 0.6;
+    const delay = it.delay ?? 0.08;
+    words.forEach((w, i) => {
+      const e = outExpo(clamp((local - delay - i * stagger) / dur));
+      const y = it.kind === "callout" ? (1 - e) * 0.32 : (1 - e) * 0.42;
+      const sc = it.kind === "callout" ? 1 + (1 - e) * 0.06 : 1;
+      w.style.opacity = r3(e);
+      w.style.transform = `translateY(${r3(y + lift)}em) scale(${r3(sc)})`;
+      sig.push(r3(e), r3(lift));
+    });
+    if (k) {
+      const e = it.kstatic ? 1 : outExpo(clamp((local - 0.02) / 0.7));
+      k.style.opacity = r3(e);
+      k.style.transform = `translateY(${r3((1 - e) * 0.6 + lift * 2)}em)`;
+      sig.push(r3(e));
+    }
+    if (it.kind === "end") {
+      // the rest of the card lands on the beat: tagline on beat 2, the call to action on beat 3
+      parts.forEach(p => {
+        const at = p.classList.contains("logo") ? 0 : p.classList.contains("tag") ? it.beat * 1.5
+               : p.classList.contains("cta") ? it.beat * 2.5 : p.classList.contains("url") ? it.beat * 2.5 + 0.12 : it.beat * 1.5;
+        const e = clamp((local - at) / 0.5);
+        const pop = p.classList.contains("cta") ? 0.86 + 0.14 * outBack(e) : 1;
+        p.style.opacity = r3(outExpo(e));
+        p.style.transform = p.classList.contains("disc") ? "" : `translateY(${r3((1 - outExpo(e)) * 0.5)}em) scale(${r3(pop)})`;
+        sig.push(r3(e));
+      });
+    } else parts.forEach(p => { const e = outExpo(clamp((local - 0.15) / 0.5)); p.style.opacity = r3(e); sig.push(r3(e)); });
+  }
+  return sig.join(",");
+};
+window.ready = (async () => {
+  await document.fonts.ready;
+  const f = TL.fonts;
+  await Promise.all(f.map(spec => document.fonts.load(spec, "AaÉé0123456789").catch(() => null)));
+  return document.fonts.size;
+})();
+</script>
+</body></html>

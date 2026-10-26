@@ -1,0 +1,13 @@
+{# Paper cut-out furniture: the site's name and the section links as paper tabs cut from card along the top edge, the call to action as
+   a ticket, the animation stand under the sheets (a cutting mat, drawn by the runtime) and the jointed paper arm the runtime
+   builds and drives. #}
+{% macro top(site, sections, nav_links) %}
+<header class="pc-head">
+  <a class="pc-head__mark" href="#"><span>{{ site.name }}</span></a>
+  {% if nav_links %}<nav class="pc-head__nav" aria-label="Sections">{% for l in nav_links %}<a href="{{ l.href }}"><span>{{ l.label }}</span></a>{% endfor %}</nav>{% endif %}
+  {% if site.nav.cta %}<a class="pc-head__cta" href="{{ site.nav.cta.href }}"><span>{{ site.nav.cta.label }}</span></a>{% endif %}
+</header>
+<p class="pc-cue" aria-hidden="true" hidden>Scroll to swing the sheet off its pin</p>
+{% endmacro %}
+
+{% macro bottom(site, sections) %}{% endmacro %}

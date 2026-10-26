@@ -22,7 +22,14 @@ def _hex(h: str) -> tuple[int, int, int]:
 
 def build(sec: SequenceScene, ctx: BuildContext, theme: dict) -> dict:
     from ..inputs import resolve_path
-    model = resolve_path(ctx.project, sec.model, ctx.log)
+    from .. import world
+    if world.active(sec):      # type in the world: fail now, before Blender renders, if a placement can't work
+        world.preflight(sec, ctx)
+    if sec.model in (None, "product"):     # the site's product: its normalised GLB (materials, axes, explode offsets)
+        from ..product import normalised_glb
+        model = normalised_glb(ctx.project, log=ctx.log)
+    else:
+        model = resolve_path(ctx.project, sec.model, ctx.log)
     raw = ctx.work / "render"
     frames = [raw / "frames" / f"{i:04d}.png" for i in range(1, sec.frames + 1)]
     draft = bool(ctx.options.get("draft"))
@@ -64,7 +71,7 @@ def build(sec: SequenceScene, ctx: BuildContext, theme: dict) -> dict:
             flat.paste(im, mask=im.split()[3])
             flat.save(ctx.web / name, quality=88)
     ctx.stage("encode", {"r": key, "bg": bg}, [desk / f"{sec.frames:04d}.webp", ctx.web / "end.jpg"], encode)
-    return {
+    cfg = {
         "count": sec.frames, "background": bg, "fit": "contain",
         "shift": (0.13 if sec.side == "right" else -0.13) if sec.layout == "cards" else 0,
         "desktop": {"base": ctx.url(desk) + "/", "ext": "webp"},
@@ -72,3 +79,10 @@ def build(sec: SequenceScene, ctx: BuildContext, theme: dict) -> dict:
         "poster": ctx.url(ctx.web / "poster.jpg"), "end": ctx.url(ctx.web / "end.jpg"),
         "credits": [sec.credit] if sec.credit else [],
     }
+    # type in the world (engine/world.py): behind the product, the frames' own alpha is the exact silhouette. The frames are
+    # also a film (over the backdrop, short GOP) that the world player draws; without WebGL the frames play as always
+    if world.active(sec):
+        src, alpha, urls = world.sequence_film(sec, ctx, frames, bg)
+        cfg.update(urls)
+        cfg["world"] = world.build(sec, ctx, src, cfg, silhouette=alpha)
+    return cfg

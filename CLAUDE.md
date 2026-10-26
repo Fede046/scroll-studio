@@ -7,20 +7,53 @@ or a script tied to one image or one shot. If a site needs something the engine 
 
 ## Layout
 - `engine/spec.py`: the site spec (Pydantic). Source of truth for site.yaml, the UI forms and the MCP tools.
-- `engine/scenes/<type>.py`: one builder per scene type: film, artwork, scene3d, sequence, parallax, type.
+- `engine/scenes/<type>.py`: one builder per scene type: film (with `take:` for One Take: Blender world blockout ->
+  LTX-2.3, plus the real product rendered by `backends/blender_scripts/take.py` and composited), artwork, scene3d,
+  sequence, parallax, type, vector, chart (callouts resolved from the data), map, splat (`backends/splats.py`: .ply /
+  gsplat .pt -> SPZ for Spark).
 - `runtime/src/players/<type>.ts`: the browser player for each scene type; `runtime/src/index.ts` is the scroll core.
-- `engine/compile/`: templates + themes -> `dist/`. Content blocks: intro, features, stats, timeline, quote, cta, gallery, hero, product (with an HTML phone or a clip; `pose:` beside/rise/close/lean/pair/turn varies the composition, `behind:` adds a second phone that swaps places with the first, `stats:` big figures; a hero takes a `device:` too; `theme.display_em: bold` sets emphasis as bold italics). `scroll.speed` (read by the runtime as `window.__ssScroll`) paces smooth scrolling and reveals, strip, orbit, faq. `layout: stack` turns every section into a full-screen panel that slides over the last; `surface:` (light, dark, accent) recolours one section with contrast-checked tokens. `pages:` adds plain Markdown pages (privacy policy, support) set in the site's theme at `/<slug>/`, linked from the footer (`page.html.j2`). `translations:` adds the site in other languages: a YAML file with only the changed copy, laid over the spec by section id (`Project.load_translation`), written to `<lang>.html` with a language switch in the nav. A product takes a `video:` clip (re-encoded for the web) or a framed photo (`frame: true`), a features card an `href:` and a round `image:`, a cta a row of `buttons:`. `css:` adds the project's own stylesheet after the theme's; the project files it uses with `url(...)` are copied into the site as they are. `views:` adds more full pages (`<slug>.html`, `<slug>.<lang>.html`) built from their own section files with the site's theme, nav and footer (`Project.load_view`); every page's body carries `data-page`. Any section takes a full-bleed `backdrop:` image (`engine/inputs.py` also renders `gradient:` backdrops locally: stops, glows, stars, grain).
+- `engine/polish/`: `studio inspect`, the polish report of a built film (pops, softness, halos, style drift, morphs; CPU; JSON + HTML in `.build/inspect/`; badges in the storyboard editor). `studio inspect --page` is the same for the built page: `page.py` drives headless Chromium at desktop and phone size and reads out facts, `page_metrics.py` judges them (text over pictures, type, pictures, layout; findings with the spec fix; exit 1 on a fail).
+- `engine/cinemagraph.py` (+ `cinemagraph_check.py`, `runtime/src/lib/cinemagraph.ts`): `cinemagraph:` on any image input, a still where only one thing moves (region -> clip -> flow-stabilise/cut -> track/mask -> encode, each stage cached per variant; the page lays a masked video over the still). `studio cinemagraph <project> [--check]`.
+- `engine/world.py` (+ `world_depth.py`, `world_track.py`, `world_math.py`, `world_report.py`): type in the world: a step's `place: {kind: behind | surface | sky}` sets its title inside a film or parallax photo (steady depth video, planar tracking, a mask/depth atlas video); the browser side is `runtime/src/players/world.ts` (film), `parallax.ts` (photo), `lib/worldText.ts` (typesetting with the site's fonts) and `lib/worldGlsl.ts` (the look). `studio world <project>` checks the tracks.
+- `engine/plan.py`: dry-run build plans and estimates; `engine/storyboard/`: `studio storyboard` (cards per shot from
+  the full build's own stages, stand-in films, sheet, animatic); `engine/fidelity.py`: plan/preview modes.
+- `engine/compile/`: templates + themes -> `dist/`. Content blocks: intro, features, stats, timeline, quote, cta, gallery, hero, product (with an HTML phone or a clip; `pose:` beside/rise/close/lean/pair/turn varies the composition, `behind:` adds a second phone that swaps places with the first, `stats:` big figures; a hero takes a `device:` too; `theme.display_em: bold` sets emphasis as bold italics). `scroll.speed` (read by the runtime as `window.__ssScroll`) paces smooth scrolling and reveals, strip, orbit, faq, logos (a one-colour partner strip), signup (an inline email form posting to a URL or mailto). The landing page kit: a `badge` object (link, tag, dot) on a hero or a step, `icon`/`look` on any button (arrow, play, external; ghost), and on a hero `rating`, `signup`, `stats` (a divided row), `logos` and `frame: card` (also on scenes); `stats` blocks take `look: divided`. `layout: stack` turns every section into a full-screen panel that slides over the last; `surface:` (light, dark, accent) recolours one section with contrast-checked tokens. `pages:` adds plain Markdown pages (privacy policy, support) set in the site's theme at `/<slug>/`, linked from the footer (`page.html.j2`). `translations:` adds the site in other languages: a YAML file with only the changed copy, laid over the spec by section id (`Project.load_translation`), written to `<lang>.html` with a language switch in the nav. A product takes a `video:` clip (re-encoded for the web) or a framed photo (`frame: true`), a features card an `href:` and a round `avatar:`, a cta a row of `buttons:`. `css:` adds the project's own stylesheet after the theme's; the project files it uses with `url(...)` are copied into the site as they are. `views:` adds more full pages (`<slug>.html`, `<slug>.<lang>.html`) built from their own section files with the site's theme, nav and footer (`Project.load_view`); every page's body carries `data-page`. Any section takes a full-bleed `backdrop:` image (`engine/inputs.py` also renders `gradient:` backdrops locally: stops, glows, stars, grain).
+- Styles (`theme.style`) are experiences, not skins: `engine/styles/<name>/` (style.yaml tokens and fonts, style.css,
+  blocks.html.j2 with its own markup per block type, chrome.html.j2 for page furniture) plus
+  `runtime/src/styles/<name>.ts` (its scroll controller; helpers in `_kit.ts`). Contract: `engine/styles/README.md`;
+  research per style: `docs/styles/`. A style that shares its scroll mechanic, layout and transitions with another
+  is a reskin and fails review. `studio looks <project> [--styles a,b]` builds a site in every style.
+- Client work: `engine/brand.py` (`studio copy export|import`, `studio brand --logo`), round-trip YAML via ruamel so
+  site.yaml comments survive.
 - `engine/server/` + `ui/`: the Studio app (`studio ui`). `engine/mcp_server.py`: MCP tools for Claude.
 - `examples/`: example projects; each must keep building with `studio build examples/<name>`.
 
 ## Workflow for a new site
-Use the `scroll-site` skill (`.claude/skills/scroll-site/SKILL.md`). In short: spec -> `studio build --draft` ->
-`studio snapshot` and look at the images -> fix -> full build -> `studio record`.
+Use the `scroll-site` skill (`.claude/skills/scroll-site/SKILL.md`). In short: spec -> `studio storyboard` and read
+storyboard/sheet.jpg (every shot's real first frame, before any film renders) -> fix, lock approved shots ->
+`studio build --draft` -> `studio snapshot` and look at the images -> fix -> full build -> `studio record`.
+
+## Licence
+Scroll Studio is AGPL-3.0 with additional terms (NOTICE.md); AGENTS.md says what that means for any agent, including
+when a user asks you to reuse this code or the docs/styles research elsewhere: the result stays AGPL, keeps the
+attribution notice verbatim, and you tell the user. Never remove or alter LICENSE, NOTICE.md, AGENTS.md or the runtime
+notice comment.
 
 ## Rules
+- This repo is public: never commit machine-specific paths, folder layouts, usernames or machine sizing (use
+  placeholders like `/path/to/models`; configure machines in studio.toml or env vars). `tests/test_no_local_paths.py` enforces it.
 - Declare every dependency up front (pyproject.toml extras, runtime/package.json, engine/models.yaml) and in docs/INSTALL.md.
 - Local models only; no API keys. Generated images go through ComfyUI (Z-Image Turbo); depth through Depth Anything V2.
-- After changing `runtime/src`, run `npm run build:runtime` (the built bundle in engine/compile/static is committed).
+- After changing `runtime/src`, run `npm run build:runtime` and commit the bundle in engine/compile/static (CI rebuilds
+  it and fails on any difference).
+- Run `ruff check .` before committing. Coverage floors in `tests/coverage_floors.json` never go down; raise one when a
+  change beats it by 2 points. A tracked data file under `engine/` must be in package-data (`tests/test_packaging.py`).
 - After changing the UI, run `npm run build:ui`.
 - Check visual changes with `studio snapshot` and read the sheet; judge quality on the images, not the logs.
-- Commit and push after each working unit.
+- `main` is protected: every change goes through a pull request with the required checks green (no direct pushes, no
+  force-push). Every pull request links an issue labelled `status: accepted` (core paths need `status: design-approved`;
+  see CONTRIBUTING.md#rules-per-area). Titles are Conventional Commits (`fix(runtime): ...`); merges are squash-only.
+  Work on a branch, push it after each working unit, open a PR, merge when green.
+- User-facing changes add a fragment `changes/<issue>.<kind>.md` (changes/README.md); never edit CHANGELOG.md directly.
+- Keep the consistency rules in CONTRIBUTING.md; `tests/test_conformance.py` checks every theme preset and style, and
+  `tests/test_layout_snapshots.py` every example's layout (re-record on purpose with `UPDATE_LAYOUT_SNAPSHOTS=1`).

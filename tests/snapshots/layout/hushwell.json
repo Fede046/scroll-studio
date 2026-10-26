@@ -1,0 +1,464 @@
+{
+ "example": "hushwell",
+ "root": {
+  "class": [
+   "mode-light",
+   "layout-stack",
+   "hero-media"
+  ]
+ },
+ "cuts": [],
+ "sections": [
+  {
+   "id": null,
+   "type": "hero",
+   "markup": [
+    {
+     "tag": "div",
+     "class": [
+      "ss-panel",
+      "ss-panel--hero"
+     ],
+     "children": [
+      {
+       "tag": "section",
+       "class": [
+        "ss-block",
+        "ss-hero",
+        "ss-hero--center",
+        "ss-surface-dark",
+        "ss-hero--media"
+       ],
+       "text": {
+        "title": "Sleep care, built around you.",
+        "title_tag": "h1"
+       },
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-hero__media"
+         ]
+        },
+        {
+         "tag": "div",
+         "class": [
+          "ss-hero__shade"
+         ]
+        },
+        {
+         "tag": "div",
+         "class": [
+          "ss-hero__in"
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "plan",
+   "type": "product",
+   "markup": [
+    {
+     "tag": "div",
+     "class": [
+      "ss-panel"
+     ],
+     "children": [
+      {
+       "tag": "section",
+       "class": [
+        "ss-block",
+        "ss-product",
+        "ss-product--left",
+        "ss-pose--beside"
+       ],
+       "id": "plan",
+       "text": {
+        "kicker": "Hushwell Sleep",
+        "title": "A plan for your nights.",
+        "title_tag": "h2"
+       },
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-wrap",
+          "ss-product__in"
+         ],
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-product__media",
+            "ss-product__media--both"
+           ],
+           "data": {
+            "data-float": ""
+           },
+           "children": [
+            {
+             "tag": "img",
+             "class": [
+              "ss-product__img"
+             ]
+            }
+           ]
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-product__copy",
+            "ss-reveal"
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "strip",
+   "markup": [
+    {
+     "tag": "div",
+     "class": [
+      "ss-panel"
+     ],
+     "children": [
+      {
+       "tag": "section",
+       "class": [
+        "ss-block",
+        "ss-strip"
+       ],
+       "text": {
+        "kicker": "In practice",
+        "title": "Small changes, every night.",
+        "title_tag": "h2"
+       },
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-wrap",
+          "ss-head",
+          "ss-strip__head",
+          "ss-reveal"
+         ]
+        },
+        {
+         "tag": "div",
+         "class": [
+          "ss-strip__track"
+         ],
+         "data": {
+          "data-strip": ""
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "product",
+   "markup": [
+    {
+     "tag": "div",
+     "class": [
+      "ss-panel",
+      "ss-surface-accent"
+     ],
+     "children": [
+      {
+       "tag": "section",
+       "class": [
+        "ss-block",
+        "ss-product",
+        "ss-product--right",
+        "ss-pose--beside",
+        "ss-surface-accent"
+       ],
+       "text": {
+        "kicker": "Hushwell Shift",
+        "title": "Sleep when the world is awake.",
+        "title_tag": "h2"
+       },
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-wrap",
+          "ss-product__in"
+         ],
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-product__media"
+           ],
+           "data": {
+            "data-float": ""
+           }
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-product__copy",
+            "ss-reveal"
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "hero",
+   "markup": [
+    {
+     "tag": "div",
+     "class": [
+      "ss-panel",
+      "ss-surface-dark",
+      "ss-panel--hero"
+     ],
+     "children": [
+      {
+       "tag": "section",
+       "class": [
+        "ss-block",
+        "ss-hero",
+        "ss-hero--center",
+        "ss-surface-dark"
+       ],
+       "text": {
+        "title": "Ask anything, even at 3 a.m.",
+        "title_tag": "h2"
+       },
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-hero__media"
+         ]
+        },
+        {
+         "tag": "div",
+         "class": [
+          "ss-hero__shade"
+         ]
+        },
+        {
+         "tag": "div",
+         "class": [
+          "ss-hero__in"
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "orbit",
+   "markup": [
+    {
+     "tag": "div",
+     "class": [
+      "ss-panel"
+     ],
+     "children": [
+      {
+       "tag": "section",
+       "class": [
+        "ss-block",
+        "ss-orbit"
+       ],
+       "text": {
+        "kicker": "End-to-end care",
+        "title": "From the first bad night to rested.",
+        "title_tag": "h2"
+       },
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-wrap",
+          "ss-orbit__in"
+         ],
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-orbit__copy",
+            "ss-reveal"
+           ]
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-orbit__stage"
+           ],
+           "data": {
+            "data-orbit": ""
+           },
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-orbit__center"
+             ]
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-orbit__item",
+              "is-primary"
+             ]
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-orbit__item",
+              "is-primary"
+             ]
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-orbit__item"
+             ]
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-orbit__item"
+             ]
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-orbit__item"
+             ]
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-orbit__item"
+             ]
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-orbit__item"
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "faq",
+   "markup": [
+    {
+     "tag": "div",
+     "class": [
+      "ss-panel"
+     ],
+     "children": [
+      {
+       "tag": "section",
+       "class": [
+        "ss-block",
+        "ss-faq"
+       ],
+       "text": {
+        "kicker": "Questions",
+        "title": "Before you start.",
+        "title_tag": "h2"
+       },
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-wrap",
+          "ss-faq__in"
+         ],
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-faq__list"
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "start",
+   "type": "cta",
+   "markup": [
+    {
+     "tag": "div",
+     "class": [
+      "ss-panel",
+      "ss-surface-dark"
+     ],
+     "children": [
+      {
+       "tag": "section",
+       "class": [
+        "ss-block",
+        "ss-cta",
+        "ss-surface-dark"
+       ],
+       "id": "start",
+       "text": {
+        "kicker": "Start tonight",
+        "title": "Rest is a plan.",
+        "title_tag": "h2"
+       },
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-cta__in"
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

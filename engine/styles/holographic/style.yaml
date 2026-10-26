@@ -1,0 +1,28 @@
+# Holographic: tokens and fonts for theme.style: holographic. See README.md in this folder for the UX contract.
+# "Obsidian": rigid holographic plates on dark pedestals; spectral light lives on the foil, never on body text.
+label: Holographic
+about: The information is in the angle. Every section is a rigid holographic plate that turns as you scroll past it; spectral light sweeps across its foil and a hidden mark appears at one narrow angle. Your pointer is the light source; features are a binder of trading cards; sections materialise behind a projector scan.
+mode: dark
+scene_blocks: [stats, quote, faq, cta]   # drawn its own way as steps inside a scene; other types use the default markup there
+colors:
+  bg: '#0b0b12'
+  bg2: '#12121b'
+  ink: '#f0eef8'
+  accent: '#a88bff'
+  accent2: '#7df9ff'
+  accent_ink: '#0b0b12'
+fonts:
+  display: Syncopate
+  body: Manrope
+  mono: Space Mono
+  sub: Space Grotesk
+font_axes:
+  Syncopate: "wght@400;700"
+  Manrope: "wght@200..800"
+  Space Mono: "ital,wght@0,400;0,700;1,400"
+  Space Grotesk: "wght@300..700"
+display_weight: 700
+radius: 18px
+# What a brand (theme.from) cannot change here: the dark room its CSS is drawn for
+requires:
+  mode: dark

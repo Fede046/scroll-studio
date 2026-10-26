@@ -51,6 +51,18 @@ def settings() -> dict:
         "ffprobe": get("FFPROBE", "ffprobe", "ffprobe"),
         "comfy_url": get("COMFY_URL", "comfy_url", "http://127.0.0.1:8188").rstrip("/"),
         "model_dir": get("STUDIO_MODELS", "model_dir", str(Path.home() / ".scroll-studio" / "models")),
+        # ComfyUI's folder, for `studio setup-comfy` and `studio doctor` (default: <model_dir>/ComfyUI)
+        "comfy_dir": get("COMFY_DIR", "comfy_dir", None),
         "chrome": get("CHROME", "chrome", None),
         "projects": get("STUDIO_PROJECTS", "projects", str(ROOT / "projects")),
+        # image -> 3D for product takes (engine/backends/trellis.py); optional
+        "trellis_python": get("TRELLIS_PYTHON", "trellis_python", None),
+        "trellis_script": get("TRELLIS_SCRIPT", "trellis_script", None),
+        # video model for film beats, takes and theme.art when the spec doesn't choose one: ltx | wan
+        "video_model": get("STUDIO_VIDEO_MODEL", "video_model", "ltx"),
+        # Wan 2.2 file names as ComfyUI lists them, when they differ from engine/backends/comfy.py WAN ([wan] table)
+        "wan": t.get("wan") or {},
+        # `studio build` asks before starting when its estimate is over this many minutes (unset: just print it);
+        # --yes skips the question, and without a terminal the build stops instead of waiting
+        "confirm_over": float(get("STUDIO_CONFIRM_OVER", "confirm_over", 0) or 0) or None,
     }

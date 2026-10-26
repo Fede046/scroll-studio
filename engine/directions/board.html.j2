@@ -1,0 +1,217 @@
+{%- macro still(d, s, n) -%}
+<figure class="still b-{{ d.board }}">
+  {%- if d.board == 'terminal' %}<div class="bar">&#9679; &#9679; &#9679; &nbsp; {{ s.slug }}</div>{% endif %}
+  <img src="{{ s.image }}" alt="{{ s.title }}" loading="eager">
+  <figcaption>
+    {%- if d.board == 'grid' %}<span class="n">{{ '%02d'|format(n + 1) }}</span>{% endif %}
+    {%- if d.board == 'terminal' %}<span class="t">$ open {{ s.slug }}</span>
+    {%- else %}<div><div class="k">{% if d.board == 'plate' %}{{ d.unit }} {{ n + 1 }}{% else %}{{ s.kicker or s.role }}{% endif %}</div><div class="t">{{ (s.title_html if n == 0 else s.title_short)|safe }}</div></div>{% endif -%}
+  </figcaption>
+</figure>
+{%- endmacro -%}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Directions · {{ site.name }}</title>
+{% for href in font_links %}<link rel="stylesheet" href="{{ href }}">
+{% endfor %}
+<style>
+:root { --page:#0e0f11; --panel:#17181b; --line:#2a2c31; --txt:#e9eaee; --dim:#9a9ea8; --hi:#ffb27a;
+  --sys: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif; --mono: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+* { box-sizing: border-box; }
+html { background: var(--page); color: var(--txt); font-family: var(--sys); }
+body { margin: 0; padding: 36px 40px 56px; }
+.top { display: flex; flex-wrap: wrap; gap: 14px 40px; align-items: flex-end; justify-content: space-between; margin-bottom: 26px; }
+.top h1 { font-size: 15px; letter-spacing: .14em; text-transform: uppercase; color: var(--dim); font-weight: 600; margin: 0 0 10px; }
+.top h2 { font-size: 34px; line-height: 1.1; margin: 0; font-weight: 650; letter-spacing: -.01em; }
+.top p { margin: 8px 0 0; color: var(--dim); max-width: 78ch; font-size: 14px; line-height: 1.5; }
+.top .brief { color: var(--txt); font-style: italic; }
+.meta { font: 12px/1.7 var(--mono); color: var(--dim); text-align: right; }
+.meta b { color: var(--txt); font-weight: 600; }
+.actions { display: none; gap: 8px; margin-top: 10px; justify-content: flex-end; }
+body.served .actions { display: flex; }
+button { font: 600 13px var(--sys); border: 1px solid var(--line); background: var(--panel); color: var(--txt); padding: 8px 14px; border-radius: 8px; cursor: pointer; }
+button:hover { border-color: var(--hi); }
+.warn { margin: 0 0 18px; padding: 10px 14px; background: #2a2118; border: 1px solid #5a4126; border-radius: 8px; color: #ffcf9a; font-size: 13px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(560px, 1fr)); gap: 26px; align-items: start; }
+
+/* ---- one direction: everything inside is set in its own palette and type */
+.dir { --ink2: color-mix(in srgb, var(--ink) 66%, var(--bg)); --ink3: color-mix(in srgb, var(--ink) 46%, var(--bg));
+  --line2: color-mix(in srgb, var(--ink) 16%, var(--bg));
+  background: var(--bg); color: var(--ink); font-family: var(--fb); border-radius: 14px; overflow: hidden;
+  border: 1px solid var(--line); display: flex; flex-direction: column; container-type: inline-size; }
+.dir.picked { outline: 3px solid var(--accent); outline-offset: 3px; }
+.dir header { padding: 22px 24px 8px; }
+.tag { display: flex; gap: 10px; align-items: center; font: 600 11px var(--fm); letter-spacing: .12em; text-transform: uppercase; color: var(--ink2); }
+.tag b { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: var(--aink); font-size: 12px; }
+.tag .kind { margin-left: auto; color: var(--ink3); }
+.dir h3 { font: var(--dw) clamp(36px, 8cqw, 54px)/1.02 var(--fd); margin: 14px 0 8px; letter-spacing: -.005em; }
+.concept { margin: 0; font-size: 15px; line-height: 1.5; color: var(--ink2); max-width: 54ch; }
+.stills { padding: 16px 24px 4px; display: grid; gap: 8px; }
+.stills .row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.still { margin: 0; position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: var(--bg2); container-type: inline-size; border-radius: var(--rad); }
+.still img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.still .t { font-family: var(--fd); font-weight: var(--dw); line-height: 1.04; font-size: 8.4cqw; }
+.still .k { font: 600 2.6cqw var(--fm); letter-spacing: .1em; text-transform: uppercase; opacity: .85; }
+.row .still .t { font-size: 11cqw; } .row .still .k { font-size: 5.4cqw; }
+.t em { font-style: var(--emstyle); color: var(--emcolor); font-weight: var(--emweight); }
+/* overlay: type on the picture, over a scrim in the direction's ground colour */
+.b-overlay figcaption { position: absolute; inset: auto 0 0 0; padding: 14cqw 5cqw 4.5cqw 5cqw; color: var(--ink);
+  background: linear-gradient(to top, color-mix(in srgb, var(--bg) 92%, transparent) 10%, transparent); }
+.row .b-overlay figcaption { padding-top: 22cqw; }
+/* split: the picture and a colour panel with the words */
+.b-split { display: grid; grid-template-columns: 58% 42%; background: var(--bg2); }
+.b-split img { grid-column: 1; height: 100%; }
+.b-split figcaption { grid-column: 2; align-self: center; padding: 0 5cqw; color: var(--ink); }
+.row .b-split { grid-template-columns: 50% 50%; }
+/* poster: type on a field of the accent colour, the picture inset */
+.b-poster { background: var(--accent); color: var(--aink); display: grid; grid-template-rows: auto 1fr; padding: 4%; gap: 2.4%; }
+.b-poster img { border-radius: 0; min-height: 0; order: 2; }
+.b-poster figcaption { order: 1; }
+.b-poster .t { font-size: 8cqw; text-transform: uppercase; letter-spacing: -.01em; } .row .b-poster .t { font-size: 9.4cqw; }
+.b-poster em { color: inherit !important; }
+.b-poster .k { display: none; }
+/* plate: a picture mounted on paper with a caption in the margin */
+.b-plate { background: var(--bg2); padding: 3.4% 3.4% 12%; border: 1px solid var(--line2); }
+.row .b-plate { padding-bottom: 21%; }
+.b-plate img { height: 100%; box-shadow: 0 1px 0 var(--line2); }
+.b-plate figcaption { position: absolute; left: 3.4cqw; right: 3.4cqw; bottom: 1.6cqw; color: var(--ink); display: flex; flex-direction: column; gap: .4cqw; }
+.b-plate .t { font-size: 5.4cqw; font-style: italic; } .row .b-plate .t { font-size: 8cqw; }
+.b-plate .k { color: var(--ink2); }
+/* grid: a column of numbers and rules beside the picture, Swiss style */
+.b-grid { display: grid; grid-template-columns: 1fr 2fr; background: var(--bg); border: 1px solid var(--ink); }
+.b-grid img { grid-column: 2; grid-row: 1; height: 100%; }
+.b-grid figcaption { grid-column: 1; grid-row: 1; padding: 3cqw; display: flex; flex-direction: column; justify-content: space-between; border-right: 1px solid var(--ink); color: var(--ink); }
+.b-grid .t { font-size: 6.4cqw; } .row .b-grid .t { font-size: 8.6cqw; }
+.b-grid .n { font: 600 4cqw var(--fm); color: var(--accent); }
+/* terminal: a window bar and a prompt */
+.b-terminal { background: var(--bg2); border: 1px solid var(--line2); display: grid; grid-template-rows: auto 1fr auto; }
+.b-terminal .bar { font: 500 2.8cqw var(--fm); padding: 1.4cqw 2.4cqw; border-bottom: 1px solid var(--line2); color: var(--ink2); letter-spacing: .04em; }
+.b-terminal img { min-height: 0; height: 100%; }
+.b-terminal figcaption { font: 500 3cqw var(--fm); padding: 1.6cqw 2.4cqw; color: var(--ink); border-top: 1px solid var(--line2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-terminal figcaption .t { font: inherit; font-size: inherit; } .b-terminal .k { display: none; }
+.row .b-terminal .bar { font-size: 5.4cqw; } .row .b-terminal figcaption { font-size: 5.4cqw; }
+.swatches { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; padding: 16px 24px 0; }
+.sw { height: 56px; border-radius: var(--rad); border: 1px solid var(--line2); position: relative; }
+.sw span { position: absolute; left: 6px; bottom: 4px; font: 500 9.5px var(--fm); }
+.pname { padding: 6px 24px 0; font: 600 11px var(--fm); letter-spacing: .1em; text-transform: uppercase; color: var(--ink2); }
+.spec { padding: 18px 24px 4px; }
+.spec .big { font: var(--dw) 40px/1.05 var(--fd); }
+.spec .big em { font-style: var(--emstyle); color: var(--emcolor); font-weight: var(--emweight); }
+.spec p { margin: 8px 0 0; font-size: 14px; line-height: 1.55; color: var(--ink2); max-width: 56ch; }
+.spec .faces { margin-top: 10px; font: 500 11px var(--fm); color: var(--ink3); }
+.facts { padding: 16px 24px 4px; margin: 0; display: grid; grid-template-columns: 74px 1fr; gap: 9px 14px; font-size: 13px; line-height: 1.45; }
+.facts dt { font: 600 10.5px var(--fm); letter-spacing: .1em; text-transform: uppercase; color: var(--ink3); padding-top: 2px; }
+.facts dd { margin: 0; color: var(--ink2); }
+.facts dd b { color: var(--ink); font-weight: 600; }
+.facts ul { margin: 0; padding-left: 16px; } .facts li { margin: 0 0 3px; }
+.why { padding: 4px 24px 0; font: 11px var(--fm); color: var(--ink3); }
+.dir footer { margin-top: auto; padding: 18px 24px 22px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.dir footer .pick { display: none; background: var(--accent); color: var(--aink); border: 0; padding: 10px 18px; border-radius: calc(var(--rad) + 2px); font: 650 14px var(--fb); }
+body.served .dir footer .pick { display: inline-block; }
+.dir footer .reroll { display: none; background: transparent; color: var(--ink2); border: 1px solid var(--line2); }
+body.served .dir footer .reroll { display: inline-block; }
+.dir footer code { font: 11.5px var(--fm); color: var(--ink3); }
+body.served .dir footer code { display: none; }
+#toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #1d2a20; border: 1px solid #3d6b48; color: #bff0c8; padding: 12px 18px; border-radius: 10px; font-size: 14px; display: none; max-width: 80vw; z-index: 9; }
+#toast.err { background: #2a1d1d; border-color: #6b3d3d; color: #f0bfbf; }
+@media (max-width: 640px) { body { padding: 18px 14px 40px; } .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="top">
+  <div>
+    <h1>Direction boards</h1>
+    <h2>{{ directions|length }} directions for {{ site.name }}</h2>
+    {% if brief.brief %}<p class="brief">&ldquo;{{ brief.brief }}&rdquo;</p>{% endif %}
+    <p>{{ read_line }}</p>
+  </div>
+  <div class="meta">
+    seed <b>{{ seed }}</b> &middot; {{ directions|length }} of {{ count }} &middot; made {{ made }}<br>
+    closest pair <b>{{ '%.2f'|format(diversity.min) }}</b> apart (1 = nothing shared) &middot; <b>{{ diversity.kinds }}</b> kinds &middot; <b>{{ diversity.styles }}</b> experiences<br>
+    {% if replaced %}weak pair{{ 's' if replaced|length > 1 }} regenerated: {% for r in replaced %}{{ r.replaced }} &rarr; {{ r.with }}{{ ', ' if not loop.last }}{% endfor %}<br>{% endif %}
+    writer: curated vocabulary, deterministic (no model)
+    <div class="actions"><button id="reseed">New seed</button><button id="refresh">Redraw stills</button></div>
+  </div>
+</div>
+{% for w in warnings %}<div class="warn">{{ w }}</div>{% endfor %}
+<div class="grid">
+{% for d in directions %}
+{% set p = d.palette %}{% set f = d.fonts %}
+<article class="dir{{ ' picked' if picked == d.id }}" id="dir-{{ d.id }}" data-id="{{ d.id }}" style="--bg:{{ p.bg }};--bg2:{{ p.bg2 }};--ink:{{ p.ink }};--accent:{{ p.accent }};--accent2:{{ p.accent2 }};--aink:{{ p.accent_ink }};--fd:{{ css_font(f.display) }};--fb:{{ css_font(f.body) }};--fm:{{ css_font(f.mono, 'mono') }};--dw:{{ f.weight }};--rad:{{ d.radius or '6px' }};--emstyle:{{ em_style(d) }};--emcolor:{{ em_color(d) }};--emweight:{{ em_weight(d) }}">
+  <header>
+    <div class="tag"><b>{{ d.id|upper }}</b> {{ d.stance }} <span class="kind">{{ d.kind }}</span></div>
+    <h3>{{ d.name }}</h3>
+    <p class="concept">{{ d.concept }}</p>
+  </header>
+  <div class="stills">
+    {% for s in d.stills[:1] %}{{ still(d, s, 0) }}{% endfor %}
+    {% if d.stills|length > 1 %}<div class="row">{% for s in d.stills[1:4] %}{{ still(d, s, loop.index) }}{% endfor %}</div>{% endif %}
+  </div>
+  <div class="pname">{{ p.name }} &middot; {{ p.mode }}</div>
+  <div class="swatches">
+    {% for key in ['bg', 'bg2', 'ink', 'accent', 'accent2'] %}<div class="sw" style="background:{{ p[key] }}"><span style="color:{{ swatch_ink(p[key]) }}">{{ p[key] }}</span></div>{% endfor %}
+  </div>
+  <div class="spec">
+    <div class="big">{{ hero_title_html|safe }}</div>
+    <p>{{ site.description or brief.brief }}</p>
+    <div class="faces">{{ f.display }} &middot; {{ f.display_class }} &nbsp;/&nbsp; {{ f.body }} &middot; {{ f.body_class }}{% if f.note %} &mdash; {{ f.note }}{% endif %}</div>
+  </div>
+  <dl class="facts">
+    <dt>Style</dt><dd><b>{{ d.style_label }}</b>{% if d.style %} <span style="opacity:.6">(theme.style: {{ d.style }})</span>{% endif %}. {{ d.style_about }}</dd>
+    <dt>Imagery</dt><dd>{% if d.imagery %}<b>{{ d.imagery.medium }}.</b>{% if d.imagery.light %} {{ d.imagery.light|capitalize }}.{% endif %}{% if d.imagery.lens %} {{ d.imagery.lens|capitalize }}.{% endif %}{% if d.imagery.mood %} Mood: {{ d.imagery.mood }}.{% endif %}{% if d.imagery.palette %} Colour: {{ d.imagery.palette }}.{% endif %}{% else %}the site's own prompts, unchanged{% endif %}</dd>
+    <dt>Motion</dt><dd><ul>{% for m in d.motion %}<li>{{ m }}</li>{% endfor %}{% if d.pace != 1 %}<li>scroll.speed {{ d.pace }}</li>{% endif %}</ul></dd>
+    <dt>Voice</dt><dd>{{ d.voice }}</dd>
+  </dl>
+  <div class="why">{{ d.why|join(' · ') }}{{ ' · ' if d.why }}fit {{ '%.1f'|format(d.fit) }} &middot; {{ '%.0f'|format(d.distance_from_current * 100) }}% away from today</div>
+  <footer>
+    <button class="pick" data-id="{{ d.id }}">Pick direction {{ d.id|upper }}</button>
+    <button class="reroll" data-id="{{ d.id }}">Another idea</button>
+    <code>studio directions {{ project }} --pick {{ d.id }}</code>
+  </footer>
+</article>
+{% endfor %}
+</div>
+<div id="toast"></div>
+<script id="state" type="application/json">{{ state_json|safe }}</script>
+<script>
+(function () {
+  var NAME = {{ project|tojson }};
+  var toast = document.getElementById('toast');
+  function say(msg, bad) { toast.textContent = msg; toast.className = bad ? 'err' : ''; toast.style.display = 'block'; clearTimeout(say.t); say.t = setTimeout(function () { toast.style.display = 'none'; }, bad ? 9000 : 12000); }
+  function post(path, body) {
+    return fetch('/api/dir/' + encodeURIComponent(NAME) + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) })
+      .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || j.detail || r.status); return j; }); });
+  }
+  fetch('/api/dir/' + encodeURIComponent(NAME) + '/state').then(function (r) { if (r.ok) document.body.classList.add('served'); }).catch(function () {});
+  document.querySelectorAll('.pick').forEach(function (b) {
+    b.addEventListener('click', function () {
+      b.disabled = true;
+      post('/pick', { id: b.dataset.id }).then(function (j) {
+        document.querySelectorAll('.dir').forEach(function (d) { d.classList.toggle('picked', d.dataset.id === b.dataset.id); });
+        say('Direction ' + b.dataset.id.toUpperCase() + ' written to site.yaml (' + j.changed.join(', ') + '). Backup: ' + j.backup + '. Next: studio storyboard ' + NAME);
+      }).catch(function (e) { say(String(e.message || e), true); }).then(function () { b.disabled = false; });
+    });
+  });
+  document.querySelectorAll('.reroll').forEach(function (b) {
+    b.addEventListener('click', function () {
+      b.disabled = true; b.textContent = 'Thinking...';
+      post('/reroll', { id: b.dataset.id }).then(function () { location.reload(); }).catch(function (e) { say(String(e.message || e), true); b.disabled = false; b.textContent = 'Another idea'; });
+    });
+  });
+  var rs = document.getElementById('reseed');
+  if (rs) rs.addEventListener('click', function () {
+    rs.disabled = true; rs.textContent = 'Writing...';
+    post('/generate', { seed: Math.floor(Math.random() * 9000) + 2 }).then(function () { location.reload(); }).catch(function (e) { say(String(e.message || e), true); rs.disabled = false; rs.textContent = 'New seed'; });
+  });
+  var rf = document.getElementById('refresh');
+  if (rf) rf.addEventListener('click', function () {
+    rf.disabled = true; rf.textContent = 'Drawing...';
+    post('/stills', {}).then(function () { location.reload(); }).catch(function (e) { say(String(e.message || e), true); rf.disabled = false; rf.textContent = 'Redraw stills'; });
+  });
+})();
+</script>
+</body>
+</html>

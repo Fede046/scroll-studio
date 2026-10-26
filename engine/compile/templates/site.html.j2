@@ -1,22 +1,26 @@
 <!doctype html>
-<html lang="{{ site.lang }}" class="mode-{{ theme.mode }} layout-{{ site.layout }}{% if sections and sections[0].s.type == 'hero' and (sections[0].img or sections[0].video) %} hero-media{% endif %}">
+<html lang="{{ site.lang }}"{% if theme.style %} data-style="{{ theme.style }}"{% endif %} class="mode-{{ theme.mode }} layout-{{ site.layout }}{% if theme.style %} style-{{ theme.style }}{% endif %}{% if sections and sections[0].s.type == 'hero' and (sections[0].img or sections[0].video) %}{% if (sections[0].calm and sections[0].calm.tone == 'light' and not sections[0].s.surface) or sections[0].s.surface == 'light' %} hero-light{% else %} hero-media{% endif %}{% endif %}{% if sections and sections[0].s.frame %} hero-frame{% endif %}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>{{ site.name }}</title>
 {% if site.description %}<meta name="description" content="{{ site.description }}">{% endif %}
 <meta name="generator" content="Scroll Studio">
+<link rel="icon" href="{{ icon }}">
 {% for l in languages %}<link rel="alternate" hreflang="{{ l.lang }}" href="{{ l.href }}">
 {% endfor %}
 {% if font_css %}<link rel="stylesheet" href="{{ font_css }}">
-{% else %}<link rel="preconnect" href="https://fonts.googleapis.com">
+{% endif %}{% if font_links or not font_css %}<link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 {% for href in font_links %}<link rel="stylesheet" href="{{ href }}">
 {% endfor %}{% endif %}
 <style>
 {{ css_vars | safe }}
 </style>
-<link rel="stylesheet" href="runtime/studio.css">
+<link rel="stylesheet" href="{{ runtime }}studio.css">
+{% if style_css %}<style id="ss-style">
+{{ style_css | safe }}
+</style>{% endif %}
 <style>
   /* A section's backdrop: the image fills the panel (or a wrapper in the flow layout); the section itself goes clear,
      whatever surface it has. */
@@ -26,28 +30,36 @@
   .ss-scene.ss-type--display .ss-type__text { font-size: clamp(46px, 8.2vw, 150px); text-align: center; letter-spacing: -.04em; line-height: 1; max-width: 12em; }
   /* On a dark surface the rolling word takes the surface's <em> colour, which is checked for contrast; the raw accent is not. */
   .ss-surface-dark .ss-type--swap .roll { color: var(--em-color); }
+{%- set used = namespace(clip=false, frame=false, btns=false, link=false, avatar=false) %}{%- for e in sections %}{% set b = e.s %}{%- if b.type == "product" %}{% if e.video %}{% set used.clip = true %}{% endif %}{% if b.frame %}{% set used.frame = true %}{% endif %}{%- elif b.type == "cta" and b.buttons %}{% set used.btns = true %}{%- elif b.type == "features" %}{% if e.avatars %}{% set used.avatar = true %}{% endif %}{%- for f in b.items %}{% if f.href %}{% set used.link = true %}{% endif %}{% endfor %}{% endif %}{% endfor %}
+{%- if languages %}
   /* The language switch (Site.translations) sits before the nav button and stays visible on phones. */
   .ss-nav__end { display: flex; align-items: center; gap: 16px; }
   .ss-lang { display: flex; gap: 2px; font-family: var(--font-mono); font-size: 12px; letter-spacing: .06em; }
   .ss-lang a { padding: 6px 8px; border-radius: 6px; color: var(--ink-3); transition: color .2s, background .2s; }
   .ss-lang a:hover { color: var(--ink); }
   .ss-lang a[aria-current] { color: var(--ink); background: rgba(var(--ink-rgb), .09); }
+{%- endif %}{% if used.clip %}
   /* A product panel can play a clip (ProductBlock.video) in a rounded frame instead of showing a shot. */
   .ss-product__clip { display: block; width: 100%; height: auto; max-height: 68vh; object-fit: cover; border-radius: 18px; background: #000;
     border: 1px solid var(--line); box-shadow: 0 50px 100px -50px rgba(0, 0, 0, .7); transform: translateY(calc(var(--float, 0) * -36px)); }
   @media (max-width: 900px) { .ss-product__clip { max-height: 52vh; } }
+{%- endif %}{% if used.frame %}
   /* ...and show a photograph whole in the same frame (ProductBlock.frame): the box follows the photo's own shape. */
   .ss-product__img--frame { width: auto; max-width: 100%; height: auto; -webkit-mask: none; mask: none; mix-blend-mode: normal;
     border-radius: 18px; border: 1px solid var(--line); box-shadow: 0 50px 100px -50px rgba(0, 0, 0, .7); }
+{%- endif %}{% if used.btns %}
   /* A CTA with several buttons centres them in one row. */
   .ss-cta .ss-btns { justify-content: center; margin-top: 44px; }
   .ss-cta .ss-btns .ss-btn { margin-top: 0; }
+{%- endif %}{% if used.link %}
   /* A feature card with an href is a link: an arrow after the title, the title takes the accent on hover. */
   .ss-feature--link h3::after { content: " ↗"; font-size: .7em; color: var(--ink-3); transition: color .3s; }
   .ss-feature--link:hover h3::after { color: var(--accent); }
+{%- endif %}{% if used.avatar %}
   /* A card's picture (Feature.image) sits round beside its tag, like an avatar. */
   .ss-feature__top { display: flex; align-items: center; gap: 14px; }
   .ss-feature__img { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; flex: none; border: 1px solid var(--line); }
+{%- endif %}
   /* A phone can play a clip instead of showing a screenshot. */
   .ss-phone__screen > video { width: 100%; height: 100%; object-fit: cover; display: block; }
   /* Poses: how a product section's phone sits (ProductBlock.pose). The panel clips at its edges (overflow: clip), so a
@@ -99,7 +111,7 @@
   .ss-hero__phone .ss-phone { position: absolute; top: 0; left: 50%; width: clamp(230px, 22vw, 340px); transform: translate(-50%, calc(var(--hero-p, 0) * 40px)); }
   .ss-product__stats .ss-v { font-size: clamp(40px, 4.2vw, 72px); }
   .ss-product__stats .ss-l { margin-top: 4px; }
-  @media (max-width: 900px) {
+  @media (max-width: {{ theme.phone or 900 }}px) {
     .ss-pose--rise.ss-product { padding-top: 100px; }
     .ss-pose--rise .ss-product__media { height: max(34svh, 250px); }
     .ss-pose--rise .ss-phone { width: min(64vw, 300px); }
@@ -124,7 +136,22 @@
   em, .mode-light em, [class*="ss-surface-"] em { color: inherit; font-style: italic; font-weight: 650; }
   .ss-surface-dark .ss-type--swap .roll { color: inherit; }
 {% endif %}
+{% if theme.em == "heavy" %}
+  /* Emphasis as a change of weight (theme.display_em: heavy): upright, the text's own colour, the heaviest weight. */
+  em, .mode-light em, [class*="ss-surface-"] em { color: inherit; font-style: normal; font-weight: 800; }
+  .ss-surface-dark .ss-type--swap .roll { color: inherit; }
+{% endif %}
+{% if theme.labels == "plain" %}
+  /* Small labels in sentence case in the body face (theme.labels: plain). */
+  .ss-kicker, .ss-num, .ss-eyebrow, .ss-tag, .ss-when { font-family: var(--font-body); font-size: 14px; font-weight: 500; letter-spacing: 0; text-transform: none; }
+  .ss-footer__in { font-family: var(--font-body); }
+{% endif %}
   .ss-h1, .ss-display { text-wrap: balance; }
+{% if theme.grain %}
+  /* Film grain over the whole page (theme.grain): a still noise tile, so it costs nothing while scrolling. */
+  .ss-grain { position: fixed; inset: 0; z-index: 2147482000; pointer-events: none; mix-blend-mode: overlay; background-size: 220px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+{% endif %}
 </style>
 {% if custom_css %}<style>
 {{ custom_css | safe }}
@@ -151,7 +178,8 @@
 {% endif %}
 </head>
 <body data-page="{{ page_id or "home" }}">
-{% if site.loader.enabled %}
+{% if theme.grain %}<div class="ss-grain" aria-hidden="true" style="opacity: {{ theme.grain }}"></div>
+{% endif %}{% if site.loader.enabled %}
 <div class="ss-loader" id="ss-loader" role="status" aria-live="polite">
   <div class="ss-loader__name">{{ site.loader.label or site.name }}</div>
   <div class="ss-loader__bar"><i></i></div>
@@ -160,6 +188,12 @@
 {% endif %}
 {% import "blocks.html.j2" as blocks %}
 {% import "scene.html.j2" as scene %}
+{# A style can bring its own markup for some block or scene types (`types` in its template) and page chrome. #}
+{% if style_blocks %}{% import "style/blocks.html.j2" as sblocks %}{% set btypes = sblocks.types %}{% else %}{% set btypes = [] %}{% endif %}
+{% if style_scenes %}{% import "style/scenes.html.j2" as sscenes %}{% set stypes = sscenes.types %}{% else %}{% set stypes = [] %}{% endif %}
+{% if style_chrome %}{% import "style/chrome.html.j2" as chrome %}{% endif %}
+{# blocks shown as steps inside scenes (`block: stats` ...) use the style's markup too #}
+{% set kit = {"sblocks": sblocks if style_blocks else none, "btypes": btypes if scene_blocks is none else (btypes | select("in", scene_blocks) | list)} %}
 
 <header class="ss-nav" id="ss-nav"><div class="ss-nav__in">
   <a class="ss-wordmark" href="{{ home_href or "#" }}">
@@ -167,30 +201,67 @@
     <span>{{ site.name }}</span>
   </a>
   <nav class="ss-nav__links">{% for l in nav_links %}<a href="{{ l.href }}">{{ l.label }}</a>{% endfor %}</nav>
-  <div class="ss-nav__end">
+  {% if languages %}<div class="ss-nav__end">
     {% if languages %}<nav class="ss-lang" aria-label="Language">{% for l in languages %}<a href="{{ l.href }}" hreflang="{{ l.lang }}" lang="{{ l.lang }}"{% if l.current %} aria-current="page"{% endif %}>{{ l.lang | upper }}</a>{% endfor %}</nav>{% endif %}
-    {% if site.nav.cta %}<a class="ss-btn" href="{{ site.nav.cta.href }}">{{ site.nav.cta.label }} <span class="ss-arrow">→</span></a>{% endif %}
+    {% if site.nav.cta and (site.nav.cta.icon or site.nav.cta.look) %}{{ blocks.btn(site.nav.cta) }}{% elif site.nav.cta %}<a class="ss-btn" href="{{ site.nav.cta.href }}">{{ site.nav.cta.label }} <span class="ss-arrow">→</span></a>{% endif %}
   </div>
+  {% else %}{% if site.nav.cta and (site.nav.cta.icon or site.nav.cta.look) %}{{ blocks.btn(site.nav.cta) }}{% elif site.nav.cta %}<a class="ss-btn" href="{{ site.nav.cta.href }}">{{ site.nav.cta.label }} <span class="ss-arrow">→</span></a>{% else %}<span></span>{% endif %}{% endif %}
 </div></header>
 
+{% if style_chrome %}{{ chrome.top(site, sections, nav_links) }}{% endif %}
 <main>
 {% set stack = site.layout == "stack" %}
 {% for e in sections %}
 {% set surface = (" ss-surface-" ~ e.s.surface) if e.s.surface else "" %}
+{# a join with a `transition:` (engine/cuts.py): the section sits in a pin, and the join gets a gap of scroll to play in #}
+{% if e.cut_in is not none %}<div class="ss-cutw ss-cutw--in" data-cut-in="{{ e.cut_in }}" style="--cut-l: {{ cuts[e.cut_in].length }}"><div class="ss-cutpin ss-cutpin--in{{ surface }}">{% endif %}
+{% if e.cut_out is not none %}<div class="ss-cutw ss-cutw--out" data-cut-out="{{ e.cut_out }}" style="--cut-l: {{ cuts[e.cut_out].length }}"><div class="ss-cutpin ss-cutpin--out{{ surface }}">{% endif %}
 {% if stack %}<div class="ss-panel{{ surface }}{% if e.s.type == 'hero' %} ss-panel--hero{% endif %}{% if e.backdrop %} ss-backdrop{% endif %}"{% if e.backdrop %} style="background-image: url({{ e.backdrop }})"{% endif %}>
 {% elif e.backdrop %}<div class="ss-backdrop{{ surface }}" style="background-image: url({{ e.backdrop }})">{% endif %}
-{% if e.scene %}{{ scene.render(e.s, e.config, e.sdata) }}{% else %}{{ blocks.render(e.s, e) }}{% endif %}
+{% if e.scene %}{% if e.s.type in stypes %}{{ sscenes.render(e.s, e.config, e.sdata, scene) }}{% else %}{{ scene.render(e.s, e.config, e.sdata, e, kit) }}{% endif %}{% elif e.s.type in btypes %}{{ sblocks.render(e.s, e, blocks, loop) }}{% else %}{{ blocks.render(e.s, e) }}{% endif %}
 {% if stack or e.backdrop %}</div>{% endif %}
+{% if e.cut_out is not none %}</div><div class="ss-cutgap" aria-hidden="true"></div></div>{% endif %}
+{% if e.cut_in is not none %}</div><div class="ss-cutgap" aria-hidden="true"></div></div>{% endif %}
 {% endfor %}
 </main>
+{% if style_chrome %}{{ chrome.bottom(site, sections) }}{% endif %}
 
 <footer class="ss-footer"><div class="ss-wrap ss-footer__in">
   <span>{{ (site.footer.left or ("© " ~ site.name)) | rich }}</span>
-  <span>{% for l in page_links %}<a href="{{ l.href }}">{{ l.label }}</a> · {% endfor %}{{ (site.footer.right or "") | rich }}{% for c in credits %}{% if loop.first and site.footer.right %} · {% endif %}{{ c }}{% if not loop.last %} · {% endif %}{% endfor %}</span>
-</div></footer>
+  <span>{% for l in page_links %}<a href="{{ l.href }}">{{ l.label }}</a> · {% endfor %}{% for l in site.footer.links %}<a href="{{ l.href }}">{{ l.label }}</a> · {% endfor %}{{ (site.footer.right or "") | rich }}{% for c in credits %}{% if loop.first and site.footer.right %} · {% endif %}{{ c }}{% if not loop.last %} · {% endif %}{% endfor %}</span>
+{% if concept %}  <p class="ss-footer__concept">{{ concept }}{% if product.url %} The real {{ product.name }}: <a href="{{ product.url }}" rel="noopener">{{ product.url.split("//")[-1].split("/")[0] }}</a>.{% endif %}</p>
+{% endif %}</div></footer>
 
 <script>window.__ssScroll = { speed: {{ site.scroll.speed }} };</script>
-<script type="module" src="runtime/index.js"></script>
+{% if theme.runtime %}<script>window.__ssTheme = {{ theme.runtime | tojson }};</script>
+{% endif %}{% if cuts %}<script type="application/json" id="ss-cuts">{{ cuts | tojson }}</script>
+{% endif %}{% if art %}<script type="application/json" id="ss-art">{{ art | tojson }}</script>
+{% endif %}<script type="module" src="{{ runtime }}index.js"></script>
+{% if looks %}
+<nav class="ss-looks" aria-label="Looks">
+  {% set i = looks["index"] %}{% set n = looks["items"] | length %}
+  <a href="{{ looks['items'][(i - 1) % n]['href'] }}" aria-label="Previous look">←</a>
+  <a class="ss-looks__name" href="{{ looks['home'] }}">{{ looks['items'][i]['label'] }} <small>{{ i + 1 }}/{{ n }}</small></a>
+  <a href="{{ looks['items'][(i + 1) % n]['href'] }}" aria-label="Next look">→</a>
+</nav>
+<style>
+  .ss-looks { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 990; display: flex; align-items: center; gap: 4px; padding: 5px;
+    background: rgba(12, 12, 14, .88); color: #fff; border-radius: 999px; font: 500 14px/1 system-ui, sans-serif; box-shadow: 0 10px 30px rgba(0, 0, 0, .35);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); text-transform: none; letter-spacing: 0; }
+  .ss-looks a { color: #fff; padding: 10px 14px; border-radius: 999px; }
+  .ss-looks a:hover { background: rgba(255, 255, 255, .14); }
+  .ss-looks__name { min-width: 170px; text-align: center; }
+  .ss-looks small { opacity: .6; margin-left: 6px; font-size: 12px; }
+</style>
+<script>
+  addEventListener("keydown", function (e) {
+    if (e.target.closest && e.target.closest("input, textarea")) return;
+    var a = document.querySelectorAll(".ss-looks a");
+    if (e.key === "ArrowLeft") location.href = a[0].href;
+    if (e.key === "ArrowRight") location.href = a[2].href;
+  });
+</script>
+{% endif %}
 <script>
   // Clips in phones play while their panel is on screen and rest while it isn't: browsers may hold a muted
   // autoplay until the element is seen, and a stack of looping videos is wasted work off screen.
@@ -209,5 +280,6 @@
     });
   })();
 </script>
+{% if trailer %}{% include "trailer_embed.html.j2" %}{% endif %}
 </body>
 </html>

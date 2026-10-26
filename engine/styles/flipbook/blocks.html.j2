@@ -1,0 +1,88 @@
+{# Flipbook blocks: every section is a run of pages in one pad of animation paper. The markup is one page: a text
+   column (lettered by hand) and a field where the pencil drawing goes. Without JavaScript each section is a single
+   finished page lying on the desk. The runtime (runtime/src/styles/flipbook.ts) pins the page over the pad, draws the
+   field page by page and letters the text in: [data-fb-write] marks text written a character or a word per page,
+   [data-fb-unit] things that appear whole, [data-fb-item] the items that each get their own run of pages. #}
+{% set types = ["hero", "intro", "features", "product", "stats", "timeline", "quote", "faq", "cta"] %}
+
+{% macro boxes(list) %}{% if list %}<div class="fb-boxes" data-fb-unit>{% for l in list %}<a class="fb-box{% if loop.first %} fb-box--hot{% endif %}" href="{{ l.href }}" data-fb-box>{{ l.label }}{% if loop.first %} <span aria-hidden="true">→</span>{% endif %}</a>{% endfor %}</div>{% endif %}{% endmacro %}
+
+{% macro render(b, e, base, loop) %}
+{% set h = "h1" if e.first else "h2" %}
+{% set surf = (" ss-surface-" ~ b.surface) if b.surface else "" %}
+<section class="fb-sec fb-sec--{{ b.type }}{{ surf }}" data-fb="{{ b.type }}"{% if b.id %} id="{{ b.id }}"{% endif %}>
+<div class="fb-page">
+  <div class="fb-text">
+
+{% if b.type == "hero" %}
+  {% if b.badge %}<span class="fb-label" data-fb-unit>{{ b.badge }}</span>{% endif %}
+  <{{ h }} class="fb-h fb-h--hero" data-fb-write="chars">{{ b.title | rich }}</{{ h }}>
+  {% if b.body %}<p class="fb-body" data-fb-write="words">{{ b.body | rich }}</p>{% endif %}
+  {{ boxes(b.buttons) }}{{ base.hero_kit(b, e, "data-fb-unit") }}
+  {% if e.img %}<img class="fb-img" src="{{ e.img }}" alt="" data-fb-img>{% endif %}
+
+{% elif b.type == "intro" %}
+  {% if b.kicker %}<span class="fb-label" data-fb-unit>{{ b.kicker }}</span>{% endif %}
+  <{{ h }} class="fb-h" data-fb-write="chars">{{ b.title | rich }}</{{ h }}>
+  {% if b.body %}<p class="fb-body" data-fb-write="words">{{ b.body | rich }}</p>{% endif %}
+  {% if b.button %}{{ boxes([b.button]) }}{% endif %}
+
+{% elif b.type == "features" %}
+  {% if b.kicker %}<span class="fb-label" data-fb-unit>{{ b.kicker }}</span>{% endif %}
+  {% if b.title %}<{{ h }} class="fb-h fb-h--sm" data-fb-write="chars">{{ b.title | rich }}</{{ h }}>{% endif %}
+  <ol class="fb-list">
+    {% for f in b.items %}
+    <li class="fb-item" data-fb-item="{{ loop.index0 }}" data-fb-tag="{{ (f.tag or ('%02d' | format(loop.index)))[:4] }}">
+      <span class="fb-tick" aria-hidden="true">✓</span>
+      <div><h3 class="fb-item__t" data-fb-write="chars">{% if f.tag %}<span class="fb-item__tag">{{ f.tag }}</span> {% endif %}{{ f.title | rich }}</h3>{% if f.body %}<p data-fb-write="words">{{ f.body | rich }}</p>{% endif %}</div>
+    </li>
+    {% endfor %}
+  </ol>
+
+{% elif b.type == "product" %}
+  {% if b.kicker %}<span class="fb-label" data-fb-unit>{{ b.kicker }}</span>{% endif %}
+  <{{ h }} class="fb-h" data-fb-write="chars">{{ b.title | rich }}</{{ h }}>
+  {% if b.body %}<p class="fb-body" data-fb-write="words">{{ b.body | rich }}</p>{% endif %}
+  {% if b.stats %}<dl class="fb-tally fb-tally--sm" data-fb-unit>{% for st in b.stats %}<div><dd>{{ st.value }}{% if st.unit %}<small>{{ st.unit }}</small>{% endif %}</dd><dt>{{ st.label }}</dt></div>{% endfor %}</dl>
+  {% elif b.tags %}<ul class="fb-tags" data-fb-unit>{% for t in b.tags %}<li data-fb-box>{{ t }}</li>{% endfor %}</ul>{% endif %}
+  {{ boxes(b.buttons) }}
+  {% if b.note %}<p class="fb-note" data-fb-write="words">{{ b.note | rich }}</p>{% endif %}
+  {% if b.device %}<script type="application/json" class="fb-device">{{ {"app": b.device.app, "title": b.device.title, "label": b.device.label, "button": b.device.button, "time": b.device.time, "options": b.device.options | map(attribute="title") | list, "selected": (b.device.options | selectattr("selected") | map(attribute="title") | first) or ""} | tojson }}</script>{% endif %}
+  {% if e.img %}<img class="fb-img" src="{{ e.img }}" alt="" data-fb-img>{% endif %}
+
+{% elif b.type == "stats" %}
+  <span class="fb-label" data-fb-unit>Counted by hand</span>
+  <dl class="fb-tally">
+    {% for st in b.items %}<div class="fb-item" data-fb-item="{{ loop.index0 }}" data-fb-value="{{ st.value }}" data-fb-unit-label="{{ st.unit or '' }}"><dd data-fb-write="chars">{{ st.value }}{% if st.unit %}<small>{{ st.unit }}</small>{% endif %}</dd><dt data-fb-write="words">{{ st.label }}</dt></div>{% endfor %}
+  </dl>
+
+{% elif b.type == "timeline" %}
+  {% if b.kicker %}<span class="fb-label" data-fb-unit>{{ b.kicker }}</span>{% endif %}
+  {% if b.title %}<{{ h }} class="fb-h fb-h--sm" data-fb-write="chars">{{ b.title | rich }}</{{ h }}>{% endif %}
+  <ol class="fb-steps">
+    {% for t in b.items %}<li class="fb-item" data-fb-item="{{ loop.index0 }}" data-fb-when="{{ t.when }}"><span class="fb-when" data-fb-write="chars">{{ t.when }}</span><div><h3 data-fb-write="chars">{{ t.title | rich }}</h3>{% if t.body %}<p data-fb-write="words">{{ t.body | rich }}</p>{% endif %}</div></li>{% endfor %}
+  </ol>
+
+{% elif b.type == "quote" %}
+  <figure class="fb-quote">
+    <blockquote data-fb-write="words">{{ b.text | rich }}</blockquote>
+    {% if b.who %}<figcaption data-fb-write="chars">— {{ b.who }}</figcaption>{% endif %}
+  </figure>
+
+{% elif b.type == "faq" %}
+  {% if b.kicker %}<span class="fb-label" data-fb-unit>{{ b.kicker }}</span>{% endif %}
+  <{{ h }} class="fb-h fb-h--sm" data-fb-write="chars">{{ b.title | rich }}</{{ h }}>
+  <div class="fb-faq">
+    {% for it in b.items %}<details class="fb-item" data-fb-item="{{ loop.index0 }}" open><summary data-fb-write="chars">{{ it.q | rich }}</summary><p data-fb-write="words">{{ it.a | rich }}</p></details>{% endfor %}
+  </div>
+
+{% elif b.type == "cta" %}
+  {% if b.kicker %}<span class="fb-label" data-fb-unit>{{ b.kicker }}</span>{% endif %}
+  <{{ h }} class="fb-h fb-h--hero" data-fb-write="chars">{{ b.title | rich }}</{{ h }}>
+  {% if b.button %}{{ boxes([b.button]) }}{% endif %}
+{% endif %}
+  </div>
+  <div class="fb-field" aria-hidden="true"></div>
+</div>
+</section>
+{% endmacro %}

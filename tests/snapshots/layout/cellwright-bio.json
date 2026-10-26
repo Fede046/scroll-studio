@@ -1,0 +1,424 @@
+{
+ "example": "cellwright-bio",
+ "root": {
+  "class": [
+   "mode-dark",
+   "layout-flow"
+  ]
+ },
+ "cuts": [],
+ "sections": [
+  {
+   "id": "journey",
+   "type": "scene3d",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-scene",
+      "ss-cards",
+      "ss-side-right",
+      "ss-type-scene3d",
+      "ss-shade-auto"
+     ],
+     "id": "journey",
+     "data": {
+      "data-scene": "scene3d"
+     },
+     "text": {
+      "kicker": "Cellwright Bio",
+      "title": "From tissue to molecule.",
+      "title_tag": "h1"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-pin",
+        "ss-pin--full"
+       ],
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-shade"
+         ]
+        },
+        {
+         "tag": "div",
+         "class": [
+          "ss-hud",
+          "ss-scalehud"
+         ]
+        }
+       ]
+      },
+      {
+       "tag": "div",
+       "class": [
+        "ss-steps",
+        "ss-steps--over"
+       ],
+       "children": [
+        {
+         "tag": "article",
+         "class": [
+          "ss-step",
+          "ss-intro"
+         ],
+         "style": {
+          "--h": "120vh"
+         },
+         "text": {
+          "kicker": "Cellwright Bio",
+          "title": "From tissue to molecule.",
+          "title_tag": "h1"
+         },
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-card"
+           ]
+          }
+         ]
+        },
+        {
+         "tag": "article",
+         "class": [
+          "ss-step"
+         ],
+         "style": {
+          "--h": "120vh"
+         },
+         "text": {
+          "kicker": "01 / 05 · 100 µm",
+          "title": "Disease starts small.",
+          "title_tag": "h2"
+         },
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-card"
+           ]
+          }
+         ]
+        },
+        {
+         "tag": "article",
+         "class": [
+          "ss-step"
+         ],
+         "style": {
+          "--h": "150vh"
+         },
+         "text": {
+          "kicker": "02 / 05 · 10 µm",
+          "title": "Inside one cell.",
+          "title_tag": "h2"
+         },
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-card"
+           ]
+          }
+         ]
+        },
+        {
+         "tag": "article",
+         "class": [
+          "ss-step"
+         ],
+         "style": {
+          "--h": "130vh"
+         },
+         "text": {
+          "kicker": "03 / 05 · 1 µm",
+          "title": "The genome, unwound.",
+          "title_tag": "h2"
+         },
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-card"
+           ]
+          }
+         ]
+        },
+        {
+         "tag": "article",
+         "class": [
+          "ss-step"
+         ],
+         "style": {
+          "--h": "150vh"
+         },
+         "text": {
+          "kicker": "04 / 05 · 2 nm",
+          "title": "Reading the code.",
+          "title_tag": "h2"
+         },
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-card"
+           ]
+          }
+         ]
+        },
+        {
+         "tag": "article",
+         "class": [
+          "ss-step"
+         ],
+         "style": {
+          "--h": "160vh"
+         },
+         "text": {
+          "kicker": "05 / 05 · 0.3 nm",
+          "title": "One target. One molecule.",
+          "title_tag": "h2"
+         },
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-card"
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "sdata": {
+    "layout": "cards",
+    "length": 4.0,
+    "steps": [
+     {
+      "kicker": "Cellwright Bio",
+      "title": "From tissue <em>to molecule.</em>",
+      "body": "We design medicines at the scale where disease actually begins. Scroll down through six orders of magnitude, from a field of cells to a single gene.",
+      "fact": null,
+      "at": null,
+      "length": 1.2,
+      "intro": true,
+      "hint": "Scroll to zoom in",
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "01 / 05 · 100 µm",
+      "title": "Disease starts <em>small.</em>",
+      "body": "Long before symptoms, something changes in a tissue: a few cells behaving differently from their neighbours.",
+      "fact": "Fluorescence imaging: membranes in green, nuclei in blue.",
+      "at": null,
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "02 / 05 · 10 µm",
+      "title": "Inside <em>one cell.</em>",
+      "body": "Mitochondria power it, vesicles move cargo, and at the centre the nucleus holds the instructions for all of it.",
+      "fact": "A typical human cell is about 10 micrometres across.",
+      "at": null,
+      "length": 1.5,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "03 / 05 · 1 µm",
+      "title": "The genome, <em>unwound.</em>",
+      "body": "Two metres of DNA packed into a nucleus a hundred times narrower than a hair, folded so the right genes stay within reach.",
+      "fact": "Chromatin: DNA wrapped around proteins, coiled and looped.",
+      "at": null,
+      "length": 1.3,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "04 / 05 · 2 nm",
+      "title": "Reading <em>the code.</em>",
+      "body": "Down at the double helix, every disease variant is a precise address: a handful of letters in three billion.",
+      "fact": "The helix is 2 nanometres wide and turns once every 10.5 base pairs.",
+      "at": null,
+      "length": 1.5,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "05 / 05 · 0.3 nm",
+      "title": "One target. <em>One molecule.</em>",
+      "body": "We design compounds that find that address and bind it, and nothing else. This is where a medicine begins.",
+      "fact": "Designed against structure, validated in patient-derived cells.",
+      "at": null,
+      "length": 1.6,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     }
+    ],
+    "hud": {
+     "kind": "scale",
+     "fields": [],
+     "events": [],
+     "clock": null,
+     "scales": [
+      "100 µm",
+      "10 µm",
+      "1 µm",
+      "2 nm",
+      "0.3 nm"
+     ],
+     "legend": [
+      {
+       "label": "Membrane",
+       "color": "#45f0a0"
+      },
+      {
+       "label": "Nucleus",
+       "color": "#5b8cff"
+      },
+      {
+       "label": "Target",
+       "color": "#ff4fd8"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "programs",
+   "type": "intro",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ],
+     "id": "programs",
+     "text": {
+      "kicker": "Platform",
+      "title": "Precision starts with seeing clearly.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-wrap",
+        "ss-intro2"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "features",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ],
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-features",
+        "ss-features--3"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "stats",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-band"
+     ],
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-wrap",
+        "ss-stats",
+        "ss-stats--4"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "partner",
+   "type": "cta",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-cta"
+     ],
+     "id": "partner",
+     "text": {
+      "kicker": "Partnerships",
+      "title": "Bring us the target.We'll find the molec",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-cta__in"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

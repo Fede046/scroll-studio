@@ -1,0 +1,336 @@
+{
+ "example": "hollis-house",
+ "root": {
+  "class": [
+   "mode-light",
+   "layout-stack"
+  ]
+ },
+ "cuts": [],
+ "sections": [
+  {
+   "id": null,
+   "type": "hero",
+   "markup": [
+    {
+     "tag": "div",
+     "class": [
+      "ss-panel",
+      "ss-panel--hero"
+     ],
+     "children": [
+      {
+       "tag": "section",
+       "class": [
+        "ss-block",
+        "ss-hero",
+        "ss-hero--center"
+       ],
+       "text": {
+        "title": "Walk through it before you visit.",
+        "title_tag": "h1"
+       },
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-hero__in"
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "walk",
+   "type": "splat",
+   "markup": [
+    {
+     "tag": "div",
+     "class": [
+      "ss-panel"
+     ],
+     "children": [
+      {
+       "tag": "section",
+       "class": [
+        "ss-scene",
+        "ss-overlay",
+        "ss-side-right",
+        "ss-type-splat",
+        "ss-shade-auto"
+       ],
+       "id": "walk",
+       "data": {
+        "data-scene": "splat"
+       },
+       "text": {
+        "kicker": "Hollis House",
+        "title": "The hall, as it is.",
+        "title_tag": "h1"
+       },
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-track"
+         ],
+         "style": {
+          "height": "500vh"
+         },
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-stage"
+           ],
+           "children": [
+            {
+             "tag": "div",
+             "class": [
+              "ss-shade"
+             ]
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-captions"
+             ],
+             "children": [
+              {
+               "tag": "div",
+               "class": [
+                "ss-caption"
+               ],
+               "data": {
+                "data-from": "0.02",
+                "data-to": "0.25"
+               },
+               "text": {
+                "kicker": "Hollis House",
+                "title": "The hall, as it is.",
+                "title_tag": "h1"
+               }
+              },
+              {
+               "tag": "div",
+               "class": [
+                "ss-caption"
+               ],
+               "data": {
+                "data-from": "0.38",
+                "data-to": "0.62"
+               },
+               "text": {
+                "kicker": "Open plan",
+                "title": "One room, windows on two sides.",
+                "title_tag": "h2"
+               }
+              },
+              {
+               "tag": "div",
+               "class": [
+                "ss-caption"
+               ],
+               "data": {
+                "data-from": "0.74",
+                "data-to": "0.98"
+               },
+               "text": {
+                "kicker": "The light",
+                "title": "Dinner for ten, light till late.",
+                "title_tag": "h2"
+               }
+              }
+             ]
+            },
+            {
+             "tag": "div",
+             "class": [
+              "ss-cue"
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "sdata": {
+    "layout": "overlay",
+    "length": 5.0,
+    "steps": [
+     {
+      "kicker": "Hollis House",
+      "title": "The hall, <em>as it is.</em>",
+      "body": null,
+      "fact": null,
+      "at": [
+       0.02,
+       0.25
+      ],
+      "length": 1.2,
+      "intro": true,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "Open plan",
+      "title": "One room, <em>windows on two sides.</em>",
+      "body": null,
+      "fact": null,
+      "at": [
+       0.38,
+       0.62
+      ],
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     },
+     {
+      "kicker": "The light",
+      "title": "Dinner for ten, <em>light till late.</em>",
+      "body": null,
+      "fact": null,
+      "at": [
+       0.74,
+       0.98
+      ],
+      "length": 1.2,
+      "intro": false,
+      "hint": null,
+      "place": null,
+      "surface": null,
+      "button": null,
+      "image": null,
+      "state": {}
+     }
+    ],
+    "hud": {
+     "kind": "none",
+     "fields": [],
+     "events": [],
+     "clock": null,
+     "scales": [],
+     "legend": []
+    }
+   }
+  },
+  {
+   "id": null,
+   "type": "features",
+   "markup": [
+    {
+     "tag": "div",
+     "class": [
+      "ss-panel"
+     ],
+     "children": [
+      {
+       "tag": "section",
+       "class": [
+        "ss-block"
+       ],
+       "text": {
+        "kicker": "The house",
+        "title": "Four bedrooms, one long room.",
+        "title_tag": "h2"
+       },
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-features",
+          "ss-features--3"
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "stats",
+   "markup": [
+    {
+     "tag": "div",
+     "class": [
+      "ss-panel"
+     ],
+     "children": [
+      {
+       "tag": "section",
+       "class": [
+        "ss-block",
+        "ss-band"
+       ],
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-wrap",
+          "ss-stats",
+          "ss-stats--4"
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "viewing",
+   "type": "cta",
+   "markup": [
+    {
+     "tag": "div",
+     "class": [
+      "ss-panel",
+      "ss-surface-dark"
+     ],
+     "children": [
+      {
+       "tag": "section",
+       "class": [
+        "ss-block",
+        "ss-cta",
+        "ss-surface-dark"
+       ],
+       "id": "viewing",
+       "text": {
+        "kicker": "Viewings",
+        "title": "See it in person.",
+        "title_tag": "h2"
+       },
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-cta__in"
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,32 @@
+# Zoetrope: tokens and fonts for theme.style: zoetrope. The landing page as one prize wheel of printed cards on a strobe
+# zoetrope: every element (hero, each feature, stat, step and question, the call to action) is a card with its own
+# animated figure. Spin it (wheel, swipe, drag, button, arrows) and it lands on one card; click a card and it flies out
+# and opens with its full content.
+label: Zoetrope
+about: A prize wheel of cards on a strobe zoetrope. Every element of the page is a printed card with its own animated figure; spin the wheel and the figures come alive under the strobe, it slows with real inertia and lands on one card, and a click opens the card with its full content.
+mode: light
+cuts: false   # the style plays its own hand-over between sections: `transition:` is ignored (see engine/styles/README.md)
+scene_blocks: []   # drawn its own way as steps inside a scene; other types use the default markup there
+colors:
+  bg: '#f3ead6'
+  bg2: '#eadfc6'
+  ink: '#1d1611'
+  accent: '#c8371e'
+  accent2: '#1f4f8a'
+  accent_ink: '#fff6ea'
+  accent_text: '#a12a14'
+fonts:
+  display: Bodoni Moda
+  body: Libre Caslon Text
+  mono: Cutive Mono
+  label: Alfa Slab One
+font_axes:
+  Bodoni Moda: "ital,opsz,wght@0,6..96,400..900;1,6..96,400..900"
+  Libre Caslon Text: "ital,wght@0,400;0,700;1,400"
+  Cutive Mono: ""
+  Alfa Slab One: ""
+display_weight: 700
+radius: 2px
+# What a brand (theme.from) cannot change here: the light room its CSS is drawn for
+requires:
+  mode: light

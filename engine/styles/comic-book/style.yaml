@@ -1,0 +1,29 @@
+# Comic book: tokens and fonts for theme.style: comic-book. See engine/styles/README.md for the contract and
+# docs/styles/styles-11-15.md section 2 for the research.
+label: Comic book
+about: Read it like a comic. Each section is a page of panels, and every scroll moves your eye to the next panel. Captions slide in, balloons pop up in order, and the camera pulls back to show the whole page before you turn it.
+mode: light
+scene_blocks: [quote]   # drawn its own way as steps inside a scene; other types use the default markup there
+colors:
+  bg: '#f3e9cf'
+  bg2: '#fffbef'
+  ink: '#111111'
+  accent: '#e8262b'
+  accent2: '#1b4f9c'
+  accent_ink: '#000000'
+fonts:
+  display: Bangers
+  body: Comic Neue
+  mono: Space Mono
+  chapter: Luckiest Guy
+font_axes:
+  Bangers: ""
+  Comic Neue: "ital,wght@0,400;0,700;1,700"
+  Space Mono: "ital,wght@0,400;0,700;1,400"
+  Luckiest Guy: ""
+display_weight: 400
+radius: 0px
+# What a brand (theme.from) cannot change here: the light room its CSS is drawn for, and its display face (the balloons are hand-lettered)
+requires:
+  mode: light
+  fonts: { display: Bangers }

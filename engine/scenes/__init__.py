@@ -14,6 +14,12 @@ MODULES = {
     "vector": "vector",
     "chart": "chart",
     "map": "map",
+    "splat": "splat",
+    "code": "code",
+    "showroom": "showroom",
+    "diorama": "diorama",
+    "inside": "inside",
+    "light": "light",
 }
 
 

@@ -1,0 +1,231 @@
+{
+ "example": "showcase",
+ "root": {
+  "class": [
+   "mode-dark",
+   "layout-flow"
+  ]
+ },
+ "cuts": [],
+ "sections": [
+  {
+   "id": "hello",
+   "type": "type",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-scene",
+      "ss-overlay",
+      "ss-side-right",
+      "ss-type-type",
+      "ss-shade-auto"
+     ],
+     "id": "hello",
+     "data": {
+      "data-scene": "type"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-track"
+       ],
+       "style": {
+        "height": "240vh"
+       },
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "ss-stage"
+         ],
+         "children": [
+          {
+           "tag": "div",
+           "class": [
+            "ss-shade"
+           ]
+          },
+          {
+           "tag": "div",
+           "class": [
+            "ss-captions"
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "sdata": {
+    "layout": "overlay",
+    "length": 2.4,
+    "steps": [],
+    "hud": {
+     "kind": "none",
+     "fields": [],
+     "events": [],
+     "clock": null,
+     "scales": [],
+     "legend": []
+    }
+   }
+  },
+  {
+   "id": "new",
+   "type": "gallery",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ],
+     "id": "new",
+     "text": {
+      "kicker": "New in 1.5 · make it yours",
+      "title": "Six brands, six hand-made looks.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-gallery"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "v1-4",
+   "type": "gallery",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ],
+     "id": "v1-4",
+     "text": {
+      "kicker": "The previous release, 1.4",
+      "title": "Nine new ways to move through a page.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-gallery"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "examples",
+   "type": "gallery",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ],
+     "id": "examples",
+     "text": {
+      "kicker": "Every scene, live",
+      "title": "One engine, every kind of scroll.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-gallery"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "features",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block"
+     ],
+     "text": {
+      "kicker": "How it works",
+      "title": "One spec in, one static site out.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-features",
+        "ss-features--4"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "stats",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-band"
+     ],
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-wrap",
+        "ss-stats",
+        "ss-stats--4"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "cta",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "ss-block",
+      "ss-cta"
+     ],
+     "text": {
+      "kicker": "Open source (AGPL-3.0) · local models on",
+      "title": "Build one tonight.",
+      "title_tag": "h2"
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "ss-cta__in"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

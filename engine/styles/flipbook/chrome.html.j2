@@ -1,0 +1,29 @@
+{# Flipbook chrome: the desk furniture around the pad. The lid band (wordmark, the pencilled page counter, the call to
+   action), the peg bar that holds the pad, the index tabs (one per section, linked to it) and the corner grip and edge
+   that take the pointer. The pad itself is drawn by runtime/src/styles/flipbook.ts. Without JavaScript only the lid
+   band and a plain list of tabs remain. #}
+
+{% macro label(e) %}{% set b = e.s %}{% if b.nav_label %}{{ b.nav_label }}{% elif b.type == "hero" %}Start{% elif b.type == "stats" %}Numbers{% elif b.type == "quote" %}{{ (b.who or "A word").split(",")[0] }}{% elif b.type == "cta" %}The end{% elif b.kicker %}{{ b.kicker }}{% elif b.title %}{{ b.title | striptags | truncate(22, True, "…") }}{% elif b.steps %}{{ b.steps[0].title | striptags | truncate(22, True, "…") }}{% else %}{{ b.type | capitalize }}{% endif %}{% endmacro %}
+
+{% macro top(site, sections, nav_links) %}
+<header class="fb-lid">
+  <a class="fb-lid__mark" href="#">{{ site.name }}</a>
+  <span class="fb-count" aria-hidden="true"><span class="fb-count__p">p. 1</span><span class="fb-count__of"></span></span>
+  {% if nav_links %}<nav class="fb-lid__nav" aria-label="Sections">{% for l in nav_links %}<a href="{{ l.href }}">{{ l.label }}</a>{% endfor %}</nav>{% endif %}
+  {% if site.nav.cta %}<a class="fb-box fb-box--hot fb-lid__cta" href="{{ site.nav.cta.href }}">{{ site.nav.cta.label }}</a>{% endif %}
+</header>
+<nav class="fb-tabs" aria-label="Index">
+  <ol>
+  {% for e in sections %}
+    {% if not e.scene %}<li data-fb-tab="{{ loop.index0 }}"><a href="{% if e.s.id %}#{{ e.s.id }}{% else %}#{% endif %}" data-fb-go="{{ loop.index0 }}">{{ label(e) }}</a></li>{% endif %}
+  {% endfor %}
+  </ol>
+</nav>
+<div class="fb-pad" id="fb-pad" aria-hidden="true">
+  <div class="fb-peg"><i></i><i></i><i></i></div>
+  <div class="fb-grip" title="Grab the corner to flip"></div>
+  <p class="fb-hint">thumb the corner <span>↘</span> or just scroll</p>
+</div>
+{% endmacro %}
+
+{% macro bottom(site, sections) %}{% endmacro %}

@@ -36,7 +36,9 @@ def checks() -> list[dict]:
         add("PyTorch + CUDA", gpu, detail, "parallax (depth), film")
     except Exception:
         add("PyTorch + CUDA", False, "torch not installed", "parallax (depth), film")
-    for mod, need in (("transformers", "parallax (depth)"), ("cv2", "artwork"), ("websocket", "recordings"), ("playwright", "recordings, URL capture")):
+    for mod, need in (("transformers", "parallax (depth)"), ("cv2", "artwork"), ("websocket", "recordings"), ("playwright", "recordings, URL capture"),
+                      ("cascadio", "product models in STEP/STP (OpenCascade)"), ("trimesh", "product models in 3MF"),
+                      ("lxml", "product models in 3MF")):
         add(mod, importlib.util.find_spec(mod), "installed" if importlib.util.find_spec(mod) else None, need)
     try:
         from .backends import comfy
@@ -44,17 +46,233 @@ def checks() -> list[dict]:
             "film, generated images (`generate:`)")
     except Exception as e:
         add("ComfyUI", False, str(e), "film, generated images")
+    res.extend(wan_checks())
+    res.extend(uni3c_checks())
+    res.extend(interpolation_checks())
+    res.extend(reveal_checks())
+    res.extend(checksum_checks())
     add("Chrome", shutil.which("chrome") or Path(r"C:\Program Files\Google\Chrome\Application\chrome.exe").exists() or s["chrome"],
         "found", "recordings")
     return res
 
 
-def report() -> None:
+def wan_checks() -> list[dict]:
+    """Every Wan 2.2 file (engine/models.yaml entries with `wan:`), looked up in ComfyUI's own model lists, so a
+    file in a subfolder, on another drive behind a junction, or renamed in studio.toml [wan] is found where ComfyUI
+    loads it from. Without ComfyUI running, the check can't see them and says so."""
+    import yaml
+    from .backends import comfy
+    entries = [m for m in yaml.safe_load((Path(__file__).parent / "models.yaml").read_text(encoding="utf-8"))["comfyui"]
+               if m.get("wan")]
+    names = comfy.wan_model_names()
+    lists, out = {}, []
+    for m in entries:
+        key = m["wan"]
+        folder = comfy.WAN_FOLDERS[key]
+        if folder not in lists:
+            lists[folder] = comfy.listed(folder)
+        have, want = lists[folder], names[key]
+        base = want.replace("\\", "/").rsplit("/", 1)[-1]
+        if have is None:
+            ok, detail = False, f"{want}: ComfyUI not running, can't check"
+        else:
+            hit = want if want in have else next((h for h in have if h.replace("\\", "/").rsplit("/", 1)[-1] == base), None)
+            ok = hit is not None
+            detail = f"{folder}/{hit}" if ok else f"missing {folder}/{want} ({m['size_gb']} GB): {m['source']}"
+        out.append({"name": m["name"], "ok": ok, "detail": detail, "needed_by": ", ".join(m.get("used_by", []))})
+    return out
+
+
+def uni3c_checks() -> list[dict]:
+    """The optional Uni3C camera controlnet (`camera.backend: uni3c`): found in ComfyUI's model_patches list, or noted as not
+    installed (it is not a failure: the other camera backends need nothing extra)."""
+    from .backends import comfy
+    from . import camera_guide as cg
+    have = comfy.listed("model_patches")
+    name = "Uni3C camera controlnet (optional)"
+    need = "film beats with camera.backend uni3c"
+    if have is None:
+        return [{"name": name, "ok": False, "detail": "ComfyUI not running, can't check", "needed_by": need}]
+    hit = next((h for h in have if h.replace("\\", "/").rsplit("/", 1)[-1] == cg.UNI3C_FILE), None)
+    return [{"name": name, "ok": True, "detail": f"model_patches/{hit}" if hit else
+             f"not installed (optional, ~2 GB, Apache-2.0): {cg.UNI3C_SOURCE}", "needed_by": need}]
+
+
+def interpolation_checks() -> list[dict]:
+    """The optional frame interpolation checkpoint of `finish.interpolate` (RIFE or FILM in ComfyUI's
+    models/frame_interpolation): listed when present, a note when not (the finishing pass then uses FFmpeg's)."""
+    from .backends import comfy
+    have = comfy.listed("frame_interpolation")
+    name = "Frame interpolation model (optional)"
+    need = "film finish.interpolate"
+    if have is None:
+        return [{"name": name, "ok": False, "detail": "ComfyUI not running, can't check", "needed_by": need}]
+    return [{"name": name, "ok": True, "detail": f"frame_interpolation/{sorted(have)[0]}" if have else
+             "not installed (optional: a RIFE or FILM checkpoint in <ComfyUI>/models/frame_interpolation); FFmpeg "
+             "minterpolate is used instead", "needed_by": need}]
+
+
+def reveal_checks() -> list[dict]:
+    """`reveal` and `faces: restore`: the ComfyUI nodes (asked of ComfyUI itself, so they count only once it has loaded them)
+    and the model files that can be seen on disk (SAM 2.1 and Florence-2 download on first use, so missing is a note)."""
+    from .backends import comfy, comfy_setup
+    out = []
+    up = comfy.alive()
+    for label, nodes, need, fix in (
+            ("ComfyUI nodes: SAM 2.1 + Florence-2 (kijai)", ("DownloadAndLoadSAM2Model", "DownloadAndLoadFlorence2Model"), "film reveal",
+             "ComfyUI-segment-anything-2 and ComfyUI-Florence2 in custom_nodes"),
+            ("ComfyUI nodes: Scroll Studio (tracking, faces)", ("SSRevealTrack", "SSRevealGround", "SSFaceRestore"), "film reveal, faces: restore",
+             "")):
+        if not up:
+            out.append({"name": label, "ok": False, "detail": "ComfyUI not running, can't check", "needed_by": need})
+            continue
+        missing = []
+        for n in nodes:
+            try:
+                comfy._req(f"/object_info/{n}")
+            except Exception:
+                missing.append(n)
+        out.append({"name": label, "ok": not missing, "detail": "loaded" if not missing else
+                    f"ComfyUI has no {', '.join(missing)}: run `studio setup-comfy`, then restart ComfyUI", "needed_by": need})
+    root = comfy_setup.comfy_dir()
+    import yaml
+    for m in yaml.safe_load((Path(__file__).parent / "models.yaml").read_text(encoding="utf-8"))["comfyui"]:
+        if not m.get("node"):
+            continue
+        if root is None:
+            out.append({"name": m["name"], "ok": False, "detail": "ComfyUI folder unknown (set comfy_dir in studio.toml)",
+                        "needed_by": ", ".join(m["used_by"])})
+            continue
+        path = root / "models" / m["file"]
+        ok = path.exists()
+        auto = m["node"] in ("sam2", "florence2")
+        out.append({"name": m["name"], "ok": ok or auto,
+                    "detail": str(path) if ok else (f"not downloaded yet: it downloads on first use ({m['size_gb']} GB)" if auto else
+                                                    f"missing {path} ({m['size_gb']} GB): `studio setup-comfy`"),
+                    "needed_by": ", ".join(m["used_by"])})
+    return out
+
+
+def checksum_checks() -> list[dict]:
+    """How many ComfyUI model files in engine/models.yaml have a pinned SHA-256 (the rest are used unverified)."""
+    from .weights import model_entries
+    entries = model_entries()
+    loose = [m["file"] for m in entries if not m.get("sha256")]
+    detail = (f"{len(entries) - len(loose)} of {len(entries)} model files pinned" +
+              (f"; not pinned yet: {', '.join(loose)}" if loose else "") + ". `studio doctor --verify` hashes the files on disk")
+    return [{"name": "Model checksums", "ok": not loose, "detail": detail, "needed_by": "every model download and install"}]
+
+
+def verify_models() -> list[dict]:
+    """Hash every pinned model file found in ComfyUI's models folder and compare it with models.yaml (slow: some are 15 GB)."""
+    from .backends import comfy_setup
+    from .weights import ChecksumError, check_sha256, model_entries
+    root = comfy_setup.comfy_dir()
+    if root is None:
+        return [{"name": "Model files (SHA-256)", "ok": False, "detail": "ComfyUI folder unknown (set comfy_dir in studio.toml)",
+                 "needed_by": "every model"}]
+    out = []
+    for m in model_entries():
+        path = root / "models" / m["file"]
+        if not path.exists() or not m.get("sha256"):
+            continue
+        try:
+            check_sha256(path, m["sha256"], m["source"])
+            ok, detail = True, f"{m['file']}: matches"
+        except ChecksumError as e:
+            ok, detail = False, str(e)
+        out.append({"name": m["name"], "ok": ok, "detail": detail, "needed_by": ", ".join(m.get("used_by", []))})
+    return out or [{"name": "Model files (SHA-256)", "ok": True, "detail": "no pinned model files found on disk", "needed_by": "every model"}]
+
+
+# What builds without a GPU. Each scene type here is built by Python on the CPU (engine/scenes/*.py) with no call to ComfyUI,
+# Blender or FFmpeg, and tests/test_laptop.py builds a site from them with those three out of reach to keep it so.
+# `need` names the Python modules a build imports beyond the package's core dependencies, `fix` how to get them.
+LAPTOP_SCENES: list[dict] = [
+    {"label": "Photo parallax", "uses": "type: parallax", "need": ("torch", "transformers"), "fix": "pip install torch transformers",
+     "detail": "your photos get depth and a slow camera; the CPU is enough, and the small depth model (about 100 MB) "
+               "downloads on the first build"},
+    {"label": "Kinetic type", "uses": "type: type", "detail": "words that reveal, swap, stack and scale as you scroll"},
+    {"label": "Artwork", "uses": "type: artwork", "detail": "your own image, drawn and painted in stages"},
+    {"label": "Vector art", "uses": "type: vector",
+     "detail": "an SVG draws itself, then fills; a raster image is traced first (pip install -e .[vector])"},
+    {"label": "Maps", "uses": "type: map", "detail": "a live map with routes and markers (tiles load when the page opens)"},
+    {"label": "Data", "uses": "type: chart", "detail": "charts that draw themselves from a CSV"},
+    {"label": "Code", "uses": "type: code", "detail": "a flight through your code, the diffs applying as you scroll"},
+    {"label": "Live 3D, miniature worlds, scans", "uses": "type: scene3d, diorama, splat",
+     "detail": "drawn in the visitor's browser (WebGL); a scan is a .ply or .spz file"},
+]
+
+
+def laptop_summary() -> dict:
+    """What this machine can build, in two lists. `no_gpu`: what needs no GPU, each ready or with the one line that makes it
+    ready. `gpu_stack`: what needs ComfyUI, Blender or a CUDA GPU, each ready or not here."""
+    from . import spec
+    from .compile import themes
+    no_gpu = []
+    for item in LAPTOP_SCENES:
+        missing = [m for m in item.get("need", ()) if importlib.util.find_spec(m) is None]
+        no_gpu.append({"label": item["label"], "uses": item["uses"], "detail": item["detail"], "ok": not missing,
+                       "fix": item.get("fix") if missing else None})
+    blocks = [c.model_fields["type"].default for c in spec.BlockBase.__subclasses__()]
+    no_gpu.append({"label": "Blocks", "uses": ", ".join(blocks), "ok": True, "fix": None,
+                   "detail": "copy, features, stats, quotes, FAQ and the rest; a picture is a file or a gradient (`generate:` needs ComfyUI)"})
+    no_gpu.append({"label": f"Every style ({len(themes.styles())})", "uses": "theme: { style: <name> }", "ok": True, "fix": None,
+                   "detail": "a style's own `art:` made from a prompt needs ComfyUI; from a file it does not"})
+    if importlib.util.find_spec("engine.remake") is not None:
+        no_gpu.append({"label": "Remake a landing page", "uses": "studio remake <url> --no-gpu", "ok": True, "fix": None,
+                       "detail": "reads a live page and opens with photo parallax; needs the network"})
+    s = settings()
+    from .backends import comfy
+    try:
+        import torch
+        cuda = torch.cuda.is_available()
+    except Exception:
+        cuda = False
+    comfy_ok = bool(comfy.alive())
+    blender_ok = bool(_ver([s["blender"], "--version"]))
+    gpu_stack = [
+        {"label": "Generated film, the one-take page, cinemagraphs, light as the scroll, `generate:` images",
+         "uses": "type: film, light; generate:", "ok": comfy_ok and cuda,
+         "detail": "ComfyUI running and a 24 GB CUDA GPU" + ("" if comfy_ok and cuda else
+                   f" (here: ComfyUI {'up' if comfy_ok else 'not running'}, CUDA {'found' if cuda else 'not found'})")},
+        {"label": "Product sequences, inside the product", "uses": "type: sequence, inside, showroom", "ok": blender_ok,
+         "detail": "Blender 4.2+" + (", faster with a GPU" if blender_ok else " (not found here)")},
+    ]
+    return {"no_gpu": no_gpu, "gpu_stack": gpu_stack}
+
+
+def marks(encoding: str | None) -> tuple[str, str]:
+    """The tick and cross for an output that can show them; plain text where it can't (a cp1252 Windows console, or
+    output redirected to a file in that code page), which would otherwise stop the report with UnicodeEncodeError."""
+    try:
+        "✓✗".encode(encoding or "utf-8")
+        return "✓", "✗"
+    except (LookupError, UnicodeEncodeError):
+        return "ok", "no"
+
+
+def report(verify: bool = False) -> None:
     from rich.console import Console
+    from rich.markup import escape
     from rich.table import Table
-    t = Table(title="Scroll Studio doctor")
+    console = Console()
+    yes, no = marks(console.encoding)
+    summary = laptop_summary()
+    for title, key in (("Without a GPU you can build:", "no_gpu"), ("Needs the GPU stack (ComfyUI, Blender):", "gpu_stack")):
+        table = Table(title=title, title_justify="left", show_header=False, box=None, pad_edge=False)
+        for _ in range(4):
+            table.add_column(overflow="fold")
+        for row in summary[key]:
+            note = escape(row["detail"]) + (f"  [yellow]Install: {escape(row['fix'])}[/]" if row.get("fix") else "")
+            table.add_row(f"[green]{yes}[/]" if row["ok"] else f"[red]{no}[/]", escape(row["label"]), f"[dim]{escape(row['uses'])}[/]", note)
+        console.print(table)
+        console.print()
+    console.print("No GPU? `studio new my-site --laptop` makes a site that builds on this machine (docs/laptop.md).")
+    console.print()
+    t = Table(title="Scroll Studio doctor: the whole toolchain")
     for c in ("", "Check", "Detail", "Needed by"):
         t.add_column(c)
-    for c in checks():
-        t.add_row("[green]✓[/]" if c["ok"] else "[red]✗[/]", c["name"], str(c["detail"]), c["needed_by"])
-    Console().print(t)
+    for c in checks() + (verify_models() if verify else []):
+        t.add_row(f"[green]{yes}[/]" if c["ok"] else f"[red]{no}[/]", c["name"], str(c["detail"]), c["needed_by"])
+    console.print(t)

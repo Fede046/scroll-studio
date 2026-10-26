@@ -1,0 +1,351 @@
+{
+ "example": "halcyon",
+ "root": {
+  "class": [
+   "mode-light",
+   "layout-flow",
+   "style-neo-brutalism"
+  ],
+  "data-style": "neo-brutalism"
+ },
+ "cuts": [],
+ "sections": [
+  {
+   "id": null,
+   "type": "hero",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "nb-sec",
+      "nb-desk",
+      "nb-hero"
+     ],
+     "children": [
+      {
+       "tag": "span",
+       "class": [
+        "nb-sticker",
+        "nb-sticker--star"
+       ],
+       "data": {
+        "data-nb-slap": "",
+        "data-nb-drag": ""
+       }
+      },
+      {
+       "tag": "span",
+       "class": [
+        "nb-sticker",
+        "nb-sticker--smile"
+       ],
+       "data": {
+        "data-nb-slap": "",
+        "data-nb-drag": ""
+       }
+      },
+      {
+       "tag": "span",
+       "class": [
+        "nb-sticker",
+        "nb-sticker--pill"
+       ],
+       "data": {
+        "data-nb-slap": "",
+        "data-nb-drag": ""
+       }
+      },
+      {
+       "tag": "span",
+       "class": [
+        "nb-sticker",
+        "nb-sticker--hand"
+       ],
+       "data": {
+        "data-nb-slap": "",
+        "data-nb-drag": ""
+       }
+      },
+      {
+       "tag": "div",
+       "class": [
+        "nb-band",
+        "nb-band--pink"
+       ],
+       "data": {
+        "data-nb-band": "1"
+       }
+      },
+      {
+       "tag": "div",
+       "class": [
+        "nb-band",
+        "nb-band--lime"
+       ],
+       "data": {
+        "data-nb-band": "-1"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "why",
+   "type": "intro",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "nb-sec",
+      "nb-c-yellow",
+      "nb-intro"
+     ],
+     "id": "why"
+    }
+   ]
+  },
+  {
+   "id": "features",
+   "type": "features",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "nb-sec",
+      "nb-desk",
+      "nb-features"
+     ],
+     "id": "features",
+     "data": {
+      "data-nb-deck": ""
+     },
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "nb-band",
+        "nb-band--yellow",
+        "nb-band--edge"
+       ],
+       "data": {
+        "data-nb-band": "1"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "app",
+   "type": "product",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "nb-sec",
+      "nb-c-sky",
+      "nb-product",
+      "nb-product--right"
+     ],
+     "id": "app",
+     "children": [
+      {
+       "tag": "span",
+       "class": [
+        "nb-sticker",
+        "nb-sticker--burst"
+       ],
+       "data": {
+        "data-nb-slap": "last",
+        "data-nb-drag": ""
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "stats",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "nb-sec",
+      "nb-c-pink",
+      "nb-stats"
+     ],
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "nb-stats__grid",
+        "nb-stats--4"
+       ],
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "nb-stat",
+          "nb-stat--sticker"
+         ],
+         "data": {
+          "data-nb-slap": "",
+          "data-nb-drag": ""
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "how",
+   "type": "timeline",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "nb-sec",
+      "nb-desk",
+      "nb-steps"
+     ],
+     "id": "how"
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "quote",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "nb-sec",
+      "nb-c-lime",
+      "nb-quote"
+     ],
+     "children": [
+      {
+       "tag": "span",
+       "class": [
+        "nb-sticker",
+        "nb-sticker--quote"
+       ],
+       "data": {
+        "data-nb-slap": "last",
+        "data-nb-drag": ""
+       }
+      },
+      {
+       "tag": "span",
+       "class": [
+        "nb-sticker",
+        "nb-sticker--heart"
+       ],
+       "data": {
+        "data-nb-slap": "last",
+        "data-nb-drag": ""
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": null,
+   "type": "faq",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "nb-sec",
+      "nb-desk",
+      "nb-faq"
+     ],
+     "children": [
+      {
+       "tag": "details",
+       "class": [
+        "nb-q",
+        "nb-q--pink"
+       ],
+       "data": {
+        "data-nb-slap": ""
+       }
+      },
+      {
+       "tag": "details",
+       "class": [
+        "nb-q",
+        "nb-q--yellow"
+       ],
+       "data": {
+        "data-nb-slap": ""
+       }
+      },
+      {
+       "tag": "details",
+       "class": [
+        "nb-q",
+        "nb-q--lime"
+       ],
+       "data": {
+        "data-nb-slap": ""
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "get",
+   "type": "cta",
+   "markup": [
+    {
+     "tag": "section",
+     "class": [
+      "nb-sec",
+      "nb-c-violet",
+      "nb-cta"
+     ],
+     "id": "get",
+     "children": [
+      {
+       "tag": "div",
+       "class": [
+        "nb-cross",
+        "nb-cross--cta"
+       ],
+       "children": [
+        {
+         "tag": "div",
+         "class": [
+          "nb-band",
+          "nb-band--yellow"
+         ],
+         "data": {
+          "data-nb-band": "1"
+         }
+        },
+        {
+         "tag": "div",
+         "class": [
+          "nb-band",
+          "nb-band--pink"
+         ],
+         "data": {
+          "data-nb-band": "-1"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "note": "the neo-brutalism style sets its own block markup: covered by its section classes and modifier classes, not by every element"
+}

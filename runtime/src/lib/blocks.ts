@@ -11,7 +11,8 @@
  */
 import { clamp, reducedMotion } from "./util";
 
-export function makeBlocks() {
+/** held: true while a cut (lib/cuts.ts) is playing on the element's section, which moves its rectangle; its motion then stays as it was. */
+export function makeBlocks(held: (el: Element) => boolean = () => false) {
   const panels = [...document.querySelectorAll<HTMLElement>(".ss-panel")];
   const heroes = [...document.querySelectorAll<HTMLElement>(".ss-hero")];
   const floats = [...document.querySelectorAll<HTMLElement>("[data-float]")];
@@ -53,17 +54,20 @@ export function makeBlocks() {
     });
 
     for (const h of heroes) {
+      if (held(h)) continue;
       const panel = h.closest<HTMLElement>(".ss-panel");
       const r = h.getBoundingClientRect();
       const k = reducedMotion ? 0 : panel ? covers.get(panel) ?? 0 : clamp(-r.top / Math.max(1, r.height));
       h.style.setProperty("--hero-p", k.toFixed(3));
     }
-    for (const f of floats) f.style.setProperty("--float", (progress(f) * 2 - 1).toFixed(3));
+    for (const f of floats) if (!held(f)) f.style.setProperty("--float", (progress(f) * 2 - 1).toFixed(3));
     for (const s of strips) {
+      if (held(s)) continue;
       const travel = Math.max(0, s.scrollWidth - innerWidth);
       s.style.setProperty("--strip", (progress(s) * travel).toFixed(1));
     }
     for (const { stage, items } of orbits) {
+      if (held(stage)) continue;
       const W = stage.clientWidth;
       // Too narrow for two legible rings (phones): keep the static wrapped layout from the stylesheet.
       const live = W >= 480;
